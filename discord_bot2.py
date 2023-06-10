@@ -106,6 +106,7 @@ async def restart(message):
     await execute_command('git reset --hard', message.channel)
     await execute_command('git clean -f', message.channel)
     await execute_command('git pull --rebase=false', message.channel)
+    await execute_command('rm poetry.lock', message.channel)
     await execute_command('poetry install', message.channel)
     await message.channel.send(f'Restarting.')
     subprocess.Popen(["bash", "restart.sh"])
