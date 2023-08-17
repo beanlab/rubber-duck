@@ -1,16 +1,19 @@
+import argparse
+import asyncio
 import json
-import os
 import logging
+import os
 import signal
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-
-import argparse
-from typing import TypedDict, Union
+from typing import TypedDict
 
 from discord import ChannelType
+from quest import task, step
+from quest.external import queue
+from quest.historian import Historian
+from quest.local_persistence import LocalJsonHistory
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -38,34 +41,183 @@ class GPTMessage(TypedDict):
     content: str
 
 
-@dataclass
-class Conversation:
-    thread: discord.Thread
-    guild_id: int
-    thread_id: int
-    thread_name: str
-    started_by: str
-    first_message: datetime
-    last_message: datetime
-    messages: list[GPTMessage]
+class Message(TypedDict):
+    channel_name: str
+    channel_id: int
+    author_id: int
+    author_name: str
+    author_mention: str
+    content: str
 
-    def to_json(self):
-        return {
-            "guild_id": self.guild_id,
-            "thread_id": self.thread_id,
-            "thread_name": self.thread_name,
-            "started_by": self.started_by,
-            "first_message": self.first_message.isoformat(),
-            "last_message": self.last_message.isoformat(),
-            "messages": self.messages
-        }
 
-    @staticmethod
-    def from_json(jobj: dict, thread: discord.Thread) -> 'Conversation':
-        jobj['first_message'] = datetime.fromisoformat(jobj['first_message'])
-        jobj['last_message'] = datetime.fromisoformat(jobj['last_message'])
-        jobj['thread'] = thread
-        return Conversation(**jobj)
+def as_message(message: discord.Message) -> Message:
+    return Message(
+        channel_name=message.channel.name,
+        channel_id=message.channel.id,
+        author_id=message.author.id,
+        author_name=message.author.name,
+        author_mention=message.author.mention,
+        content=message.content
+    )
+
+
+def parse_blocks(text: str, limit=2000):
+    tick = '`'
+    block = ""
+    current_fence = ""
+    for line in text.splitlines():
+        if len(block) + len(line) > limit - 3:
+            if block:
+                if current_fence:
+                    block += '```'
+                yield block
+                block = current_fence
+
+        block += ('\n' + line) if block else line
+
+        if line.strip().startswith(tick * 3):
+            if current_fence:
+                current_fence = ""
+            else:
+                current_fence = line
+
+    if block:
+        yield block
+
+
+class MyClient(discord.Client):
+    def __init__(self, root_save_folder: Path, prompt_dir: Path):
+        # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
+        intents = discord.Intents.default()  # Select all the intents in your bot settings
+        intents.message_content = True
+        intents.members = True
+        super().__init__(intents=intents)
+
+        self._prompts = self._load_prompts(prompt_dir)
+
+        self._root_folder = root_save_folder
+        self._conversation_manager = Historian(
+            'conversation_manager',
+            self.conversation_manager,
+            LocalJsonHistory(root_save_folder)
+        )
+        self._conversation_manager_task = None  # started in on_ready
+        self._conversation_queues: dict[int, asyncio.Queue] = {}
+        self._conversation_tasks: dict[int, asyncio.Task] = {}
+
+    def _load_prompts(self, prompt_dir: Path):
+        self.prompts = {}
+        for file in prompt_dir.iterdir():
+            if file.suffix == '.txt':
+                self.prompts[file.stem] = file.read_text()
+
+    async def on_ready(self):
+        # print out information when the bot wakes up
+        logging.info('Logged in as')
+        logging.info(self.user.name)
+        logging.info(self.user.id)
+        logging.info('------')
+
+        self._conversation_manager_task = asyncio.create_task(self._conversation_manager.run())
+
+    async def on_message(self, message: discord.Message):
+        # ignore messages from the bot itself
+        if message.author.id == self.user.id:
+            return
+
+        message_info: Message = as_message(message)
+        await self._conversation_manager.record_external_event('messages', None, 'put', message_info)
+
+    #
+    # Begin Conversation Management
+    #
+
+    async def conversation_manager(self):
+        clean_up_task = self._clean_up()
+
+        async with queue('messages', None) as messages:
+            while True:
+                next_message: Message = await messages.get()
+
+                if next_message['channel_name'] in self.prompts:
+                    # Start new conversation
+                    await self._create_conversation(next_message)
+
+                else:
+                    # Delegate message
+                    await self._delegate_message(next_message)
+
+    @task
+    async def _clean_up(self):
+        await asyncio.sleep(60)
+        for cid, ctask in self._conversation_tasks.items():
+            if ctask.done():
+                logging.info(f'Closing conversation {cid}')
+                result = await ctask
+                del self._conversation_tasks[cid]
+                del self._conversation_queues[cid]
+
+    @step
+    async def _create_thread(self, message: Message) -> int:
+        thread = await self.get_channel(message['channel_id']).create_thread(
+            name=message['content'][:20],
+            type=ChannelType.public_thread,
+            auto_archive_duration=60
+        )
+        return thread.id
+
+    async def _create_conversation(self, message: Message):
+        # Create a private thread in the message channel
+        thread_id = await self._create_thread(message)
+        self._conversation_queues[thread_id] = (message_queue := asyncio.Queue())
+        self._conversation_tasks[thread_id] = self.have_conversation(thread_id, message)
+
+    async def _delegate_message(self, message: Message):
+        if (convo := self._conversation_queues.get(message['channel_id'], None)) is not None:
+            await convo.put(message)
+        else:
+            return  # ignore message
+
+    @step
+    async def _send_block(self, channel_id, block):
+        await self.get_channel(channel_id).send(block)
+
+    @step
+    async def send_message(self, channel_id, message: str):
+        for block in parse_blocks(message):
+            await self._send_block(channel_id, block)
+
+    #
+    # Begin Conversation
+    #
+    @task
+    async def have_conversation(self, thread_id, initial_message):
+        message_history = []
+        message_queue = self._conversation_queues[thread_id]
+
+        await self.send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
+
+        while True:
+            message: Message = await message_queue.get()
+            message_history.append(GPTMessage(role='user', content=message['content']))
+
+            response = await self.get_response(thread_id, message_history)
+            message_history.append(GPTMessage(role='assistant', content=response))
+            await self.send_message(thread_id, response)
+
+    @step
+    async def get_response(self, thread_id, message_history) -> str:
+        async with self.get_channel(thread_id).typing():
+            completion = await openai.ChatCompletion.acreate(
+                model=AI_ENGINE,
+                messages=message_history
+            )
+            logging.debug(f"Completion: {completion}")
+
+            response_message = completion.choices[0]['message']
+            response = response_message['content'].strip()
+
+            return response
 
 
 async def display_help(message):
@@ -137,79 +289,6 @@ async def control_on_message(message):
         await display_help(message)
     elif content.startswith('!'):
         await message.channel.send('Unknown command. Try !help')
-
-
-async def query(conversation: Conversation, message_text: str):
-    """
-    Query the OPENAI API
-    """
-    logging.debug(f"User said: {message_text}")
-
-    conversation.messages.append(dict(role='user', content=message_text))
-
-    completion = await openai.ChatCompletion.acreate(
-        model=AI_ENGINE,
-        messages=conversation.messages
-    )
-    logging.debug(f"Completion: {completion}")
-
-    response_message = completion.choices[0]['message']
-    response = response_message['content'].strip()
-    logging.debug(f"Response: {response}")
-
-    conversation.messages.append(response_message)
-
-    return response
-
-
-def parse_blocks(text: str, limit=2000):
-    tick = '`'
-    block = ""
-    current_fence = ""
-    for line in text.splitlines():
-        if len(block) + len(line) > limit - 3:
-            if block:
-                if current_fence:
-                    block += '```'
-                yield block
-                block = current_fence
-
-        block += ('\n' + line) if block else line
-
-        if line.strip().startswith(tick * 3):
-            if current_fence:
-                current_fence = ""
-            else:
-                current_fence = line
-
-    if block:
-        yield block
-
-
-async def send(thread: Union[discord.Thread, discord.TextChannel], text: str):
-    for block in parse_blocks(text):
-        await thread.send(block)
-
-
-
-
-async def continue_conversation(
-        conversation: Conversation, message_text: str):
-    """
-    Use the OPNENAI API to continue the conversation
-    """
-    thread = conversation.thread
-
-    # while the bot is waiting on a response from the model
-    # set its status as typing for user-friendliness
-    async with thread.typing():
-        response = await query(conversation, message_text)
-
-        if not response:
-            response = 'RubberDuck encountered an error.'
-
-        # send the model's response to the Discord channel
-        await send(thread, response)
 
 
 class MyClient(discord.Client):
@@ -360,7 +439,6 @@ class MyClient(discord.Client):
             config = json.load(file)
         self.control_channel_ids = config['control_channels']
         self.control_channels = [c for c in self.get_all_channels() if c.id in self.control_channel_ids]
-
 
 
 def main(prompts: Path, conversations: Path):
