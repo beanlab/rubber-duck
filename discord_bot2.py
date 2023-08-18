@@ -2,8 +2,8 @@ import argparse
 import asyncio
 import logging
 import os
-import random
 import subprocess
+import traceback
 import uuid
 from pathlib import Path
 from typing import TypedDict
@@ -14,7 +14,7 @@ from quest.external import queue
 from quest.historian import Historian
 from quest.local_persistence import LocalJsonHistory
 
-logging.basicConfig(level=logging.DEBUG)
+LOG_FILE = '/tmp/duck.log'
 
 # the Discord Python API
 import discord
@@ -196,9 +196,11 @@ class MyClient(discord.Client):
         await self.get_channel(channel_id).send(block)
 
     @step
-    async def send_message(self, channel_id, message: str):
+    async def send_message(self, channel_id, message: str, file=None):
         for block in parse_blocks(message):
             await self._send_block(channel_id, block)
+        if file is not None:
+            await self.get_channel(channel_id).send(file=file)
 
     #
     # Begin Conversation
@@ -254,26 +256,25 @@ class MyClient(discord.Client):
             """
         content = message['content']
         channel_id = message['channel_id']
+        try:
+            if content.startswith('!restart'):
+                await self.restart(channel_id)
 
-        if content.startswith('!restart'):
-            await self.restart(channel_id)
+            elif content.startswith('!log'):
+                await self.send_message(channel_id, 'Log', file=discord.File(LOG_FILE))
 
-        elif content.startswith('!log'):
-            # await message.channel.send(file=discord.File('/tmp/duck.log'))
-            await self.send_message(channel_id, '`!log` currently unsupported')
+            elif content.startswith('!status'):
+                await self.send_message(channel_id, 'I am alive. 🦆')
 
-        elif content.startswith('!rmlog'):
-            await self._execute_command("rm /tmp/duck.log", channel_id)
-            await self._execute_command("touch /tmp/duck.log", channel_id)
+            elif content.startswith('!help'):
+                await self.display_help(channel_id)
 
-        elif content.startswith('!status'):
-            await self.send_message(channel_id, 'I am alive. 🦆')
+            elif content.startswith('!'):
+                await self.send_message(channel_id, 'Unknown command. Try !help')
 
-        elif content.startswith('!help'):
-            await self.display_help(channel_id)
-
-        elif content.startswith('!'):
-            await self.send_message(channel_id, 'Unknown command. Try !help')
+        except:
+            logging.exception('Error')
+            await self.send_message(channel_id, traceback.format_exc())
 
     async def _execute_command(self, text, channel_id):
         """
@@ -300,7 +301,6 @@ class MyClient(discord.Client):
             channel_id,
             "!restart - restart the bot\n"
             "!log - print the log file\n"
-            "!rmlog - remove the log file\n"
             "!status - print a status message\n"
             "!help - print this message\n"
         )
@@ -328,6 +328,11 @@ def main(prompts: Path, conversations: Path, command_channels: list[int]):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename=LOG_FILE,
+        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument('--prompts', type=Path, default='prompts')
     parser.add_argument('--state', type=Path, default='state')
