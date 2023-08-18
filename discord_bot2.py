@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 import subprocess
@@ -124,9 +125,13 @@ class MyClient(discord.Client):
         self._conversation_manager_task = asyncio.create_task(self._conversation_manager.run())
         await asyncio.sleep(0.1)
         logging.info('Ready')
+        for channel in self._command_channels:
+            await self.get_channel(channel).send('Duck online')
         logging.info('------')
 
     async def close(self):
+        for channel in self._command_channels:
+            await self.get_channel(channel).send('Duck closing')
         self._conversation_manager.suspend()
         await super().close()
 
@@ -322,8 +327,8 @@ class MyClient(discord.Client):
         return
 
 
-def main(prompts: Path, conversations: Path, command_channels: list[int]):
-    client = MyClient(conversations, prompts, command_channels)
+def main(prompts: Path, state: Path, command_channels: list[int]):
+    client = MyClient(state, prompts, command_channels)
     client.run(os.environ['DISCORD_TOKEN'])
 
 
@@ -336,6 +341,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--prompts', type=Path, default='prompts')
     parser.add_argument('--state', type=Path, default='state')
-    parser.add_argument('--command-channels', type=str, help='comma-delimited list of channel IDs')
     args = parser.parse_args()
-    main(args.prompts, args.state, list(map(int, args.command_channels.split(','))))
+
+    with open('config.json') as file:
+        config = json.load(file)
+
+    config.update(**vars(args))
+
+    main(**config)
