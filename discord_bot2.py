@@ -2,7 +2,9 @@ import argparse
 import asyncio
 import logging
 import os
+import random
 import subprocess
+import uuid
 from pathlib import Path
 from typing import TypedDict
 
@@ -22,7 +24,11 @@ import openai
 def load_env():
     with open('secrets.env') as file:
         for line in file:
-            key, value = line.strip().split('=')
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            key, value = line.split('=')
             os.environ[key] = value
 
 
@@ -120,6 +126,10 @@ class MyClient(discord.Client):
         logging.info('Ready')
         logging.info('------')
 
+    async def close(self):
+        self._conversation_manager.suspend()
+        await super().close()
+
     async def on_message(self, message: discord.Message):
         # ignore messages from the bot itself
         if message.author.id == self.user.id:
@@ -133,11 +143,12 @@ class MyClient(discord.Client):
     #
 
     async def conversation_manager(self):
-        clean_up_task = self._clean_up()
+        # clean_up_task = self._clean_up()
 
         async with queue('messages', None) as messages:
             while True:
                 next_message: Message = await messages.get()
+
                 if next_message['channel_id'] in self._command_channels:
                     await self._handle_command(next_message)
 
@@ -203,10 +214,17 @@ class MyClient(discord.Client):
             message: Message = await message_queue.get()
             message_history.append(GPTMessage(role='user', content=message['content']))
 
-            response = await self.get_response(thread_id, message_history)
-            message_history.append(GPTMessage(role='assistant', content=response))
+            try:
+                response = await self.get_response(thread_id, message_history)
+                message_history.append(GPTMessage(role='assistant', content=response))
 
-            await self.send_message(thread_id, response)
+                await self.send_message(thread_id, response)
+
+            except Exception:
+                error_code = str(uuid.uuid4()).split('-')[0].upper()
+                logging.exception('Error getting completion: ' + error_code)
+                await self.send_message(thread_id, f'😵 **Error code {error_code}** 😵'
+                                                   f'\nAn error occurred. Please tell a TA or the instructor.')
 
     @step
     async def get_response(self, thread_id, message_history) -> str:
@@ -247,7 +265,7 @@ class MyClient(discord.Client):
             await self.send_message(channel_id, 'I am alive. 🦆')
 
         elif content.startswith('!help'):
-            await self.display_help(message)
+            await self.display_help(channel_id)
 
         elif content.startswith('!'):
             await self.send_message(channel_id, 'Unknown command. Try !help')
@@ -300,8 +318,8 @@ class MyClient(discord.Client):
 
 
 def main(prompts: Path, conversations: Path, command_channels: list[int]):
-    with MyClient(prompts, conversations, command_channels) as client:
-        client.run(os.environ['DISCORD_TOKEN'])
+    client = MyClient(conversations, prompts, command_channels)
+    client.run(os.environ['DISCORD_TOKEN'])
 
 
 if __name__ == '__main__':
