@@ -1,5 +1,3 @@
-# the os module helps us access environment variables
-# i.e., our API keys
 import json
 import os
 import logging
