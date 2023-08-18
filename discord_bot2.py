@@ -204,8 +204,13 @@ class MyClient(discord.Client):
     # Begin Conversation
     #
     @task
-    async def have_conversation(self, thread_id, initial_message):
+    async def have_conversation(self, thread_id: int, initial_message: Message):
         message_history = []
+
+        prompt = self.prompts.get(initial_message['channel_name'], None)
+        if prompt is not None:
+            message_history.append(GPTMessage(role='system', content=prompt))
+
         message_queue = self._conversation_queues[thread_id]
 
         await self.send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
