@@ -126,14 +126,14 @@ frozenlist = ">=1.1.0"
 
 [[package]]
 name = "async-timeout"
-version = "4.0.2"
+version = "4.0.3"
 description = "Timeout context manager for asyncio programs"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "async-timeout-4.0.2.tar.gz", hash = "sha256:2163e1640ddb52b7a8c80d0a67a08587e5d245cc9c553a74a847056bc2976b15"},
-    {file = "async_timeout-4.0.2-py3-none-any.whl", hash = "sha256:8ca1e4fcf50d07413d66d1a5e416e42cfdf5851c981d679a09851a6853383b3c"},
+    {file = "async-timeout-4.0.3.tar.gz", hash = "sha256:4640d96be84d82d02ed59ea2b7105a0f7b33abe8703703cd0ab0bf87c427522f"},
+    {file = "async_timeout-4.0.3-py3-none-any.whl", hash = "sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028"},
 ]
 
 [[package]]
@@ -266,29 +266,29 @@ files = [
 
 [[package]]
 name = "discord"
-version = "2.3.1"
+version = "2.3.2"
 description = "A mirror package for discord.py. Please install that instead."
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "discord-2.3.1-py3-none-any.whl", hash = "sha256:6bce94c14019e62baf1d3426603ed388e564a1d6f2239404ea42d172181083b3"},
-    {file = "discord-2.3.1.tar.gz", hash = "sha256:c180bea8f0db059b3cdd8008d6de88d9fce4283d6301cb2c9f395b5150138c32"},
+    {file = "discord-2.3.2-py3-none-any.whl", hash = "sha256:d7959418799dd3b1e896685812d880169c193468b061b3431fa2a4664febd3da"},
+    {file = "discord-2.3.2.tar.gz", hash = "sha256:cc1ee2dbe6df218ca51519af355b97e87309f8230f58c7f34885feb8e8a76145"},
 ]
 
 [package.dependencies]
-"discord.py" = ">=2.3.1"
+"discord.py" = ">=2.3.2"
 
 [[package]]
-name = "discord.py"
-version = "2.3.1"
+name = "discord-py"
+version = "2.3.2"
 description = "A Python wrapper for the Discord API"
 category = "main"
 optional = false
 python-versions = ">=3.8.0"
 files = [
-    {file = "discord.py-2.3.1-py3-none-any.whl", hash = "sha256:149652f24da299706270bf8c03c2fcf80cf1caf3a480744c61d5b001688b380d"},
-    {file = "discord.py-2.3.1.tar.gz", hash = "sha256:8eb4fe66b5d503da6de3a8425e23012711dc2fbcd7a782107a92beac15ee3459"},
+    {file = "discord.py-2.3.2-py3-none-any.whl", hash = "sha256:9da4679fc3cb10c64b388284700dc998663e0e57328283bbfcfc2525ec5960a6"},
+    {file = "discord.py-2.3.2.tar.gz", hash = "sha256:4560f70f2eddba7e83370ecebd237ac09fbb4980dc66507482b0c0e5b8f76b9c"},
 ]
 
 [package.dependencies]
@@ -492,14 +492,14 @@ wandb = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1
 
 [[package]]
 name = "quest-py"
-version = "0.2.0b0"
+version = "0.2.0b1"
 description = "Framework for coordinated, long-running processes"
 category = "main"
 optional = false
 python-versions = ">=3.11,<4.0"
 files = [
-    {file = "quest_py-0.2.0b0-py3-none-any.whl", hash = "sha256:d684302f5e3955d890e0785f237fc962fa3cce66e5895e4fff98f8977d732e4b"},
-    {file = "quest_py-0.2.0b0.tar.gz", hash = "sha256:2bd8ade37fb1e72fea0394f0f7475f095fa77c993e1e89ed3da5f8351e2c2c71"},
+    {file = "quest_py-0.2.0b1-py3-none-any.whl", hash = "sha256:c119f71f4ce0eccf248eb1c85f5d5967a4d6bff50354d2796e6cb3fb74416f6e"},
+    {file = "quest_py-0.2.0b1.tar.gz", hash = "sha256:0aa2bb1cada1cb7e6ec3a6d23e14256a9ab40240d85c1587289d8407a3e755b0"},
 ]
 
 [[package]]
@@ -526,21 +526,21 @@ use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "tqdm"
-version = "4.65.0"
+version = "4.66.1"
 description = "Fast, Extensible Progress Meter"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "tqdm-4.65.0-py3-none-any.whl", hash = "sha256:c4f53a17fe37e132815abceec022631be8ffe1b9381c2e6e30aa70edc99e9671"},
-    {file = "tqdm-4.65.0.tar.gz", hash = "sha256:1871fb68a86b8fb3b59ca4cdd3dcccbc7e6d613eeed31f4c332531977b89beb5"},
+    {file = "tqdm-4.66.1-py3-none-any.whl", hash = "sha256:d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386"},
+    {file = "tqdm-4.66.1.tar.gz", hash = "sha256:d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7"},
 ]
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [package.extras]
-dev = ["py-make (>=0.1.0)", "twine", "wheel"]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
 notebook = ["ipywidgets (>=6)"]
 slack = ["slack-sdk"]
 telegram = ["requests"]
@@ -653,4 +653,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "a0c5df21786bb9b40559d85b480393982be64846762d135f804c7dbe96a2758c"
+content-hash = "35f28c9fe24840310e384ad91fc519777355f186afc3bed0eb5d2961882cf473"
