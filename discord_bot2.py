@@ -325,7 +325,7 @@ def main(prompts: Path, conversations: Path, command_channels: list[int]):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--prompts', type=Path, default='prompts')
-    parser.add_argument('--conversations', type=Path, default='conversations')
+    parser.add_argument('--state', type=Path, default='state')
     parser.add_argument('--command-channels', type=str, help='comma-delimited list of channel IDs')
     args = parser.parse_args()
     main(args.prompts, args.conversations, list(map(int, args.command_channels.split(','))))
