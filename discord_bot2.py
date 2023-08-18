@@ -125,13 +125,21 @@ class MyClient(discord.Client):
         self._conversation_manager_task = asyncio.create_task(self._conversation_manager.run())
         await asyncio.sleep(0.1)
         logging.info('Ready')
-        for channel in self._command_channels:
-            await self.get_channel(channel).send('Duck online')
+        for channel_id in self._command_channels:
+            channel = self.get_channel(channel_id)
+            if channel is None:
+                logging.error(f'Unable to access channel {channel_id}')
+                continue
+            await channel.send('Duck online')
         logging.info('------')
 
     async def close(self):
-        for channel in self._command_channels:
-            await self.get_channel(channel).send('Duck closing')
+        for channel_id in self._command_channels:
+            channel = self.get_channel(channel_id)
+            if channel is None:
+                logging.error(f'Unable to access channel {channel_id}')
+                continue
+            await channel.send('Duck closing')
         self._conversation_manager.suspend()
         await super().close()
 
