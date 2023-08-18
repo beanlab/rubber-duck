@@ -333,4 +333,4 @@ if __name__ == '__main__':
     parser.add_argument('--state', type=Path, default='state')
     parser.add_argument('--command-channels', type=str, help='comma-delimited list of channel IDs')
     args = parser.parse_args()
-    main(args.prompts, args.conversations, list(map(int, args.command_channels.split(','))))
+    main(args.prompts, args.state, list(map(int, args.command_channels.split(','))))
