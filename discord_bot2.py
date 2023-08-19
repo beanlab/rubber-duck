@@ -94,7 +94,6 @@ class MyClient(discord.Client):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
-        intents.members = True
         super().__init__(intents=intents)
 
         self._command_channels = command_channels
