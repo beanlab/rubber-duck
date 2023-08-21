@@ -91,14 +91,21 @@ def parse_blocks(text: str, limit=2000):
 
 
 class MyClient(discord.Client):
-    def __init__(self, root_save_folder: Path, prompt_dir: Path, command_channels: list[int]):
+    def __init__(self, root_save_folder: Path, config: dict):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self._command_channels = command_channels
-        self._load_prompts(prompt_dir)
+        self._command_channels = config['command_channels']
+        self._prompts = {
+            entry['name']: entry.get('prompt', Path(entry.get('prompt-file')).read_text())
+            for entry in config['channels'].items()
+        }
+        self._engines = {
+            entry['name']: entry.get('engine', config['default-engine'])
+            for entry in config['channels'].items()
+        }
 
         self._root_folder = root_save_folder
         self._conversation_manager = Historian(
@@ -350,8 +357,8 @@ class MyClient(discord.Client):
         await self._execute_command(['git', 'switch', branch_name], channel_id)
 
 
-def main(prompts: Path, state: Path, command_channels: list[int]):
-    client = MyClient(state, prompts, command_channels)
+def main(state_path: Path, config: dict):
+    client = MyClient(state_path, config)
     client.run(os.environ['DISCORD_TOKEN'])
 
 
@@ -362,13 +369,10 @@ if __name__ == '__main__':
         format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
     )
     parser = argparse.ArgumentParser()
-    parser.add_argument('--prompts', type=Path, default='prompts')
+    parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--state', type=Path, default='state')
     args = parser.parse_args()
 
-    with open('config.json') as file:
-        config = json.load(file)
+    config = json.loads(args.config.read_text())
 
-    config.update(**vars(args))
-
-    main(**config)
+    main(args.state, config)

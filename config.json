@@ -2,5 +2,23 @@
   "command_channels": [
     1116427477330432011,
     1142192571435716619
+  ],
+  "default-engine": "gpt-3.5-turbo",
+  "channels": [
+    {
+      "name": "duck-pond",
+      "prompt-file": "prompts/standard-rubber-duck.txt",
+      "engine": "gpt-4"
+    },
+    {
+      "name": "new-pond",
+      "prompt-file": "prompts/standard-rubber-duck.txt",
+      "engine": "gpt-3.5-turbo-16k"
+    },
+    {
+      "name": "gpt4",
+      "prompt": "",
+      "engine": "gpt-4"
+    }
   ]
 }
