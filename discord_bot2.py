@@ -282,7 +282,7 @@ class MyClient(discord.Client):
                 if m is None:
                     await self.send_message(channel_id, 'Error. Usage: !branch <branch name>')
                 else:
-                    self.switch_branch(channel_id, m.group(1))
+                    await self.switch_branch(channel_id, m.group(1))
 
             elif content.startswith('!log'):
                 await self.send_message(channel_id, 'Log', file=discord.File(LOG_FILE))
