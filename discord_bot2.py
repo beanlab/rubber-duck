@@ -147,6 +147,10 @@ class MyClient(discord.Client):
         if message.author.id == self.user.id:
             return
 
+        # ignore messages that start with //
+        if message.content.startswith('//'):
+            return
+
         message_info: Message = as_message(message)
         await self._conversation_manager.record_external_event('messages', None, 'put', message_info)
 
