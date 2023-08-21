@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 import traceback
 import uuid
@@ -276,6 +277,13 @@ class MyClient(discord.Client):
             if content.startswith('!restart'):
                 await self.restart(channel_id)
 
+            elif content.startswith('!branch'):
+                m = re.match(r'!branch\s+(\w+)', content)
+                if m is None:
+                    await self.send_message(channel_id, 'Error. Usage: !branch <branch name>')
+                else:
+                    self.switch_branch(channel_id, m.group(1))
+
             elif content.startswith('!log'):
                 await self.send_message(channel_id, 'Log', file=discord.File(LOG_FILE))
 
@@ -298,7 +306,7 @@ class MyClient(discord.Client):
         """
         # Run command using shell and pipe output to channel
         work_dir = Path(__file__).parent
-        await self.send_message(channel_id, f"```ps\n$ {text}```")
+        await self.send_message(channel_id, f"```bash\n$ {text}```")
         process = subprocess.run(
             text,
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work_dir
@@ -336,6 +344,10 @@ class MyClient(discord.Client):
         await self.send_message(channel_id, f'Restarting.')
         subprocess.Popen(["bash", "restart.sh"])
         return
+
+    async def switch_branch(self, channel_id, branch_name: str):
+        await self._execute_command(['git', 'fetch'], channel_id)
+        await self._execute_command(['git', 'checkout', branch_name], channel_id)
 
 
 def main(prompts: Path, state: Path, command_channels: list[int]):
