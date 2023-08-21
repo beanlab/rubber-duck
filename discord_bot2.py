@@ -309,7 +309,7 @@ class MyClient(discord.Client):
         await self.send_message(channel_id, f"```bash\n$ {text}```")
         process = subprocess.run(
             text,
-            shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work_dir
+            shell=isinstance(text, str), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work_dir
         )
         # Get output of command and send to channel
         errors = process.stderr.decode('utf-8')
@@ -347,7 +347,7 @@ class MyClient(discord.Client):
 
     async def switch_branch(self, channel_id, branch_name: str):
         await self._execute_command(['git', 'fetch'], channel_id)
-        await self._execute_command(['git', 'checkout', branch_name], channel_id)
+        await self._execute_command(['git', 'switch', branch_name], channel_id)
 
 
 def main(prompts: Path, state: Path, command_channels: list[int]):
