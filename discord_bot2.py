@@ -278,7 +278,7 @@ class MyClient(discord.Client):
                 await self.restart(channel_id)
 
             elif content.startswith('!branch'):
-                m = re.match(r'!branch\s+(\w+)', content)
+                m = re.match(r'!branch\s+(\S+)', content)
                 if m is None:
                     await self.send_message(channel_id, 'Error. Usage: !branch <branch name>')
                 else:
