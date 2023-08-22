@@ -176,7 +176,7 @@ class MyClient(discord.Client):
                 if next_message['channel_id'] in self._command_channels:
                     await self._handle_command(next_message)
 
-                elif next_message['channel_name'] in self.prompts:
+                elif self._is_on_listen_channel(next_message):
                     # Start new conversation
                     await self._create_conversation(next_message)
 
@@ -197,6 +197,9 @@ class MyClient(discord.Client):
                 del self._conversation_tasks[cid]
                 del self._conversation_queues[cid]
 
+    def _is_on_listen_channel(self, message: Message) -> bool:
+        return message['channel_name'] in self._prompts
+
     @step
     async def _create_thread(self, message: Message) -> int:
         thread = await self.get_channel(message['channel_id']).create_thread(
@@ -209,7 +212,7 @@ class MyClient(discord.Client):
     async def _create_conversation(self, message: Message):
         # Create a private thread in the message channel
         thread_id = await self._create_thread(message)
-        self._conversation_queues[thread_id] = (message_queue := asyncio.Queue())
+        self._conversation_queues[thread_id] = asyncio.Queue()
         self._conversation_tasks[thread_id] = self.have_conversation(thread_id, message)
 
     @step
@@ -230,8 +233,8 @@ class MyClient(discord.Client):
     async def have_conversation(self, thread_id: int, initial_message: Message):
         message_history = []
 
-        prompt = self.prompts.get(initial_message['channel_name'], None)
-        if prompt is not None:
+        prompt = self._prompts.get(initial_message['channel_name'], None)
+        if prompt:  # is not None or empty
             message_history.append(GPTMessage(role='system', content=prompt))
 
         message_queue = self._conversation_queues[thread_id]
