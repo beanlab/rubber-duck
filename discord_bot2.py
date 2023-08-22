@@ -180,9 +180,12 @@ class MyClient(discord.Client):
                     # Start new conversation
                     await self._create_conversation(next_message)
 
+                elif (convo := self._conversation_queues.get(next_message['channel_id'], None)) is not None:
+                    # Delegate to the conversation thread
+                    await convo.put(next_message)
+
                 else:
-                    # Delegate message
-                    await self._delegate_message(next_message)
+                    return  # ignore message
 
     @task
     async def _clean_up(self):
@@ -208,12 +211,6 @@ class MyClient(discord.Client):
         thread_id = await self._create_thread(message)
         self._conversation_queues[thread_id] = (message_queue := asyncio.Queue())
         self._conversation_tasks[thread_id] = self.have_conversation(thread_id, message)
-
-    async def _delegate_message(self, message: Message):
-        if (convo := self._conversation_queues.get(message['channel_id'], None)) is not None:
-            await convo.put(message)
-        else:
-            return  # ignore message
 
     @step
     async def _send_block(self, channel_id, block):
