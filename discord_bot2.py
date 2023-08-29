@@ -11,10 +11,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from discord import ChannelType
-from quest import task, step
-from quest.external import queue
-from quest.historian import Historian
-from quest.local_persistence import LocalJsonHistory
+from quest import task, step, queue, Historian, create_filesystem_historian
 
 LOG_FILE = '/tmp/duck.log'
 
@@ -39,6 +36,19 @@ openai.api_key = os.environ['OPENAI_API_KEY']
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
+
+
+class ChannelConfig(TypedDict):
+    name: str
+    prompt: str | None
+    prompt_file: str | None
+    engine: str | None
+
+
+class RubberDuckConfig(TypedDict):
+    command_channels: list[int]
+    default_engine: str
+    channels: list[ChannelConfig]
 
 
 class GPTMessage(TypedDict):
@@ -97,31 +107,16 @@ class MyClient(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
 
+        self._config = config
         self._command_channels = config['command_channels']
-        self._prompts = {
-            entry['name']: entry.get('prompt', Path(entry.get('prompt-file')).read_text())
-            for entry in config['channels'].items()
-        }
-        self._engines = {
-            entry['name']: entry.get('engine', config['default-engine'])
-            for entry in config['channels'].items()
-        }
 
         self._root_folder = root_save_folder
-        self._conversation_manager = Historian(
+        self._conversation_manager = create_filesystem_historian(
+            root_save_folder,
             'conversation_manager',
-            self.conversation_manager,
-            LocalJsonHistory(root_save_folder)
+            self.conversation_manager
         )
         self._conversation_manager_task = None  # started in on_ready
-        self._conversation_queues: dict[int, asyncio.Queue] = {}
-        self._conversation_tasks: dict[int, asyncio.Task] = {}
-
-    def _load_prompts(self, prompt_dir: Path):
-        self.prompts = {}
-        for file in prompt_dir.iterdir():
-            if file.suffix == '.txt':
-                self.prompts[file.stem] = file.read_text()
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -129,8 +124,8 @@ class MyClient(discord.Client):
         logging.info(self.user.name)
         logging.info(self.user.id)
 
-        self._conversation_manager_task = asyncio.create_task(self._conversation_manager.run())
-        await asyncio.sleep(0.1)
+        self._conversation_manager_task = self._conversation_manager.run(config)
+        await asyncio.sleep(0.1)  # allow the conversation manager to warm up
         logging.info('Ready')
         for channel_id in self._command_channels:
             channel = self.get_channel(channel_id)
@@ -147,7 +142,7 @@ class MyClient(discord.Client):
                 logging.error(f'Unable to access channel {channel_id}')
                 continue
             await channel.send('Duck closing')
-        self._conversation_manager.suspend()
+        await self._conversation_manager.suspend()
         await super().close()
 
     async def on_message(self, message: discord.Message):
@@ -160,67 +155,80 @@ class MyClient(discord.Client):
             return
 
         message_info: Message = as_message(message)
-        await self._conversation_manager.record_external_event('messages', None, 'put', message_info)
+
+        # First check if the channel ID is registered
+        identity = str(message.channel.id)
+        resources = await self._conversation_manager.get_resources(identity)
+
+        if 'messages' not in resources:
+            # See if the channel name is registered
+            identity = str(message.channel.name)
+            resources = await self._conversation_manager.get_resources(identity)
+
+        if 'messages' not in resources:
+            # Neither the channel ID nor channel name are watched, so ignore this message
+            return
+
+        await self._conversation_manager.record_external_event('messages', identity, 'put', message_info)
 
     #
     # Begin Conversation Management
     #
 
-    async def conversation_manager(self):
-        # clean_up_task = self._clean_up()
+    async def conversation_manager(self, config: RubberDuckConfig):
+        for channel_id in config['command_channels']:
+            self.command_channel(channel_id)
 
-        async with queue('messages', None) as messages:
-            while True:
-                next_message: Message = await messages.get()
+        for channel_config in config['channels']:
+            self.listen_channel(config['default_engine'], channel_config)
 
-                if next_message['channel_id'] in self._command_channels:
-                    await self._handle_command(next_message)
-
-                elif self._is_on_listen_channel(next_message):
-                    # Start new conversation
-                    await self._create_conversation(next_message)
-
-                elif (convo := self._conversation_queues.get(next_message['channel_id'], None)) is not None:
-                    # Delegate to the conversation thread
-                    await convo.put(next_message)
-
-                else:
-                    return  # ignore message
+        await asyncio.Future()  # i.e. run forever
 
     @task
-    async def _clean_up(self):
-        await asyncio.sleep(60)
-        for cid, ctask in self._conversation_tasks.items():
-            if ctask.done():
-                logging.info(f'Closing conversation {cid}')
-                result = await ctask
-                del self._conversation_tasks[cid]
-                del self._conversation_queues[cid]
+    @step
+    async def command_channel(self, channel_id: int):
+        async with queue('messages', str(channel_id)) as messages:
+            while True:
+                message: Message = await messages.get()
+                await self._handle_command(message)
 
-    def _is_on_listen_channel(self, message: Message) -> bool:
-        return message['channel_name'] in self._prompts
+    @task
+    @step
+    async def listen_channel(self, default_engine: str, config: ChannelConfig):
+        async with queue('messages', config['name']) as messages:
+            while True:
+                message: Message = await messages.get()
+                thread_id = await self._create_thread(
+                    message['channel_id'],
+                    message['content'][:20]
+                )
+                prompt = config.get('prompt', None)
+                if prompt is None:
+                    prompt_file = config.get('prompt_file', None)
+                    if prompt_file is None:
+                        prompt = message['content']
+                    else:
+                        prompt = Path(prompt_file).read_text()
+
+                engine = config.get('engine', default_engine)
+
+                self.have_conversation(thread_id, engine, prompt, message)
 
     @step
-    async def _create_thread(self, message: Message) -> int:
-        thread = await self.get_channel(message['channel_id']).create_thread(
-            name=message['content'][:20],
+    async def _create_thread(self, parent_channel_id: int, title: str) -> int:
+        thread = await self.get_channel(parent_channel_id).create_thread(
+            name=title,
             type=ChannelType.public_thread,
             auto_archive_duration=60
         )
         return thread.id
-
-    async def _create_conversation(self, message: Message):
-        # Create a private thread in the message channel
-        thread_id = await self._create_thread(message)
-        self._conversation_queues[thread_id] = asyncio.Queue()
-        self._conversation_tasks[thread_id] = self.have_conversation(thread_id, message)
 
     @step
     async def _send_block(self, channel_id, block):
         await self.get_channel(channel_id).send(block)
 
     @step
-    async def send_message(self, channel_id, message: str, file=None):
+    async def _send_message(self, channel_id, message: str, file=None):
         for block in parse_blocks(message):
             await self._send_block(channel_id, block)
         if file is not None:
@@ -230,38 +238,36 @@ class MyClient(discord.Client):
     # Begin Conversation
     #
     @task
-    async def have_conversation(self, thread_id: int, initial_message: Message):
-        message_history = []
+    @step
+    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message):
+        async with queue('messages', str(thread_id)) as messages:
+            message_history = [
+                GPTMessage(role='system', content=prompt)
+            ]
 
-        prompt = self._prompts.get(initial_message['channel_name'], None)
-        if prompt:  # is not None or empty
-            message_history.append(GPTMessage(role='system', content=prompt))
+            await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
 
-        message_queue = self._conversation_queues[thread_id]
+            while True:
+                message: Message = await messages.get()
+                message_history.append(GPTMessage(role='user', content=message['content']))
 
-        await self.send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
+                try:
+                    response = await self._get_response(thread_id, engine, message_history)
+                    message_history.append(GPTMessage(role='assistant', content=response))
 
-        while True:
-            message: Message = await message_queue.get()
-            message_history.append(GPTMessage(role='user', content=message['content']))
+                    await self._send_message(thread_id, response)
 
-            try:
-                response = await self.get_response(thread_id, message_history)
-                message_history.append(GPTMessage(role='assistant', content=response))
-
-                await self.send_message(thread_id, response)
-
-            except Exception:
-                error_code = str(uuid.uuid4()).split('-')[0].upper()
-                logging.exception('Error getting completion: ' + error_code)
-                await self.send_message(thread_id, f'😵 **Error code {error_code}** 😵'
-                                                   f'\nAn error occurred. Please tell a TA or the instructor.')
+                except Exception:
+                    error_code = str(uuid.uuid4()).split('-')[0].upper()
+                    logging.exception('Error getting completion: ' + error_code)
+                    await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵'
+                                                       f'\nAn error occurred. Please tell a TA or the instructor.')
 
     @step
-    async def get_response(self, thread_id, message_history) -> str:
+    async def _get_response(self, thread_id, engine, message_history) -> str:
         async with self.get_channel(thread_id).typing():
             completion = await openai.ChatCompletion.acreate(
-                model=AI_ENGINE,
+                model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
@@ -282,30 +288,30 @@ class MyClient(discord.Client):
         channel_id = message['channel_id']
         try:
             if content.startswith('!restart'):
-                await self.restart(channel_id)
+                await self._restart(channel_id)
 
             elif content.startswith('!branch'):
                 m = re.match(r'!branch\s+(\S+)', content)
                 if m is None:
-                    await self.send_message(channel_id, 'Error. Usage: !branch <branch name>')
+                    await self._send_message(channel_id, 'Error. Usage: !branch <branch name>')
                 else:
-                    await self.switch_branch(channel_id, m.group(1))
+                    await self._switch_branch(channel_id, m.group(1))
 
             elif content.startswith('!log'):
-                await self.send_message(channel_id, 'Log', file=discord.File(LOG_FILE))
+                await self._send_message(channel_id, 'Log', file=discord.File(LOG_FILE))
 
             elif content.startswith('!status'):
-                await self.send_message(channel_id, 'I am alive. 🦆')
+                await self._send_message(channel_id, 'I am alive. 🦆')
 
             elif content.startswith('!help'):
-                await self.display_help(channel_id)
+                await self._display_help(channel_id)
 
             elif content.startswith('!'):
-                await self.send_message(channel_id, 'Unknown command. Try !help')
+                await self._send_message(channel_id, 'Unknown command. Try !help')
 
         except:
             logging.exception('Error')
-            await self.send_message(channel_id, traceback.format_exc())
+            await self._send_message(channel_id, traceback.format_exc())
 
     async def _execute_command(self, text, channel_id):
         """
@@ -313,7 +319,7 @@ class MyClient(discord.Client):
         """
         # Run command using shell and pipe output to channel
         work_dir = Path(__file__).parent
-        await self.send_message(channel_id, f"```bash\n$ {text}```")
+        await self._send_message(channel_id, f"```bash\n$ {text}```")
         process = subprocess.run(
             text,
             shell=isinstance(text, str), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work_dir
@@ -321,38 +327,40 @@ class MyClient(discord.Client):
         # Get output of command and send to channel
         errors = process.stderr.decode('utf-8')
         if errors:
-            await self.send_message(channel_id, f'Errors: ```{errors}```')
+            await self._send_message(channel_id, f'Errors: ```{errors}```')
         output = process.stdout.decode('utf-8')
         if output:
-            await self.send_message(channel_id, f'```{output}```')
+            await self._send_message(channel_id, f'```{output}```')
         return
 
-    async def display_help(self, channel_id):
-        await self.send_message(
+    async def _display_help(self, channel_id):
+        await self._send_message(
             channel_id,
-            "!restart - restart the bot\n"
-            "!log - print the log file\n"
+            "```\n"
             "!status - print a status message\n"
             "!help - print this message\n"
+            "!log - print the log file\n"
+            "!restart - restart the bot\n"
+            "```\n"
         )
 
-    async def restart(self, channel_id):
+    async def _restart(self, channel_id):
         """
         Restart the bot
         :param message: The message that triggered the restart
         """
-        await self.send_message(channel_id, f'Restart requested.')
+        await self._send_message(channel_id, f'Restart requested.')
         await self._execute_command('git fetch', channel_id)
         await self._execute_command('git reset --hard', channel_id)
         await self._execute_command('git clean -f', channel_id)
         await self._execute_command('git pull --rebase=false', channel_id)
         await self._execute_command('rm poetry.lock', channel_id)
         await self._execute_command('poetry install', channel_id)
-        await self.send_message(channel_id, f'Restarting.')
+        await self._send_message(channel_id, f'Restarting.')
         subprocess.Popen(["bash", "restart.sh"])
         return
 
-    async def switch_branch(self, channel_id, branch_name: str):
+    async def _switch_branch(self, channel_id, branch_name: str):
         await self._execute_command(['git', 'fetch'], channel_id)
         await self._execute_command(['git', 'switch', branch_name], channel_id)
 
@@ -365,7 +373,7 @@ def main(state_path: Path, config: dict):
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.DEBUG,
-        filename=LOG_FILE,
+        #filename=LOG_FILE,
         format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
     )
     parser = argparse.ArgumentParser()
