@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from discord import ChannelType
-from quest import task, step, queue, Historian, create_filesystem_historian
+from quest import task, step, queue, create_filesystem_historian, state
 
 LOG_FILE = '/tmp/duck.log'
 
@@ -176,6 +176,11 @@ class MyClient(discord.Client):
     #
 
     async def conversation_manager(self, config: RubberDuckConfig):
+        # TODO - figure out how to handle changes to the config
+        # The original configuration is baked in the history and can't change
+        # so we need a way to communicate and track updates to the config
+        # over time. Add this feature to quest, then use it here.
+
         for channel_id in config['command_channels']:
             self.command_channel(channel_id)
 
@@ -261,7 +266,7 @@ class MyClient(discord.Client):
                     error_code = str(uuid.uuid4()).split('-')[0].upper()
                     logging.exception('Error getting completion: ' + error_code)
                     await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵'
-                                                       f'\nAn error occurred. Please tell a TA or the instructor.')
+                                                        f'\nAn error occurred. Please tell a TA or the instructor.')
 
     @step
     async def _get_response(self, thread_id, engine, message_history) -> str:
@@ -371,15 +376,16 @@ def main(state_path: Path, config: dict):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        level=logging.DEBUG,
-        #filename=LOG_FILE,
-        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-    )
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--state', type=Path, default='state')
     args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename=LOG_FILE,
+        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
+    )
 
     config = json.loads(args.config.read_text())
 
