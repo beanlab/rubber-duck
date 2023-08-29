@@ -469,14 +469,14 @@ files = [
 
 [[package]]
 name = "openai"
-version = "0.27.8"
+version = "0.27.9"
 description = "Python client library for the OpenAI API"
 category = "main"
 optional = false
 python-versions = ">=3.7.1"
 files = [
-    {file = "openai-0.27.8-py3-none-any.whl", hash = "sha256:e0a7c2f7da26bdbe5354b03c6d4b82a2f34bd4458c7a17ae1a7092c3e397e03c"},
-    {file = "openai-0.27.8.tar.gz", hash = "sha256:2483095c7db1eee274cebac79e315a986c4e55207bb4fa7b82d185b3a2ed9536"},
+    {file = "openai-0.27.9-py3-none-any.whl", hash = "sha256:6a3cf8e276d1a6262b50562fbc0cba7967cfebb78ed827d375986b48fdad6475"},
+    {file = "openai-0.27.9.tar.gz", hash = "sha256:b687761c82f5ebb6f61efc791b2083d2d068277b94802d4d1369efe39851813d"},
 ]
 
 [package.dependencies]
@@ -492,14 +492,14 @@ wandb = ["numpy", "openpyxl (>=3.0.7)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1
 
 [[package]]
 name = "quest-py"
-version = "0.2.0b1"
+version = "0.2.0b2"
 description = "Framework for coordinated, long-running processes"
 category = "main"
 optional = false
 python-versions = ">=3.11,<4.0"
 files = [
-    {file = "quest_py-0.2.0b1-py3-none-any.whl", hash = "sha256:c119f71f4ce0eccf248eb1c85f5d5967a4d6bff50354d2796e6cb3fb74416f6e"},
-    {file = "quest_py-0.2.0b1.tar.gz", hash = "sha256:0aa2bb1cada1cb7e6ec3a6d23e14256a9ab40240d85c1587289d8407a3e755b0"},
+    {file = "quest_py-0.2.0b2-py3-none-any.whl", hash = "sha256:85c4658008df7731f22f97755bcbd67a8e66416355fd4682dabf729e567aaa0b"},
+    {file = "quest_py-0.2.0b2.tar.gz", hash = "sha256:9abee222bc61f4cb1af62c47e9530b4e0ce30797262a40960f60b3aa0f492c1f"},
 ]
 
 [[package]]
@@ -653,4 +653,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "35f28c9fe24840310e384ad91fc519777355f186afc3bed0eb5d2961882cf473"
+content-hash = "a434bc8261d98e1f3559ad8b9884dcdabd0e5c08f2757985376d69cf7311bee8"
