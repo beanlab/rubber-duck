@@ -384,7 +384,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(
         level=logging.DEBUG,
-        # filename=LOG_FILE,
+        filename=LOG_FILE,
         format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
     )
 
