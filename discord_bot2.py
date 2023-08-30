@@ -126,6 +126,7 @@ class MyClient(discord.Client):
 
         self._conversation_manager_task = self._conversation_manager.run(config)
         await asyncio.sleep(0.1)  # allow the conversation manager to warm up
+        await self._conversation_manager.get_resources(None)  # check that it's up
         logging.info('Ready')
         for channel_id in self._command_channels:
             channel = self.get_channel(channel_id)
@@ -383,7 +384,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(
         level=logging.DEBUG,
-        filename=LOG_FILE,
+        # filename=LOG_FILE,
         format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
     )
 
