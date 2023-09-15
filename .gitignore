@@ -1,3 +1,4 @@
 *.env
 .idea/
 /conversations/
+/local-testing-convos/
