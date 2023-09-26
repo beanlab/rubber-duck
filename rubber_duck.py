@@ -69,9 +69,9 @@ def parse_blocks(text: str, limit=2000):
 
 
 class MessageHandler(Protocol):
-    def send_message(self, channel_id: int, message: str, file=None): ...
+    async def send_message(self, channel_id: int, message: str, file=None): ...
 
-    def create_thread(self, parent_id: int, title: str, ): ...
+    async def create_thread(self, parent_id: int, title: str, ): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -83,6 +83,7 @@ class RubberDuck:
                  log_file_path: Path,
                  configs: list[dict]
                  ):
+        self._send_raw_message = handler.send_message
         self._send_block = step(handler.send_message)
         self._create_thread = step(handler.create_thread)
         self._typing = handler.typing
@@ -102,7 +103,7 @@ class RubberDuck:
 
     async def on_ready(self):
         for config in self._configs:
-            self._conversation_manager.configure(config)
+            self._conversation_manager.configure(self.configure, config)
 
         self._conversation_manager_task = self._conversation_manager.run()
 
@@ -113,7 +114,7 @@ class RubberDuck:
 
         for channel_id in self._command_channels:
             try:
-                await self._send_message(channel_id, 'Duck online')
+                await self._send_raw_message(channel_id, 'Duck online')
             except:
                 logging.exception(f'Unable to message channel {channel_id}')
 
@@ -122,7 +123,7 @@ class RubberDuck:
     async def close(self):
         for channel_id in self._command_channels:
             try:
-                await self._send_message(channel_id, 'Duck online')
+                await self._send_raw_message(channel_id, 'Duck online')
             except:
                 logging.exception(f'Unable to message channel {channel_id}')
         await self._conversation_manager.suspend()

@@ -1,15 +1,4 @@
-import argparse
-import json
-import logging
 import os
-from pathlib import Path
-
-import discord
-from discord import ChannelType
-
-from rubber_duck import Message, RubberDuck, MessageHandler
-
-LOG_FILE = Path('/tmp/duck.log')
 
 
 def load_env():
@@ -24,6 +13,18 @@ def load_env():
 
 
 load_env()
+
+import argparse
+import json
+import logging
+from pathlib import Path
+
+import discord
+from discord import ChannelType
+
+from rubber_duck import Message, RubberDuck, MessageHandler
+
+LOG_FILE = Path('/tmp/duck.log')
 
 
 def as_message(message: discord.Message) -> Message:
@@ -57,6 +58,7 @@ class MyClient(discord.Client, MessageHandler):
         logging.info('------')
 
     async def close(self):
+        logging.warning("-- Suspending --")
         await self._rubber_duck.close()
         await super().close()
 
@@ -99,14 +101,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-folder', type=Path, default='configs')
     parser.add_argument('--state', type=Path, default='state')
+    parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        filename=LOG_FILE,
-        format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-    )
+    if args.log_console:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
+        )
 
-    configs = [json.loads(config.read_text()) for config in args.config_folder.iterdir()]
+    else:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            filename=LOG_FILE,
+            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
+        )
+
+    configs = [json.loads(config.read_text()) for config in sorted(args.config_folder.iterdir())]
 
     main(args.state, configs)
