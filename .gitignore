@@ -2,3 +2,5 @@
 .idea/
 /conversations/
 /local-testing-convos/
+/local-testing-configs/
+/state
