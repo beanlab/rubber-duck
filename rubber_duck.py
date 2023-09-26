@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import TypedDict, Protocol, ContextManager
 
 import openai
-from quest import create_filesystem_historian, task, step, queue
+from quest import create_filesystem_historian, task, step, queue, version, get_version
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
+
+V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
 
 
 class Message(TypedDict):
@@ -221,7 +223,7 @@ class RubberDuck:
         for block in parse_blocks(message):
             await self._send_block(channel_id, block)
         if file is not None:
-            await self._send_block.send(channel_id, "", file=file)
+            await self._send_block(channel_id, "", file=file)
 
     #
     # Begin Conversation
@@ -267,6 +269,7 @@ class RubberDuck:
             return response
 
     @step
+    @version(V_SUPPORT_STATE_COMMAND)
     async def _handle_command(self, message: Message):
         """
             This function is called whenever the bot sees a message in a control channel
@@ -295,6 +298,9 @@ class RubberDuck:
             elif content.startswith('!help'):
                 await self._display_help(channel_id)
 
+            elif get_version() >= V_SUPPORT_STATE_COMMAND and content.startswith('!state'):
+                await self._state(channel_id)
+
             elif content.startswith('!'):
                 await self._send_message(channel_id, 'Unknown command. Try !help')
 
@@ -312,7 +318,7 @@ class RubberDuck:
         return process.stdout.decode('utf-8'), process.stderr.decode('utf-8')
 
     @step
-    async def _execute_command(self, text, channel_id):
+    async def _execute_command(self, channel_id, text):
         """
         Execute a command in the shell and return the output to the channel
         """
@@ -332,7 +338,8 @@ class RubberDuck:
             "```\n"
             "!status - print a status message\n"
             "!help - print this message\n"
-            "!log - print the log file\n"
+            "!log - get the log file\n"
+            "!state - get a zip of the state folder\n"
             "!restart - restart the bot\n"
             "```\n"
         )
@@ -343,16 +350,22 @@ class RubberDuck:
         Restart the bot
         """
         await self._send_message(channel_id, f'Restart requested.')
-        await self._execute_command('git fetch', channel_id)
-        await self._execute_command('git reset --hard', channel_id)
-        await self._execute_command('git clean -f', channel_id)
-        await self._execute_command('git pull --rebase=false', channel_id)
-        await self._execute_command('rm poetry.lock', channel_id)
-        await self._execute_command('poetry install', channel_id)
+        await self._execute_command(channel_id, 'git fetch')
+        await self._execute_command(channel_id, 'git reset --hard')
+        await self._execute_command(channel_id, 'git clean -f')
+        await self._execute_command(channel_id, 'git pull --rebase=false')
+        await self._execute_command(channel_id, 'rm poetry.lock')
+        await self._execute_command(channel_id, 'poetry install')
         await self._send_message(channel_id, f'Restarting.')
         subprocess.Popen(["bash", "restart.sh"])
         return
 
+    @step
+    async def _state(self, channel_id):
+        await self._send_message(channel_id, "Getting state zip")
+        await self._execute_command(channel_id, 'zip -r state.zip state')
+        await self._send_message(channel_id, 'state zip', file='state.zip')
+
     async def _switch_branch(self, channel_id, branch_name: str):
-        await self._execute_command(['git', 'fetch'], channel_id)
-        await self._execute_command(['git', 'switch', branch_name], channel_id)
+        await self._execute_command(channel_id, ['git', 'fetch'])
+        await self._execute_command(channel_id, ['git', 'switch', branch_name])
