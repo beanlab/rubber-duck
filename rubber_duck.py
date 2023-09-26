@@ -363,7 +363,7 @@ class RubberDuck:
     @step
     async def _state(self, channel_id):
         await self._send_message(channel_id, "Getting state zip")
-        await self._execute_command(channel_id, 'zip -r state.zip state')
+        await self._execute_command(channel_id, 'zip -q -r state.zip state')
         await self._send_message(channel_id, 'state zip', file='state.zip')
 
     async def _switch_branch(self, channel_id, branch_name: str):
