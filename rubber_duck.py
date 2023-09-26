@@ -318,7 +318,7 @@ class RubberDuck:
         """
         # Run command using shell and pipe output to channel
         await self._send_message(channel_id, f"```bash\n$ {text}```")
-        output, errors = self._run(text)
+        output, errors = await self._run(text)
 
         if errors:
             await self._send_message(channel_id, f'Errors: ```{errors}```')
