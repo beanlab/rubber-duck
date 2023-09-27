@@ -17,6 +17,7 @@ AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
 
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
+V_LOG_ZIP = '2023-09-26 Zip log file'
 
 
 class Message(TypedDict):
@@ -269,7 +270,7 @@ class RubberDuck:
             return response
 
     @step
-    @version(V_SUPPORT_STATE_COMMAND)
+    @version(V_LOG_ZIP)
     async def _handle_command(self, message: Message):
         """
             This function is called whenever the bot sees a message in a control channel
@@ -290,7 +291,10 @@ class RubberDuck:
                     await self._switch_branch(channel_id, m.group(1))
 
             elif content.startswith('!log'):
-                await self._send_message(channel_id, 'Log', file=self._log_file_path)
+                if get_version() >= V_LOG_ZIP:
+                    await self._log(channel_id)
+                else:
+                    await self._send_message(channel_id, 'Log', file=self._log_file_path)
 
             elif content.startswith('!status'):
                 await self._send_message(channel_id, 'I am alive. 🦆')
@@ -343,6 +347,11 @@ class RubberDuck:
             "!restart - restart the bot\n"
             "```\n"
         )
+
+    @step
+    async def _log(self, channel_id):
+        await self._execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
+        await self._send_message(channel_id, 'log zip', file='log.zip')
 
     @step
     async def _restart(self, channel_id):
