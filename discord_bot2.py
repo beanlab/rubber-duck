@@ -1,5 +1,7 @@
 import os
 
+from metrics import MetricsHandler
+
 
 def load_env():
     with open('secrets.env') as file:
@@ -29,6 +31,7 @@ LOG_FILE = Path('/tmp/duck.log')
 
 def as_message(message: discord.Message) -> Message:
     return Message(
+        guild_id=message.guild.id,
         channel_name=message.channel.name,
         channel_id=message.channel.id,
         author_id=message.author.id,
@@ -45,7 +48,11 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self._rubber_duck = RubberDuck(self, root_save_folder, LOG_FILE, configs)
+        state_folder = root_save_folder / 'history'
+        metrics_folder = root_save_folder / 'metrics'
+
+        self._rubber_duck = RubberDuck(
+            self, MetricsHandler(metrics_folder), state_folder, LOG_FILE, configs)
 
     async def on_ready(self):
         # print out information when the bot wakes up

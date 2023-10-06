@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import TypedDict, Protocol, ContextManager
 
 import openai
-from quest import create_filesystem_historian, task, step, queue, version, get_version
+from openai.openai_object import OpenAIObject
+from quest import create_filesystem_historian, task, step, queue, version
+
+from metrics import MetricsHandler
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 
@@ -17,10 +20,11 @@ AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
 
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
-V_LOG_ZIP = '2023-09-26 Zip log file'
+V_LOG_ZIP_STATS = '2023-09-26 Zip log file, Stats'
 
 
 class Message(TypedDict):
+    guild_id: int
     channel_name: str
     channel_id: int
     author_id: int
@@ -79,17 +83,32 @@ class MessageHandler(Protocol):
     def typing(self, channel_id: int) -> ContextManager: ...
 
 
+def wrap_steps(obj):
+    for field in dir(obj):
+        if field.startswith('_'):
+            continue
+
+        if callable(method := getattr(obj, field)):
+            method = step(method)
+            setattr(obj, field, method)
+
+    return obj
+
+
 class RubberDuck:
     def __init__(self,
-                 handler: MessageHandler,
-                 root_save_folder: Path,
+                 message_handler: MessageHandler,
+                 metrics_handler: MetricsHandler,
+                 root_state_folder: Path,
                  log_file_path: Path,
                  configs: list[dict]
                  ):
-        self._send_raw_message = handler.send_message
-        self._send_block = step(handler.send_message)
-        self._create_thread = step(handler.create_thread)
-        self._typing = handler.typing
+        self._send_raw_message = message_handler.send_message
+        self._send_block = step(message_handler.send_message)
+        self._create_thread = step(message_handler.create_thread)
+        self._typing = message_handler.typing
+
+        self._metrics_handler = wrap_steps(metrics_handler)
 
         self._log_file_path = log_file_path
         self._configs = configs
@@ -97,8 +116,11 @@ class RubberDuck:
         self._command_channel_tasks: dict[int, asyncio.Task] = {}
         self._channel_tasks: dict[str, asyncio.Task] = {}
 
+        if not root_state_folder.exists():
+            root_state_folder.mkdir(parents=True)
+
         self._conversation_manager = create_filesystem_historian(
-            root_save_folder,
+            root_state_folder,
             'conversation_manager',
             self.conversation_manager
         )
@@ -231,11 +253,17 @@ class RubberDuck:
     #
     @task
     @step
+    @version(V_LOG_ZIP_STATS)
     async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message):
+
         async with queue('messages', str(thread_id)) as messages:
             message_history = [
                 GPTMessage(role='system', content=prompt)
             ]
+            user_id = initial_message['author_id']
+            guild_id = initial_message['guild_id']
+            await self._metrics_handler.record_message(
+                guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
 
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
 
@@ -243,8 +271,24 @@ class RubberDuck:
                 message: Message = await messages.get()
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
+                user_id = message['author_id']
+                guild_id = message['guild_id']
+
+                await self._metrics_handler.record_message(
+                    guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
+
                 try:
-                    response = await self._get_response(thread_id, engine, message_history)
+                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+
+                    await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
+                                                             usage['prompt_tokens'],
+                                                             usage['completion_tokens'])
+
+                    response_message = choices[0]['message']
+                    await self._metrics_handler.record_message(
+                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
+
+                    response = response_message['content'].strip()
                     message_history.append(GPTMessage(role='assistant', content=response))
 
                     await self._send_message(thread_id, response)
@@ -256,21 +300,17 @@ class RubberDuck:
                                                         f'\nAn error occurred. Please tell a TA or the instructor.')
 
     @step
-    async def _get_response(self, thread_id, engine, message_history) -> str:
+    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
+        # Replaces _get_response
         async with self._typing(thread_id):
-            completion = await openai.ChatCompletion.acreate(
+            completion: OpenAIObject = await openai.ChatCompletion.acreate(
                 model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-
-            response_message = completion.choices[0]['message']
-            response = response_message['content'].strip()
-
-            return response
+            return completion.choices, completion.usage
 
     @step
-    @version(V_LOG_ZIP)
     async def _handle_command(self, message: Message):
         """
             This function is called whenever the bot sees a message in a control channel
@@ -291,10 +331,10 @@ class RubberDuck:
                     await self._switch_branch(channel_id, m.group(1))
 
             elif content.startswith('!log'):
-                if get_version() >= V_LOG_ZIP:
-                    await self._log(channel_id)
-                else:
-                    await self._send_message(channel_id, 'Log', file=self._log_file_path)
+                await self._log(channel_id)
+
+            elif content.startswith('!metrics'):
+                await self._report_metrics(channel_id)
 
             elif content.startswith('!status'):
                 await self._send_message(channel_id, 'I am alive. 🦆')
@@ -302,7 +342,7 @@ class RubberDuck:
             elif content.startswith('!help'):
                 await self._display_help(channel_id)
 
-            elif get_version() >= V_SUPPORT_STATE_COMMAND and content.startswith('!state'):
+            elif content.startswith('!state'):
                 await self._state(channel_id)
 
             elif content.startswith('!'):
@@ -352,6 +392,14 @@ class RubberDuck:
     async def _log(self, channel_id):
         await self._execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
         await self._send_message(channel_id, 'log zip', file='log.zip')
+
+    @step
+    async def _report_metrics(self, channel_id):
+        await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
+        await self._send_message(channel_id, 'messages zip', file='messages.zip')
+
+        await self._execute_command(channel_id, f'zip -q -r usage.zip {self._metrics_handler._usage_file}')
+        await self._send_message(channel_id, 'usage zip', file='usage.zip')
 
     @step
     async def _restart(self, channel_id):
