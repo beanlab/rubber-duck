@@ -33,7 +33,7 @@ class Message(TypedDict):
     content: str
 
 
-class GPTMessage(TypedDict):
+class GPTMessage(TypedDict): []
     role: str
     content: str
 
