@@ -12,7 +12,7 @@ import openai
 from openai.openai_object import OpenAIObject
 from quest import create_filesystem_historian, task, step, queue, version
 
-from metrics import MetricsHandler
+from rubber_duck.metrics import MetricsHandler
 
 openai.api_key = os.environ['OPENAI_API_KEY']
 

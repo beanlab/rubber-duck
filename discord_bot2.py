@@ -1,6 +1,6 @@
 import os
 
-from metrics import MetricsHandler
+from rubber_duck.metrics import MetricsHandler
 
 
 def load_env():
