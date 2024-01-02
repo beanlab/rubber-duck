@@ -22,7 +22,7 @@ import logging
 from pathlib import Path
 
 import discord
-from discord import ChannelType
+from discord import ChannelType, User
 
 from rubber_duck import Message, RubberDuck, MessageHandler
 
@@ -37,6 +37,7 @@ def as_message(message: discord.Message) -> Message:
         author_id=message.author.id,
         author_name=message.author.name,
         author_mention=message.author.mention,
+        message_id=message.id,
         content=message.content
     )
 
@@ -82,12 +83,35 @@ class MyClient(discord.Client, MessageHandler):
     # Methods for MessageHandler protocol
     #
 
-    async def create_thread(self, parent_channel_id: int, title: str) -> int:
+    async def create_thread(self, parent_channel_id: int, title: str, author_id: int, message_id: int) -> int:
+        # Find the TA and faculty roles
+        admins = []
+        guild = self.get_channel(parent_channel_id).guild
+        for role in guild.roles:
+            if role.name.lower() in ['faculty', 'professor', 'instructor', 'ta', 'tas']:
+                admins.append(role)
+
+        # Create the private thread
         thread = await self.get_channel(parent_channel_id).create_thread(
             name=title,
-            type=ChannelType.public_thread,
             auto_archive_duration=60
         )
+
+        # Grant access to the admins
+        for role in admins:
+            await thread.add_user(role)
+
+        # Grant access to the user
+        await thread._state.http.add_user_to_thread(thread.id, author_id)
+
+        # Add reaction to original message to indicate to user
+        #  that the message has been processed
+        msg = await self.get_channel(parent_channel_id).fetch_message(message_id)
+        if 'duck' in title.lower():
+            await msg.add_reaction('🦆')
+        else:
+            await msg.add_reaction('✅')
+
         return thread.id
 
     async def send_message(self, channel_id, message: str, file=None):

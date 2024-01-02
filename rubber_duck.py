@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TypedDict, Protocol, ContextManager
 
 import openai
+from discord import User
 from openai.openai_object import OpenAIObject
 from quest import create_filesystem_historian, task, step, queue, version
 
@@ -30,6 +31,7 @@ class Message(TypedDict):
     author_id: int
     author_name: str
     author_mention: str
+    message_id: int
     content: str
 
 
@@ -78,7 +80,7 @@ def parse_blocks(text: str, limit=2000):
 class MessageHandler(Protocol):
     async def send_message(self, channel_id: int, message: str, file=None): ...
 
-    async def create_thread(self, parent_id: int, title: str, ): ...
+    async def create_thread(self, parent_id: int, title: str, author_id: int, message_id: int): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -227,7 +229,9 @@ class RubberDuck:
                 message: Message = await messages.get()
                 thread_id = await self._create_thread(
                     message['channel_id'],
-                    message['content'][:20]
+                    message['content'][:20],
+                    message['author_id'],
+                    message['message_id']
                 )
                 prompt = config.get('prompt', None)
                 if prompt is None:
@@ -255,6 +259,7 @@ class RubberDuck:
     @step
     @version(V_LOG_ZIP_STATS)
     async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message):
+        prompt += '\nWhen the conversation is finished, append the string "<FINISHED>" to your last response.'
 
         async with queue('messages', str(thread_id)) as messages:
             message_history = [
@@ -269,6 +274,7 @@ class RubberDuck:
 
             while True:
                 message: Message = await messages.get()
+
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
                 user_id = message['author_id']
@@ -279,25 +285,41 @@ class RubberDuck:
 
                 try:
                     choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    response_message = choices[0]['message']
+                    response = response_message['content'].strip()
+
+                    finished = False  # TODO - if the thread is old, it is also finished
+                    if "<FINISHED>" in response:
+                        response = response.replace("<FINISHED>", "")
+                        finished = True
 
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
 
-                    response_message = choices[0]['message']
                     await self._metrics_handler.record_message(
                         guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
-                    response = response_message['content'].strip()
                     message_history.append(GPTMessage(role='assistant', content=response))
 
                     await self._send_message(thread_id, response)
 
+                    if finished:
+                        await self._send_message(thread_id, '*This conversation has been closed.*')
+                        return
+
+
+
                 except Exception:
                     error_code = str(uuid.uuid4()).split('-')[0].upper()
                     logging.exception('Error getting completion: ' + error_code)
+                    # TODO - send the control channel the thread link, error code, and full error message\
+                    # For now, we need to look up the error in the logs.
                     await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵'
-                                                        f'\nAn error occurred. Please tell a TA or the instructor.')
+                                                        f'\nAn error occurred.'
+                                                        f'\nPlease tell a TA or the instructor the error code.'
+                                                        '\n*This conversation is closed*')
+                    return
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
