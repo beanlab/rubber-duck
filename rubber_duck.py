@@ -41,15 +41,17 @@ class GPTMessage(TypedDict):
 
 
 class ChannelConfig(TypedDict):
-    name: str
+    name: str | None
+    id: int | None
     prompt: str | None
     prompt_file: str | None
     engine: str | None
+    timeout: int | None
 
 
 class RubberDuckConfig(TypedDict):
     command_channels: list[int]
-    default_engine: str
+    defaults: ChannelConfig
     channels: list[ChannelConfig]
 
 
@@ -201,7 +203,7 @@ class RubberDuck:
         for channel_config in config['channels']:
             if channel_config['name'] not in self._channel_tasks:
                 self._channel_tasks[channel_config['name']] = \
-                    self.listen_channel(config['default_engine'], channel_config)
+                    self.listen_channel(config['defaults'], channel_config)
 
         # Remove old listen channels
         valid_channels = set(c['name'] for c in config['channels'])
@@ -223,7 +225,7 @@ class RubberDuck:
 
     @task
     @step
-    async def listen_channel(self, default_engine: str, config: ChannelConfig):
+    async def listen_channel(self, defaults: ChannelConfig, config: ChannelConfig):
         async with queue('messages', config['name']) as messages:
             while True:
                 message: Message = await messages.get()
@@ -241,9 +243,11 @@ class RubberDuck:
                     else:
                         prompt = Path(prompt_file).read_text()
 
-                engine = config.get('engine', default_engine)
+                engine = config.get('engine', defaults['engine'])
 
-                self.have_conversation(thread_id, engine, prompt, message)
+                timeout = config.get('timeout', defaults['timeout'])
+
+                self.have_conversation(thread_id, engine, prompt, message, timeout)
 
     @step
     async def _send_message(self, channel_id, message: str, file=None):
@@ -258,9 +262,7 @@ class RubberDuck:
     @task
     @step
     @version(V_LOG_ZIP_STATS)
-    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message):
-        prompt += '\nWhen the conversation is finished, append the string "<FINISHED>" to your last response.'
-
+    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         async with queue('messages', str(thread_id)) as messages:
             message_history = [
                 GPTMessage(role='system', content=prompt)
@@ -273,7 +275,14 @@ class RubberDuck:
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
 
             while True:
-                message: Message = await messages.get()
+                # TODO - if the conversation is getting long, and the user changes the subject
+                #  prompt them to start a new conversation (and close this one)
+                try:
+                    message: Message = await asyncio.wait_for(messages.get(), timeout)
+
+                except asyncio.TimeoutError:
+                    await self._send_message(thread_id, '*This conversation has been closed.*')
+                    return
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
@@ -288,11 +297,6 @@ class RubberDuck:
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
-                    finished = False  # TODO - if the thread is old, it is also finished
-                    if "<FINISHED>" in response:
-                        response = response.replace("<FINISHED>", "")
-                        finished = True
-
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
@@ -303,12 +307,6 @@ class RubberDuck:
                     message_history.append(GPTMessage(role='assistant', content=response))
 
                     await self._send_message(thread_id, response)
-
-                    if finished:
-                        await self._send_message(thread_id, '*This conversation has been closed.*')
-                        return
-
-
 
                 except Exception:
                     error_code = str(uuid.uuid4()).split('-')[0].upper()

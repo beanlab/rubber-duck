@@ -37,7 +37,7 @@ The file should contain the prompt to use for each thread in that channel.
     - https://python-poetry.org/docs/#installation
     - `curl -sSL https://install.python-poetry.org | python3 -`
   - Clone this repo
-    - requires python 3.9
+    - requires python 3.11
     - run `poetry install`
 
 To run on server:

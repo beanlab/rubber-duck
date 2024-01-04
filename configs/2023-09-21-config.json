@@ -3,7 +3,10 @@
     1116427477330432011,
     1142192571435716619
   ],
-  "default_engine": "gpt-3.5-turbo",
+  "defaults": {
+    "engine": "gpt-4-1106-preview",
+    "timeout": 600
+  },
   "channels": [
     {
       "name": "duck-pond",
