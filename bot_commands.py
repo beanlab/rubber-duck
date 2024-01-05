@@ -1,3 +1,4 @@
+import datetime
 import logging
 import re
 import subprocess
@@ -27,6 +28,9 @@ class BotCommands:
         try:
             if content.startswith('!restart'):
                 await self._restart(channel_id)
+
+            elif content.startswith('!clean-restart'):
+                await self._restart(channel_id, clean=True)
 
             elif content.startswith('!branch'):
                 m = re.match(r'!branch\s+(\S+)', content)
@@ -90,6 +94,7 @@ class BotCommands:
             "!log - get the log file\n"
             "!state - get a zip of the state folder\n"
             "!restart - restart the bot\n"
+            "!clean-restart - wipe the state and restart the bot\n"
             "```\n"
         )
 
@@ -107,7 +112,7 @@ class BotCommands:
         await self._send_message(channel_id, 'usage zip', file='usage.zip')
 
     @step
-    async def _restart(self, channel_id):
+    async def _restart(self, channel_id, clean=False):
         """
         Restart the bot
         """
@@ -119,6 +124,15 @@ class BotCommands:
         await self._execute_command(channel_id, 'rm poetry.lock')
         await self._execute_command(channel_id, 'poetry install')
         await self._send_message(channel_id, f'Restarting.')
+
+        if clean:
+            timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d-%H%M%S")
+            await self._send_message(channel_id, f'mv state state-{timestamp}.')
+
+            # Don't run this as a step, as we are essentially deleting the state folder
+            subprocess.check_output(f'mv state state-{timestamp}')
+
+        # This script will kill and restart the python process
         subprocess.Popen(["bash", "restart.sh"])
         return
 
