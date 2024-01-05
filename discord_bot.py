@@ -98,7 +98,7 @@ class MyClient(discord.Client, MessageHandler):
 
         self._config = config
         self._duck_channels = {
-            cc.get('name', cc['id']): cc
+            (cc.get('name') or cc.get('id')): cc
             for cc in config['channels']
         }
 
@@ -169,6 +169,14 @@ class MyClient(discord.Client, MessageHandler):
                 as_message(message)
             )
 
+        # Belongs to an existing conversation
+        str_id = str(message.channel.id)
+        if self._workflow_manager.has_workflow(str_id):
+            await self._workflow_manager.send_event(
+                str_id, 'messages', str_id, 'put',
+                as_message(message)
+            )
+
         # Ignore message
 
     async def start_duck_conversation(self, defaults, config, message: Message):
@@ -190,9 +198,10 @@ class MyClient(discord.Client, MessageHandler):
 
         timeout = config.get('timeout', defaults['timeout'])
 
-        self._workflow_manager.start_workflow(
+        self._workflow_manager.start_workflow_background(
             'duck', str(thread_id), thread_id, engine, prompt, message, timeout
         )
+        await asyncio.sleep(0.1)
 
     async def create_thread(self, parent_channel_id: int, title: str, author_id: int, message_id: int) -> int:
         # Find the TA and faculty roles
