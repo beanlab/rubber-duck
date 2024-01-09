@@ -219,6 +219,7 @@ class MyClient(discord.Client, MessageHandler):
 
         # Grant access to the admins
         for role in admins:
+            logging.debug(f'Adding role {role.name} ({role.id}) to thread {thread.id}')
             await thread.add_user(role)
 
         # Grant access to the user
