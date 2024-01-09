@@ -21,6 +21,7 @@ load_env()
 import argparse
 import json
 import logging
+logging.basicConfig(level=logging.DEBUG)
 from pathlib import Path
 
 import discord
