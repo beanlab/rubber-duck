@@ -205,23 +205,12 @@ class MyClient(discord.Client, MessageHandler):
         await asyncio.sleep(0.1)
 
     async def create_thread(self, parent_channel_id: int, title: str, author_id: int, message_id: int) -> int:
-        # Find the TA and faculty roles
-        admins = []
-        guild = self.get_channel(parent_channel_id).guild
-        for role in guild.roles:
-            if role.name.lower() in ['faculty', 'professor', 'instructor', 'ta', 'tas']:
-                admins.append(role)
-
         # Create the private thread
+        # Users/roles with "Manage Threads" will be able to see the private threads
         thread = await self.get_channel(parent_channel_id).create_thread(
             name=title,
             auto_archive_duration=60
         )
-
-        # Grant access to the admins
-        for role in admins:
-            logging.debug(f'Adding role {role.name} ({role.id}) to thread {thread.id}')
-            await thread.add_user(role)
 
         # Grant access to the user
         await thread._state.http.add_user_to_thread(thread.id, author_id)
