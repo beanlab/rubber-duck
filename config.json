@@ -10,7 +10,7 @@
     {
       "name": "duck-pond",
       "prompt_file": "prompts/standard-rubber-duck.txt",
-      "engine": "gpt-4"
+      "engine": "gpt-4-1106-preview"
     },
     {
       "name": "other-pond",
