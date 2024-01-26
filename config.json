@@ -3,14 +3,13 @@
     1192895746672951340
   ],
   "defaults": {
-    "engine": "gpt-4-1106-preview",
+    "engine": "gpt-4-turbo-preview",
     "timeout": 600
   },
   "channels": [
     {
       "name": "duck-pond",
-      "prompt_file": "prompts/standard-rubber-duck.txt",
-      "engine": "gpt-4-1106-preview"
+      "prompt_file": "prompts/standard-rubber-duck.txt"
     },
     {
       "name": "other-pond",
@@ -19,7 +18,7 @@
     },
     {
       "name": "gpt4",
-      "engine": "gpt-4-1106-preview"
+      "engine": "gpt-4-turbo-preview"
     },
     {
       "name": "gpt-3.5-turbo",
