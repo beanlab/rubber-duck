@@ -95,7 +95,6 @@ def reset_files(client: OpenAI) -> None:
 
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-    # reset_files(client)
 
     my_assistant = get_assistant(client, 'Demo')
 
@@ -116,6 +115,7 @@ if __name__ == "__main__":
         )
 
         while run.status != 'completed':
+            # TODO: There's probably a better way to get info, maybe test out await or async
             run = client.beta.threads.runs.retrieve(
                 run_id=run.id,
                 thread_id=message_thread.id
@@ -124,5 +124,4 @@ if __name__ == "__main__":
         message_thread = client.beta.threads.retrieve(message_thread.id)
         messages= client.beta.threads.messages.list(message_thread.id)
         print(f'ChatGPT: {messages.data[0].content[0].text.value}')
-        # print(messages.data[-1].content[-1].text.value)
 
