@@ -1,0 +1,245 @@
+---
+layout: ../../../layouts/Guide.astro
+name: guide/fix-the-bridge.zip
+---
+
+import { YouTube } from "../../../components/helpers.jsx";
+
+# Fix the bridge
+
+<YouTube id='-QjtpK_xIIU' />
+
+This problem will help you practice using while loops and decomposing problems.
+Download the code linked above. Bit starts in this world:
+
+![a world with a broken bridge](/images/guide/bit/fix-bridge.start.svg)
+
+The black squares represent the ground. The blue squares represent water in a
+river. The red squares represents a bridge -- except it is not complete!
+
+Your job is to fix the bridge so that it looks like this:
+
+![a world with bridge across a river](/images/guide/bit/fix-bridge.finish.svg)
+
+## Starter code
+
+Download the zip file above and put it in your `bit` folder. You will find a
+file called `fix_bridge.py` that has the following starter code:
+
+```python
+from byubit import Bit
+
+
+@Bit.worlds('fix-bridge', 'fix-another-bridge')
+def go_fix_the_bridge(bit):
+    # Write code here
+    pass
+
+
+if __name__ == '__main__':
+    go_fix_the_bridge(Bit.new_bit)
+
+```
+
+Notice that there is another world (`fix-another-bridge`) so your solution will
+need to be general enough to solve both problems:
+
+![another world with a broken bridge](/images/guide/bit/fix-another-bridge.start.svg)
+
+## Planning
+
+Before you write any code, plan out your solution with pencil and paper. Find a
+friend and draw out how you think you would solve this problem.
+
+![work with a friend to solve this problem](/images/guide/work-with-a-friend.png)
+
+What did you draw? Maybe you drew something like this:
+
+![fixing the bridge sketch](/images/guide/bit/fix-bridge-sketch.png)
+
+- Step 1: Move to the bridge
+- Step 2: Fix the bridge
+- Step 3: Move off the bridge
+
+## Decomposing the problem
+
+Now start at the highest or most abstract level and write functions. For
+example:
+
+```python
+def go_fix_the_bridge(bit):
+    """ Move to the bridge, fix the bridge, and move off the bridge. """
+    move_to_the_bridge(bit)
+    fix_the_bridge(bit)
+    move_off_the_bridge(bit)
+```
+
+Remember, PyCharm will put squiggly red lines underneath the functions you
+haven't defined yet:
+
+![Pycharm showing undefined functions](/images/guide/bit/fix-bridge-function-not-defined.png)
+
+Hover over these and select `Create function` in blue to create empty functions
+for each of them:
+
+```python
+
+def move_to_the_bridge(bit):
+    pass
+
+
+def fix_the_bridge(bit):
+    pass
+
+
+def move_off_the_bridge(bit):
+    pass
+
+
+@Bit.worlds('fix-another-bridge', 'fix-bridge')
+def go_fix_the_bridge(bit):
+    """ Move to the bridge, fix the bridge, and move off the bridge. """
+    move_to_the_bridge(bit)
+    fix_the_bridge(bit)
+    move_off_the_bridge(bit)
+```
+
+We define these functions with `pass` so that we can fill them in one at a time.
+
+## Moving to the bridge
+
+How would you move to the bridge?
+
+![work with a friend to solve this problem](/images/guide/work-with-a-friend.png)
+
+Here is one way to do this:
+
+```python
+def move_to_the_bridge(bit):
+    """ Move to the left corner of the bridge.
+        End up on the red square, facing right
+    """
+    while not bit.right_clear():
+        bit.move()
+
+    # Bit is now over the left end of the bridge
+    # Move down and onto the bridge, end facing to the right
+    bit.right()
+    bit.move()
+    bit.left()
+```
+
+We can use `while not bit.right_clear()` to keep moving until we get past the
+edge of the ground. This leaves us right above the red square. The last step is
+to turn, move down, and then turn back so we end up facing right. This puts Bit
+in good position to fix the bridge.
+
+Stop and run your code to be sure it works:
+
+![Bit has moved onto the bridge](/images/guide/bit/fix-bridge-step-1.png)
+
+It is OK that we haven't solved the entire problem! We have the first step
+working great!
+
+## Comments
+
+In the code above, you will see that there are some _comments_, which are lines
+starting with a pound sign `#`. Comments are a way to write notes to yourself
+and to others to explain what you were thinking when you wrote your code. They
+are really helpful!
+
+Try to write comments liberally in your code. This will seem like extra work at
+first, but they will _save you time_ as you write code. You will invariably take
+a break and come back to your code at a later time. Comments will let you know
+what you were thinking, especially if you are looking for bugs.
+
+> Use comments liberally!
+
+## Fix the bridge
+
+OK, back to coding. How would you fix the bridge?
+
+![work with a friend to solve this problem](/images/guide/work-with-a-friend.png)
+
+Here is one way to do this:
+
+```python
+def fix_the_bridge(bit):
+    """ Fix the bridge. End up on the last square, facing right. """
+    # move off the first red square
+    bit.move()
+    # now move until we get to a red square, painting as we go
+    while not bit.is_red():
+        bit.paint('red')
+        bit.move()
+```
+
+We want to use `while not bit.is_red()` to move to the right side of the bridge.
+But Bit starts on a red square! So we need to move Bit one square first, and
+then run this while loop.
+
+Inside the while loop, we paint first and then move. If we move first and then
+paint, we would skip a square.
+
+Let's run our code, which covers the first two steps:
+
+![Bit has fixed the bridge](/images/guide/bit/fix-bridge-step-2.png)
+
+We have made great progress! We have only one more step left.
+
+## Move off the bridge
+
+How would you move off the bridge and get Bit to its final position?
+
+![work with a friend to solve this problem](/images/guide/work-with-a-friend.png)
+
+Here is one way to do this:
+
+```python
+def move_off_the_bridge(bit):
+    """ Move off the bridge and into the final position, at the right
+        edge of the world, facing right.
+    """
+    # move off the bridge
+    bit.left()
+    bit.move()
+    bit.right()
+
+    # now move until Bit gets to the edge of the world
+    while bit.front_clear():
+        bit.move()
+```
+
+We first have to move Bit off the bridge. Once Bit is on the ground, we can use
+a while loop to move to the right edge of the world.
+
+Let's check to be sure this works:
+
+![bridge is complete, Bit is at the edge of the world](/images/guide/bit/fix-bridge-complete.png)
+
+Wonderful! Another problem solved!
+
+## While versus while not
+
+Notice how we sometimes use `while` and sometimes `while not`. To move to the
+edge of the bridge we use `while not`:
+
+```python
+while not bit.right_clear():
+    bit.move()
+```
+
+We are looking for a clear space, so we need to move while it is _not_ clear on
+the right.
+
+However, to move to the edge of the world, we use just `while`:
+
+```python
+while bit.front_clear():
+    bit.move()
+```
+
+This is because we are looking for a space that is _not_ clear, so we need to
+move while it _is_ clear.
+
+With practice, this will become natural.
