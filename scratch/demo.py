@@ -45,11 +45,9 @@ def get_assistant_instructions() -> str:
 
 
 def serialize_assistant(assistant_name: str, assistant: openai.types.beta.Assistant) -> None:
-    # Pickle the assistant for easy retrieval later
-    # Also, serializing with JSON didn't work
-    with open(f'assistants/{assistant_name}.pkl', 'wb') as f:
-        pickle.dump(assistant, f)
-
+    # Serialize the assistant for easy retrieval later
+    with open(f'assistants/{assistant_name}.json', 'w') as f:
+        f.write(assistant.model_dump_json(indent=4))
 
 
 def create_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assistant:
@@ -78,13 +76,15 @@ def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assi
 
     dir_contents = os.listdir(dir)
     # If there isn't a serialized version of this specific assistant, create a new one
-    if f'{assistant_name}.pkl' not in dir_contents:
+    if f'{assistant_name}.json' not in dir_contents:
         return create_assistant(client, assistant_name)
     # Implied else statement
 
-    # Unpickle the assistant
-    with open(f'{dir}/{assistant_name}.pkl', 'rb') as f:
-        return pickle.load(f)
+    # Get the assistant information
+    with open(f'{dir}/{assistant_name}.json', 'r') as f:
+        assistant_info = json.load(f)
+
+    return client.beta.assistants.retrieve(assistant_info['id'])
 
 
 def reset_files(client: OpenAI) -> None:
@@ -95,9 +95,34 @@ def reset_files(client: OpenAI) -> None:
 
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+    # reset_files(client)
 
     my_assistant = get_assistant(client, 'Demo')
 
+    print('ChatGPT: How can I help you today?')
+    message_thread = client.beta.threads.create()
     while True:
-        user_input = input("ChatGPT: How can I help you today?\n")
+        user_input = input("User: ")
+
+        message = client.beta.threads.messages.create(
+            thread_id=message_thread.id,
+            role='user',
+            content= user_input
+        )
+
+        run = client.beta.threads.runs.create(
+            thread_id=message_thread.id,
+            assistant_id=my_assistant.id
+        )
+
+        while run.status != 'completed':
+            run = client.beta.threads.runs.retrieve(
+                run_id=run.id,
+                thread_id=message_thread.id
+            )
+
+        message_thread = client.beta.threads.retrieve(message_thread.id)
+        messages= client.beta.threads.messages.list(message_thread.id)
+        print(f'ChatGPT: {messages.data[0].content[0].text.value}')
+        # print(messages.data[-1].content[-1].text.value)
 
