@@ -1,15 +1,21 @@
 import openai.types.beta
 from openai import OpenAI
-import pickle
 import json
 import os
 
 
 def create_file_id(filename: str, dir: str) -> openai.File:
     return client.files.create(
-        file=open(f'{dir}/{filename}', "rb"), # Must be 'rb' for API to work
+        file=open(f'{dir}/{filename}', "rb"),  # Must be 'rb' for API to work
         purpose='assistants'
     )
+
+
+
+def serialize_file(assistant_name: str, file: openai.File) -> None:
+    with open(f'{assistant_name}-file-objects/{file.filename}.json', 'w') as f:
+        f.write(file.model_dump_json(indent=4))
+        # json.dump(file.__dict__, f)
 
 
 def serialize_files(assistant_name: str, assistant_files: list[openai.File]) -> None:
@@ -20,9 +26,7 @@ def serialize_files(assistant_name: str, assistant_files: list[openai.File]) -> 
 
     for file in assistant_files:
         # Serialize openai.File with JSON for easy storage and retrieval
-        with open(f'{assistant_name}-file-objects/{file.filename}.json', 'w') as f:
-            json.dump(file.__dict__, f)
-
+        serialize_file(assistant_name, file)
 
 
 def get_file_ids(assistant_name: str) -> list:
@@ -73,7 +77,6 @@ def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assi
     if dir not in dir_contents:
         os.mkdir(dir)
 
-
     dir_contents = os.listdir(dir)
     # If there isn't a serialized version of this specific assistant, create a new one
     if f'{assistant_name}.json' not in dir_contents:
@@ -93,20 +96,32 @@ def reset_files(client: OpenAI) -> None:
         client.files.delete(file.id)
 
 
+def add_assistant_file(client: OpenAI, filename: str, assistant: openai.types.beta.Assistant) -> None:
+    dir = '.'
+    file = create_file_id(filename, dir)
+    assistant_file = client.beta.assistants.files.create(
+        assistant_id=assistant.id,
+        file_id=file.id
+    )
+
+    serialize_file(assistant.name, file)
+
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
     my_assistant = get_assistant(client, 'Demo')
 
+    lcr = 0
     print('ChatGPT: How can I help you today?')
     message_thread = client.beta.threads.create()
     while True:
+        lcr += 1
         user_input = input("User: ")
 
         message = client.beta.threads.messages.create(
             thread_id=message_thread.id,
             role='user',
-            content= user_input
+            content=user_input
         )
 
         run = client.beta.threads.runs.create(
@@ -115,13 +130,16 @@ if __name__ == "__main__":
         )
 
         while run.status != 'completed':
-            # TODO: There's probably a better way to get info, maybe test out await or async
+            # TODO: There's probably a better way to wait for an update, maybe test out await / async
             run = client.beta.threads.runs.retrieve(
                 run_id=run.id,
                 thread_id=message_thread.id
             )
 
         message_thread = client.beta.threads.retrieve(message_thread.id)
-        messages= client.beta.threads.messages.list(message_thread.id)
-        print(f'ChatGPT: {messages.data[0].content[0].text.value}')
+        messages = client.beta.threads.messages.list(message_thread.id)
+        formatted_response = "\n".join(messages.data[0].content[0].text.value.split("."))
+        print(f'ChatGPT: {formatted_response}')
 
+        if lcr == 1:
+            add_assistant_file(client, 'bitbot.mdx', my_assistant)
