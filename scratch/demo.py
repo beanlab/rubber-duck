@@ -47,9 +47,9 @@ def get_assistant_instructions() -> str:
         return f.read()
 
 
-def serialize_assistant(assistant_name: str, assistant: openai.types.beta.Assistant) -> None:
+def serialize_assistant(assistant: openai.types.beta.Assistant) -> None:
     # Serialize the assistant for easy retrieval later
-    with open(f'assistants/{assistant_name}.json', 'w') as f:
+    with open(f'assistants/{assistant.name}.json', 'w') as f:
         f.write(assistant.model_dump_json(indent=4))
 
 
@@ -64,7 +64,7 @@ def create_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.A
         # Generates file ids for all the files in the folder with the assistant's name
     )
 
-    serialize_assistant(assistant_name, assistant)
+    serialize_assistant(assistant)
 
     return assistant
 
@@ -95,6 +95,7 @@ def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assi
 def delete_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> None:
     response = client.beta.assistants.delete(assistant.id)
     print(response)
+    print('Assistant deleted.\nProgram will now exit.')
 
 
 def reset_files(client: OpenAI) -> None:
@@ -104,7 +105,7 @@ def reset_files(client: OpenAI) -> None:
 
 
 def add_assistant_file(client: OpenAI, assistant: openai.types.beta.Assistant, filename: str) -> None:
-    dir = '.'
+    dir = f'{assistant.name}-files'
     file = create_file_id(filename, dir)
     # This returns an assistant file object, which is different from a File object
     client.beta.assistants.files.create(
@@ -115,13 +116,18 @@ def add_assistant_file(client: OpenAI, assistant: openai.types.beta.Assistant, f
     serialize_file(assistant.name, file)
 
 
-def remove_assistant_file(client: openai.OpenAI,
-                          assistant_id: str,
-                          file_id: str) -> None:
-    client.beta.assistants.files.delete(
-        assistant_id=assistant_id,
-        file_id=file_id
+def remove_assistant_file(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> None:
+    print_assistant_files(assistant.name)
+    filename = input('Enter the filename (include extension): ').strip()
+    # This removes the file from the assistant's list of files
+    response = client.beta.assistants.files.delete(
+        assistant_id=assistant.id,
+        file_id=get_assistant_file_id(assistant.name, filename)
     )
+    print(response)
+
+    # This removes the file in the local directory
+    remove_serialized_file(assistant.name, filename)
 
 
 def remove_serialized_file(assistant_name: str, filename: str) -> None:
@@ -135,53 +141,105 @@ def get_assistant_file_id(assistant_name: str, filename: str) -> str:
         return json.load(f)['id']
 
 
-def get_modify_assistant_options() -> str:
-    return """
+def modify_instructions(client: openai.OpenAI, assistant_id: str) -> openai.types.beta.Assistant:
+    updated_instructions = input('\nPlease enter the new instructions:\n')
+
+    return client.beta.assistants.update(
+        assistant_id=assistant_id,
+        instructions=updated_instructions
+    )
+
+
+def modify_assistant_parameters(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> None:
+    print_modify_assistant_options()
+    modify_parameter = int(input('Enter a number: ').strip())
+
+    match modify_parameter:
+        case '1':  # Instructions
+            new_assistant = modify_instructions(client, assistant.id)
+        case '2':  # Name
+            pass
+        case '3':  # Tools
+            pass
+        case '4':  # Model
+            pass
+        case '5':  # Files
+            pass
+        case _:
+            print('Invalid input. Please enter a number between 1-5')
+
+    serialize_assistant(new_assistant)
+
+
+def print_assistant_files(assistant_name: str) -> None:
+    # ***
+    # Assuming that all the files in the {assistant.name}-file-objects folder are associated with the
+    # assistant and will display them accordingly
+    # ***
+    dir = f'{assistant_name}-file-objects'
+
+    files = os.listdir(dir)
+    file_json_objects = []
+
+    for filename in files:
+        with open(f'{dir}/{filename}') as f:
+            file_json_objects.append(json.load(f))
+
+    file_names = [f"{number}. {f_json['filename']}" for number, f_json in enumerate(file_json_objects)]
+
+    print(f"\nHere's a list of all the files linked to the {assistant_name} assistant:")
+    print("\n".join(file_names),end='\n\n')
+
+
+def print_modify_assistant_options() -> None:
+    print("""
 Which would you like to modify?
     1. Instructions 
     2. Name (of assistant)
     3. Tools (retrieval, function, code generation)
     4. Model ('gpt4', 'gpt3.5-1106')
     5. Files (new filename(s))
-    """
+    """)
 
 
-def get_modify_options() -> str:
-    return """
-How would you like to modify this assistant?
+def print_modify_options() -> None:
+     print("""
+How would you like to modify this assistant? (Enter 'q' to stop modifications)
     1. Add an assistant file
     2. Remove an assistant file
     3. Modify assistant instructions, name, tools, model, file ids
     4. Delete this assistant
-    """
+    """)
 
 
-def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> None:
-    print(get_modify_options())
-    modify_number = int(input('Enter a number: ').strip())
+def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> bool:
+    print_modify_options()
+    modify_number = input('Enter a number: ').strip()
     match modify_number:
-        case 1:  # Add assistant file
+        case '1':  # Add assistant file
             filename = input('Enter filename (include extension): ').strip()
             add_assistant_file(client, assistant, filename)
-        case 2:  # Remove an assistant file
-            filename = input('Enter filename (include extension): ').strip()
-            remove_assistant_file(client, assistant.id, get_assistant_file_id(assistant.name, filename))
-            remove_serialized_file(assistant.name, filename)
-        case 3:  # Modify an assistant
-            print(get_modify_assistant_options())
-            # TODO: Implement dynamic functions to change assistant
-        case 4:  # Delete this assistant
+        case '2':  # Remove an assistant file
+            remove_assistant_file(client, assistant)
+        case '3':  # Modify an assistant
+            modify_assistant_parameters(client, assistant)
+        case '4':  # Delete this assistant
             confirmation = input(f'Are you sure you want to permanently delete {assistant.name}? [y] / [n]\n')
             if 'y' in confirmation.strip().lower():
                 delete_assistant(client, assistant)
+                exit(0)
+        case 'q':
+            return False
         case _:
             print('Invalid input. Please enter a number between 1-4')
+
+    print('Model has been modified.\n')
+    return True
 
     # TODO: Make this an input loop for making as many changes as the user wants
 
 
 def get_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
-    # message_thread = client.beta.threads.retrieve(message_thread_id)
     messages = client.beta.threads.messages.list(message_thread_id)
     formatted_response = "\n".join(messages.data[0].content[0].text.value.split("."))
     return f'ChatGPT: {formatted_response}'
@@ -223,16 +281,18 @@ if __name__ == "__main__":
     assistant_name = input("Which assistant do you want to use? ").strip()
 
     my_assistant = get_assistant(client, assistant_name)
+
     print("Assistant loaded!\n")
 
     modify_answer = input('Do you want to modify this assistant? [y]o / [n]o\n').lower()
 
     if 'y' in modify_answer:
-        modify_assistant(client, my_assistant)
-        print('Model has been modified.\n')
+        modify = True
+        while modify:
+            modify = modify_assistant(client, my_assistant)
 
-    lcr = 0
-    print('ChatGPT: How can I help you today?')
     message_thread = client.beta.threads.create()
+    print('ChatGPT: How can I help you today?')
+
     while True:
         chat_bot(client, my_assistant.id, message_thread.id)
