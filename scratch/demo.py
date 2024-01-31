@@ -2,6 +2,7 @@ import openai.types.beta
 from openai import OpenAI
 import json
 import os
+import re
 
 
 def create_file_id(filename: str, dir: str) -> openai.File:
@@ -239,7 +240,8 @@ def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assista
 
 def get_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
     messages = client.beta.threads.messages.list(message_thread_id)
-    formatted_response = "\n".join(messages.data[0].content[0].text.value.split("."))
+
+    formatted_response = messages.data[0].content[0].text.value.replace('. ', '.\n')
     return f'ChatGPT: {formatted_response}'
 
 
