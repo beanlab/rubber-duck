@@ -2,7 +2,7 @@ import openai.types.beta
 from openai import OpenAI
 import json
 import os
-import re
+import time
 
 
 def create_file_id(filename: str, dir: str) -> openai.File:
@@ -238,11 +238,11 @@ def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assista
     return True
 
 
-def get_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
+def print_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
     messages = client.beta.threads.messages.list(message_thread_id)
 
     formatted_response = messages.data[0].content[0].text.value.replace('. ', '.\n')
-    return f'ChatGPT: {formatted_response}'
+    print(f'ChatGPT: {formatted_response}')
 
 
 
@@ -264,12 +264,14 @@ def chat_bot(client: openai.OpenAI,
     )
 
     while run.status != 'completed':
+        time.sleep(1)
         run = client.beta.threads.runs.retrieve(
             run_id=run.id,
             thread_id=message_thread_id
         )
 
-    print(get_gpt_completion(client, message_thread_id))
+
+    print_gpt_completion(client, message_thread_id)
 
 
 # BEFORE YOU RUN:
@@ -290,6 +292,10 @@ if __name__ == "__main__":
         modify = True
         while modify:
             modify = modify_assistant(client, my_assistant)
+
+        # Update the assistant based on the changes
+        my_assistant = client.beta.assistants.retrieve(my_assistant.id)
+        serialize_assistant(my_assistant)
 
     message_thread = client.beta.threads.create()
     print('ChatGPT: How can I help you today?')
