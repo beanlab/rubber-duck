@@ -236,8 +236,6 @@ def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assista
     print('Model has been modified.\n')
     return True
 
-    # TODO: Make this an input loop for making as many changes as the user wants
-
 
 def get_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
     messages = client.beta.threads.messages.list(message_thread_id)
