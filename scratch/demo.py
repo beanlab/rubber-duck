@@ -75,7 +75,7 @@ def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assi
     dir_contents = [f.name for f in pathlib.Path().iterdir()]
     dir_name = 'assistants'
     # Create the directory "assistants" if it isn't there
-    if dir not in dir_contents:
+    if dir_name not in dir_contents:
         # os.mkdir(dir_name)
         pathlib.Path(dir_name).mkdir()
 
@@ -275,9 +275,9 @@ def chat_bot(client: openai.OpenAI,
     print_gpt_completion(client, message_thread_id)
 
 
-def show_assistants():
-    print([f.name for f in pathlib.Path().iterdir()])
-    pass
+def show_assistants(dir_name: str):
+    print("Here are all the assistants on file: ",end='\n\t')
+    print("\t\n".join([f'{num+1}. {f.name.removesuffix(".json")}' for num, f in enumerate(pathlib.Path(dir_name).iterdir())]))
 
 
 # BEFORE YOU RUN:
@@ -286,7 +286,8 @@ def show_assistants():
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-    show_assistants()
+    assistant_directory = 'assistants'
+    show_assistants(assistant_directory)
     assistant_name = input("Which assistant do you want to use? ").strip()
 
     my_assistant = get_assistant(client, assistant_name)
@@ -303,6 +304,7 @@ if __name__ == "__main__":
         # Update the assistant based on the changes
         my_assistant = client.beta.assistants.retrieve(my_assistant.id)
         serialize_assistant(my_assistant)
+        # TODO: Update the files with the new assistant
 
     message_thread = client.beta.threads.create()
     print('ChatGPT: How can I help you today?')
