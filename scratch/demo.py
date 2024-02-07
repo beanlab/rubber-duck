@@ -2,12 +2,13 @@ import openai.types.beta
 from openai import OpenAI
 import json
 import os
+import pathlib
 import time
 
 
-def create_file_id(filename: str, dir: str) -> openai.File:
+def create_file_id(filename: str, dir_name: str) -> openai.File:
     return client.files.create(
-        file=open(f'{dir}/{filename}', "rb"),  # Must be 'rb' for API to work
+        file=open(f'{dir_name}/{filename}', "rb"),  # Must be 'rb' for API to work
         purpose='assistants'
     )
 
@@ -19,7 +20,7 @@ def serialize_file(assistant_name: str, file: openai.File) -> None:
 
 
 def serialize_files(assistant_name: str, assistant_files: list[openai.File]) -> None:
-    dir_contents = os.listdir()
+    dir_contents = [f.name for f in pathlib.Path().iterdir()]
     # Creates a directory to hold file objects if not already there
     if f'{assistant_name}-file-objects' not in dir_contents:
         os.mkdir(f'{assistant_name}-file-objects')
@@ -31,9 +32,9 @@ def serialize_files(assistant_name: str, assistant_files: list[openai.File]) -> 
 
 def get_file_ids(assistant_name: str) -> list:
     # Read the files and generate unique file ids for each document
-    dir = f'{assistant_name}-files'
-    files = os.listdir(dir)
-    assistant_files = [create_file_id(file, dir) for file in files]
+    dir_name = f'{assistant_name}-files'
+    files = [f.name for f in pathlib.Path().iterdir()]
+    assistant_files = [create_file_id(file, dir_name) for file in files]
 
     # Serialize the documents as .json
     serialize_files(assistant_name, assistant_files)
@@ -71,13 +72,14 @@ def create_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.A
 
 
 def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assistant:
-    dir_contents = os.listdir()
-    dir = 'assistants'
+    dir_contents = [f.name for f in pathlib.Path().iterdir()]
+    dir_name = 'assistants'
     # Create the directory "assistants" if it isn't there
     if dir not in dir_contents:
-        os.mkdir(dir)
+        # os.mkdir(dir_name)
+        pathlib.Path(dir_name).mkdir()
 
-    dir_contents = os.listdir(dir)
+    dir_contents = [f.name for f in pathlib.Path(dir_name).iterdir()]
     # If there isn't a serialized version of this specific assistant, create a new one
     if f'{assistant_name}.json' not in dir_contents:
         print('Assistant not found!\nCreating new assistant...')
@@ -87,13 +89,14 @@ def get_assistant(client: OpenAI, assistant_name: str) -> openai.types.beta.Assi
     print('Assistant found!\nLoading assistant...')
 
     # Get the assistant information
-    with open(f'{dir}/{assistant_name}.json', 'r') as f:
+    with open(f'{dir_name}/{assistant_name}.json', 'r') as f:
         assistant_info = json.load(f)
 
     return client.beta.assistants.retrieve(assistant_info['id'])
 
 
 def delete_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assistant) -> None:
+    pathlib.Path(f'assistants/{assistant.name}.json').unlink()  # Same as os.remove(path)
     response = client.beta.assistants.delete(assistant.id)
     print(response)
     print('Assistant deleted.\nProgram will now exit.')
@@ -106,8 +109,8 @@ def reset_files(client: OpenAI) -> None:
 
 
 def add_assistant_file(client: OpenAI, assistant: openai.types.beta.Assistant, filename: str) -> None:
-    dir = f'{assistant.name}-files'
-    file = create_file_id(filename, dir)
+    dir_name = f'{assistant.name}-files'
+    file = create_file_id(filename, dir_name)
     # This returns an assistant file object, which is different from a File object
     client.beta.assistants.files.create(
         assistant_id=assistant.id,
@@ -132,7 +135,7 @@ def remove_assistant_file(client: openai.OpenAI, assistant: openai.types.beta.As
 
 
 def remove_serialized_file(assistant_name: str, filename: str) -> None:
-    os.remove(f'{assistant_name}-file-objects/{filename}.json')
+    pathlib.Path(f'{assistant_name}-file-objects/{filename}.json').unlink()  # Same as os.remove(path)
     print('File successfully deleted.\n')
 
 
@@ -177,19 +180,19 @@ def print_assistant_files(assistant_name: str) -> None:
     # Assuming that all the files in the {assistant.name}-file-objects folder are associated with the
     # assistant and will display them accordingly
     # ***
-    dir = f'{assistant_name}-file-objects'
+    dir_name = f'{assistant_name}-file-objects'
 
-    files = os.listdir(dir)
+    files = [f.name for f in pathlib.Path(dir_name).iterdir()]
     file_json_objects = []
 
     for filename in files:
-        with open(f'{dir}/{filename}') as f:
+        with open(f'{dir_name}/{filename}') as f:
             file_json_objects.append(json.load(f))
 
     file_names = [f"{number}. {f_json['filename']}" for number, f_json in enumerate(file_json_objects)]
 
     print(f"\nHere's a list of all the files linked to the {assistant_name} assistant:")
-    print("\n".join(file_names),end='\n\n')
+    print("\n".join(file_names), end='\n\n')
 
 
 def print_modify_assistant_options() -> None:
@@ -204,7 +207,7 @@ Which would you like to modify?
 
 
 def print_modify_options() -> None:
-     print("""
+    print("""
 How would you like to modify this assistant? (Enter 'q' to stop modifications)
     1. Add an assistant file
     2. Remove an assistant file
@@ -238,12 +241,11 @@ def modify_assistant(client: openai.OpenAI, assistant: openai.types.beta.Assista
     return True
 
 
-def print_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> str:
+def print_gpt_completion(client: openai.OpenAI, message_thread_id: str) -> None:
     messages = client.beta.threads.messages.list(message_thread_id)
 
     formatted_response = messages.data[0].content[0].text.value.replace('. ', '.\n')
     print(f'ChatGPT: {formatted_response}')
-
 
 
 def chat_bot(client: openai.OpenAI,
@@ -270,8 +272,12 @@ def chat_bot(client: openai.OpenAI,
             thread_id=message_thread_id
         )
 
-
     print_gpt_completion(client, message_thread_id)
+
+
+def show_assistants():
+    print([f.name for f in pathlib.Path().iterdir()])
+    pass
 
 
 # BEFORE YOU RUN:
@@ -280,6 +286,7 @@ def chat_bot(client: openai.OpenAI,
 if __name__ == "__main__":
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+    show_assistants()
     assistant_name = input("Which assistant do you want to use? ").strip()
 
     my_assistant = get_assistant(client, assistant_name)

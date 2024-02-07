@@ -10,12 +10,13 @@ from typing import TypedDict, Protocol, ContextManager
 
 import openai
 from discord import User
-from openai.openai_object import OpenAIObject
+from openai import AsyncOpenAI
+from openai.types.chat.chat_completion import ChatCompletion
 from quest import create_filesystem_historian, task, step, queue, version
 
 from metrics import MetricsHandler
 
-openai.api_key = os.environ['OPENAI_API_KEY']
+client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
@@ -106,10 +107,15 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
-                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    completion = await self._get_completion(thread_id, engine, message_history)
+                    choices = completion['choices']
+                    usage = completion['usage']
+
+                    logging.debug(f"Completion \"choices\": {choices}")
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
+                    logging.debug(f"Completion \"usage\": {usage}")
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
@@ -133,12 +139,12 @@ class RubberDuck:
                     return
 
     @step
-    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
+    async def _get_completion(self, thread_id, engine, message_history) -> dict:
         # Replaces _get_response
         async with self._typing(thread_id):
-            completion: OpenAIObject = await openai.ChatCompletion.acreate(
+            completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-            return completion.choices, completion.usage
+            return completion.dict()
