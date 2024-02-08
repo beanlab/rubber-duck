@@ -280,6 +280,7 @@ def show_assistants(dir_name: str):
     print("\t\n".join([f'{num+1}. {f.name.removesuffix(".json")}' for num, f in enumerate(pathlib.Path(dir_name).iterdir())]))
 
 
+# nohup poetry run python discord_bot.py >> /tmp/duck.log &
 # BEFORE YOU RUN:
 # Make sure you have a directory named "{assistant_name}-files" with the appropriate documents
 # These wil be the documents uploaded with the assistant
