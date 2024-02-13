@@ -250,7 +250,7 @@ def main(state_path: Path, config: RubberDuckConfig):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='my_config.json')
     parser.add_argument('--state', type=Path, default='state')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()

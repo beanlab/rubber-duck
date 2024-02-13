@@ -6,12 +6,13 @@ import subprocess
 import traceback
 import uuid
 from pathlib import Path
-from typing import TypedDict, Protocol, ContextManager
+from typing import TypedDict, Protocol, ContextManager, Tuple, Dict, List
 
 import openai
 from discord import User
 from openai import AsyncOpenAI
-from openai.types.chat.chat_completion import ChatCompletion
+from openai.types import CompletionUsage
+from openai.types.chat.chat_completion import ChatCompletion, Choice
 from quest import create_filesystem_historian, task, step, queue, version
 
 from metrics import MetricsHandler
@@ -107,9 +108,7 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
-                    completion = await self._get_completion(thread_id, engine, message_history)
-                    choices = completion['choices']
-                    usage = completion['usage']
+                    choices, usage = await self._get_completion(thread_id, engine, message_history)
 
                     logging.debug(f"Completion \"choices\": {choices}")
                     response_message = choices[0]['message']
@@ -139,7 +138,8 @@ class RubberDuck:
                     return
 
     @step
-    async def _get_completion(self, thread_id, engine, message_history) -> dict:
+    async def _get_completion(self, thread_id, engine, message_history) -> tuple[
+        dict[str, list[Choice]], dict | None]:
         # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
@@ -147,4 +147,7 @@ class RubberDuck:
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-            return completion.dict()
+            completion_dict = completion.dict()
+            choices = completion_dict['choices']
+            usage = completion_dict['usage']
+            return choices, usage
