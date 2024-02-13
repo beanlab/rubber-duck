@@ -138,8 +138,7 @@ class RubberDuck:
                     return
 
     @step
-    async def _get_completion(self, thread_id, engine, message_history) -> tuple[
-        dict[str, list[Choice]], dict | None]:
+    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
