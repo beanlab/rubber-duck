@@ -119,6 +119,7 @@ class RubberDuck:
                     response = response_message['content'].strip()
 
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
+                                                             engine,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
 
