@@ -1,19 +1,12 @@
 import asyncio
 import logging
 import os
-import re
-import subprocess
-import traceback
 import uuid
 import traceback as tb
-from typing import TypedDict, Protocol, ContextManager, Callable, Coroutine, Any
-
-import openai
-from discord import User
+from typing import TypedDict, Protocol, ContextManager
 from openai import AsyncOpenAI
-from openai.types import CompletionUsage
-from openai.types.chat.chat_completion import ChatCompletion, Choice
-from quest import create_filesystem_historian, task, step, queue, version
+from openai.types.chat.chat_completion import ChatCompletion
+from quest import step, queue
 
 from metrics import MetricsHandler
 
