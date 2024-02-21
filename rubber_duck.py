@@ -136,7 +136,6 @@ class RubberDuck:
                         f'\n{ex}\n'
                         '\n'.join(tb.format_exception(ex))
                     )
-                    print("This is the error: ", ex)
                     await self._report_error(error_message)
 
                     if isinstance(ex, (openai.error.Timeout, openai.error.APIError, openai.error.APIConnectionError,
