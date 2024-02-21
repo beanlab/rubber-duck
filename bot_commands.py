@@ -28,10 +28,12 @@ class BotCommands:
         channel_id = message['channel_id']
         try:
             if content.startswith('!restart'):
-                await self._restart(channel_id)
+                await self._send_message('The restart command has been temporarily disabled.')
+                # await self._restart(channel_id)
 
             elif content.startswith('!clean-restart'):
-                await self._restart(channel_id, clean=True)
+                await self._send_message('The restart command has been temporarily disabled.')
+                # await self._restart(channel_id, clean=True)
 
             elif content.startswith('!branch'):
                 m = re.match(r'!branch\s+(\S+)', content)

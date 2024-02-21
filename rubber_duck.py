@@ -1,21 +1,16 @@
 import asyncio
 import logging
 import os
-import re
-import subprocess
-import traceback
 import uuid
-from pathlib import Path
+import traceback as tb
 from typing import TypedDict, Protocol, ContextManager
-
-import openai
-from discord import User
-from openai.openai_object import OpenAIObject
-from quest import create_filesystem_historian, task, step, queue, version
+from openai import AsyncOpenAI
+from openai.types.chat.chat_completion import ChatCompletion
+from quest import step, queue
 
 from metrics import MetricsHandler
 
-openai.api_key = os.environ['OPENAI_API_KEY']
+client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
@@ -46,6 +41,10 @@ class MessageHandler(Protocol):
     def typing(self, channel_id: int) -> ContextManager: ...
 
 
+class ErrorHandler(Protocol):
+    async def __call__(self, message: str): ...
+
+
 def wrap_steps(obj):
     for field in dir(obj):
         if field.startswith('_'):
@@ -60,9 +59,11 @@ def wrap_steps(obj):
 
 class RubberDuck:
     def __init__(self,
+                 error_handler: ErrorHandler,
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
                  ):
+        self._report_error = step(error_handler)
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
         self._typing = message_handler.typing
@@ -114,6 +115,7 @@ class RubberDuck:
                     response = response_message['content'].strip()
 
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
+                                                             engine,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
 
@@ -124,24 +126,34 @@ class RubberDuck:
 
                     await self._send_message(thread_id, response)
 
-                except Exception:
+                except Exception as ex:
                     error_code = str(uuid.uuid4()).split('-')[0].upper()
                     logging.exception('Error getting completion: ' + error_code)
-                    # TODO - send the control channel the thread link, error code, and full error message
-                    # For now, we need to look up the error in the logs.
-                    await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵'
-                                                        f'\nAn error occurred.'
-                                                        f'\nPlease tell a TA or the instructor the error code.'
-                                                        '\n*This conversation is closed*')
+                    error_message = (
+                        f'😵 **Error code {error_code}** 😵'
+                        f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
+                        f'\n{ex}\n'
+                        '\n'.join(tb.format_exception(ex))
+                    )
+                    await self._report_error(error_message)
+
+                    await self._send_message(thread_id,
+                                             f'😵 **Error code {error_code}** 😵'
+                                             f'\nAn error occurred.'
+                                             f'\nPlease tell a TA or the instructor the error code.'
+                                             '\n*This conversation is closed*')
                     return
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
-            completion: OpenAIObject = await openai.ChatCompletion.acreate(
+            completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-            return completion.choices, completion.usage
+            completion_dict = completion.dict()
+            choices = completion_dict['choices']
+            usage = completion_dict['usage']
+            return choices, usage

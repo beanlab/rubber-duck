@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -111,7 +111,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message, MetricsHandler(metrics_folder))
                 case 'duck':
-                    return RubberDuck(self, MetricsHandler(metrics_folder))
+                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder))
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -242,6 +242,15 @@ class MyClient(discord.Client, MessageHandler):
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
+    #
+    # Method for ErrorHandler Protocol
+    #
+    async def handle_error(self, msg: str):
+        for channel_id in self._config['command_channels']:
+            try:
+                await self.send_message(channel_id, msg)
+            except:
+                logging.exception(f'Unable to message channel {channel_id}')
 
 def main(state_path: Path, config: RubberDuckConfig):
     client = MyClient(state_path, config)
