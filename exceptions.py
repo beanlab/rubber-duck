@@ -1,0 +1,3 @@
+
+class ServerError(Exception):
+    pass
