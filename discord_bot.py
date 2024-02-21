@@ -230,14 +230,26 @@ class MyClient(discord.Client, MessageHandler):
     #
 
     async def send_message(self, channel_id, message: str, file=None):
+        channel = self.get_channel(channel_id)
+        curr_message = None
         if file is not None:
             file = discord.File(file)
 
         for block in parse_blocks(message):
-            await self.get_channel(channel_id).send(block)
+            curr_message = await channel.send(block)
 
         if file is not None:
-            await self.get_channel(channel_id).send("", file=file)
+            curr_message = await channel.send("", file=file)
+
+        return curr_message.id
+
+    async def edit_message(self, channel_id, message_id: int, new_content: str):
+        channel = self.get_channel(channel_id)
+        try:
+            msg = await channel.fetch_message(message_id)
+            await msg.edit(content=new_content)
+        except Exception as e:
+            logging.exception(f"Could not edit message in channel {channel_id}: {e}")
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
@@ -280,3 +292,4 @@ if __name__ == '__main__':
     config = json.loads(args.config.read_text())
 
     main(args.state, config)
+

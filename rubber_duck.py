@@ -3,14 +3,15 @@ import logging
 import os
 import uuid
 import traceback as tb
-from typing import TypedDict, Protocol, ContextManager
-from openai import AsyncOpenAI
-from openai.types.chat.chat_completion import ChatCompletion
+from typing import TypedDict, Protocol, ContextManager, Callable, Coroutine, Any
+
+import openai
+from openai.openai_object import OpenAIObject
 from quest import step, queue
 
 from metrics import MetricsHandler
 
-client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
+openai.api_key = os.environ['OPENAI_API_KEY']
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
@@ -36,7 +37,9 @@ class GPTMessage(TypedDict):
 
 
 class MessageHandler(Protocol):
-    async def send_message(self, channel_id: int, message: str, file=None): ...
+    async def send_message(self, channel_id: int, message: str, file=None) ->int: ...
+
+    async def edit_message(self, channel_id: int, message_id: int, new_content: str): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -56,7 +59,6 @@ def wrap_steps(obj):
 
     return obj
 
-
 class RubberDuck:
     def __init__(self,
                  error_handler: ErrorHandler,
@@ -66,9 +68,11 @@ class RubberDuck:
         self._report_error = step(error_handler)
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
+        self._edit_message = step(message_handler.edit_message)
         self._typing = message_handler.typing
 
         self._metrics_handler = wrap_steps(metrics_handler)
+        self._error_message_id = None
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
@@ -107,7 +111,7 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
-                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
@@ -134,23 +138,54 @@ class RubberDuck:
                     )
                     await self._report_error(error_message)
 
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵'
-                                             f'\nAn error occurred.'
-                                             f'\nPlease tell a TA or the instructor the error code.'
-                                             '\n*This conversation is closed*')
+                    if isinstance(ex, (openai.error.Timeout, openai.error.APIError, openai.error.APIConnectionError,
+                                  openai.error.InvalidRequestError, openai.error.AuthenticationError,
+                                  openai.error.PermissionError, openai.error.RateLimitError)):
+                        await self._edit_message(thread_id, self._error_message_id,
+                                            'I\'m having trouble connecting to the OpenAI servers, please open up a separate conversation and try again')
+                    else:
+                        await self._edit_message(thread_id, self._error_message_id,
+                                            f'😵 **Error code {error_code}** 😵'
+                                            f'\nAn unexpected error occurred. Please contact support.'
+                                            f'\nError code for reference: {error_code}'
+                                            '\n*This conversation is closed*')
+
                     return
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
-            completion: ChatCompletion = await client.chat.completions.create(
+            await asyncio.sleep(3)
+            completion: OpenAIObject = await openai.ChatCompletion.acreate(
                 model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-            completion_dict = completion.dict()
-            choices = completion_dict['choices']
-            usage = completion_dict['usage']
-            return choices, usage
+            return completion.choices, completion.usage
+
+
+    @step
+    async def _get_completion_with_retry(self, thread_id, engine, message_history):
+        max_retries = 4
+        delay = 2
+        backoff = 2
+        retries = 0
+        current_delay = delay
+        processing_message_sent = False
+        while retries < max_retries:
+            try:
+                return await self._get_completion(thread_id, engine, message_history)
+            except Exception as ex:
+                if not processing_message_sent:
+                    processing_message_id = await self._send_message(thread_id, 'Trying to contact servers...')
+                    self._error_message_id = processing_message_id
+                    processing_message_sent = True
+                retries += 1
+                if retries >= max_retries:
+                    raise
+                logging.warning(
+                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {current_delay} seconds.")
+                await asyncio.sleep(current_delay)
+                current_delay *= backoff
+
