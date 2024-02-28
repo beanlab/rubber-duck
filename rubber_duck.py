@@ -154,20 +154,20 @@ class RubberDuck:
                         await self._edit_message(thread_id, self._error_message_id,
                                                  'I\'m having trouble processing your request, I have notified your professor to look into the problem!')
                         if isinstance(ex, openai.APIConnectionError):
-                            client_error_message = f"{mentions}\n*** APIConnectionError ***\n{openai_web_mention}"
+                            client_error_message = "*** APIConnectionError ***"
                         elif isinstance(ex, openai.BadRequestError):
-                            client_error_message = f"{mentions}\n*** BadRequestError ***\n{openai_web_mention}"
+                            client_error_message = "*** BadRequestError ***"
                         elif isinstance(ex, openai.AuthenticationError):
-                            client_error_message = f"{mentions}\n*** AuthenticationError ***\n{openai_web_mention}"
+                            client_error_message = "*** AuthenticationError ***"
                         elif isinstance(ex, openai.ConflictError):
-                            client_error_message = f"{mentions}\n*** ConflictError ***\n{openai_web_mention}"
+                            client_error_message = "*** ConflictError ***"
                         elif isinstance(ex, openai.NotFoundError):
-                            client_error_message = f"{mentions}\n*** NotFoundError ***\n{openai_web_mention}"
+                            client_error_message = "*** NotFoundError ***"
                         elif isinstance(ex, openai.PermissionDeniedError):
-                            client_error_message = f"{mentions}\n*** PermissionDeniedError ***\n{openai_web_mention}"
+                            client_error_message = "*** PermissionDeniedError ***"
                         elif isinstance(ex, openai.RateLimitError):
-                            client_error_message = f"{mentions}\n*** RateLimitError ***\n{openai_web_mention}"
-                        await self._report_error(client_error_message)
+                            client_error_message = "*** RateLimitError ***"
+                        await self._report_error(f"{mentions}\n{client_error_message}\n{openai_web_mention}")
                     else:
                         await self._edit_message(thread_id, self._error_message_id,
                                                  f'😵 **Error code {error_code}** 😵'
