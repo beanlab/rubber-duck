@@ -5,6 +5,7 @@ import uuid
 import traceback as tb
 from typing import TypedDict, Protocol, ContextManager
 from openai import AsyncOpenAI
+import openai
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue
 
@@ -139,35 +140,33 @@ class RubberDuck:
 
                     # For server-side errors
                     if isinstance(ex,
-                                  (openai.error.Timeout, openai.error.APIError, openai.error.ServiceUnavailableError)):
+                                  (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError)):
                         await self._edit_message(thread_id, self._error_message_id,
                                                  'I\'m having trouble connecting to the OpenAI servers, please open up a separate conversation and try again')
                     # For client-side errors
-                    # Should I have specific instructions here or just give the link to the OpenAI site that describes these errors in more depth?
-                    elif isinstance(ex, (openai.error.APIConnectionError, openai.error.InvalidRequestError,
-                                         openai.error.AuthenticationError, openai.error.PermissionError,
-                                         openai.error.RateLimitError)):
+                    elif isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
+                                         openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
+                                         openai.RateLimitError)):
                         user_ids_to_mention = [933123843038535741]
                         # user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791, 353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
                         mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+                        openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors for more details on how to resolve this error"
                         await self._edit_message(thread_id, self._error_message_id,
                                                  'I\'m having trouble processing your request, I have notified your professor to look into the problem!')
-                        if isinstance(ex, openai.error.APIConnectionError):
-                            client_error_message = f"{mentions}\n*** APIConnectionError *** \nThere was an issue connecting to OpenAI on the client side." \
-                                                   f"\nSome possible solutions are to check network settings, proxy configuration, SSL certificates, or firewall rules."
-                        elif isinstance(ex, openai.error.InvalidRequestError):
-                            client_error_message = f"{mentions}\n*** InvalidRequestError *** \nThe client request was malformed or missing some required parameters," \
-                                                   f" such as a token or an input.\nThe error message below should advise you on the specific error made. " \
-                                                   f"Check the documentation for the specific API method called and make sure valid and complete parameters are being sent." \
-                                                   f"You may also need to check the encoding, format, or size of the request data."
-                        elif isinstance(ex, openai.error.AuthenticationError):
-                            client_error_message = f"{mentions}\n*** AuthenticationError *** \nThe API key used was invalid, expired, or revoked." \
-                                                   f"\nCheck that the API key used is correct and active"
-                        elif isinstance(ex, openai.error.PermissionError):
-                            client_error_message = f"{mentions}\n*** PermissionError *** \nThe API key does not have the required scope or role to perform the requested action" \
-                                                   f"\nCheck that the API key used has appropriate permissions"
-                        elif isinstance(ex, openai.error.RateLimitError):
-                            client_error_message = f"{mentions}\n*** RateLimitError *** \nThe assigned rate limit was hit"
+                        if isinstance(ex, openai.APIConnectionError):
+                            client_error_message = f"{mentions}\n*** APIConnectionError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.BadRequestError):
+                            client_error_message = f"{mentions}\n*** BadRequestError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.AuthenticationError):
+                            client_error_message = f"{mentions}\n*** AuthenticationError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.ConflictError):
+                            client_error_message = f"{mentions}\n*** ConflictError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.NotFoundError):
+                            client_error_message = f"{mentions}\n*** NotFoundError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.PermissionDeniedError):
+                            client_error_message = f"{mentions}\n*** PermissionDeniedError ***\n{openai_web_mention}"
+                        elif isinstance(ex, openai.RateLimitError):
+                            client_error_message = f"{mentions}\n*** RateLimitError ***\n{openai_web_mention}"
                         await self._report_error(client_error_message)
                     else:
                         await self._edit_message(thread_id, self._error_message_id,
@@ -184,10 +183,9 @@ class RubberDuck:
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
-            await asyncio.sleep(3)
-            raise openai.error.APIConnectionError(message="Simulated OpenAI error for demonstration.")
             completion: ChatCompletion = await client.chat.completions.create(
-                model=engine,
+                # model=engine,
+                model = "fake_engine",
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
@@ -215,9 +213,9 @@ class RubberDuck:
                     processing_message_sent = True
                 retries += 1
                 # These errors are specific to the client side of things, so we don't need to send multiple calls to the server
-                if retries >= max_retries or isinstance(ex, (
-                openai.error.APIConnectionError, openai.error.InvalidRequestError,
-                openai.error.AuthenticationError, openai.error.PermissionError, openai.error.RateLimitError)):
+                if retries >= max_retries or isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
+                                         openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
+                                         openai.RateLimitError)):
                     raise
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {current_delay} seconds.")

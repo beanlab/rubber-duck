@@ -236,11 +236,9 @@ class MyClient(discord.Client, MessageHandler):
             file = discord.File(file)
 
         for block in parse_blocks(message):
-            await channel.send(block)
             curr_message = await channel.send(block)
 
         if file is not None:
-            await channel.send("", file=file)
             curr_message = await channel.send("", file=file)
 
         return curr_message.id
