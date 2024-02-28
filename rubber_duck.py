@@ -142,17 +142,20 @@ class RubberDuck:
                     if isinstance(ex,
                                   (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError)):
                         await self._edit_message(thread_id, self._error_message_id,
-                                                 'I\'m having trouble connecting to the OpenAI servers, please open up a separate conversation and try again')
+                                                 'I\'m having trouble connecting to the OpenAI servers, '
+                                                 'please open up a separate conversation and try again')
                     # For client-side errors
                     elif isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError)):
-                        #user_ids_to_mention = [933123843038535741]
-                        user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791, 353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
+                        user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791,
+                                               353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
                         mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
-                        openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors for more details on how to resolve this error"
+                        openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
+                                             "for more details on how to resolve this error"
                         await self._edit_message(thread_id, self._error_message_id,
-                                                 'I\'m having trouble processing your request, I have notified your professor to look into the problem!')
+                                                 'I\'m having trouble processing your request, '
+                                                 'I have notified your professor to look into the problem!')
                         if isinstance(ex, openai.APIConnectionError):
                             client_error_message = "*** APIConnectionError ***"
                         elif isinstance(ex, openai.BadRequestError):
@@ -212,7 +215,8 @@ class RubberDuck:
                     self._error_message_id = processing_message_id
                     processing_message_sent = True
                 retries += 1
-                # These errors are specific to the client side of things, so we don't need to send multiple calls to the server
+                # These errors are specific to the client side of things,
+                # so we don't need to send multiple calls to the server
                 if retries >= max_retries or isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
                                                              openai.AuthenticationError, openai.ConflictError,
                                                              openai.ConflictError, openai.NotFoundError,
