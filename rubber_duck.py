@@ -147,8 +147,8 @@ class RubberDuck:
                     elif isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError)):
-                        user_ids_to_mention = [933123843038535741]
-                        # user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791, 353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
+                        #user_ids_to_mention = [933123843038535741]
+                        user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791, 353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
                         mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
                         openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors for more details on how to resolve this error"
                         await self._edit_message(thread_id, self._error_message_id,
@@ -214,8 +214,9 @@ class RubberDuck:
                 retries += 1
                 # These errors are specific to the client side of things, so we don't need to send multiple calls to the server
                 if retries >= max_retries or isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
-                                         openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
-                                         openai.RateLimitError)):
+                                                             openai.AuthenticationError, openai.ConflictError,
+                                                             openai.ConflictError, openai.NotFoundError,
+                                                             openai.RateLimitError)):
                     raise
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {current_delay} seconds.")
