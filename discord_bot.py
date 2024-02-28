@@ -66,7 +66,8 @@ def as_message(message: discord.Message) -> Message:
         author_name=message.author.name,
         author_mention=message.author.mention,
         message_id=message.id,
-        content=message.content
+        content=message.content,
+        is_file=len(message.attachments) > 0
     )
 
 
