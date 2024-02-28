@@ -148,6 +148,7 @@ class RubberDuck:
                     elif isinstance(ex, (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError)):
+                        #user_ids_to_mention = [933123843038535741]
                         user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791,
                                                353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
                         mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
@@ -187,8 +188,7 @@ class RubberDuck:
         # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
-                # model=engine,
-                model = "fake_engine",
+                model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
