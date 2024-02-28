@@ -36,7 +36,9 @@ class GPTMessage(TypedDict):
 
 
 class MessageHandler(Protocol):
-    async def send_message(self, channel_id: int, message: str, file=None): ...
+    async def send_message(self, channel_id: int, message: str, file=None) -> int: ...
+
+    async def edit_message(self, channel_id: int, message_id: int, new_content: str): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -66,9 +68,11 @@ class RubberDuck:
         self._report_error = step(error_handler)
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
+        self._edit_message = step(message_handler.edit_message)
         self._typing = message_handler.typing
 
         self._metrics_handler = wrap_steps(metrics_handler)
+        self._error_message_id = None
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
@@ -107,7 +111,7 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
-                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
@@ -132,19 +136,56 @@ class RubberDuck:
                         f'\n{ex}\n'
                         '\n'.join(tb.format_exception(ex))
                     )
+
+                    # For server-side errors
+                    if isinstance(ex,
+                                  (openai.error.Timeout, openai.error.APIError, openai.error.ServiceUnavailableError)):
+                        await self._edit_message(thread_id, self._error_message_id,
+                                                 'I\'m having trouble connecting to the OpenAI servers, please open up a separate conversation and try again')
+                    # For client-side errors
+                    # Should I have specific instructions here or just give the link to the OpenAI site that describes these errors in more depth?
+                    elif isinstance(ex, (openai.error.APIConnectionError, openai.error.InvalidRequestError,
+                                         openai.error.AuthenticationError, openai.error.PermissionError,
+                                         openai.error.RateLimitError)):
+                        user_ids_to_mention = [933123843038535741]
+                        # user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791, 353454081265762315, 941080292557471764] #Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
+                        mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+                        await self._edit_message(thread_id, self._error_message_id,
+                                                 'I\'m having trouble processing your request, I have notified your professor to look into the problem!')
+                        if isinstance(ex, openai.error.APIConnectionError):
+                            client_error_message = f"{mentions}\n*** APIConnectionError *** \nThere was an issue connecting to OpenAI on the client side." \
+                                                   f"\nSome possible solutions are to check network settings, proxy configuration, SSL certificates, or firewall rules."
+                        elif isinstance(ex, openai.error.InvalidRequestError):
+                            client_error_message = f"{mentions}\n*** InvalidRequestError *** \nThe client request was malformed or missing some required parameters," \
+                                                   f" such as a token or an input.\nThe error message below should advise you on the specific error made. " \
+                                                   f"Check the documentation for the specific API method called and make sure valid and complete parameters are being sent." \
+                                                   f"You may also need to check the encoding, format, or size of the request data."
+                        elif isinstance(ex, openai.error.AuthenticationError):
+                            client_error_message = f"{mentions}\n*** AuthenticationError *** \nThe API key used was invalid, expired, or revoked." \
+                                                   f"\nCheck that the API key used is correct and active"
+                        elif isinstance(ex, openai.error.PermissionError):
+                            client_error_message = f"{mentions}\n*** PermissionError *** \nThe API key does not have the required scope or role to perform the requested action" \
+                                                   f"\nCheck that the API key used has appropriate permissions"
+                        elif isinstance(ex, openai.error.RateLimitError):
+                            client_error_message = f"{mentions}\n*** RateLimitError *** \nThe assigned rate limit was hit"
+                        await self._report_error(client_error_message)
+                    else:
+                        await self._edit_message(thread_id, self._error_message_id,
+                                                 f'😵 **Error code {error_code}** 😵'
+                                                 f'\nAn unexpected error occurred. Please contact support.'
+                                                 f'\nError code for reference: {error_code}'
+                                                 '\n*This conversation is closed*')
+
                     await self._report_error(error_message)
 
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵'
-                                             f'\nAn error occurred.'
-                                             f'\nPlease tell a TA or the instructor the error code.'
-                                             '\n*This conversation is closed*')
                     return
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
+            await asyncio.sleep(3)
+            raise openai.error.APIConnectionError(message="Simulated OpenAI error for demonstration.")
             completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
                 messages=message_history
@@ -154,3 +195,31 @@ class RubberDuck:
             choices = completion_dict['choices']
             usage = completion_dict['usage']
             return choices, usage
+
+    @step
+    async def _get_completion_with_retry(self, thread_id, engine, message_history):
+        max_retries = 2
+        delay = 2
+        backoff = 2
+        retries = 0
+        current_delay = delay
+        processing_message_sent = False
+        while retries < max_retries:
+            try:
+                return await self._get_completion(thread_id, engine, message_history)
+            except Exception as ex:
+                print("This is the exception: ", ex)
+                if not processing_message_sent:
+                    processing_message_id = await self._send_message(thread_id, 'Trying to contact servers...')
+                    self._error_message_id = processing_message_id
+                    processing_message_sent = True
+                retries += 1
+                # These errors are specific to the client side of things, so we don't need to send multiple calls to the server
+                if retries >= max_retries or isinstance(ex, (
+                openai.error.APIConnectionError, openai.error.InvalidRequestError,
+                openai.error.AuthenticationError, openai.error.PermissionError, openai.error.RateLimitError)):
+                    raise
+                logging.warning(
+                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {current_delay} seconds.")
+                await asyncio.sleep(current_delay)
+                current_delay *= backoff
