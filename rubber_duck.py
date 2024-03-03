@@ -3,15 +3,14 @@ import logging
 import os
 import uuid
 import traceback as tb
-from typing import TypedDict, Protocol, ContextManager, Callable, Coroutine, Any
-
-import openai
-from openai.openai_object import OpenAIObject
+from typing import TypedDict, Protocol, ContextManager
+from openai import AsyncOpenAI
+from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue
 
 from metrics import MetricsHandler
 
-openai.api_key = os.environ['OPENAI_API_KEY']
+client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 AI_ENGINE = 'gpt-4'
 CONVERSATION_TIMEOUT = 60 * 3  # three minutes
@@ -146,9 +145,12 @@ class RubberDuck:
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
         async with self._typing(thread_id):
-            completion: OpenAIObject = await openai.ChatCompletion.acreate(
+            completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
-            return completion.choices, completion.usage
+            completion_dict = completion.dict()
+            choices = completion_dict['choices']
+            usage = completion_dict['usage']
+            return choices, usage
