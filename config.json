@@ -1,15 +1,16 @@
 {
   "command_channels": [
-    1192895746672951340
+    1194803260163366952
   ],
   "defaults": {
-    "engine": "gpt-4-turbo-preview",
+    "engine": "gpt-4-1106-preview",
     "timeout": 600
   },
   "channels": [
     {
       "name": "duck-pond",
-      "prompt_file": "prompts/standard-rubber-duck.txt"
+      "prompt_file": "prompts/standard-rubber-duck.txt",
+      "engine": "gpt-4"
     },
     {
       "name": "other-pond",
@@ -18,7 +19,7 @@
     },
     {
       "name": "gpt4",
-      "engine": "gpt-4-turbo-preview"
+      "engine": "gpt-4"
     },
     {
       "name": "gpt-3.5-turbo",

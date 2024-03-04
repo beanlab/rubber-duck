@@ -5,6 +5,7 @@ import uuid
 import traceback as tb
 from typing import TypedDict, Protocol, ContextManager
 from openai import AsyncOpenAI
+from discord import User 
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue
 

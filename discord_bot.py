@@ -238,7 +238,7 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             await self.get_channel(channel_id).send("", file=file)
-
+ 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
@@ -259,7 +259,7 @@ def main(state_path: Path, config: RubberDuckConfig):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='myConfig.json')
     parser.add_argument('--state', type=Path, default='state')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
