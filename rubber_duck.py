@@ -8,7 +8,10 @@ from openai import AsyncOpenAI
 import openai
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue
-# from discord_bot import RubberDuckConfig
+import httpx
+
+from unittest.mock import Mock
+
 
 from metrics import MetricsHandler
 
@@ -169,11 +172,6 @@ class RubberDuck:
                 except (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError) as ex:
-
-
-                    # user_ids_to_mention = [911012305880358952, 933123843038535741, 1014286006595358791,
-                    #                        353454081265762315,
-                    #                        941080292557471764]  # Dr.Bean, MaKenna, Chase, YoungWoo, Molly's ID's
                     user_ids_to_mention = self._config["admin_ids"]
                     mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
@@ -204,8 +202,8 @@ class RubberDuck:
         # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
-                model="fake_engine",
                 # model=engine,
+                model="fake_engine",
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
@@ -219,17 +217,18 @@ class RubberDuck:
         max_retries = self._config["max_retries"]
         delay = self._config["delay"]
         backoff = self._config["backoff"]
-        retries = 0
+        retries = -1
         while retries < max_retries:
             try:
                 return await self._get_completion(thread_id, engine, message_history)
             except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
-                if retries == 0:
+                if retries == -1:
                     processing_message_id = await self._send_message(thread_id, 'Trying to contact servers...')
                     self._error_message_id = processing_message_id
-                elif retries >= max_retries:
-                    raise
                 retries += 1
+                if retries >= max_retries:
+                    raise
+
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
