@@ -92,7 +92,6 @@ class RubberDuck:
         self._edit_message = step(message_handler.edit_message)
         self._typing = message_handler.typing
         self._config = config
-
         self._metrics_handler = wrap_steps(metrics_handler)
         self._error_message_id = None
 
@@ -108,7 +107,7 @@ class RubberDuck:
             f'\n{ex}\n'
             '\n'.join(tb.format_exception(ex))
         )
-        return error_message
+        return error_message, error_code
 
     #
     # Begin Conversation
@@ -161,7 +160,7 @@ class RubberDuck:
                     await self._send_message(thread_id, response)
 
                 except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
-                    error_message = self.generate_error_message(guild_id, thread_id, ex)
+                    error_message, _ = self.generate_error_message(guild_id, thread_id, ex)
                     await self._edit_message(thread_id, self._error_message_id,
                                              'I\'m having trouble connecting to the OpenAI servers, '
                                              'please open up a separate conversation and try again')
@@ -179,8 +178,8 @@ class RubberDuck:
                     mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
-                    error_message = self.generate_error_message(guild_id, thread_id, ex)
-                    await self._edit_message(thread_id, self._error_message_id,
+                    error_message, _ = self.generate_error_message(guild_id, thread_id, ex)
+                    await self._send_message(thread_id,
                                              'I\'m having trouble processing your request, '
                                              'I have notified your professor to look into the problem!')
                     openai_error_message = f"*** {type(ex).__name__} ***"
@@ -189,15 +188,8 @@ class RubberDuck:
                     await self._report_error(error_message)
 
                 except Exception as ex:
-                    error_code = str(uuid.uuid4()).split('-')[0].upper()
-                    logging.exception('Error getting completion: ' + error_code)
-                    error_message = (
-                        f'😵 **Error code {error_code}** 😵'
-                        f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
-                        f'\n{ex}\n'
-                        '\n'.join(tb.format_exception(ex))
-                    )
-                    await self._edit_message(thread_id, self._error_message_id,
+                    error_message, error_code = self.generate_error_message(guild_id, thread_id, ex)
+                    await self._send_message(thread_id,
                                              f'😵 **Error code {error_code}** 😵'
                                              f'\nAn unexpected error occurred. Please contact support.'
                                              f'\nError code for reference: {error_code}'

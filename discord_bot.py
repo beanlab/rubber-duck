@@ -241,7 +241,7 @@ class MyClient(discord.Client, MessageHandler):
     #
     # Method for ErrorHandler Protocol
     #
-    async def ErrorHandler(self, msg: str):
+    async def handle_error(self, msg: str):
         for channel_id in self._config['command_channels']:
             try:
                 await self.send_message(channel_id, msg)

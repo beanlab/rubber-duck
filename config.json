@@ -1,6 +1,6 @@
 {
   "command_channels": [
-    1192895746672951340
+    1212135823617560587
   ],
   "defaults": {
     "engine": "gpt-4-turbo-preview",
@@ -28,13 +28,7 @@
   "admin_ids": [
     933123843038535741
   ],
-  "max_retries": [
-    2
-  ],
-  "delay": [
-    2
-  ],
-  "backoff": [
-    2
-  ]
+  "max_retries": 2,
+  "delay": 2,
+  "backoff": 2
 }
