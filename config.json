@@ -24,5 +24,17 @@
       "name": "gpt-3.5-turbo",
       "engine": "gpt-3.5-turbo"
     }
+  ],
+  "admin_ids": [
+    933123843038535741
+  ],
+  "max_retries": [
+    2
+  ],
+  "delay": [
+    2
+  ],
+  "backoff": [
+    2
   ]
 }

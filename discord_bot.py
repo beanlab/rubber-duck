@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, RubberDuckConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -69,22 +69,6 @@ def as_message(message: discord.Message) -> Message:
         content=message.content
     )
 
-
-class ChannelConfig(TypedDict):
-    name: str | None
-    id: int | None
-    prompt: str | None
-    prompt_file: str | None
-    engine: str | None
-    timeout: int | None
-
-
-class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
-
-
 class MyClient(discord.Client, MessageHandler):
     def __init__(self, root_save_folder: Path, config: RubberDuckConfig):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
@@ -111,7 +95,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder))
+                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder), config)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -229,7 +213,7 @@ class MyClient(discord.Client, MessageHandler):
     # Methods for MessageHandler protocol
     #
 
-    async def send_message(self, channel_id, message: str, file=None):
+    async def send_message(self, channel_id, message: str, file=None) -> int:
         channel = self.get_channel(channel_id)
         curr_message = None
         if file is not None:
@@ -243,13 +227,13 @@ class MyClient(discord.Client, MessageHandler):
 
         return curr_message.id
 
-    async def edit_message(self, channel_id, message_id: int, new_content: str):
+    async def edit_message(self, channel_id: int, message_id: int, new_content: str):
         channel = self.get_channel(channel_id)
         try:
             msg = await channel.fetch_message(message_id)
             await msg.edit(content=new_content)
         except Exception as e:
-            logging.exception(f"Could not edit message in channel {channel_id}: {e}")
+            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
@@ -257,7 +241,7 @@ class MyClient(discord.Client, MessageHandler):
     #
     # Method for ErrorHandler Protocol
     #
-    async def handle_error(self, msg: str):
+    async def ErrorHandler(self, msg: str):
         for channel_id in self._config['command_channels']:
             try:
                 await self.send_message(channel_id, msg)
