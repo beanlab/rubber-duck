@@ -78,6 +78,12 @@ for key, value in shopping_cart.items():
     print(key, value)
 ```
 
+------
+
+User: This code doesn't work. Can you fix it for me?
+
+Response:
+
 # Bad
 
 User: I'm totally lost with how to use a dictionary. Can you explain them to me and show me some sample code?

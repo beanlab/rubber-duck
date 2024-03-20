@@ -11,9 +11,8 @@ from rubber_duck import Message
 
 
 class BotCommands:
-    def __init__(self, send_message, metrics_handler):
+    def __init__(self, send_message):
         self._send_message = step(send_message)
-        self._metrics_handler = metrics_handler
 
     async def __call__(self, message: Message):
         return await self.handle_command(message)
