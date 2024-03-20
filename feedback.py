@@ -22,9 +22,6 @@ class FeedbackWorkflow:
 
     async def request_feedback(self, guild_id: int, thread_id: int, user_id: int):
         async with queue("feedback", str(thread_id)) as feedback_queue:
-            
-            # async def send_feedback(feedback_score: int):
-            #     await self.workflow_manager.send_event(str(thread_id), "feedback", str(thread_id), "put", feedback_score)
 
             feedback_view = FeedbackView(self.post_event, self._send_message, thread_id)
             message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation?"
