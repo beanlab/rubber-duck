@@ -11,11 +11,6 @@ from quest import step, queue
 
 from metrics import MetricsHandler
 
-from datetime import datetime, timedelta
-
-import discord
-from discord.ui import View, Button
-
 from feedback import FeedbackWorkflow, FeedbackButton, FeedbackView
 
 openai.api_key = os.environ['OPENAI_API_KEY']
