@@ -4,5 +4,6 @@
 /local-testing-convos/
 /local-testing-configs/
 /state
-__pycache__/
+/__pycache__
 my_config.json
+
