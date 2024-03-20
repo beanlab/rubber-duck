@@ -39,6 +39,7 @@ class GPTMessage(TypedDict):
     role: str
     content: str
 
+
 class ChannelConfig(TypedDict):
     name: str | None
     id: int | None
@@ -48,15 +49,18 @@ class ChannelConfig(TypedDict):
     timeout: int | None
 
 
-class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
-    admin_ids: list[int]
+class RetryConfig(TypedDict):
     max_retries: int
     delay: int
     backoff: int
 
+
+class RubberDuckConfig(TypedDict):
+    command_channels: list[int]
+    admin_ids: list[int]
+    defaults: ChannelConfig
+    channels: list[ChannelConfig]
+    retry_protocol: RetryConfig
 
 class MessageHandler(Protocol):
     async def send_message(self, channel_id: int, message: str, file=None) -> int: ...
@@ -202,8 +206,7 @@ class RubberDuck:
         # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
-                # model=engine,
-                model="fake_engine",
+                model=engine,
                 messages=message_history
             )
             logging.debug(f"Completion: {completion}")
@@ -214,9 +217,9 @@ class RubberDuck:
 
     @step
     async def _get_completion_with_retry(self, thread_id, engine, message_history):
-        max_retries = self._config["max_retries"]
-        delay = self._config["delay"]
-        backoff = self._config["backoff"]
+        max_retries = self._config['retry_protocol']['max_retries']
+        delay = self._config['retry_protocol']['delay']
+        backoff = self._config['retry_protocol']['backoff']
         retries = -1
         while retries < max_retries:
             try:

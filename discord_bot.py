@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, RubberDuckConfig
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, RubberDuckConfig, RetryConfig, ChannelConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -70,7 +70,7 @@ def as_message(message: discord.Message) -> Message:
     )
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, config: RubberDuckConfig):
+    def __init__(self, root_save_folder: Path, x):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
@@ -86,6 +86,22 @@ class MyClient(discord.Client, MessageHandler):
             (cc.get('name') or cc.get('id')): cc
             for cc in config['channels']
         }
+        self._retry_config = RetryConfig(max_retries=self._config["max_retries"], delay=self._config["delay"],backoff=self._config["backoff"])
+        self._default_config = ChannelConfig(name=None, id=None, prompt=None, prompt_file=None,
+                                             engine=self._config["defaults"]["engine"], timeout=self._config["defaults"]["timeout"])
+        self._all_channels_config = []
+        for channel in self._config["channels"]:
+            self._all_channels_config.append(ChannelConfig(
+                name=channel.get("name", None),
+                id=channel.get("id", None),
+                prompt=channel.get("prompt", None),
+                prompt_file=channel.get("prompt_file", None),
+                engine=channel.get("engine", self._config["defaults"].get("engine", None)),
+                timeout=channel.get("timeout", self._config["defaults"].get("timeout", None))
+            ))
+        self._rubber_duck_config = RubberDuckConfig(command_channels=self._config["command_channels"], admin_ids=self._config["admin_ids"],
+                                                   defaults=self._default_config,channels=self._all_channels_config,
+                                                   retry_protocol=self._retry_config)
 
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
@@ -95,7 +111,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder), config)
+                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder), self._rubber_duck_config)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
