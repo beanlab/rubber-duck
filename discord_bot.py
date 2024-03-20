@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, Attachment
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -58,6 +58,7 @@ def parse_blocks(text: str, limit=2000):
 
 
 def as_message(message: discord.Message) -> Message:
+   
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -66,10 +67,22 @@ def as_message(message: discord.Message) -> Message:
         author_name=message.author.name,
         author_mention=message.author.mention,
         message_id=message.id,
+        
         content=message.content,
-        is_file=len(message.attachments) > 0
-    )
+        # is_file=len(message.attachments) > 0
 
+        file = [as_attachment(attachment) for attachment in message.attachments] # call new as_attachment
+    )
+#create function that takes a attachment and return a dictionary
+#converts each attachment to a dictionary try __dict()
+# get filename and id
+
+def as_attachment(attachment):
+    return Attachment(
+        attachment_id = attachment.id,
+        description = attachment.description,
+        filename = attachment.filename
+    )
 
 class ChannelConfig(TypedDict):
     name: str | None
@@ -279,5 +292,6 @@ if __name__ == '__main__':
         )
 
     config = json.loads(args.config.read_text())
+
 
     main(args.state, config)

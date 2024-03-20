@@ -28,8 +28,15 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    is_file: bool
+    # swapped
+    file: list
+    # is_file: bool
 
+#create class attachment extends type dict and import to discord bot
+class Attachment(TypedDict):
+    attachment_id: int
+    description: str
+    filename: str
 
 class GPTMessage(TypedDict):
     role: str
@@ -99,12 +106,19 @@ class RubberDuck:
                     await self._send_message(thread_id, '*This conversation has been closed.*')
                     return
 
-                if message['is_file'] == True:
-                    appended_content = "*The user attached a file*"
-                else:
-                    appended_content = message['content']
+                if len(message['file']) > 0:
+                    await self._send_message(thread_id, "I'm sorry, I can't read file attachments. Please resend your message with the relevant parts of your file included in the message.")
+                    continue
 
-                message_history.append(GPTMessage(role='user', content=appended_content))
+                message_history.append(GPTMessage(role='user', content=message['content']))
+
+                # replaced by recommended lines (102-104) above line 106 (101 originally)
+                # if message['is_file'] == True:
+                #     appended_content = "*The user attached a file*"
+                # else:
+                #     appended_content = message['content']
+
+                # message_history.append(GPTMessage(role='user', content=appended_content))
 
                 user_id = message['author_id']
                 guild_id = message['guild_id']
