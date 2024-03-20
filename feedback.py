@@ -28,7 +28,7 @@ class FeedbackWorkflow:
 
             await self._send_message(channel_id=thread_id, message=message_content, view=feedback_view)
             try:
-                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=30)
+                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=300)
                 await self._send_message(thread_id, f'Thank you for your feedback: {feedback_score}!')
                 await self._metrics_handler.record_feedback(guild_id, thread_id, user_id, feedback_score)
             except asyncio.TimeoutError:
