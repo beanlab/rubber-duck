@@ -90,8 +90,6 @@ class MyClient(discord.Client, MessageHandler):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
-        intents.messages = True
-        intents.guild_messages = True
         super().__init__(intents=intents)
 
         # root_state_folder: Path,
@@ -116,7 +114,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, self.metrics_handler, self, self._workflow_manager) # Use the initialized MetricsHandler
+                    return RubberDuck(self.handle_error, self, self.metrics_handler, self._workflow_manager) # Use the initialized MetricsHandler
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
