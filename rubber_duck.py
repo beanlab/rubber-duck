@@ -28,11 +28,8 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    # swapped
     file: list
-    # is_file: bool
-
-#create class attachment extends type dict and import to discord bot
+    
 class Attachment(TypedDict):
     attachment_id: int
     description: str
@@ -112,14 +109,6 @@ class RubberDuck:
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
-                # replaced by recommended lines (102-104) above line 106 (101 originally)
-                # if message['is_file'] == True:
-                #     appended_content = "*The user attached a file*"
-                # else:
-                #     appended_content = message['content']
-
-                # message_history.append(GPTMessage(role='user', content=appended_content))
-
                 user_id = message['author_id']
                 guild_id = message['guild_id']
 
@@ -127,24 +116,17 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
-                    if message_history[-1]['content'] == "*The user attached a file*":
-                        response = "I'm unable to read entire files directly. Could you please paste the relevant sections and rephrase your question? " \
-                                   "This will help me assist you better!"
+                    
+                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    response_message = choices[0]['message']
+                    response = response_message['content'].strip()
 
-                        await self._metrics_handler.record_message(
-                            guild_id, thread_id, user_id, 'assistant', response)
-
-                    else:
-                        choices, usage = await self._get_completion(thread_id, engine, message_history)
-                        response_message = choices[0]['message']
-                        response = response_message['content'].strip()
-
-                        await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
+                    await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
                                                                  engine,
                                                                  usage['prompt_tokens'],
                                                                  usage['completion_tokens'])
 
-                        await self._metrics_handler.record_message(
+                    await self._metrics_handler.record_message(
                             guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))
@@ -171,7 +153,6 @@ class RubberDuck:
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
-        # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,

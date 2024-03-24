@@ -73,9 +73,6 @@ def as_message(message: discord.Message) -> Message:
 
         file = [as_attachment(attachment) for attachment in message.attachments] # call new as_attachment
     )
-#create function that takes a attachment and return a dictionary
-#converts each attachment to a dictionary try __dict()
-# get filename and id
 
 def as_attachment(attachment):
     return Attachment(
