@@ -28,7 +28,8 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    file: list
+    Attachment: dict
+    file: list[Attachment]
     
 class Attachment(TypedDict):
     attachment_id: int
