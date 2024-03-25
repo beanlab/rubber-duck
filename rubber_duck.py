@@ -28,7 +28,13 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-
+    Attachment: dict
+    file: list[Attachment]
+    
+class Attachment(TypedDict):
+    attachment_id: int
+    description: str
+    filename: str
 
 class GPTMessage(TypedDict):
     role: str
@@ -98,6 +104,10 @@ class RubberDuck:
                     await self._send_message(thread_id, '*This conversation has been closed.*')
                     return
 
+                if len(message['file']) > 0:
+                    await self._send_message(thread_id, "I'm sorry, I can't read file attachments. Please resend your message with the relevant parts of your file included in the message.")
+                    continue
+
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
                 user_id = message['author_id']
@@ -107,17 +117,18 @@ class RubberDuck:
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
                 try:
+                    
                     choices, usage = await self._get_completion(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
-                                                             engine,
-                                                             usage['prompt_tokens'],
-                                                             usage['completion_tokens'])
+                                                                 engine,
+                                                                 usage['prompt_tokens'],
+                                                                 usage['completion_tokens'])
 
                     await self._metrics_handler.record_message(
-                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
+                            guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 
@@ -143,7 +154,6 @@ class RubberDuck:
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
-        # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
