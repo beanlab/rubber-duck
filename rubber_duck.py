@@ -10,7 +10,7 @@ from quest import step, queue
 
 from metrics import MetricsHandler
 
-from feedback import FeedbackWorkflow, FeedbackButton, FeedbackView
+from feedback import FeedbackWorkflow
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -76,7 +76,7 @@ class RubberDuck:
         async def post_event(workflow_id, name, identity, action, *args):
             await workflow_manager.send_event(workflow_id, name, identity, action, *args)
 
-        self.feedback_workflow = FeedbackWorkflow(self._metrics_handler.record_feedback, post_event, message_handler.send_message)
+        self.feedback_workflow = FeedbackWorkflow(metrics_handler.record_feedback, post_event, message_handler.send_message)
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
