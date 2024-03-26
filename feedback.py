@@ -3,6 +3,7 @@ from typing import Callable
 import discord
 from quest import queue, step
 
+# TODO -> Once Quest provides it use that instead
 def wrap_steps(obj):
     for field in dir(obj):
         if field.startswith('_'):
@@ -15,10 +16,10 @@ def wrap_steps(obj):
     return obj
 
 class FeedbackWorkflow:
-    def __init__(self, metrics_handler, post_event_function, message_handler):
-        self._metrics_handler = wrap_steps(metrics_handler)
+    def __init__(self, record_feedback, post_event_function, send_message):
+        self._record_feedback = step(record_feedback)
         self.post_event = post_event_function
-        self._send_message = step(message_handler.send_message)
+        self._send_message = step(send_message)
 
     async def request_feedback(self, guild_id: int, thread_id: int, user_id: int):
         async with queue("feedback", str(thread_id)) as feedback_queue:
@@ -30,7 +31,7 @@ class FeedbackWorkflow:
             try:
                 feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=300)
                 await self._send_message(thread_id, f'Thank you for your feedback: {feedback_score}!')
-                await self._metrics_handler.record_feedback(guild_id, thread_id, user_id, feedback_score)
+                await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
             except asyncio.TimeoutError:
                 await self._send_message(thread_id, 'Feedback time out.')
 

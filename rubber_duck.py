@@ -18,7 +18,7 @@ AI_ENGINE = 'gpt-4'
 
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
 V_LOG_ZIP_STATS = '2023-09-26 Zip log file, Stats'
-
+ 
 
 class Message(TypedDict):
     guild_id: int
@@ -73,15 +73,14 @@ class RubberDuck:
 
         self.workflow_manager = workflow_manager
 
-        post_event_function = self.post_event
+        async def post_event(workflow_id, name, identity, action, *args):
+            await workflow_manager.send_event(workflow_id, name, identity, action, *args)
 
-        self.feedback_workflow = FeedbackWorkflow(self._metrics_handler, post_event_function, message_handler)
+        self.feedback_workflow = FeedbackWorkflow(self._metrics_handler.record_feedback, post_event, message_handler.send_message)
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
     
-    async def post_event(self, workflow_id, name, identity, action, *args):
-        await self.workflow_manager.send_event(workflow_id, name, identity, action, *args)
     
     #
     # Begin Conversation
