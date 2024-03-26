@@ -4,16 +4,6 @@ import discord
 from quest import queue, step
 
 # TODO -> Once Quest provides it use that instead
-def wrap_steps(obj):
-    for field in dir(obj):
-        if field.startswith('_'):
-            continue
-
-        if callable(method := getattr(obj, field)):
-            method = step(method)
-            setattr(obj, field, method)
-
-    return obj
 
 class FeedbackWorkflow:
     def __init__(self, record_feedback, post_event_function, send_message):
@@ -30,7 +20,7 @@ class FeedbackWorkflow:
             await self._send_message(channel_id=thread_id, message=message_content, view=feedback_view)
             try:
                 feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=300)
-                await self._send_message(thread_id, f'Thank you for your feedback: {feedback_score}!')
+                await self._send_message(thread_id, f'Thank you for your feedback!')
                 await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
             except asyncio.TimeoutError:
                 await self._send_message(thread_id, 'Feedback time out.')
