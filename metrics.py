@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 import datetime
+import logging
 
 
 def get_timestamp():
@@ -21,6 +22,12 @@ class MetricsHandler:
             self._usage_file.write_text(
                 ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens', 'output_tokens']) + '\n')
 
+        # Added feedback metrics file
+        self._feedback_file = metrics_folder / 'feedback.csv'
+        if not self._feedback_file.exists():
+            self._feedback_file.write_text(
+                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'feedback_score']) + '\n')
+
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         with self._messages_file.open('at', newline='') as file:
             writer = csv.writer(file)
@@ -30,3 +37,12 @@ class MetricsHandler:
         with self._usage_file.open('at', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
+
+    # Record the feedback in feedback.csv
+    async def record_feedback(self, guild_id: int, thread_id: int, user_id: int, feedback_score: int):
+        try:
+            with self._feedback_file.open('at', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([get_timestamp(), guild_id, thread_id, user_id, feedback_score])
+        except Exception as e:
+            logging.error(f"Failed to record feedback: {e}")
