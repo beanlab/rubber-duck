@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, RubberDuckConfig, RetryConfig, ChannelConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -69,24 +69,8 @@ def as_message(message: discord.Message) -> Message:
         content=message.content
     )
 
-
-class ChannelConfig(TypedDict):
-    name: str | None
-    id: int | None
-    prompt: str | None
-    prompt_file: str | None
-    engine: str | None
-    timeout: int | None
-
-
-class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
-
-
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, config: RubberDuckConfig):
+    def __init__(self, root_save_folder: Path, x):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
@@ -97,12 +81,15 @@ class MyClient(discord.Client, MessageHandler):
         #                  configs: list[dict]
         #
 
-        self._config = config
+        self._bot_config = config['bot_settings']
+        self._rubber_duck_config = config['duck_settings']
+        self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
-            (cc.get('name') or cc.get('id')): cc
-            for cc in config['channels']
+            (cc.get('name')): cc
+            for cc in self._bot_config['channels']
         }
-
+        self._admin_ids = self._bot_config['admin_ids']
+        self._defaults = self._bot_config['defaults']
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
 
@@ -111,7 +98,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder))
+                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder), self._rubber_duck_config)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -127,7 +114,7 @@ class MyClient(discord.Client, MessageHandler):
         await asyncio.sleep(0.1)
         logging.info('Workflow manager ready')
 
-        for channel_id in self._config['command_channels']:
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, 'Duck online')
             except:
@@ -150,7 +137,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Command channel
-        if message.channel.id in self._config['command_channels']:
+        if message.channel.id in self._command_channels:
             self._workflow_manager.start_workflow(
                 'command', str(message.id), as_message(message))
             return
@@ -158,14 +145,14 @@ class MyClient(discord.Client, MessageHandler):
         # Duck channel
         if message.channel.id in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.id],
                 as_message(message)
             )
 
         if message.channel.name in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.name],
                 as_message(message)
             )
@@ -229,15 +216,38 @@ class MyClient(discord.Client, MessageHandler):
     # Methods for MessageHandler protocol
     #
 
-    async def send_message(self, channel_id, message: str, file=None):
+    async def send_message(self, channel_id, message: str, file=None) -> int:
+        channel = self.get_channel(channel_id)
+        curr_message = None
         if file is not None:
             file = discord.File(file)
 
         for block in parse_blocks(message):
-            await self.get_channel(channel_id).send(block)
+            curr_message = await channel.send(block)
 
         if file is not None:
-            await self.get_channel(channel_id).send("", file=file)
+            curr_message = await channel.send("", file=file)
+
+        return curr_message.id
+
+    async def edit_message(self, channel_id: int, message_id: int, new_content: str):
+        channel = self.get_channel(channel_id)
+        try:
+            msg = await channel.fetch_message(message_id)
+            await msg.edit(content=new_content)
+        except Exception as e:
+            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+
+    async def notify_admins(self):
+        user_ids_to_mention = self._bot_config["admin_ids"]
+        mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+        for channel_id in self._command_channels:
+            try:
+                await self.handle_error(f"{mentions}")
+            except:
+                logging.exception(f'Unable to message channel {channel_id}')
+
+
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
@@ -246,7 +256,7 @@ class MyClient(discord.Client, MessageHandler):
     # Method for ErrorHandler Protocol
     #
     async def handle_error(self, msg: str):
-        for channel_id in self._config['command_channels']:
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, msg)
             except:
