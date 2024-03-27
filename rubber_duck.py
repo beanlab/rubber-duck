@@ -229,16 +229,6 @@ class RubberDuck:
         retries = -1
         while retries < max_retries:
             try:
-                mock_request = httpx.Request(method="GET", url="https://example.com")
-
-                # Create a mock response object
-                mock_response = httpx.Response(
-                    status_code=404,
-                    request=mock_request,
-                    content=b'{"error": "Beep Beep Boop Boop"}'
-                )
-                # raise openai.InternalServerError("Error", response=mock_response, body="yolo")
-                raise openai.NotFoundError("Error", response=mock_response, body="yolo")
                 return await self._get_completion(thread_id, engine, message_history)
             except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                 if retries == -1:
