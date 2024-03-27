@@ -56,16 +56,22 @@ class RetryConfig(TypedDict):
 
 
 class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    admin_ids: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
     retry_protocol: RetryConfig
+
+
+class BotCommandsConfig(TypedDict):
+    command_channels: list[int]
+    channels: list[ChannelConfig]
+    defaults: ChannelConfig
+
+
 
 class MessageHandler(Protocol):
     async def send_message(self, channel_id: int, message: str, file=None) -> int: ...
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str): ...
+
+    async def notify_admins(self): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -97,6 +103,7 @@ class RubberDuck:
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
         self._edit_message = step(message_handler.edit_message)
+        self._notify_admins = step(message_handler.notify_admins)
         self._typing = message_handler.typing
         self._config = config
         self._metrics_handler = wrap_steps(metrics_handler)
@@ -176,8 +183,7 @@ class RubberDuck:
                 except (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError) as ex:
-                    user_ids_to_mention = self._config["admin_ids"]
-                    mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+                    await self._notify_admins()
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self.generate_error_message(guild_id, thread_id, ex)
@@ -185,7 +191,7 @@ class RubberDuck:
                                              'I\'m having trouble processing your request, '
                                              'I have notified your professor to look into the problem!')
                     openai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{mentions}\n{openai_error_message}\n{openai_web_mention}")
+                    await self._report_error(f"{openai_error_message}\n{openai_web_mention}")
 
                     await self._report_error(error_message)
 
@@ -223,6 +229,16 @@ class RubberDuck:
         retries = -1
         while retries < max_retries:
             try:
+                mock_request = httpx.Request(method="GET", url="https://example.com")
+
+                # Create a mock response object
+                mock_response = httpx.Response(
+                    status_code=404,
+                    request=mock_request,
+                    content=b'{"error": "Beep Beep Boop Boop"}'
+                )
+                # raise openai.InternalServerError("Error", response=mock_response, body="yolo")
+                raise openai.NotFoundError("Error", response=mock_response, body="yolo")
                 return await self._get_completion(thread_id, engine, message_history)
             except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                 if retries == -1:

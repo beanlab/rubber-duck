@@ -1,34 +1,42 @@
 {
-  "command_channels": [
-    1192895746672951340
-  ],
-  "defaults": {
-    "engine": "gpt-4-turbo-preview",
-    "timeout": 600
-  },
-  "channels": [
-    {
-      "name": "duck-pond",
-      "prompt_file": "prompts/standard-rubber-duck.txt"
-    },
-    {
-      "name": "other-pond",
-      "prompt_file": "prompts/standard-rubber-duck.txt",
-      "engine": "gpt-3.5-turbo-16k"
-    },
-    {
-      "name": "gpt4",
-      "engine": "gpt-4-turbo-preview"
-    },
-    {
-      "name": "gpt-3.5-turbo",
-      "engine": "gpt-3.5-turbo"
+  "bot_settings": {
+    "command_channels": [
+      1212135823617560587
+    ],
+    "channels": [
+      {
+        "name": "duck-pond",
+        "prompt_file": "prompts/standard-rubber-duck.txt"
+      },
+      {
+        "name": "other-pond",
+        "prompt_file": "prompts/standard-rubber-duck.txt",
+        "engine": "gpt-3.5-turbo-16k"
+      },
+      {
+        "name": "gpt4",
+        "engine": "gpt-4-turbo-preview"
+      },
+      {
+        "name": "gpt-3.5-turbo",
+        "engine": "gpt-3.5-turbo"
+      }
+    ],
+    "admin_ids": [
+      933123843038535741
+    ],
+    "defaults": {
+      "engine": "gpt-4-turbo-preview",
+      "timeout": 600
     }
-  ],
-  "admin_ids": [
-    933123843038535741
-  ],
-  "max_retries": 2,
-  "delay": 2,
-  "backoff": 2
+  },
+  "duck_settings": {
+    "retry_protocol": {
+      "max_retries": 2,
+      "delay": 2,
+      "backoff": 2
+    }
+  }
 }
+
+

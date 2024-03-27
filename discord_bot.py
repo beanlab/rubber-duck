@@ -81,28 +81,15 @@ class MyClient(discord.Client, MessageHandler):
         #                  configs: list[dict]
         #
 
-        self._config = config
+        self._bot_config = config['bot_settings']
+        self._rubber_duck_config = config['duck_settings']
+        self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
-            (cc.get('name') or cc.get('id')): cc
-            for cc in config['channels']
+            (cc.get('name')): cc
+            for cc in self._bot_config['channels']
         }
-        self._retry_config = RetryConfig(max_retries=self._config["max_retries"], delay=self._config["delay"],backoff=self._config["backoff"])
-        self._default_config = ChannelConfig(name=None, id=None, prompt=None, prompt_file=None,
-                                             engine=self._config["defaults"]["engine"], timeout=self._config["defaults"]["timeout"])
-        self._all_channels_config = []
-        for channel in self._config["channels"]:
-            self._all_channels_config.append(ChannelConfig(
-                name=channel.get("name", None),
-                id=channel.get("id", None),
-                prompt=channel.get("prompt", None),
-                prompt_file=channel.get("prompt_file", None),
-                engine=channel.get("engine", self._config["defaults"].get("engine", None)),
-                timeout=channel.get("timeout", self._config["defaults"].get("timeout", None))
-            ))
-        self._rubber_duck_config = RubberDuckConfig(command_channels=self._config["command_channels"], admin_ids=self._config["admin_ids"],
-                                                   defaults=self._default_config,channels=self._all_channels_config,
-                                                   retry_protocol=self._retry_config)
-
+        self._admin_ids = self._bot_config['admin_ids']
+        self._defaults = self._bot_config['defaults']
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
 
@@ -127,7 +114,7 @@ class MyClient(discord.Client, MessageHandler):
         await asyncio.sleep(0.1)
         logging.info('Workflow manager ready')
 
-        for channel_id in self._config['command_channels']:
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, 'Duck online')
             except:
@@ -150,7 +137,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Command channel
-        if message.channel.id in self._config['command_channels']:
+        if message.channel.id in self._command_channels:
             self._workflow_manager.start_workflow(
                 'command', str(message.id), as_message(message))
             return
@@ -158,14 +145,14 @@ class MyClient(discord.Client, MessageHandler):
         # Duck channel
         if message.channel.id in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.id],
                 as_message(message)
             )
 
         if message.channel.name in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.name],
                 as_message(message)
             )
@@ -251,6 +238,17 @@ class MyClient(discord.Client, MessageHandler):
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
+    async def notify_admins(self):
+        user_ids_to_mention = self._bot_config["admin_ids"]
+        mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+        for channel_id in self._command_channels:
+            try:
+                await self.handle_error(f"{mentions}")
+            except:
+                logging.exception(f'Unable to message channel {channel_id}')
+
+
+
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
@@ -258,7 +256,7 @@ class MyClient(discord.Client, MessageHandler):
     # Method for ErrorHandler Protocol
     #
     async def handle_error(self, msg: str):
-        for channel_id in self._config['command_channels']:
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, msg)
             except:
