@@ -6,3 +6,4 @@
 /state
 __pycache__/
 my_config.json
+/topic_transition_test

@@ -112,6 +112,10 @@ class RubberDuck:
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
 
+                # After user messages has added
+                # if len(message_history) > 5:
+                #     message_history = [message_history[0]] + message_history[-4:]
+
                 user_id = message['author_id']
                 guild_id = message['guild_id']
 
@@ -132,6 +136,10 @@ class RubberDuck:
                         guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))
+  
+                    # After bot messages has added - check and message_history to have initial message (instruction) and 4 most recent messages
+                    if len(message_history) > 5:
+                        message_history = [message_history[0]] + message_history[-4:]
 
                     await self._send_message(thread_id, response)
 
