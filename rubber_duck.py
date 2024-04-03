@@ -129,6 +129,7 @@ class RubberDuck:
 
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
 
+
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)

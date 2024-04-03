@@ -44,6 +44,8 @@ def parse_blocks(text: str, limit=2000):
                     block += '```'
                 yield block
                 block = current_fence
+            else:
+                line = # we need to take trust this off this is absolutely
 
         block += ('\n' + line) if block else line
 
@@ -83,7 +85,7 @@ class MyClient(discord.Client, MessageHandler):
         #
 
         self._bot_config = config['bot_settings']
-        self._rubber_duck_config = config['duck_settings']
+        self._retry_config = config['retry_protocol']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
@@ -99,7 +101,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self, MetricsHandler(metrics_folder), self._rubber_duck_config)
+                    return RubberDuck(self, MetricsHandler(metrics_folder), self._retry_config)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 

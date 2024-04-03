@@ -30,12 +30,10 @@
       "timeout": 600
     }
   },
-  "duck_settings": {
-    "retry_protocol": {
-      "max_retries": 2,
-      "delay": 2,
-      "backoff": 2
-    }
+  "retry_protocol": {
+    "max_retries": 2,
+    "delay": 2,
+    "backoff": 2
   }
 }
 
