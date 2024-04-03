@@ -1,19 +1,17 @@
 import asyncio
 import logging
 import os
-import uuid
 import traceback as tb
-from typing import TypedDict, Protocol, ContextManager
-from openai import AsyncOpenAI
+import uuid
+from typing import ContextManager, Protocol, TypedDict
+
 import openai
+from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
-from quest import step, queue
-import httpx
-
-from unittest.mock import Mock
-
 
 from metrics import MetricsHandler
+from quest import queue, step
+
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -71,14 +69,9 @@ class MessageHandler(Protocol):
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str): ...
 
-    async def notify_admins(self): ...
+    async def report_error(self, msg: str, notify_admin: bool=False): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
-
-
-class ErrorHandler(Protocol):
-    async def __call__(self, message: str): ...
-
 
 def wrap_steps(obj):
     for field in dir(obj):
@@ -94,16 +87,14 @@ def wrap_steps(obj):
 
 class RubberDuck:
     def __init__(self,
-                 error_handler: ErrorHandler,
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
                  config: RubberDuckConfig
                  ):
-        self._report_error = step(error_handler)
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
         self._edit_message = step(message_handler.edit_message)
-        self._notify_admins = step(message_handler.notify_admins)
+        self._report_error = step(message_handler.report_error)
         self._typing = message_handler.typing
         self._config = config
         self._metrics_handler = wrap_steps(metrics_handler)
@@ -183,7 +174,6 @@ class RubberDuck:
                 except (openai.APIConnectionError, openai.BadRequestError,
                                          openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
                                          openai.RateLimitError) as ex:
-                    await self._notify_admins()
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self.generate_error_message(guild_id, thread_id, ex)
@@ -193,7 +183,7 @@ class RubberDuck:
                     openai_error_message = f"*** {type(ex).__name__} ***"
                     await self._report_error(f"{openai_error_message}\n{openai_web_mention}")
 
-                    await self._report_error(error_message)
+                    await self._report_error(error_message, True)
 
                 except Exception as ex:
                     error_message, error_code = self.generate_error_message(guild_id, thread_id, ex)

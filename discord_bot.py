@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import TypedDict
 
 from metrics import MetricsHandler
 
@@ -21,17 +20,18 @@ load_env()
 import argparse
 import json
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, RubberDuckConfig, RetryConfig, ChannelConfig
+from rubber_duck import Message, RubberDuck, MessageHandler, RubberDuckConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
-
+# make a ticket
 
 def parse_blocks(text: str, limit=2000):
     tick = '`'
@@ -69,6 +69,7 @@ def as_message(message: discord.Message) -> Message:
         content=message.content
     )
 
+
 class MyClient(discord.Client, MessageHandler):
     def __init__(self, root_save_folder: Path, x):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
@@ -85,7 +86,7 @@ class MyClient(discord.Client, MessageHandler):
         self._rubber_duck_config = config['duck_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
-            (cc.get('name')): cc
+            (cc.get('name') or cc.get('id')): cc
             for cc in self._bot_config['channels']
         }
         self._admin_ids = self._bot_config['admin_ids']
@@ -98,7 +99,7 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder), self._rubber_duck_config)
+                    return RubberDuck(self, MetricsHandler(metrics_folder), self._rubber_duck_config)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -238,29 +239,19 @@ class MyClient(discord.Client, MessageHandler):
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
-    async def notify_admins(self):
-        user_ids_to_mention = self._bot_config["admin_ids"]
-        mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
-        for channel_id in self._command_channels:
-            try:
-                await self.handle_error(f"{mentions}")
-            except:
-                logging.exception(f'Unable to message channel {channel_id}')
-
-
-
-    def typing(self, channel_id):
-        return self.get_channel(channel_id).typing()
-
-    #
-    # Method for ErrorHandler Protocol
-    #
-    async def handle_error(self, msg: str):
+    async def report_error(self, msg: str, notify_admins: bool = False):
+        if notify_admins:
+            user_ids_to_mention = self._bot_config["admin_ids"]
+            mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+            msg = mentions + '\n' + msg
         for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, msg)
             except:
                 logging.exception(f'Unable to message channel {channel_id}')
+
+    def typing(self, channel_id):
+        return self.get_channel(channel_id).typing()
 
 def main(state_path: Path, config: RubberDuckConfig):
     client = MyClient(state_path, config)
