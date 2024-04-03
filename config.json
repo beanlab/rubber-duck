@@ -30,7 +30,7 @@
       "timeout": 600
     }
   },
-  "retry_protocol": {
+  "retry_settings": {
     "max_retries": 2,
     "delay": 2,
     "backoff": 2

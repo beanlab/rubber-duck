@@ -196,7 +196,6 @@ class RubberDuck:
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
-        # Replaces _get_response
         async with self._typing(thread_id):
             completion: ChatCompletion = await client.chat.completions.create(
                 model=engine,
@@ -210,9 +209,9 @@ class RubberDuck:
 
     @step
     async def _get_completion_with_retry(self, thread_id, engine, message_history):
-        max_retries = self._config['retry_protocol']['max_retries']
-        delay = self._config['retry_protocol']['delay']
-        backoff = self._config['retry_protocol']['backoff']
+        max_retries = self._config['max_retries']
+        delay = self._config['delay']
+        backoff = self._config['backoff']
         retries = -1
         while retries < max_retries:
             try:

@@ -83,7 +83,7 @@ class MyClient(discord.Client, MessageHandler):
         #
 
         self._bot_config = config['bot_settings']
-        self._retry_config = config['retry_protocol']
+        self._retry_config = config['retry_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
