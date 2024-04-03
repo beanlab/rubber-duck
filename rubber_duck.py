@@ -53,10 +53,6 @@ class RetryConfig(TypedDict):
     backoff: int
 
 
-class RubberDuckConfig(TypedDict):
-    retry_protocol: RetryConfig
-
-
 class BotCommandsConfig(TypedDict):
     command_channels: list[int]
     channels: list[ChannelConfig]
@@ -89,7 +85,7 @@ class RubberDuck:
     def __init__(self,
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
-                 config: RubberDuckConfig
+                 config: RetryConfig
                  ):
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)

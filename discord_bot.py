@@ -26,7 +26,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, RubberDuckConfig
+from rubber_duck import Message, RubberDuck, MessageHandler, RetryConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -44,8 +44,6 @@ def parse_blocks(text: str, limit=2000):
                     block += '```'
                 yield block
                 block = current_fence
-            else:
-                line = # we need to take trust this off this is absolutely
 
         block += ('\n' + line) if block else line
 
@@ -255,7 +253,7 @@ class MyClient(discord.Client, MessageHandler):
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
-def main(state_path: Path, config: RubberDuckConfig):
+def main(state_path: Path, config: RetryConfig):
     client = MyClient(state_path, config)
     client.run(os.environ['DISCORD_TOKEN'])
 
