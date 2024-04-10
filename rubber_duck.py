@@ -87,17 +87,22 @@ class RubberDuck:
     #
     async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         user_id = initial_message['author_id']
+        long_input_char = 100
 
         async with queue('messages', str(thread_id)) as messages:
-            message_history = [
-                GPTMessage(role='system', content=prompt)
-            ]
+            message_history = {
+                0: GPTMessage(role='system', content=prompt)
+            }
+
             user_id = initial_message['author_id']
             guild_id = initial_message['guild_id']
             await self._metrics_handler.record_message(
-                guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
+                guild_id, thread_id, user_id, 0, message_history[0]['role'], message_history[0]['content'])
 
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
+
+            latest_long_input_index = None
+            message_index = 1
 
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
@@ -110,22 +115,31 @@ class RubberDuck:
                     await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
                     return
 
-                message_history.append(GPTMessage(role='user', content=message['content']))
+                message_history[message_index] = GPTMessage(role='user', content=message['content'])
 
-                # After user messages has added
-                # if len(message_history) > 5:
-                #     message_history = [message_history[0]] + message_history[-4:]
+                if len(message['content']) > long_input_char:
+                    latest_long_input_index = message_index
+
+                # Message used for response
+                response_used_messages = {0: message_history[0]}
+                if latest_long_input_index:
+                    response_used_messages[latest_long_input_index] = message_history[latest_long_input_index]  # If there is a user input that is longer than somewhat characters assume it as a code, put that into the response_used_messages assuming it is a code. If user submits an input that is longer than somewhat character one more time, replace it.
+
+                response_used_messages.update({i: message_history[i] for i in sorted(message_history.keys())[-3:]}) # Last 9 messages
+                response_used_messages = {key: response_used_messages[key] for key in sorted(response_used_messages.keys())}
 
                 user_id = message['author_id']
                 guild_id = message['guild_id']
 
                 await self._metrics_handler.record_message(
-                    guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
+                    guild_id, thread_id, user_id, message_index, message_history[message_index]['role'], message_history[message_index]['content'])
+
+                message_index += 1
 
                 message_history = self.reduce_history(message_history)
 
                 try:
-                    choices, usage = await self._get_completion(thread_id, engine, message_history)
+                    choices, usage = await self._get_completion(thread_id, engine, list(response_used_messages.values()))
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
@@ -135,15 +149,14 @@ class RubberDuck:
                                                              usage['completion_tokens'])
 
                     await self._metrics_handler.record_message(
-                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
+                        guild_id, thread_id, user_id, message_index, response_message['role'], response_message['content'])
 
-                    message_history.append(GPTMessage(role='assistant', content=response))
-  
-                    # After bot messages has added - check and message_history to have initial message (instruction) and 4 most recent messages
-                    if len(message_history) > 5:
-                        message_history = [message_history[0]] + message_history[-4:]
+                    message_history[message_index] = GPTMessage(role='assistant', content=response)
+                    message_index += 1
 
                     await self._send_message(thread_id, response)
+
+                    print(f"response used messages: {response_used_messages}")
 
                 except Exception as ex:
                     error_code = str(uuid.uuid4()).split('-')[0].upper()
@@ -182,3 +195,6 @@ class RubberDuck:
             choices = completion_dict['choices']
             usage = completion_dict['usage']
             return choices, usage
+
+# async def _summarize
+# make a recent_messages = [] and append that to message_history -> message_history.append(GPTMessage(role='system', content=summary))
