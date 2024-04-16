@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 import datetime
 
-
+#-06:00, label time zone
 def get_timestamp():
     return datetime.datetime.utcnow().isoformat()
 

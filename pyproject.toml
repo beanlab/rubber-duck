@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "rubber_duck"
+version = "0.2.0"
+description = ""
+authors = ["Gordon Bean <gbean@cs.byu.edu>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+openai = "^1.11.1"
+discord = "^2.1.0"
+urllib3 = "<2.0"
+quest-py = "0.2.0b5"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

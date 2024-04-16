@@ -30,15 +30,14 @@ from rubber_duck import Message, RubberDuck, MessageHandler, RubberDuckConfig
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
-# make a ticket
-
-def parse_blocks(text: str, limit=2000):
+LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this... on the file
+# it looks like there already is a timestamp...
+def parse_blocks(text: str, limit=1990):
     tick = '`'
     block = ""
     current_fence = ""
     for line in text.splitlines():
-        if len(block) + len(line) > limit - 3:
+        if len(block) + len(line) > limit:
             if block:
                 if current_fence:
                     block += '```'

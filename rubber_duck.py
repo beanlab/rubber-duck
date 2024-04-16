@@ -162,7 +162,11 @@ class RubberDuck:
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 
-                    await self._send_message(thread_id, response)
+                    with open('delete_me.txt', 'r') as file:
+                        file_contents = file.read()
+
+                    await self._send_message(thread_id, file_contents)
+                    # await self._send_message(thread_id, response)
 
                 except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                     error_message, _ = self.generate_error_message(guild_id, thread_id, ex)
