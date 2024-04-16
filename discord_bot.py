@@ -31,7 +31,6 @@ from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this... on the file
-# it looks like there already is a timestamp...
 def parse_blocks(text: str, limit=1990):
     tick = '`'
     block = ""

@@ -1,11 +1,11 @@
 import csv
 from pathlib import Path
-import datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-#-06:00, label time zone
+
 def get_timestamp():
-    return datetime.datetime.utcnow().isoformat()
-
+    return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
 class MetricsHandler:
     def __init__(self, metrics_folder: Path):
