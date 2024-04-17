@@ -43,13 +43,16 @@ def parse_blocks(text: str, limit=1990):
                 yield block
                 block = current_fence
 
-        block += ('\n' + line) if block else line
-
         if line.strip().startswith(tick * 3):
+            #this means the code block has ended
             if current_fence:
                 current_fence = ""
             else:
+                yield block
                 current_fence = line
+                block = current_fence
+
+        block += ('\n' + line) if block else line
 
     if block:
         yield block
