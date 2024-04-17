@@ -69,19 +69,14 @@ def as_message(message: discord.Message) -> Message:
 
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, x):
+    def __init__(self, root_save_folder: Path):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        # root_state_folder: Path,
-        #                  log_file_path: Path,
-        #                  configs: list[dict]
-        #
-
         self._bot_config = config['bot_settings']
-        self._rubber_duck_config = config['duck_settings']
+        self._rubber_duck_config = self._bot_config['duck_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
