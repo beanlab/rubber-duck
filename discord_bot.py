@@ -44,7 +44,6 @@ def parse_blocks(text: str, limit=1990):
                 block = current_fence
 
         if line.strip().startswith(tick * 3):
-            #this means the code block has ended
             if current_fence:
                 current_fence = ""
             else:
