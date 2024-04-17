@@ -10,14 +10,15 @@ from quest import step, queue
 
 from metrics import MetricsHandler
 
+from feedback import FeedbackWorkflow
+
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
 AI_ENGINE = 'gpt-4'
-CONVERSATION_TIMEOUT = 60 * 3  # three minutes
 
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
 V_LOG_ZIP_STATS = '2023-09-26 Zip log file, Stats'
-
+ 
 
 class Message(TypedDict):
     guild_id: int
@@ -36,7 +37,7 @@ class GPTMessage(TypedDict):
 
 
 class MessageHandler(Protocol):
-    async def send_message(self, channel_id: int, message: str, file=None): ...
+    async def send_message(self, channel_id: int, message: str, file=None, view=None): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
 
@@ -56,12 +57,12 @@ def wrap_steps(obj):
 
     return obj
 
-
 class RubberDuck:
     def __init__(self,
                  error_handler: ErrorHandler,
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
+                 workflow_manager
                  ):
         self._report_error = step(error_handler)
         self._send_raw_message = message_handler.send_message
@@ -70,13 +71,23 @@ class RubberDuck:
 
         self._metrics_handler = wrap_steps(metrics_handler)
 
+        self.workflow_manager = workflow_manager
+
+        async def post_event(workflow_id, name, identity, action, *args):
+            await workflow_manager.send_event(workflow_id, name, identity, action, *args)
+
+        self.feedback_workflow = FeedbackWorkflow(metrics_handler.record_feedback, post_event, message_handler.send_message)
+
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
-
+    
+    
     #
     # Begin Conversation
     #
     async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+        user_id = initial_message['author_id']
+
         async with queue('messages', str(thread_id)) as messages:
             message_history = [
                 GPTMessage(role='system', content=prompt)
@@ -96,6 +107,7 @@ class RubberDuck:
 
                 except asyncio.TimeoutError:
                     await self._send_message(thread_id, '*This conversation has been closed.*')
+                    await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
                     return
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
@@ -140,7 +152,7 @@ class RubberDuck:
                                              f'\nPlease tell a TA or the instructor the error code.'
                                              '\n*This conversation is closed*')
                     return
-
+        
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
