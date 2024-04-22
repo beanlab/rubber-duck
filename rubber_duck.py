@@ -157,8 +157,8 @@ class RubberDuck:
     
     # Keep message 0 for instruction and the last 20 messages
     def reduce_history(self, message_history):
-        if len(message_history) > 4:
-            return [message_history[0]] + message_history[-4:]
+        if len(message_history) > 20:
+            return [message_history[0]] + message_history[-20:]
         return message_history
 
     @step
