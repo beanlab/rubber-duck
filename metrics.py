@@ -28,10 +28,10 @@ class MetricsHandler:
             self._feedback_file.write_text(
                 ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'feedback_score']) + '\n')
 
-    async def record_message(self, guild_id: int, thread_id: int, user_id: int, message_index: int, role: str, message: str):
+    async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         with self._messages_file.open('at', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([get_timestamp(), guild_id, thread_id, user_id, message_index, role, message])
+            writer.writerow([get_timestamp(), guild_id, thread_id, user_id, role, message])
 
     async def record_usage(self, guild_id, thread_id, user_id, engine, input_tokens, output_tokens):
         with self._usage_file.open('at', newline='') as file:
