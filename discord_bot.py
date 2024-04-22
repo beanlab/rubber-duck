@@ -112,7 +112,7 @@ class MyClient(discord.Client, MessageHandler):
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, MetricsHandler(metrics_folder))
+                    return BotCommands(self.send_message)
                 case 'duck':
                     return RubberDuck(self.handle_error, self, self.metrics_handler, self._workflow_manager) # Use the initialized MetricsHandler
 
