@@ -92,6 +92,7 @@ class RubberDuck:
             message_history = [
                 GPTMessage(role='system', content=prompt)
             ]
+            track_summarization_index = 0
             user_id = initial_message['author_id']
             guild_id = initial_message['guild_id']
             await self._metrics_handler.record_message(
@@ -111,6 +112,7 @@ class RubberDuck:
                     return
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
+                track_summarization_index += 1
 
                 user_id = message['author_id']
                 guild_id = message['guild_id']
@@ -118,7 +120,7 @@ class RubberDuck:
                 await self._metrics_handler.record_message(
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
-                message_history = self.reduce_history(message_history)
+                # message_history = self.reduce_history(message_history)
 
                 try:
                     choices, usage = await self._get_completion(thread_id, engine, message_history)
@@ -136,6 +138,10 @@ class RubberDuck:
                     message_history.append(GPTMessage(role='assistant', content=response))
 
                     await self._send_message(thread_id, response)
+                
+                    if track_summarization_index % 3 == 0:
+                        summary = await self.summarize_message_history(thread_id, engine, message_history)
+                        message_history = [message_history[0], GPTMessage(role='system', content=summary)]
 
                 except Exception as ex:
                     error_code = str(uuid.uuid4()).split('-')[0].upper()
@@ -156,10 +162,10 @@ class RubberDuck:
                     return
     
     # Keep message 0 for instruction and the last 20 messages
-    def reduce_history(self, message_history):
-        if len(message_history) > 20:
-            return [message_history[0]] + message_history[-20:]
-        return message_history
+    # def reduce_history(self, message_history):
+    #     if len(message_history) > 4:
+    #         return [message_history[0]] + message_history[-4:]
+    #     return message_history
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
@@ -174,3 +180,30 @@ class RubberDuck:
             choices = completion_dict['choices']
             usage = completion_dict['usage']
             return choices, usage
+
+    @step
+    async def summarize_message_history(self, thread_id, engine, message_history):
+        conversation_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in message_history])
+
+        prompt = (
+            "Summarize:\n"
+            "- The latest version of the student's code (if any).\n"
+            "- The latest examples provided by the AI (if any).\n"
+            "- A bullet list of the key details from the conversation, focusing on what the student needs to understand and their main questions.\n"
+            "Transcript:\n"
+            f"{conversation_text}"
+        )
+
+        async with self._typing(thread_id):
+            try:
+                completion = await client.chat.completions.create(
+                    model=engine,
+                    prompt=prompt,
+                    max_tokens=700
+                )
+                logging.debug(f"Completion: {completion}")
+                summarized_text = completion.choices[0].text.strip()
+                return summarized_text
+            except Exception as e:
+                logging.error(f"Error while summarizing: {e}")
+                return "Error in generating summary."
