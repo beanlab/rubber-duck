@@ -118,6 +118,8 @@ class RubberDuck:
                 await self._metrics_handler.record_message(
                     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
 
+                message_history = self.reduce_history(message_history)
+
                 try:
                     choices, usage = await self._get_completion(thread_id, engine, message_history)
                     response_message = choices[0]['message']
@@ -152,7 +154,13 @@ class RubberDuck:
                                              f'\nPlease tell a TA or the instructor the error code.'
                                              '\n*This conversation is closed*')
                     return
-        
+    
+    # Keep message 0 for instruction and the last 20 messages
+    def reduce_history(self, message_history):
+        if len(message_history) > 20:
+            return [message_history[0]] + message_history[-20:]
+        return message_history
+
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
         # Replaces _get_response
