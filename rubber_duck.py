@@ -8,10 +8,9 @@ from typing import ContextManager, Protocol, TypedDict
 import openai
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
-
-from metrics import MetricsHandler
 from quest import queue, step
 
+from metrics import MetricsHandler
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -59,15 +58,15 @@ class BotCommandsConfig(TypedDict):
     defaults: ChannelConfig
 
 
-
 class MessageHandler(Protocol):
     async def send_message(self, channel_id: int, message: str, file=None) -> int: ...
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str): ...
 
-    async def report_error(self, msg: str, notify_admin: bool=False): ...
+    async def report_error(self, msg: str, notify_admin: bool = False): ...
 
     def typing(self, channel_id: int) -> ContextManager: ...
+
 
 def wrap_steps(obj):
     for field in dir(obj):
@@ -125,7 +124,6 @@ class RubberDuck:
 
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
 
-
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
@@ -169,8 +167,8 @@ class RubberDuck:
                     await self._report_error(error_message)
 
                 except (openai.APIConnectionError, openai.BadRequestError,
-                                         openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
-                                         openai.RateLimitError) as ex:
+                        openai.AuthenticationError, openai.ConflictError, openai.ConflictError, openai.NotFoundError,
+                        openai.RateLimitError) as ex:
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self.generate_error_message(guild_id, thread_id, ex)

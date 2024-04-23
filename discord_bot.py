@@ -70,14 +70,14 @@ def as_message(message: discord.Message) -> Message:
 
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path):
+    def __init__(self, root_save_folder: Path, x):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
         self._bot_config = config['bot_settings']
-        self._retry_config = self._bot_config['retry_settings']
+        self._retry_config = config['retry_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
@@ -160,7 +160,6 @@ class MyClient(discord.Client, MessageHandler):
                 as_message(message)
             )
 
-        # Ignore message
 
     async def start_duck_conversation(self, defaults, config, message: Message):
         thread_id = await self.create_thread(
@@ -247,7 +246,7 @@ class MyClient(discord.Client, MessageHandler):
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
-def main(state_path: Path, config: RetryConfig):
+def main(state_path: Path, config):
     client = MyClient(state_path, config)
     client.run(os.environ['DISCORD_TOKEN'])
 
