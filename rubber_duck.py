@@ -18,6 +18,10 @@ CONVERSATION_TIMEOUT = 60 * 3  # three minutes
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
 V_LOG_ZIP_STATS = '2023-09-26 Zip log file, Stats'
 
+class Attachment(TypedDict):
+    attachment_id: int
+    description: str
+    filename: str
 
 class Message(TypedDict):
     guild_id: int
@@ -31,11 +35,6 @@ class Message(TypedDict):
     Attachment: dict
     file: list[Attachment]
     
-class Attachment(TypedDict):
-    attachment_id: int
-    description: str
-    filename: str
-
 class GPTMessage(TypedDict):
     role: str
     content: str
