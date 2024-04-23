@@ -117,12 +117,15 @@ class MyClient(discord.Client, MessageHandler):
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
 
+        # MetricsHandler initialization
+        self.metrics_handler = MetricsHandler(metrics_folder)
+
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, MetricsHandler(metrics_folder))
+                    return RubberDuck(self.handle_error, self, self.metrics_handler, self._workflow_manager) # Use the initialized MetricsHandler
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -189,8 +192,6 @@ class MyClient(discord.Client, MessageHandler):
                 as_message(message)
             )
 
-        # Ignore message
-
     async def start_duck_conversation(self, defaults, config, message: Message):
 
         prompt = config.get('prompt', None)
@@ -249,7 +250,7 @@ class MyClient(discord.Client, MessageHandler):
     # Methods for MessageHandler protocol
     #
 
-    async def send_message(self, channel_id, message: str, file=None):
+    async def send_message(self, channel_id, message: str, file=None, view=None):
         if file is not None:
             file = discord.File(file)
 
@@ -258,6 +259,9 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             await self.get_channel(channel_id).send("", file=file)
+ 
+        if view is not None:
+            await self.get_channel(channel_id).send("", view=view)
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
@@ -275,7 +279,6 @@ class MyClient(discord.Client, MessageHandler):
 def main(state_path: Path, config: RubberDuckConfig):
     client = MyClient(state_path, config)
     client.run(os.environ['DISCORD_TOKEN'])
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
