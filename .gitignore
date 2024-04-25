@@ -6,4 +6,6 @@
 /state
 /__pycache__
 my_config.json
+myConfig.json
 scratch/suites/.DS_Store
+poetry.lock

@@ -1,11 +1,12 @@
 import csv
-from pathlib import Path
-import datetime
 import logging
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 def get_timestamp():
-    return datetime.datetime.utcnow().isoformat()
+    return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
 
 class MetricsHandler:
@@ -20,7 +21,8 @@ class MetricsHandler:
         self._usage_file = metrics_folder / 'usage.csv'
         if not self._usage_file.exists():
             self._usage_file.write_text(
-                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens', 'output_tokens']) + '\n')
+                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens',
+                          'output_tokens']) + '\n')
 
         # Added feedback metrics file
         self._feedback_file = metrics_folder / 'feedback.csv'

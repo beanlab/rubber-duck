@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import TypedDict
 
 from metrics import MetricsHandler
 
@@ -21,43 +20,47 @@ load_env()
 import argparse
 import json
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, Attachment
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
-def parse_blocks(text: str, limit=2000):
+def parse_blocks(text: str, limit=1990):
     tick = '`'
     block = ""
     current_fence = ""
     for line in text.splitlines():
-        if len(block) + len(line) > limit - 3:
+        if len(block) + len(line) > limit:
             if block:
                 if current_fence:
                     block += '```'
                 yield block
                 block = current_fence
 
-        block += ('\n' + line) if block else line
-
         if line.strip().startswith(tick * 3):
             if current_fence:
                 current_fence = ""
             else:
+                yield block
                 current_fence = line
+                block = current_fence
+
+        block += ('\n' + line) if block else line
 
     if block:
         yield block
 
 
 def as_message(message: discord.Message) -> Message:
+   
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -66,9 +69,19 @@ def as_message(message: discord.Message) -> Message:
         author_name=message.author.name,
         author_mention=message.author.mention,
         message_id=message.id,
-        content=message.content
+        
+        content=message.content,
+        # is_file=len(message.attachments) > 0
+
+        file = [as_attachment(attachment) for attachment in message.attachments] # call new as_attachment
     )
 
+def as_attachment(attachment):
+    return Attachment(
+        attachment_id = attachment.id,
+        description = attachment.description,
+        filename = attachment.filename
+    )
 
 class ChannelConfig(TypedDict):
     name: str | None
@@ -86,22 +99,21 @@ class RubberDuckConfig(TypedDict):
 
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, config: RubberDuckConfig):
+    def __init__(self, root_save_folder: Path, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        # root_state_folder: Path,
-        #                  log_file_path: Path,
-        #                  configs: list[dict]
-        #
-
-        self._config = config
+        self._bot_config = config['bot_settings']
+        self._rubber_duck_config = self._bot_config['duck_settings']
+        self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
-            for cc in config['channels']
+            for cc in self._bot_config['channels']
         }
+        self._admin_ids = self._bot_config['admin_ids']
+        self._defaults = self._bot_config['defaults']
 
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
@@ -114,7 +126,8 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    return RubberDuck(self.handle_error, self, self.metrics_handler, self._workflow_manager) # Use the initialized MetricsHandler
+                    return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
+                                      self._workflow_manager)  # Use the initialized MetricsHandler
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -130,7 +143,7 @@ class MyClient(discord.Client, MessageHandler):
         await asyncio.sleep(0.1)
         logging.info('Workflow manager ready')
 
-        for channel_id in self._config['command_channels']:
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, 'Duck online')
             except:
@@ -153,7 +166,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Command channel
-        if message.channel.id in self._config['command_channels']:
+        if message.channel.id in self._command_channels:
             self._workflow_manager.start_workflow(
                 'command', str(message.id), as_message(message))
             return
@@ -161,14 +174,14 @@ class MyClient(discord.Client, MessageHandler):
         # Duck channel
         if message.channel.id in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.id],
                 as_message(message)
             )
 
         if message.channel.name in self._duck_channels:
             return await self.start_duck_conversation(
-                self._config['defaults'],
+                self._defaults,
                 self._duck_channels[message.channel.name],
                 as_message(message)
             )
@@ -182,12 +195,7 @@ class MyClient(discord.Client, MessageHandler):
             )
 
     async def start_duck_conversation(self, defaults, config, message: Message):
-        thread_id = await self.create_thread(
-            message['channel_id'],
-            message['content'][:20],
-            message['author_id'],
-            message['message_id']
-        )
+
         prompt = config.get('prompt', None)
         if prompt is None:
             prompt_file = config.get('prompt_file', None)
@@ -199,6 +207,25 @@ class MyClient(discord.Client, MessageHandler):
         engine = config.get('engine', defaults['engine'])
 
         timeout = config.get('timeout', defaults['timeout'])
+        
+        thread_id = await self.create_thread(
+            message['channel_id'],
+            message['content'][:20],
+            message['author_id'],
+            message['message_id'],
+        )
+        # await send message
+        msg = await self.get_channel(message['channel_id']).fetch_message(
+            message['message_id']
+        )
+        # Add reaction to original message to indicate to user
+        #  that the message has been processed
+        if "duck" in message['content'].lower():
+            await msg.add_reaction('🦆')
+        else:
+            await msg.add_reaction('✅')
+
+        await self.send_message(message["channel_id"], f"<@{message['author_id']}> Click here to join the conversation: <#{thread_id}>")
 
         self._workflow_manager.start_workflow_background(
             'duck', str(thread_id), thread_id, engine, prompt, message, timeout
@@ -215,14 +242,9 @@ class MyClient(discord.Client, MessageHandler):
 
         # Grant access to the user
         await thread._state.http.add_user_to_thread(thread.id, author_id)
-
-        # Add reaction to original message to indicate to user
-        #  that the message has been processed
         msg = await self.get_channel(parent_channel_id).fetch_message(message_id)
-        if 'duck' in title.lower():
-            await msg.add_reaction('🦆')
-        else:
-            await msg.add_reaction('✅')
+
+        
 
         return thread.id
 
@@ -230,35 +252,50 @@ class MyClient(discord.Client, MessageHandler):
     # Methods for MessageHandler protocol
     #
 
-    async def send_message(self, channel_id, message: str, file=None, view=None):
+    async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
+        channel = self.get_channel(channel_id)
+        curr_message = None
         if file is not None:
             file = discord.File(file)
 
         for block in parse_blocks(message):
-            await self.get_channel(channel_id).send(block)
+            curr_message = await channel.send(block)
 
         if file is not None:
-            await self.get_channel(channel_id).send("", file=file)
- 
+            curr_message = await channel.send("", file=file)
+
         if view is not None:
-            await self.get_channel(channel_id).send("", view=view)
+            await channel.send("", view=view)
 
-    def typing(self, channel_id):
-        return self.get_channel(channel_id).typing()
+        return curr_message.id
 
-    #
-    # Method for ErrorHandler Protocol
-    #
-    async def handle_error(self, msg: str):
-        for channel_id in self._config['command_channels']:
+    async def edit_message(self, channel_id: int, message_id: int, new_content: str):
+        channel = self.get_channel(channel_id)
+        try:
+            msg = await channel.fetch_message(message_id)
+            await msg.edit(content=new_content)
+        except Exception as e:
+            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+
+    async def report_error(self, msg: str, notify_admins: bool = False):
+        if notify_admins:
+            user_ids_to_mention = self._bot_config["admin_ids"]
+            mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
+            msg = mentions + '\n' + msg
+        for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, msg)
             except:
                 logging.exception(f'Unable to message channel {channel_id}')
 
-def main(state_path: Path, config: RubberDuckConfig):
+    def typing(self, channel_id):
+        return self.get_channel(channel_id).typing()
+
+
+def main(state_path: Path, config):
     client = MyClient(state_path, config)
     client.run(os.environ['DISCORD_TOKEN'])
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -281,5 +318,6 @@ if __name__ == '__main__':
         )
 
     config = json.loads(args.config.read_text())
+
 
     main(args.state, config)
