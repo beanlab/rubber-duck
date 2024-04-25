@@ -147,9 +147,10 @@ class RubberDuck:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
                 try:
+                    # Waiting for a response from the user
                     message: Message = await asyncio.wait_for(messages.get(), timeout)
 
-                except asyncio.TimeoutError:
+                except asyncio.TimeoutError: # Close the thread if the conversation has closed
                     await self._send_message(thread_id, '*This conversation has been closed.*')
                     await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
                     return
@@ -164,7 +165,8 @@ class RubberDuck:
                 guild_id = message['guild_id']
 
                 await self._metrics_handler.record_message(
-                    guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content'])
+                    guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
+                )
 
                 try:
                     choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
