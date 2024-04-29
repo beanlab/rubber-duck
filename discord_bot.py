@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import TypedDict
 
 from metrics import MetricsHandler
 
@@ -26,7 +27,7 @@ from pathlib import Path
 
 import discord
 
-from rubber_duck import Message, RubberDuck, MessageHandler, ErrorHandler, Attachment
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
@@ -105,8 +106,8 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
+        self._rubber_duck_config = config['duck_settings']
         self._bot_config = config['bot_settings']
-        self._rubber_duck_config = self._bot_config['duck_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
