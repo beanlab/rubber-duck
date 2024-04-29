@@ -49,12 +49,18 @@ def parse_blocks(text: str, limit=1990):
                 else:
                     yield block
                     block = ""
+            else:
+                # REALLY long line
+                while len(line) > limit:
+                    yield line[:limit]
+                    line = line[limit:]
 
         if line.strip().startswith(fence):
             if current_fence:
                 current_fence = ""
             else:
-                yield block
+                if block:
+                    yield block
                 current_fence = line
                 block = ""
 
@@ -65,7 +71,6 @@ def parse_blocks(text: str, limit=1990):
 
 
 def as_message(message: discord.Message) -> Message:
-   
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -74,19 +79,18 @@ def as_message(message: discord.Message) -> Message:
         author_name=message.author.name,
         author_mention=message.author.mention,
         message_id=message.id,
-        
         content=message.content,
-        # is_file=len(message.attachments) > 0
-
-        file = [as_attachment(attachment) for attachment in message.attachments] # call new as_attachment
+        file=[as_attachment(attachment) for attachment in message.attachments]
     )
+
 
 def as_attachment(attachment):
     return Attachment(
-        attachment_id = attachment.id,
-        description = attachment.description,
-        filename = attachment.filename
+        attachment_id=attachment.id,
+        description=attachment.description,
+        filename=attachment.filename
     )
+
 
 class ChannelConfig(TypedDict):
     name: str | None
@@ -212,7 +216,7 @@ class MyClient(discord.Client, MessageHandler):
         engine = config.get('engine', defaults['engine'])
 
         timeout = config.get('timeout', defaults['timeout'])
-        
+
         thread_id = await self.create_thread(
             message['channel_id'],
             message['content'][:20],
@@ -230,7 +234,8 @@ class MyClient(discord.Client, MessageHandler):
         else:
             await msg.add_reaction('✅')
 
-        await self.send_message(message["channel_id"], f"<@{message['author_id']}> Click here to join the conversation: <#{thread_id}>")
+        await self.send_message(message["channel_id"],
+                                f"<@{message['author_id']}> Click here to join the conversation: <#{thread_id}>")
 
         self._workflow_manager.start_workflow_background(
             'duck', str(thread_id), thread_id, engine, prompt, message, timeout
@@ -248,8 +253,6 @@ class MyClient(discord.Client, MessageHandler):
         # Grant access to the user
         await thread._state.http.add_user_to_thread(thread.id, author_id)
         msg = await self.get_channel(parent_channel_id).fetch_message(message_id)
-
-        
 
         return thread.id
 
@@ -323,6 +326,5 @@ if __name__ == '__main__':
         )
 
     config = json.loads(args.config.read_text())
-
 
     main(args.state, config)

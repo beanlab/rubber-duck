@@ -20,10 +20,12 @@ AI_ENGINE = 'gpt-4'
 V_SUPPORT_STATE_COMMAND = '2023-09-26 Support State'
 V_LOG_ZIP_STATS = '2023-09-26 Zip log file, Stats'
 
+
 class Attachment(TypedDict):
     attachment_id: int
     description: str
     filename: str
+
 
 class Message(TypedDict):
     guild_id: int
@@ -34,9 +36,9 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    Attachment: dict
     file: list[Attachment]
-    
+
+
 class GPTMessage(TypedDict):
     role: str
     content: str
@@ -150,13 +152,14 @@ class RubberDuck:
                     # Waiting for a response from the user
                     message: Message = await asyncio.wait_for(messages.get(), timeout)
 
-                except asyncio.TimeoutError: # Close the thread if the conversation has closed
+                except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                     await self._send_message(thread_id, '*This conversation has been closed.*')
                     await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
                     return
 
                 if len(message['file']) > 0:
-                    await self._send_message(thread_id, "I'm sorry, I can't read file attachments. Please resend your message with the relevant parts of your file included in the message.")
+                    await self._send_message(thread_id,
+                                             "I'm sorry, I can't read file attachments. Please resend your message with the relevant parts of your file included in the message.")
                     continue
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
@@ -174,12 +177,12 @@ class RubberDuck:
                     response = response_message['content'].strip()
 
                     await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
-                                                                 engine,
-                                                                 usage['prompt_tokens'],
-                                                                 usage['completion_tokens'])
+                                                             engine,
+                                                             usage['prompt_tokens'],
+                                                             usage['completion_tokens'])
 
                     await self._metrics_handler.record_message(
-                            guild_id, thread_id, user_id, response_message['role'], response_message['content'])
+                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 

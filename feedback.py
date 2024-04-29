@@ -1,9 +1,8 @@
 import asyncio
-from typing import Callable
+
 import discord
 from quest import queue, step
 
-# TODO -> Once Quest provides it use that instead
 
 class FeedbackWorkflow:
     def __init__(self, record_feedback, post_event_function, send_message):
@@ -21,22 +20,27 @@ class FeedbackWorkflow:
 
             await self._send_message(channel_id=thread_id, message=message_content, view=feedback_view)
             try:
-                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=300)
+                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 30)
                 await self._send_message(thread_id, f'Thank you for your feedback!')
                 await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
             except asyncio.TimeoutError:
                 await self._send_message(thread_id, 'Feedback time out.')
+
 
 class FeedbackButton(discord.ui.Button):
     def __init__(self, label, post_score):
         super().__init__(label=label, style=discord.ButtonStyle.grey)
         self.post_score = post_score
 
-    async def callback(self, interaction: discord.Interaction): # Needs interaction for the function callback to work even if it is not used
+    async def callback(self, interaction: discord.Interaction):
+        # Needs interaction for the function callback to work even if it is not used
         feedback_score = self.label
         await self.post_score(feedback_score)
-        self.view.stop() # Stop the button interaction after getting one interaction
-        await interaction.response.defer(ephemeral=True) # Wait few seconds after getting the feedback to prevent interaction failed error
+        # Stop the button interaction after getting one interaction
+        self.view.stop()
+        # Wait few seconds after getting the feedback to prevent interaction failed error
+        await interaction.response.defer(ephemeral=True)
+
 
 class FeedbackView(discord.ui.View):
     def __init__(self, post_score):
@@ -45,4 +49,4 @@ class FeedbackView(discord.ui.View):
 
         # Add FeedbackButton instances to the view
         for i in range(1, 6):
-            self.add_item(FeedbackButton(label=str(i), post_score = self.post_score))
+            self.add_item(FeedbackButton(label=str(i), post_score=self.post_score))
