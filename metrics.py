@@ -41,7 +41,7 @@ class MetricsHandler:
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
 
     # Record the feedback in feedback.csv
-    async def record_feedback(self, guild_id: int, thread_id: int, user_id: int, feedback_score: int):
+    async def record_feedback(self, guild_id: int, thread_id: int, user_id: int, feedback_score):
         try:
             with self._feedback_file.open('at', newline='') as file:
                 writer = csv.writer(file)

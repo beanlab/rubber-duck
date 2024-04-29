@@ -12,19 +12,22 @@ class FeedbackWorkflow:
 
     async def request_feedback(self, guild_id: int, thread_id: int, user_id: int):
         async with queue("feedback", str(thread_id)) as feedback_queue:
-            async def post_score(score: str):
+            async def post_score(score):
                 await self.post_event(str(thread_id), "feedback", str(thread_id), "put", score)
 
             feedback_view = FeedbackView(post_score)
             message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation?"
-
             await self._send_message(channel_id=thread_id, message=message_content, view=feedback_view)
+
             try:
                 feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 30)
                 await self._send_message(thread_id, f'Thank you for your feedback!')
-                await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
+
             except asyncio.TimeoutError:
-                await self._send_message(thread_id, 'Feedback time out.')
+                await self._send_message(thread_id, '*Feedback time out.*')
+                feedback_score = 'na'
+
+            await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
 
 
 class FeedbackButton(discord.ui.Button):

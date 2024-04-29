@@ -108,11 +108,11 @@ class RubberDuck:
         self._error_message_id = None
         self.workflow_manager = workflow_manager
 
-        async def post_event(workflow_id, name, identity, action, *args):
-            await workflow_manager.send_event(workflow_id, name, identity, action, *args)
-
-        self.feedback_workflow = FeedbackWorkflow(metrics_handler.record_feedback, post_event,
-                                                  message_handler.send_message)
+        self.feedback_workflow = FeedbackWorkflow(
+            metrics_handler.record_feedback,
+            workflow_manager.send_event,
+            message_handler.send_message
+        )
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
@@ -158,8 +158,11 @@ class RubberDuck:
                     return
 
                 if len(message['file']) > 0:
-                    await self._send_message(thread_id,
-                                             "I'm sorry, I can't read file attachments. Please resend your message with the relevant parts of your file included in the message.")
+                    await self._send_message(
+                        thread_id,
+                        "I'm sorry, I can't read file attachments. "
+                        "Please resend your message with the relevant parts of your file included in the message."
+                    )
                     continue
 
                 message_history.append(GPTMessage(role='user', content=message['content']))
