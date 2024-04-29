@@ -36,23 +36,27 @@ LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 def parse_blocks(text: str, limit=1990):
     tick = '`'
+    fence = tick * 3
     block = ""
     current_fence = ""
     for line in text.splitlines():
         if len(block) + len(line) > limit:
             if block:
                 if current_fence:
-                    block += '```'
-                yield block
-                block = current_fence
+                    block += fence
+                    yield block
+                    block = current_fence
+                else:
+                    yield block
+                    block = ""
 
-        if line.strip().startswith(tick * 3):
+        if line.strip().startswith(fence):
             if current_fence:
                 current_fence = ""
             else:
                 yield block
                 current_fence = line
-                block = current_fence
+                block = ""
 
         block += ('\n' + line) if block else line
 
