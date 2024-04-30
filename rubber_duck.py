@@ -148,33 +148,31 @@ class RubberDuck:
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
-                try:
-                    # Waiting for a response from the user
-                    message: Message = await asyncio.wait_for(messages.get(), timeout)
+                try:  # catch all errors
+                    try:
+                        # Waiting for a response from the user
+                        message: Message = await asyncio.wait_for(messages.get(), timeout)
 
-                except asyncio.TimeoutError:  # Close the thread if the conversation has closed
-                    await self._send_message(thread_id, '*This conversation has been closed.*')
-                    await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
-                    return
+                    except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                        break
 
-                if len(message['file']) > 0:
-                    await self._send_message(
-                        thread_id,
-                        "I'm sorry, I can't read file attachments. "
-                        "Please resend your message with the relevant parts of your file included in the message."
+                    if len(message['file']) > 0:
+                        await self._send_message(
+                            thread_id,
+                            "I'm sorry, I can't read file attachments. "
+                            "Please resend your message with the relevant parts of your file included in the message."
+                        )
+                        continue
+
+                    message_history.append(GPTMessage(role='user', content=message['content']))
+
+                    user_id = message['author_id']
+                    guild_id = message['guild_id']
+
+                    await self._metrics_handler.record_message(
+                        guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
-                    continue
 
-                message_history.append(GPTMessage(role='user', content=message['content']))
-
-                user_id = message['author_id']
-                guild_id = message['guild_id']
-
-                await self._metrics_handler.record_message(
-                    guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
-                )
-
-                try:
                     choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
@@ -197,6 +195,7 @@ class RubberDuck:
                                              'I\'m having trouble connecting to the OpenAI servers, '
                                              'please open up a separate conversation and try again')
                     await self._report_error(error_message)
+                    break
 
                 except (openai.APIConnectionError, openai.BadRequestError,
                         openai.AuthenticationError, openai.ConflictError, openai.NotFoundError,
@@ -210,17 +209,20 @@ class RubberDuck:
                     openai_error_message = f"*** {type(ex).__name__} ***"
                     await self._report_error(f"{openai_error_message}\n{openai_web_mention}")
                     await self._report_error(error_message, True)
+                    break
 
                 except Exception as ex:
                     error_message, error_code = self.generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              f'😵 **Error code {error_code}** 😵'
                                              f'\nAn unexpected error occurred. Please contact support.'
-                                             f'\nError code for reference: {error_code}'
-                                             '\n*This conversation is closed*')
+                                             f'\nError code for reference: {error_code}')
                     await self._report_error(error_message)
+                    break
 
-                    return
+            # After while loop
+            await self._send_message(thread_id, '*This conversation has been closed.*')
+            await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
