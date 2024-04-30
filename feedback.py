@@ -36,13 +36,14 @@ class FeedbackButton(discord.ui.Button):
         self.post_score = post_score
 
     async def callback(self, interaction: discord.Interaction):
-        # Needs interaction for the function callback to work even if it is not used
+        for button in self.view.children:
+            button.disabled = True
+        self.view.stop()
+        await interaction.response.edit_message(view=self.view)
+
+        # Last thing is to post the feedback, which closes the thread
         feedback_score = self.label
         await self.post_score(feedback_score)
-        # Stop the button interaction after getting one interaction
-        self.view.stop()
-        # Wait few seconds after getting the feedback to prevent interaction failed error
-        await interaction.response.defer(ephemeral=True)
 
 
 class FeedbackView(discord.ui.View):
