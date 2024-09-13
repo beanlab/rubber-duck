@@ -3,6 +3,8 @@ import asyncio
 import discord
 from quest import queue, step
 
+CHANNEL_ID = 1284224818698260490
+
 
 class FeedbackWorkflow:
     def __init__(self, record_feedback, post_event_function, send_message):
@@ -29,6 +31,28 @@ class FeedbackWorkflow:
 
             await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
 
+    async def ta_feedback(self, guild_id: int, thread_id: int, user_id: int):
+        """
+        Takes thread_id, sends it to the ta-channel, collect's feedback
+        """
+        async with queue("feedback", str(thread_id)) as feedback_queue:
+            async def post_score(score):
+                await self.post_event(str(thread_id), "feedback", str(thread_id), "put", score)
+
+            feedback_view = FeedbackView(post_score)
+            message_content = (f"Thread ID {thread_id} has finished their conversation\n"
+                               f"On a scale of 1 to 5, how helpful was their conversation?")
+            await self._send_message(channel_id=CHANNEL_ID, message=message_content, view=feedback_view)
+
+            try:
+                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=60)
+                await self._send_message(thread_id, f'Thank you for your feedback!')
+
+            except asyncio.TimeoutError:
+                await self._send_message(thread_id, '*Feedback time out.*')
+                feedback_score = 'na'
+
+            await self._record_feedback(guild_id, thread_id, CHANNEL_ID, feedback_score)
 
 class FeedbackButton(discord.ui.Button):
     def __init__(self, label, post_score):

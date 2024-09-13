@@ -222,6 +222,7 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
+            await self.feedback_workflow.ta_feedback(guild_id, thread_id, user_id)
             await self.feedback_workflow.request_feedback(guild_id, thread_id, user_id)
 
     @step
