@@ -22,7 +22,7 @@ class FeedbackWorkflow:
             await self._send_message(channel_id=thread_id, message=message_content, view=feedback_view)
 
             try:
-                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 30)
+                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=30) ##Changed the timeout for testing
                 await self._send_message(thread_id, f'Thank you for your feedback!')
 
             except asyncio.TimeoutError:
@@ -41,11 +41,12 @@ class FeedbackWorkflow:
 
             feedback_view = FeedbackView(post_score)
             message_content = (f"Thread ID {thread_id} has finished their conversation\n"
+                               f"https://discord.com/channels/{guild_id}/{thread_id}/{user_id}"
                                f"On a scale of 1 to 5, how helpful was their conversation?")
             await self._send_message(channel_id=CHANNEL_ID, message=message_content, view=feedback_view)
 
             try:
-                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=60)
+                feedback_score = await asyncio.wait_for(feedback_queue.get(), timeout=30)
                 await self._send_message(thread_id, f'Thank you for your feedback!')
 
             except asyncio.TimeoutError:
