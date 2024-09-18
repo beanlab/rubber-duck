@@ -114,7 +114,7 @@ class RubberDuck:
             message_handler.send_message
         )
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=30):#we changed this to 30 seconds for testing purposes
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
 
     def generate_error_message(self, guild_id, thread_id, ex):
@@ -131,7 +131,7 @@ class RubberDuck:
     #
     # Begin Conversation
     #
-    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=30): #we changed this to 30 seconds.
         user_id = initial_message['author_id']
 
         async with queue('messages', str(thread_id)) as messages:
@@ -263,3 +263,4 @@ class RubberDuck:
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
+#Add a function that removes the state folder every run.
