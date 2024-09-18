@@ -164,6 +164,10 @@ class RubberDuck:
                         )
                         continue
 
+                    # Here, we could check the similarity between the current and previous messages, and prompt them to
+                    # start a new thread if there is a low similarity
+
+
                     message_history.append(GPTMessage(role='user', content=message['content']))
 
                     user_id = message['author_id']
