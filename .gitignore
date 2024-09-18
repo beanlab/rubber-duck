@@ -10,3 +10,4 @@ myConfig.json
 scratch/suites/.DS_Store
 poetry.lock
 /wiley_config.json
+/bryce_config.json
