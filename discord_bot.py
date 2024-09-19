@@ -3,7 +3,7 @@ import os
 from typing import TypedDict
 
 from metrics import MetricsHandler
-
+from feedback import FeedbackWorkflow
 
 def load_env():
     with open('secrets.env') as file:
@@ -92,6 +92,10 @@ def as_attachment(attachment):
     )
 
 
+def get_feedback_workflow_id(thread_id):
+    return f'feedback-{thread_id}'
+
+
 class ChannelConfig(TypedDict):
     name: str | None
     id: int | None
@@ -135,8 +139,15 @@ class MyClient(discord.Client, MessageHandler):
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
+                    async def start_feedback_workflow(thread_id, *args, **kwargs):
+                        workflow_id = get_feedback_worfklow_id(thread_id)
+                        await self._workflow_manager.start_workflow('feedback', workflow_id, *args, **kwargs)
+
                     return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
-                                      self._workflow_manager)  # Use the initialized MetricsHandler
+                                      start_feedback_workflow)
+                case 'feedback':
+                    # TODO get channel ID from config above
+                    return FeedbackWorkflow(feedback_channel_id, self.send_message, self.metrics_handler.record_feedback)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -201,6 +212,17 @@ class MyClient(discord.Client, MessageHandler):
             await self._workflow_manager.send_event(
                 str_id, 'messages', str_id, 'put',
                 as_message(message)
+            )
+
+    async def on_reaction(self, message: Message, reaction: str):
+        message_id = str(message.id)
+
+        workflow_id = get_feedback_workflow_id(message.channel.id)
+
+        if self._workflow_manager.has_workflow(workflow_id):
+            await self._workflow_manager.send_event(
+                workflow_id, 'feedback', None, 'put',
+                reaction
             )
 
     async def start_duck_conversation(self, defaults, config, message: Message):
