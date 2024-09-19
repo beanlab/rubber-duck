@@ -9,7 +9,7 @@ python = "^3.11"
 openai = "^1.11.1"
 discord = "^2.1.0"
 urllib3 = "<2.0"
-quest-py = "0.2.0b5"
+quest-py = "0.2.1"
 
 [tool.poetry.dev-dependencies]
 

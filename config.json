@@ -11,7 +11,7 @@
       {
         "name": "other-pond",
         "prompt_file": "prompts/standard-rubber-duck.txt",
-        "engine": "gpt-3.5-turbo-16k"
+        "engine": "gpt-4o-mini"
       },
       {
         "name": "gpt4",

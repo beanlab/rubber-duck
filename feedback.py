@@ -6,7 +6,7 @@ from quest import queue, step
 
 class FeedbackWorkflow:
     def __init__(self, record_feedback, post_event_function, send_message):
-        self._record_feedback = step(record_feedback)
+        self._record_feedback = record_feedback
         self.post_event = post_event_function
         self._send_message = step(send_message)
 
