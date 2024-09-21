@@ -222,7 +222,7 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-            await self.start_feedback_workflow(guild_id, thread_id, user_id)
+            await self.start_feedback_workflow.ta_feedback(guild_id, thread_id, user_id)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
