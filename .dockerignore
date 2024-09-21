@@ -1,0 +1,36 @@
+# Ignore environment files
+*.env
+
+# Ignore IDE configurations
+.idea/
+
+# Ignore conversation and local testing directories
+/conversations/
+/local-testing-convos/
+/local-testing-configs/
+
+# Ignore state files
+/state
+
+# Ignore Python cache files
+__pycache__/
+
+# Ignore configuration files
+my_config.json
+myConfig.json
+wiley_config.json
+bryce_config.json
+
+# Ignore macOS system files
+scratch/suites/.DS_Store
+
+# Ignore Poetry lock file
+poetry.lock
+
+# Ignore Git files
+.git/
+.gitignore
+
+# Ignore Docker files
+Dockerfile
+.dockerignore
