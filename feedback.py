@@ -12,11 +12,11 @@ class FeedbackWorkflow:
         self._record_feedback = step(record_feedback)
 
         self._reactions = {
-            '1': 1,
-            '2': 2,
-            '3': 3,
-            '4': 4,
-            '5': 5
+            ':one:': 1,
+            ':two:': 2,
+            ':three:': 3,
+            ':four:': 4,
+            ':five:': 5
         }
 
     async def ta_feedback(self, guild_id: int, thread_id: int, user_id: int):
@@ -24,14 +24,22 @@ class FeedbackWorkflow:
         Takes thread_id, sends it to the ta-channel, collect's feedback
         """
         async with queue("feedback", None) as feedback_queue:
+            message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation? (Add your reaction below)"
 
-            feedback_message = self._send_message(self._feedback_channel_id, 'Get feedback')
-            for reaction in self._reactions:
-                feedback_message.add_reaction(reaction)
 
-            reaction = await feedback_queue.get()
+            feedback_message = await self._send_message(self._feedback_channel_id, message_content)
+            # for reaction in self._reactions:
+            #     await feedback_message.add_reaction(reaction)
+            #
 
-            feedback_score = self._reactions[reaction]
+            try:
+                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24)
+                feedback_score = self._reactions[feedback_emoji]
+                await self._send_message(thread_id, f'Thank you for your feedback!')
+
+            except asyncio.TimeoutError:
+                await self._send_message(thread_id, '*Feedback time out.*')
+                feedback_score = 'na'
 
             # TODO - put a timeout on here. Maybe a week?
 

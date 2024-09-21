@@ -147,7 +147,7 @@ class MyClient(discord.Client, MessageHandler):
                             print("start_workflow returned None")
 
                     return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
-                                      start_feedback_workflow)
+                                      FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback))
                 case 'feedback':
                     if self._ta_channel_config is None:
                         print("ta_review_channel is not set in the configuration.")
