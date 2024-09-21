@@ -3,7 +3,6 @@ import asyncio
 import discord
 from quest import queue, step
 
-CHANNEL_ID = 1284224818698260490  # Don't hard code anything. Put this in config.
 
 
 class FeedbackWorkflow:
@@ -14,7 +13,10 @@ class FeedbackWorkflow:
 
         self._reactions = {
             '1': 1,
-            '2': 2
+            '2': 2,
+            '3': 3,
+            '4': 4,
+            '5': 5
         }
 
     async def ta_feedback(self, guild_id: int, thread_id: int, user_id: int):

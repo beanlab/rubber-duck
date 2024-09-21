@@ -119,6 +119,7 @@ class MyClient(discord.Client, MessageHandler):
         super().__init__(intents=intents)
 
         self._rubber_duck_config = config['duck_settings']
+        self._ta_channel_config = config["ta_settings"]['ta_review_channel'][0]
         self._bot_config = config['bot_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
@@ -140,14 +141,18 @@ class MyClient(discord.Client, MessageHandler):
                     return BotCommands(self.send_message)
                 case 'duck':
                     async def start_feedback_workflow(thread_id, *args, **kwargs):
-                        workflow_id = get_feedback_worfklow_id(thread_id)
-                        await self._workflow_manager.start_workflow('feedback', workflow_id, *args, **kwargs)
+                        workflow_id = get_feedback_workflow_id(thread_id)
+                        result = await self._workflow_manager.start_workflow('feedback', workflow_id, *args, **kwargs)
+                        if result is None:
+                            print("start_workflow returned None")
 
                     return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
                                       start_feedback_workflow)
                 case 'feedback':
+                    if self._ta_channel_config is None:
+                        print("ta_review_channel is not set in the configuration.")
                     # TODO get channel ID from config above
-                    return FeedbackWorkflow(feedback_channel_id, self.send_message, self.metrics_handler.record_feedback)
+                    return FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
