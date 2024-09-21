@@ -8,6 +8,7 @@ COPY . /rubber-duck
 
 RUN pip install poetry
 
+#fixed this
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
 
