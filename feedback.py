@@ -27,7 +27,7 @@ class FeedbackWorkflow:
             message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}/{user_id} (Add your reaction below)"
 
 
-            feedback_message = await self._send_message(self._feedback_channel_id, message_content)
+            feedback_message_id = await self._send_message(self._feedback_channel_id, message_content)
             # for reaction in self._reactions:
             #     await feedback_message.add_reaction(reaction)
 
