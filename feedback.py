@@ -24,7 +24,7 @@ class FeedbackWorkflow:
         Takes thread_id, sends it to the ta-channel, collect's feedback
         """
         async with queue("feedback", None) as feedback_queue:
-            message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation? (Add your reaction below)"
+            message_content = f"<@{user_id}>, on a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}user_id%7D? (Add your reaction below)"
 
 
             feedback_message = await self._send_message(self._feedback_channel_id, message_content)
@@ -33,7 +33,7 @@ class FeedbackWorkflow:
             #
 
             try:
-                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24)
+                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24 * 7)
                 feedback_score = self._reactions[feedback_emoji]
                 await self._send_message(thread_id, f'Thank you for your feedback!')
 
