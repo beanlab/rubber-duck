@@ -30,8 +30,10 @@ class FeedbackWorkflow:
             message_id = await self._send_message(self._feedback_channel_id, message_content)
             # feedback_channel = self.discord_client.get_channel(self._feedback_channel_id)
             feedback_message = await self._ta_channel_object.fetch_message(message_id)
+
             for reaction in self._reactions:
                 await feedback_message.add_reaction(reaction)
+                await asyncio.sleep(0.5)
 
 
             try:
