@@ -131,7 +131,7 @@ class MyClient(discord.Client, MessageHandler):
 
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
-
+        # randomstuff
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(metrics_folder)
 
