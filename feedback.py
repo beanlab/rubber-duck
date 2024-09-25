@@ -35,7 +35,7 @@ class FeedbackWorkflow:
                 await feedback_message.add_reaction(reaction)
                 await asyncio.sleep(0.5)
 
-
+            # TODO - put a timeout on here. Maybe a week?
             try:
                 feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24 * 7)
                 feedback_score = self._reactions[feedback_emoji]
@@ -45,7 +45,6 @@ class FeedbackWorkflow:
                 await self._send_message(thread_id, '*Feedback time out.*')
                 feedback_score = 'na'
 
-            # TODO - put a timeout on here. Maybe a week?
 
             # Record score
             await self._record_feedback(guild_id, thread_id, user_id, feedback_score)

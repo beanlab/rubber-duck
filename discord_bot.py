@@ -229,9 +229,9 @@ class MyClient(discord.Client, MessageHandler):
             )
 
     async def on_reaction(self, message: Message, reaction: str):
-        message_id = str(message.id)
+        message_id = str(message['message_id'])
 
-        workflow_id = get_feedback_workflow_id(message.channel.id)
+        workflow_id = get_feedback_workflow_id(message['channel_id'])
 
         if self._workflow_manager.has_workflow(workflow_id):
             await self._workflow_manager.send_event(
