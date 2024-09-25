@@ -10,13 +10,22 @@ class ReportAssistant():
         self.usage = pd.read_csv("./state/metrics/usage.csv")
         # self.messages = pd.read_csv("./state/metrics/messages.csv")
         self.feedback = pd.read_csv("./state/metrics/feedback.csv")
+        self.current_df = None
 
     def read_df(self, df: pd.DataFrame, n=10):
         print(df.head(n))
         return df
 
     def view_graph(self, df: pd.DataFrame, type = 'bar chart'):
-        pass
+        df = df[["user_id", "output_tokens"]]
+        if type == "bar chart":
+            print(f'You chose a bar chart to view {self.current_df}')
+            print(f"{df.groupby(['user_id']).output_tokens.sum().reset_index()}")
+            sbn.barplot(
+                data=df.groupby(['user_id']).output_tokens.sum().reset_index(),
+                x='user_id',
+                y='output_tokens',
+            )
 
 
 def get_df(assistant: ReportAssistant):
@@ -24,9 +33,11 @@ def get_df(assistant: ReportAssistant):
         df_request = input("Which data do you want to view from? Usage, messages, or feedback?\n").lower()
         match df_request:
             case 'usage' | 'u':
-                return assistant.usage
+                assistant.current_df = 'usage'
+                return assistant.read_df(assistant.usage)
             case 'feedback' | 'f':
-                return assistant.feedback
+                assistant.current_df = 'feedback'
+                return assistant.read_df(assistant.feedback)
             case 'q':
                 print("See you next time!")
                 return None
@@ -38,7 +49,7 @@ def get_df(assistant: ReportAssistant):
 def main(assistant: ReportAssistant):
     print("Seems like you'd like to do some data analytics!")
     df = get_df(assistant)
-    assistant.read_df(df)
+    assistant.view_graph(df)
 
     print("Hope that was helpful!")
 
