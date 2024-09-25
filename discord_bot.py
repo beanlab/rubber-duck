@@ -128,6 +128,8 @@ class MyClient(discord.Client, MessageHandler):
         }
         self._admin_ids = self._bot_config['admin_ids']
         self._defaults = self._bot_config['defaults']
+        self._ta_channel_object = None
+
 
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
@@ -147,12 +149,12 @@ class MyClient(discord.Client, MessageHandler):
                             print("start_workflow returned None")
 
                     return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
-                                      FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback))
+                                      FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback, self._ta_channel_object))
                 case 'feedback':
                     if self._ta_channel_config is None:
                         print("ta_review_channel is not set in the configuration.")
                     # TODO get channel ID from config above
-                    return FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback)
+                    return FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback, self._ta_channel_object)
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -167,6 +169,13 @@ class MyClient(discord.Client, MessageHandler):
         self._workflow_manager = await self._workflow_manager.__aenter__()
         await asyncio.sleep(0.1)
         logging.info('Workflow manager ready')
+
+        #Create a ta
+        self._ta_channel_object = self.get_channel(self._ta_channel_config)
+        if self._ta_channel_object is None:
+            print(f"Failed to fetch TA channel with ID {self._ta_channel_config}")
+        else:
+            print(f"Successfully fetched TA channel: {self._ta_channel_config}")
 
         for channel_id in self._command_channels:
             try:
