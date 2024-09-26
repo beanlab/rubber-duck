@@ -55,7 +55,7 @@ class FeedbackWorkflow:
 
             try:
                 # TODO - Actually grab the emoji we need
-                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24 * 7) # fix this to work because feedback_queue doesn't have a get method.
+                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout = 60 * 60 * 24 * 7) # fix this to work because feedback_queue doesn't have a get method.
                 feedback_score = self._reactions[feedback_emoji]
                 # TODO - add a checkmark reaction to the message
                 await feedback_message.add_reaction('✅')
@@ -65,6 +65,6 @@ class FeedbackWorkflow:
                 feedback_score = 'na'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
+            await self._record_feedback(guild_id, thread_id, user_id, self._feedback_config['ta_role_id'], feedback_score)
 
             # Done
