@@ -96,7 +96,7 @@ class RubberDuck:
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
                  config: RubberDuckConfig,
-                 feedback_workflow: FeedbackWorkflow
+                 start_feedback_workflow
                  ):
         self._send_raw_message = message_handler.send_message
         self._send_message = step(message_handler.send_message)
@@ -107,7 +107,7 @@ class RubberDuck:
         self._metrics_handler = wrap_steps(metrics_handler)
         self._error_message_id = None
 
-        self.feedback_workflow = feedback_workflow
+        self.start_feedback_workflow = step(start_feedback_workflow)
 
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=60):#we changed this to 60 seconds for testing purposes
@@ -222,7 +222,7 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-            await self.feedback_workflow.ta_feedback(guild_id, thread_id, user_id)
+            await self.start_feedback_workflow(guild_id, thread_id, user_id)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
