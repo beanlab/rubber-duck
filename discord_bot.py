@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from typing import TypedDict
 
 from metrics import MetricsHandler
@@ -119,7 +120,7 @@ class MyClient(discord.Client, MessageHandler):
         super().__init__(intents=intents)
 
         self._rubber_duck_config = config['duck_settings']
-        self._ta_channel_config = config["ta_settings"]['ta_review_channel'][0]
+        self._ta_channel_config = config['feedback_config']
         self._bot_config = config['bot_settings']
         self._command_channels = self._bot_config['command_channels']
         self._duck_channels = {
@@ -128,33 +129,44 @@ class MyClient(discord.Client, MessageHandler):
         }
         self._admin_ids = self._bot_config['admin_ids']
         self._defaults = self._bot_config['defaults']
-        self._ta_channel_object = None
-
 
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
-        # randomstuff
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(metrics_folder)
+
+        if self._ta_channel_config is None:
+            # TODO - Exception
+            print("ta_review_channel is not set in the configuration.")
+
+        async def fetch_message(channel_id, message_id):
+            return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+
+        feedback_workflow = FeedbackWorkflow(
+            self._ta_channel_config,
+            self.send_message,
+            fetch_message,
+            self.metrics_handler.record_feedback
+        )
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
                     return BotCommands(self.send_message)
                 case 'duck':
-                    async def start_feedback_workflow(thread_id, *args, **kwargs):
-                        workflow_id = get_feedback_workflow_id(thread_id)
-                        result = await self._workflow_manager.start_workflow('feedback', workflow_id, *args, **kwargs)
+                    async def start_feedback_workflow(guild_id, channel_id, user_id):
+                        workflow_id = get_feedback_workflow_id(channel_id)
+                        result = await self._workflow_manager.start_workflow('feedback', workflow_id, guild_id, channel_id, user_id)
                         if result is None:
                             print("start_workflow returned None")
 
-                    return RubberDuck(self, self.metrics_handler, self._rubber_duck_config,
-                                      FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback, self._ta_channel_object))
+                    return RubberDuck(self,
+                                      self.metrics_handler,
+                                      self._rubber_duck_config,
+                                      start_feedback_workflow
+                                      )
                 case 'feedback':
-                    if self._ta_channel_config is None:
-                        print("ta_review_channel is not set in the configuration.")
-                    # TODO get channel ID from config above
-                    return FeedbackWorkflow(self._ta_channel_config, self.send_message, self.metrics_handler.record_feedback, self._ta_channel_object)
+                    return feedback_workflow
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -171,11 +183,6 @@ class MyClient(discord.Client, MessageHandler):
         logging.info('Workflow manager ready')
 
         #Create a ta
-        self._ta_channel_object = self.get_channel(self._ta_channel_config)
-        if self._ta_channel_object is None:
-            print(f"Failed to fetch TA channel with ID {self._ta_channel_config}")
-        else:
-            print(f"Successfully fetched TA channel: {self._ta_channel_config}")
 
         for channel_id in self._command_channels:
             try:
@@ -228,15 +235,27 @@ class MyClient(discord.Client, MessageHandler):
                 as_message(message)
             )
 
-    async def on_reaction(self, message: Message, reaction: str):
-        message_id = str(message['message_id'])
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
+        if user.id == self.user.id:
+            return
 
-        workflow_id = get_feedback_workflow_id(message['channel_id'])
+        message = reaction.message
+        emoji = reaction.emoji
+        print('reaction received:', message.channel.id, message.id, emoji)
+
+        # parse channel ID from message text
+        # TODO - use quest workflow alias once implemented
+        m = re.search(r'https://discord.com/channels/(\d+)/(\d+)/(\d+)', message.content)
+        if m is None:
+            return
+
+        channel_id = m.group(2)
+        workflow_id = get_feedback_workflow_id(channel_id)
 
         if self._workflow_manager.has_workflow(workflow_id):
             await self._workflow_manager.send_event(
                 workflow_id, 'feedback', None, 'put',
-                reaction
+                emoji
             )
 
     async def start_duck_conversation(self, defaults, config, message: Message):
