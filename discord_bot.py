@@ -157,8 +157,6 @@ class MyClient(discord.Client, MessageHandler):
                     async def start_feedback_workflow(guild_id, channel_id, user_id):
                         workflow_id = get_feedback_workflow_id(channel_id)
                         result = await self._workflow_manager.start_workflow('feedback', workflow_id, guild_id, channel_id, user_id)
-                        if result is None:
-                            print("start_workflow returned None")
 
                     return RubberDuck(self,
                                       self.metrics_handler,
@@ -179,11 +177,8 @@ class MyClient(discord.Client, MessageHandler):
         logging.info(self.user.id)
         logging.info('Starting workflow manager')
         self._workflow_manager = await self._workflow_manager.__aenter__()
-        await asyncio.sleep(0.1)
-        logging.info('Workflow manager ready')
 
         #Create a ta
-
         for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, 'Duck online')
@@ -238,10 +233,8 @@ class MyClient(discord.Client, MessageHandler):
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         if user.id == self.user.id:
             return
-
         message = reaction.message
         emoji = reaction.emoji
-        print('reaction received:', message.channel.id, message.id, emoji)
 
         # parse channel ID from message text
         # TODO - use quest workflow alias once implemented
