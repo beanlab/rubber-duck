@@ -43,28 +43,25 @@ class FeedbackWorkflow:
 
             message_content = f"<@{self._feedback_config['ta_role_id']}>, on a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}/{user_id} (Add your reaction below)"
 
-            # check to see if this a discord.message
+            # TODO - when quest code-object support is implemented, use that to directly return a message object from _send_message
             message_id = await self._send_message(feedback_channel_id, message_content)
             feedback_message = await self._fetch_message(feedback_channel_id, message_id)
 
-            # TODO - this is where the workflow alias would be registered
 
             for reaction in self._reactions:
                 await feedback_message.add_reaction(reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
             try:
-                # TODO - Actually grab the emoji we need
-                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout=60 * 60 * 24 * 7) # fix this to work because feedback_queue doesn't have a get method.
+                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout = 60 * 60 * 24 * 7) # fix this to work because feedback_queue doesn't have a get method.
                 feedback_score = self._reactions[feedback_emoji]
-                # TODO - add a checkmark reaction to the message
                 await feedback_message.add_reaction('✅')
 
             except asyncio.TimeoutError:
-                await self._send_message(feedback_channel_id, '*Feedback time out.*')
+                await feedback_message.add_reaction('❌')
                 feedback_score = 'na'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
+            await self._record_feedback(guild_id, thread_id, user_id, self._feedback_config['ta_role_id'], feedback_score)
 
             # Done

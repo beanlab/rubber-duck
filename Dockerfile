@@ -1,6 +1,6 @@
 FROM python:3.11.9
 
-LABEL authors="Wiley Welch, Bryce Martin, Dr. Gordon Bean"
+LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 
 WORKDIR /rubber-duck
 
