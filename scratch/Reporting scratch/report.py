@@ -7,9 +7,9 @@ import json
 
 class ReportAssistant():
     def __init__(self):
-        self.usage = pd.read_csv("./state/metrics/usage.csv")
+        self.usage = pd.read_csv("../../state/metrics/usage.csv")
         # self.messages = pd.read_csv("./state/metrics/messages.csv")
-        self.feedback = pd.read_csv("./state/metrics/feedback.csv")
+        self.feedback = pd.read_csv("../../state/metrics/feedback.csv")
         self.current_df = None
 
     def read_df(self, df: pd.DataFrame, n=10):
@@ -19,7 +19,7 @@ class ReportAssistant():
     def view_graph(self, df: pd.DataFrame, type = 'bar chart'):
         df = df[["user_id", "output_tokens"]]
         if type == "bar chart":
-            print(f'You chose a bar chart to view {self.current_df}')
+            print(f'Print a bar chart with {self.current_df}')
             print(f"{df.groupby(['user_id']).output_tokens.sum().reset_index()}")
             sbn.barplot(
                 data=df.groupby(['user_id']).output_tokens.sum().reset_index(),
