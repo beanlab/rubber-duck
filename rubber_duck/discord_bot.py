@@ -359,6 +359,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--state', type=Path, default='state')
+    parser.add_argument("--secrets",type=Path,default =".env")
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
     # Read secrets here add an arguement for the secrets
