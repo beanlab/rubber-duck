@@ -7,9 +7,9 @@ import json
 
 class ReportAssistant():
     def __init__(self):
-        self.usage = pd.read_csv("./state/metrics/usage.csv")
+        self.usage = pd.read_csv("../state/metrics/usage.csv")
         # self.messages = pd.read_csv("./state/metrics/messages.csv")
-        self.feedback = pd.read_csv("./state/metrics/feedback.csv")
+        self.feedback = pd.read_csv("../state/metrics/feedback.csv")
         self.current_df = None
 
     def read_df(self, df: pd.DataFrame, n=10):
