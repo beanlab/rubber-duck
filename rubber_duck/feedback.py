@@ -53,7 +53,7 @@ class FeedbackWorkflow:
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
             try:
-                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout = 7) # fix this to work because feedback_queue doesn't have a get method.
+                feedback_emoji = await asyncio.wait_for(feedback_queue.get(), timeout = 60 * 60 * 24 * 7) # fix this to work because feedback_queue doesn't have a get method.
                 feedback_score = self._reactions[feedback_emoji]
                 await feedback_message.add_reaction('✅')
 
