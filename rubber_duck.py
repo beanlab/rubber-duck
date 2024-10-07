@@ -3,7 +3,7 @@ import logging
 import os
 import traceback as tb
 import uuid
-from typing import TypedDict, Protocol, ContextManager
+from typing import TypedDict, Protocol, ContextManager, TypeVar
 
 import openai
 from openai import AsyncOpenAI
@@ -79,16 +79,25 @@ class MessageHandler(Protocol):
     def typing(self, channel_id: int) -> ContextManager: ...
 
 
-def wrap_steps(obj):
+class _Wrapped:
+    pass
+
+
+T = TypeVar('T')
+
+
+def wrap_steps(obj: T) -> T:
+    wrapped = _Wrapped()
+
     for field in dir(obj):
         if field.startswith('_'):
             continue
 
         if callable(method := getattr(obj, field)):
             method = step(method)
-            setattr(obj, field, method)
+            setattr(wrapped, field, method)
 
-    return obj
+    return wrapped
 
 
 class RubberDuck:
