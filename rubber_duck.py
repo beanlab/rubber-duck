@@ -119,7 +119,7 @@ class RubberDuck:
         self.start_feedback_workflow = step(start_feedback_workflow)
 
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=60):#we changed this to 60 seconds for testing purposes
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
 
     def generate_error_message(self, guild_id, thread_id, ex):
@@ -136,7 +136,7 @@ class RubberDuck:
     #
     # Begin Conversation
     #
-    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=20): #we changed this to 60 seconds.
+    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         user_id = initial_message['author_id']
 
         async with queue('messages', str(thread_id)) as messages:
@@ -168,10 +168,6 @@ class RubberDuck:
                             "Please resend your message with the relevant parts of your file included in the message."
                         )
                         continue
-
-                    # Here, we could check the similarity between the current and previous messages, and prompt them to
-                    # start a new thread if there is a low similarity
-
 
                     message_history.append(GPTMessage(role='user', content=message['content']))
 
@@ -267,4 +263,3 @@ class RubberDuck:
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
-#Add a function that removes the state folder every run.

@@ -135,9 +135,6 @@ class MyClient(discord.Client, MessageHandler):
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(metrics_folder)
 
-        if self._ta_channel_config is None:
-            # TODO - Exception
-            print("ta_review_channel is not set in the configuration.")
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
@@ -178,7 +175,6 @@ class MyClient(discord.Client, MessageHandler):
         logging.info('Starting workflow manager')
         self._workflow_manager = await self._workflow_manager.__aenter__()
 
-        #Create a ta
         for channel_id in self._command_channels:
             try:
                 await self.send_message(channel_id, 'Duck online')
