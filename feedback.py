@@ -11,12 +11,10 @@ class FeedbackConfig(TypedDict):
 
 class FeedbackWorkflow:
     def __init__(self,
-                 feedback_config: FeedbackConfig,
                  send_message,
                  fetch_message,
                  record_feedback
                  ):
-        self._feedback_config = feedback_config
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
         self._record_feedback = step(record_feedback)
@@ -32,16 +30,16 @@ class FeedbackWorkflow:
     async def __call__(self, *args):
         return await self.ta_feedback(*args)
 
-    async def ta_feedback(self, guild_id, thread_id, user_id):
+    async def ta_feedback(self, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
         """
         Takes thread_id, sends it to the ta-channel, collect's feedback
         """
 
-        feedback_channel_id = self._feedback_config['channel_id']
+        feedback_channel_id = feedback_config['channel_id']
 
         async with queue("feedback", None) as feedback_queue:
 
-            message_content = f"<@{self._feedback_config['ta_role_id']}>, on a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}/{user_id} (Add your reaction below)"
+            message_content = f"<@{feedback_config['ta_role_id']}>, on a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}/{user_id} (Add your reaction below)"
 
             # TODO - when quest code-object support is implemented, use that to directly return a message object from _send_message
             message_id = await self._send_message(feedback_channel_id, message_content)
@@ -62,6 +60,6 @@ class FeedbackWorkflow:
                 feedback_score = 'na'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, user_id, self._feedback_config['ta_role_id'], feedback_score)
+            await self._record_feedback(guild_id, thread_id, user_id, feedback_config['ta_role_id'], feedback_score)
 
             # Done

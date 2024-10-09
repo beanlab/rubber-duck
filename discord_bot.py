@@ -119,10 +119,15 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self._rubber_duck_config = config['duck_settings']
-        self._ta_channel_config = config['feedback_config']
-        self._bot_config = config['bot_settings']
-        self._command_channels = self._bot_config['command_channels']
+        storage_config = config['storage_settings']
+        bot_settings = config['bot_settings']
+        admin_settings = bot_settings['admin']
+        self._rubber_duck_config = bot_settings['duck_settings']
+
+        # Command channel feature
+        self._command_channels = bot_settings['command_channels']
+
+        # Rubber duck feature
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
             for cc in self._bot_config['channels']
@@ -130,11 +135,14 @@ class MyClient(discord.Client, MessageHandler):
         self._admin_ids = self._bot_config['admin_ids']
         self._defaults = self._bot_config['defaults']
 
+        # Metrics tracking
         state_folder = root_save_folder / 'history'
         metrics_folder = root_save_folder / 'metrics'
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(metrics_folder)
 
+        # Feedback feature
+        feedback_config = bot_settings['feedback']
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
@@ -150,10 +158,18 @@ class MyClient(discord.Client, MessageHandler):
             match wtype:
                 case 'command':
                     return BotCommands(self.send_message)
+
                 case 'duck':
+
                     async def start_feedback_workflow(guild_id, channel_id, user_id):
+                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
+                            return
+
                         workflow_id = get_feedback_workflow_id(channel_id)
-                        result = await self._workflow_manager.start_workflow('feedback', workflow_id, guild_id, channel_id, user_id)
+                        result = await self._workflow_manager.start_workflow(
+                            'feedback', workflow_id, guild_id, channel_id, user_id,
+                            server_feedback_config
+                        )
 
                     return RubberDuck(self,
                                       self.metrics_handler,
