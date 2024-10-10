@@ -4,6 +4,7 @@
       1192895746672951340
     ],
     "ta_review_channel": [
+      1284224818698260490
     ],
     "channels": [
       {
@@ -13,7 +14,7 @@
       {
         "name": "other-pond",
         "prompt_file": "prompts/standard-rubber-duck.txt",
-        "engine": "gpt-4o-mini"
+        "engine": "gpt-3.5-turbo-16k"
       },
       {
         "name": "gpt4",

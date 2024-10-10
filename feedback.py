@@ -6,7 +6,7 @@ from quest import queue, step
 
 class FeedbackConfig(TypedDict):
     channel_id: int
-    ta_role_id: int
+    reviewer_role_id: int
 
 
 class FeedbackWorkflow:
