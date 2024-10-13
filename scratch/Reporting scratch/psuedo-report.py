@@ -91,26 +91,26 @@ def trim_df(df, period, ind_var, exp_var):
 
 
 def visualize_graph(df_limited, ind_var, exp_var, period):
-    graph = None
     if len(df_limited) == 0:
         raise Exception("The dataframe is empty")
 
     final_df = df_limited.groupby([exp_var])[ind_var].sum().reset_index()
+    final_df[exp_var] = final_df[exp_var].astype(str)
+    final_df.sort_values(ind_var, ascending=True, inplace=True)
 
     print(final_df)
-    #Stop iteration error with the below code
-    sns.barplot(
-        data=final_df,
-        x=exp_var,
-        y=ind_var
-    )
+    plt.bar(final_df[exp_var], final_df[ind_var])
 
     title_string = f'{ind_var} by {exp_var}'
     title_string += f' over the past {period}' if period is not None else ''
     plt.title(title_string)
-
+    plt.xlabel(exp_var)
+    plt.ylabel(ind_var)
+    plt.tight_layout()
     plt.show()
 
+    graph_path = f"graphs/{ind_var}_{exp_var}_{period}"
+    graph = plt.savefig(graph_path)
     return graph
 
 
