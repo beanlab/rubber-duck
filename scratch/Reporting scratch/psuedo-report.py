@@ -1,7 +1,10 @@
 from argparse import ArgumentError
 
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
 df_options = {'feedback', 'usage', 'messages'}
@@ -37,7 +40,6 @@ def select_timeframe(df, args):
 
 
 def select_pivot(df, ind_var, period, args):
-    # Valid options: df ind_var period, df ind_var exp_var, df ind_var period exp_var
     if period is None:
         exp_var = args[2]
         if exp_var in df.columns:
@@ -48,30 +50,66 @@ def select_pivot(df, ind_var, period, args):
         else:
             raise ArgumentError(exp_var,f"Invalid argument: '{exp_var}' is not a variable of the df {args[0]}")
     else:
-        exp_var = period
+        if len(args) < 4:
+            return None #We'll later use the period as the exp_var in this case
+        else:
+            exp_var = args[3]
+            if exp_var not in df.columns:
+                raise ArgumentError(exp_var, f"Invalid argument: '{exp_var}' is not a variable of the df {args[0]}")
+            return exp_var
 
-    return exp_var
+
+def trim_df(df, period, ind_var, exp_var):
+    # Valid options: df ind_var period, df ind_var exp_var, df ind_var period exp_var
+
+    if period and exp_var is None:
+        # We want a chart/table of a sum/avg of the ind_var
+        df_summary = df
+        pass
 
 
-def trim_df(df, ind_var, period, exp_var):
-    # if period and exp_var is None:
-    # We want a chart of week to week, month to month sum/avg of the ind_var
+    if period is None:
+        # we want to see the ind_var by the sum/avg/etc of the exp_var
+        pass
 
-    # if period is None:
-    # we want to see the ind_var by the sum/avg/etc of the exp_var
+    elif exp_var is None:
+        # we want to see the ind_var by the sum/avg/etc over the smaller time period (ie. summary of the month by weekly data, weekly by daily, etc).
+        pass
 
-    #if period != None and exp_var != None
+
+    elif period is not None and exp_var is not None:
+        #Select only the data within the proper time period
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        now = datetime.now(ZoneInfo('US/Mountain'))
+        one_period_ago = now - timedelta(days=time_periods[period])
+        df_period_fitted = df[df['timestamp'] >= one_period_ago]
+
+        #Pivot the data by the exp_var
+        return df_period_fitted
     #this below part will select only the data that fits in the time period
-
-    # df['timestamp'] = pd.to_datetime(df['timestamp'])
-    # now = datetime.now()
-    # one_period_ago = now - timedelta(days=period)
-    # return df[df['timestamp'] >= one_period_ago]
-    pass
+    return None
 
 
-def visualize_graph(df_limited, ind_var, exp_var):
+def visualize_graph(df_limited, ind_var, exp_var, period):
     graph = None
+    if len(df_limited) == 0:
+        raise Exception("The dataframe is empty")
+
+    final_df = df_limited.groupby([exp_var])[ind_var].sum().reset_index()
+
+    print(final_df)
+    #Stop iteration error with the below code
+    sns.barplot(
+        data=final_df,
+        x=exp_var,
+        y=ind_var
+    )
+
+    title_string = f'{ind_var} by {exp_var}'
+    title_string += f' over the past {period}' if period is not None else ''
+    plt.title(title_string)
+
+    plt.show()
 
     return graph
 
@@ -93,7 +131,7 @@ def main(args):
     df_limited = trim_df(df, period, ind_var, exp_var)
 
     #Finally visualize the data (and send it to discord?)
-    return visualize_graph(df_limited, ind_var, exp_var)
+    return visualize_graph(df_limited, ind_var, exp_var, period)
 
 def process_args(args):
     # Maybe be a place to seperate the logic for help, quit, etc
@@ -115,7 +153,7 @@ if __name__ == '__main__':
     image_cache = {}
     while arg_string != 'quit':
         # arg_string = input("What would you like to see? ")
-        arg_string = "feedback cost week server"
+        arg_string = "usage output_tokens month guild_id"
         args = arg_string.split(" ")
         if len(args) < 3:
             print("Not enough arguments (df independent_variable time_period")
@@ -129,3 +167,11 @@ if __name__ == '__main__':
         except ArgumentError as e:
             image_cache[arg_string] = f'invalid argument: {e}'
             print(e)
+
+        except StopIteration as e:
+            print(f"Error: {e}")
+            break
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            break
