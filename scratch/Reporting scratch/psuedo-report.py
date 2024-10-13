@@ -36,42 +36,45 @@ def select_pivot(df, ind_var, period, args):
             return exp_var
 
 
-def trim_df(df, period, ind_var, exp_var):
+def edit_df(df, args):
     """Filter and pivot the dataframe based on user inputs."""
-    if period:
+    if args.period:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         now = datetime.now(ZoneInfo('US/Mountain'))
-        cutoff = now - timedelta(days=time_periods[period])
+        cutoff = now - timedelta(days=time_periods[args.period])
         df = df[df['timestamp'] >= cutoff]
 
-    if exp_var:
-        if isinstance(df[ind_var], int) or isinstance(df[ind_var], float):
-            df_grouped = df.groupby(exp_var)[ind_var].sum().reset_index()
+    if args.exp_var:
+        if isinstance(df[args.ind_var], int) or isinstance(df[args.ind_var], float):
+            df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
         else:
-            df_grouped = df.groupby(exp_var)[ind_var].count().reset_index()
+            df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
     else:
-        df_grouped = df[ind_var].reset_index()
+        df_grouped = df[args.ind_var].reset_index()
 
     return df_grouped
 
 
-def visualize_graph(df, ind_var, exp_var, period):
+def visualize_graph(df, args):
     if len(df) == 0:
         raise Exception("The dataframe is empty")
 
-    x_axis = exp_var if exp_var else 'Index'
-    df[x_axis] = df[x_axis].astype(str)
-    df.sort_values(ind_var, ascending=True, inplace=True)
+    if args.log:
+        plt.yscale('log')
 
-    plt.bar(df[x_axis], df[ind_var])
-    title = f"{ind_var} by {x_axis}" + (f" over the past {period}" if period else "")
+    x_axis = args.exp_var if args.exp_var else 'Index'
+    df[x_axis] = df[x_axis].astype(str)
+    df.sort_values(args.ind_var, ascending=True, inplace=True)
+
+    plt.bar(df[x_axis], df[args.ind_var])
+    title = f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f"(log scale)" if args.log else "")
     plt.title(title)
     plt.xlabel(x_axis)
-    plt.ylabel(ind_var)
+    plt.ylabel(args.ind_var)
     plt.tight_layout()
     plt.show()
 
-    path = f"graphs/{ind_var}_{exp_var or 'index'}_{period or 'all'}.png"
+    path = f"graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
     plt.savefig(path)
     return path
 
@@ -83,6 +86,7 @@ def parse_args():
     parser.add_argument("-p", "--period", choices=time_periods.keys(), help="Time period to filter data.")
     parser.add_argument("-ev", "--exp_var", help="Explanatory variable to pivot by.")
     parser.add_argument("-ev2", "--exp_var_2", help="Additional explanatory variable to pivot by.")
+    parser.add_argument("-ln", "--log", action="store_true", help="Enable logarithmic scale for the y-axis.")
     return parser.parse_args()
 
 
@@ -94,6 +98,8 @@ def arg_to_string(args):
         string += "-" + args.exp_var_2
     if args.period:
         string += "-" + args.period
+    if args.log:
+        string += "-log_scale"
     return string
 
 def main(args):
@@ -109,9 +115,9 @@ def main(args):
     if args.period and args.period not in time_periods:
         raise ArgumentError(None, f"Invalid time period: {args.period}")
 
-    df_limited = trim_df(df, args.period, args.ind_var, args.exp_var)
+    df_limited = edit_df(df, args)
 
-    return visualize_graph(df_limited, args.ind_var, args.exp_var, args.period)
+    return visualize_graph(df_limited, args)
 
 if __name__ == '__main__':
     """
