@@ -1,8 +1,7 @@
-from argparse import ArgumentError
-
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
+
+from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -11,32 +10,10 @@ df_options = {'feedback', 'usage', 'messages'}
 
 
 def select_dataframe(desired_df):
-    # Choose the dataframe from different options (ie feedback.csv, messages.csv, usage.csv)
-    # Load the csv into a pandas dataframe to return
-    # TODO: get an actual metrics handler that will take care of finding the files
+    """Load the dataframe based on user input."""
     if desired_df not in df_options:
-        raise ArgumentError(desired_df, f"Invalid dataframe argument: {desired_df}")
-    else:
-        return pd.read_csv(f"./sample_metrics/{desired_df}.csv")
-
-
-def variable_of_interest(df, args):
-    #From the dataframe, get the headers and validate the variable of interest
-    ind_var = args[1]
-    if ind_var in df.columns:
-        return ind_var
-    else:
-        raise ArgumentError(ind_var, f"Invalid argument: '{ind_var}' is not in the df {args[0]}")
-
-
-def select_timeframe(df, args):
-    period = args[2]
-    if period in time_periods:
-        return period
-    elif args[2] in df.columns: ## In case they just chose to see the data outside any time period
-        return None
-    else:
-        raise ArgumentError(period, f"Invalid argument: '{period}' is not a valid time period (day, week, month, year)")
+        raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
+    return pd.read_csv(f"./sample_metrics/{desired_df}.csv")
 
 
 def select_pivot(df, ind_var, period, args):
@@ -60,83 +37,81 @@ def select_pivot(df, ind_var, period, args):
 
 
 def trim_df(df, period, ind_var, exp_var):
-    # Valid options: df ind_var period, df ind_var exp_var, df ind_var period exp_var
-
-    if period and exp_var is None:
-        # We want a chart/table of a sum/avg of the ind_var
-        df_summary = df
-        pass
-
-
-    if period is None:
-        # we want to see the ind_var by the sum/avg/etc of the exp_var
-        pass
-
-    elif exp_var is None:
-        # we want to see the ind_var by the sum/avg/etc over the smaller time period (ie. summary of the month by weekly data, weekly by daily, etc).
-        pass
-
-
-    elif period is not None and exp_var is not None:
-        #Select only the data within the proper time period
+    """Filter and pivot the dataframe based on user inputs."""
+    if period:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         now = datetime.now(ZoneInfo('US/Mountain'))
-        one_period_ago = now - timedelta(days=time_periods[period])
-        df_period_fitted = df[df['timestamp'] >= one_period_ago]
+        cutoff = now - timedelta(days=time_periods[period])
+        df = df[df['timestamp'] >= cutoff]
 
-        #Pivot the data by the exp_var
-        return df_period_fitted
-    #this below part will select only the data that fits in the time period
-    return None
+    if exp_var:
+        if isinstance(df[ind_var], int) or isinstance(df[ind_var], float):
+            df_grouped = df.groupby(exp_var)[ind_var].sum().reset_index()
+        else:
+            df_grouped = df.groupby(exp_var)[ind_var].count().reset_index()
+    else:
+        df_grouped = df[ind_var].reset_index()
+
+    return df_grouped
 
 
-def visualize_graph(df_limited, ind_var, exp_var, period):
-    if len(df_limited) == 0:
+def visualize_graph(df, ind_var, exp_var, period):
+    if len(df) == 0:
         raise Exception("The dataframe is empty")
 
-    final_df = df_limited.groupby([exp_var])[ind_var].sum().reset_index()
-    final_df[exp_var] = final_df[exp_var].astype(str)
-    final_df.sort_values(ind_var, ascending=True, inplace=True)
+    x_axis = exp_var if exp_var else 'Index'
+    df[x_axis] = df[x_axis].astype(str)
+    df.sort_values(ind_var, ascending=True, inplace=True)
 
-    print(final_df)
-    plt.bar(final_df[exp_var], final_df[ind_var])
-
-    title_string = f'{ind_var} by {exp_var}'
-    title_string += f' over the past {period}' if period is not None else ''
-    plt.title(title_string)
-    plt.xlabel(exp_var)
+    plt.bar(df[x_axis], df[ind_var])
+    title = f"{ind_var} by {x_axis}" + (f" over the past {period}" if period else "")
+    plt.title(title)
+    plt.xlabel(x_axis)
     plt.ylabel(ind_var)
     plt.tight_layout()
     plt.show()
 
-    graph_path = f"graphs/{ind_var}_{exp_var}_{period}"
-    graph = plt.savefig(graph_path)
-    return graph
+    path = f"graphs/{ind_var}_{exp_var or 'index'}_{period or 'all'}.png"
+    plt.savefig(path)
+    return path
 
+def parse_args():
+    """Parse command-line arguments using argparse."""
+    parser = ArgumentParser(description="Visualize data from selected metrics.")
+    parser.add_argument("-df", "--dataframe", required=True, choices=df_options, help="Choose the dataframe.")
+    parser.add_argument("-iv", "--ind_var", required=True, help="Independent variable to analyze.")
+    parser.add_argument("-p", "--period", choices=time_periods.keys(), help="Time period to filter data.")
+    parser.add_argument("-ev", "--exp_var", help="Explanatory variable to pivot by.")
+    parser.add_argument("-ev2", "--exp_var_2", help="Additional explanatory variable to pivot by.")
+    return parser.parse_args()
+
+
+def arg_to_string(args):
+    string = args.dataframe + "-" + args.ind_var
+    if args.exp_var:
+        string += "-" + args.exp_var
+    if args.exp_var_2:
+        string += "-" + args.exp_var_2
+    if args.period:
+        string += "-" + args.period
+    return string
 
 def main(args):
     #First select the dataframe you're interested in seeing
-    df = select_dataframe(args[0])
+    df = select_dataframe(args.dataframe)
 
-    #Then select the variable you're interested in from the dataframe
-    ind_var = variable_of_interest(df, args)
+    if args.ind_var not in df.columns:
+        raise ArgumentError(None, f"Invalid independent variable: {args.ind_var}")
 
-    #Next choose the time frame you're wanting to see it by
-    period = select_timeframe(df, args)
+    if args.exp_var and args.exp_var not in df.columns:
+        raise ArgumentError(None, f"Invalid explanatory variable: {args.exp_var}")
 
-    #(Optionally) choose whatever else you want to see it by (the explanatory variable)
-    exp_var = select_pivot(df, ind_var, period, args)
+    if args.period and args.period not in time_periods:
+        raise ArgumentError(None, f"Invalid time period: {args.period}")
 
-    #Restrict the dataframe
-    df_limited = trim_df(df, period, ind_var, exp_var)
+    df_limited = trim_df(df, args.period, args.ind_var, args.exp_var)
 
-    #Finally visualize the data (and send it to discord?)
-    return visualize_graph(df_limited, ind_var, exp_var, period)
-
-def process_args(args):
-    # Maybe be a place to seperate the logic for help, quit, etc
-    pass
-
+    return visualize_graph(df_limited, args.ind_var, args.exp_var, args.period)
 
 if __name__ == '__main__':
     """
@@ -152,20 +127,18 @@ if __name__ == '__main__':
     arg_string = None
     image_cache = {}
     while arg_string != 'quit':
-        # arg_string = input("What would you like to see? ")
-        arg_string = "usage output_tokens month guild_id"
-        args = arg_string.split(" ")
-        if len(args) < 3:
-            print("Not enough arguments (df independent_variable time_period")
-            continue
+        # args = "-df usage -iv output_tokens -p month -ev guild_id"
+        args = parse_args()
+        arg_string = arg_to_string(args)
         try:
             if arg_string not in image_cache:
-                image = main(args)
-                image_cache[arg_string] = image
+                # TODO: get an actual metrics handler that will take care of finding the files
+                image_path = main(args)
+                image_cache[arg_string] = image_path
             else:
                 image = image_cache[arg_string]
         except ArgumentError as e:
-            image_cache[arg_string] = f'invalid argument: {e}'
+            image_cache[args] = f'invalid argument: {e}'
             print(e)
 
         except StopIteration as e:
