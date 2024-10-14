@@ -7,6 +7,14 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
+guilds = {
+    1058490579799003187: 'BeanLab',
+    927616651409649675: 'CS 110',
+    1008806488384483338: 'CS 111',
+    747510855536738336: 'CS 235',
+    748656649287368704: 'CS 260',
+    1128355484039123065: 'CS 312'
+}
 
 csvHandler = csvHandler()
 
@@ -49,7 +57,16 @@ def edit_df(df, args):
     else:
         df_grouped = df[args.ind_var].reset_index()
 
-    return df_grouped
+    df_pretty = prettify_df(df_grouped, args)
+
+    return df_pretty
+
+def prettify_df(df, args):
+    if args.exp_var == 'guild_id':
+        df['guild_name'] = df['guild_id'].map(guilds)
+        df = df.drop(columns=['guild_id'])#.rename(columns={'guild_name': 'guild_name'})
+        args.exp_var = 'guild_name'
+    return df
 
 
 def visualize_graph(df, args):
@@ -64,7 +81,7 @@ def visualize_graph(df, args):
     df.sort_values(args.ind_var, ascending=True, inplace=True)
 
     plt.bar(df[x_axis], df[args.ind_var])
-    title = f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f"(log scale)" if args.log else "")
+    title = f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
     plt.title(title)
     plt.xlabel(x_axis)
     plt.ylabel(args.ind_var)
