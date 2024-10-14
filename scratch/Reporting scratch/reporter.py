@@ -1,20 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from reporting_handler import csvHandler
 
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
-df_options = {'feedback', 'usage', 'messages'}
 
+csvHandler = csvHandler()
 
 def select_dataframe(desired_df):
-    """Load the dataframe based on user input."""
-    if desired_df not in df_options:
-        raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
-    return pd.read_csv(f"./sample_metrics/{desired_df}.csv")
-
+    return csvHandler.select_dataframe(desired_df)
 
 def select_pivot(df, ind_var, period, args):
     if period is None:
@@ -81,7 +78,7 @@ def visualize_graph(df, args):
 def parse_args():
     """Parse command-line arguments using argparse."""
     parser = ArgumentParser(description="Visualize data from selected metrics.")
-    parser.add_argument("-df", "--dataframe", required=True, choices=df_options, help="Choose the dataframe.")
+    parser.add_argument("-df", "--dataframe", required=True, choices=csvHandler.df_options, help="Choose the dataframe.")
     parser.add_argument("-iv", "--ind_var", required=True, help="Independent variable to analyze.")
     parser.add_argument("-p", "--period", choices=time_periods.keys(), help="Time period to filter data.")
     parser.add_argument("-ev", "--exp_var", help="Explanatory variable to pivot by.")
@@ -132,13 +129,14 @@ if __name__ == '__main__':
     """
     arg_string = None
     image_cache = {}
-    while arg_string != 'quit':
+    iters = 0
+    while iters < 1:
+        iters += 1
         # args = "-df usage -iv output_tokens -p month -ev guild_id"
         args = parse_args()
         arg_string = arg_to_string(args)
         try:
             if arg_string not in image_cache:
-                # TODO: get an actual metrics handler that will take care of finding the files
                 image_path = main(args)
                 image_cache[arg_string] = image_path
             else:
