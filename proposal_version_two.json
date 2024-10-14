@@ -3,7 +3,7 @@
     "state_path": "state/quest/"
   },
   "metrics": {
-    "metric_path": "state/metrics/"
+    "metrics_path": "state/metrics/"
   },
   "rubber_duck": {
     "channels": [

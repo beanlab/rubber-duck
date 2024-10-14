@@ -113,42 +113,36 @@ class RubberDuckConfig(TypedDict):
 
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, config):
+    def __init__(self, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        storage_config = config['storage_settings']
-        bot_settings = config['bot_settings']
-        admin_settings = bot_settings['admin']
-        self._rubber_duck_config = bot_settings['duck_settings']
+        feedback_config = config['feedback']
+        quest_config = config['quest']
+        metrics_config = config['metrics']
+        self.admin_settings = config['admin_settings']
+        open_ai_retry_protocol = config['open_ai_retry_protocol']
+        rubber_duck_config = config['rubber_duck']
 
         # Command channel feature
-        self._command_channels = bot_settings['command_channels']
+        self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
         self._duck_channels = {
             (cc.get('name') or cc.get('id')): cc
-            for cc in self._bot_config['channels']
+            for cc in rubber_duck_config['channels']
         }
-        self._admin_ids = self._bot_config['admin_ids']
-        self._defaults = self._bot_config['defaults']
+        self._defaults = rubber_duck_config['defaults']
 
-        # Metrics tracking
-        state_folder = root_save_folder / 'history'
-        metrics_folder = root_save_folder / 'metrics'
         # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(metrics_folder)
-
-        # Feedback feature
-        feedback_config = bot_settings['feedback']
+        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
 
         feedback_workflow = FeedbackWorkflow(
-            self._ta_channel_config,
             self.send_message,
             fetch_message,
             self.metrics_handler.record_feedback
@@ -166,14 +160,14 @@ class MyClient(discord.Client, MessageHandler):
                             return
 
                         workflow_id = get_feedback_workflow_id(channel_id)
-                        result = await self._workflow_manager.start_workflow(
+                        self._workflow_manager.start_workflow(
                             'feedback', workflow_id, guild_id, channel_id, user_id,
                             server_feedback_config
                         )
 
                     return RubberDuck(self,
                                       self.metrics_handler,
-                                      self._rubber_duck_config,
+                                      open_ai_retry_protocol,
                                       start_feedback_workflow
                                       )
                 case 'feedback':
@@ -181,7 +175,7 @@ class MyClient(discord.Client, MessageHandler):
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(state_folder, 'rubber-duck', create_workflow)
+        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck', create_workflow)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -191,11 +185,10 @@ class MyClient(discord.Client, MessageHandler):
         logging.info('Starting workflow manager')
         self._workflow_manager = await self._workflow_manager.__aenter__()
 
-        for channel_id in self._command_channels:
-            try:
-                await self.send_message(channel_id, 'Duck online')
-            except:
-                logging.exception(f'Unable to message channel {channel_id}')
+        try:
+            await self.send_message(self._command_channel, 'Duck online')
+        except:
+            logging.exception(f'Unable to message channel {self._command_channel}')
 
         logging.info('------')
 
@@ -214,7 +207,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Command channel
-        if message.channel.id in self._command_channels:
+        if message.channel.id == self._command_channel:
             self._workflow_manager.start_workflow(
                 'command', str(message.id), as_message(message))
             return
@@ -347,28 +340,27 @@ class MyClient(discord.Client, MessageHandler):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            user_ids_to_mention = self._bot_config["admin_ids"]
+            #TODO make this assume one id
+            user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg
-        for channel_id in self._command_channels:
             try:
-                await self.send_message(channel_id, msg)
+                await self.send_message(self._command_channel, msg)
             except:
-                logging.exception(f'Unable to message channel {channel_id}')
+                logging.exception(f'Unable to message channel {self._command_channel}')
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
 
-def main(state_path: Path, config):
-    client = MyClient(state_path, config)
+def main(config):
+    client = MyClient(config)
     client.run(os.environ['DISCORD_TOKEN'])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--state', type=Path, default='state')
+    parser.add_argument('--config', type=Path, default='wiley_config_v2.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
@@ -387,4 +379,4 @@ if __name__ == '__main__':
 
     config = json.loads(args.config.read_text())
 
-    main(args.state, config)
+    main(config)
