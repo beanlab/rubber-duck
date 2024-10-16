@@ -6,19 +6,6 @@ from typing import TypedDict
 from metrics import MetricsHandler
 from feedback import FeedbackWorkflow
 
-def load_env():
-    with open('../secrets.env') as file:
-        for line in file:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            key, value = line.split('=')
-            os.environ[key] = value
-
-
-load_env()
-
 import argparse
 import json
 import logging
@@ -253,7 +240,7 @@ class MyClient(discord.Client, MessageHandler):
         if self._workflow_manager.has_workflow(workflow_id):
             await self._workflow_manager.send_event(
                 workflow_id, 'feedback', None, 'put',
-                emoji
+                (emoji,user.id)
             )
 
     async def start_duck_conversation(self, defaults, config, message: Message):
