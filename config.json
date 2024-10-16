@@ -36,21 +36,9 @@
     }
   },
   "feedback": {
-    "cs101": {
-      "ta_feedback_channel": 12871096109832741098,
-      "ta_role_id": 32742987340293740298347
-    },
-    "cs111": {
-      "ta_feedback-channel": 222234234234,
-      "ta_role_id": 4356356712345684
-    },
-    "cs260": {
-      "ta_feedback-channel": 2223423241234,
-      "ta_role_id": 14352136312356745684
-    },
-    "cs312": {
-      "ta_feedback-channel": 123422234234,
-      "reviewer_role_id": 56412356356745684
+    "1296158078017736725": {
+      "channel_id": 927616651409649675,
+      "name": "cs110"
     }
   },
   "open_ai_retry_protocol": {
