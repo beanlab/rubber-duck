@@ -28,7 +28,7 @@ class MetricsHandler:
         self._feedback_file = metrics_folder / 'feedback.csv'
         if not self._feedback_file.exists():
             self._feedback_file.write_text(
-                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'reviewer_id', 'feedback_score']) + '\n')
+                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'reviewer_role_id', 'feedback_score']) + '\n')
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         with self._messages_file.open('at', newline='') as file:

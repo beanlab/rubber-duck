@@ -59,10 +59,6 @@ class RetryConfig(TypedDict):
     backoff: int
 
 
-class RubberDuckConfig(TypedDict):
-    retry_protocol: RetryConfig
-
-
 class BotCommandsConfig(TypedDict):
     command_channels: list[int]
     channels: list[ChannelConfig]
@@ -104,7 +100,7 @@ class RubberDuck:
     def __init__(self,
                  message_handler: MessageHandler,
                  metrics_handler: MetricsHandler,
-                 config: RubberDuckConfig,
+                 config: RetryConfig,
                  start_feedback_workflow
                  ):
         self._send_raw_message = message_handler.send_message
@@ -119,7 +115,7 @@ class RubberDuck:
         self.start_feedback_workflow = step(start_feedback_workflow)
 
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=60):#we changed this to 60 seconds for testing purposes
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         return await self.have_conversation(thread_id, engine, prompt, initial_message, timeout)
 
     def generate_error_message(self, guild_id, thread_id, ex):
@@ -136,7 +132,7 @@ class RubberDuck:
     #
     # Begin Conversation
     #
-    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=20): #we changed this to 60 seconds.
+    async def have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         user_id = initial_message['author_id']
 
         async with queue('messages', str(thread_id)) as messages:
@@ -168,10 +164,6 @@ class RubberDuck:
                             "Please resend your message with the relevant parts of your file included in the message."
                         )
                         continue
-
-                    # Here, we could check the similarity between the current and previous messages, and prompt them to
-                    # start a new thread if there is a low similarity
-
 
                     message_history.append(GPTMessage(role='user', content=message['content']))
 
@@ -248,9 +240,9 @@ class RubberDuck:
 
     @step
     async def _get_completion_with_retry(self, thread_id, engine, message_history):
-        max_retries = self._config['retry_protocol']['max_retries']
-        delay = self._config['retry_protocol']['delay']
-        backoff = self._config['retry_protocol']['backoff']
+        max_retries = self._config['max_retries']
+        delay = self._config['delay']
+        backoff = self._config['backoff']
         retries = -1
         while retries < max_retries:
             try:
@@ -267,4 +259,3 @@ class RubberDuck:
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
-#Add a function that removes the state folder every run.
