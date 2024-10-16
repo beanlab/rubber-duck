@@ -9,11 +9,15 @@ from zoneinfo import ZoneInfo
 time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
 guilds = {
     1058490579799003187: 'BeanLab',
+    1.05849E+18: 'BeanLab',
     927616651409649675: 'CS 110',
+    9.27617E+17: 'CS 110',
     1008806488384483338: 'CS 111',
     747510855536738336: 'CS 235',
+    7.47511E+17: 'CS 235',
     748656649287368704: 'CS 260',
-    1128355484039123065: 'CS 312'
+    1128355484039123065: 'CS 312',
+    1.2353E+18: 'Unknown??'
 }
 
 pricing = {
@@ -154,12 +158,15 @@ if __name__ == '__main__':
     >>> !report help
     *show the available list of flags and the order they'd need to be processed
     """
+    import sys
     arg_string = None
     image_cache = {}
     iters = 0
     while iters < 1:
         iters += 1
-        # args = "-df usage -iv output_tokens -p month -ev guild_id -ln"
+        sys.argv = ['main.py', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
+        # sys.argv = ['main.py', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
+        # sys.argv = ['main.py', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
         args = parse_args()
         arg_string = arg_to_string(args)
         try:
