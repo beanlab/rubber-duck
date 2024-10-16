@@ -16,29 +16,29 @@ guilds = {
     1128355484039123065: 'CS 312'
 }
 
+pricing = {
+    'gpt-4': [0.03, 0.06],
+    'gpt-4-1106-preview': [0.01, 0.03],
+    'gpt-4-0125-preview': [0.01, 0.03],
+    'gpt-4o-mini' : [.0003, .0012],
+    'gpt-4-turbo-preview': [0.01, 0.03],
+    'gpt-3.5-turbo-1106': [0.001, 0.002],
+    'gpt-3.5-turbo': [0.001, 0.003]
+}
+
 csvHandler = csvHandler()
 
 def select_dataframe(desired_df):
     return csvHandler.select_dataframe(desired_df)
 
-def select_pivot(df, ind_var, period, args):
-    if period is None:
-        exp_var = args[2]
-        if exp_var in df.columns:
-            if exp_var != ind_var:
-                return exp_var
-            else:
-                raise ArgumentError(exp_var, f"Invalid argument: cannot pivot '{exp_var}' by itself")
-        else:
-            raise ArgumentError(exp_var,f"Invalid argument: '{exp_var}' is not a variable of the df {args[0]}")
-    else:
-        if len(args) < 4:
-            return None #We'll later use the period as the exp_var in this case
-        else:
-            exp_var = args[3]
-            if exp_var not in df.columns:
-                raise ArgumentError(exp_var, f"Invalid argument: '{exp_var}' is not a variable of the df {args[0]}")
-            return exp_var
+def compute_cost(row):
+    ip, op = pricing.get(row.get('engine', 'gpt-4'), (0,0))
+    return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
+
+def preprocessing(df, args):
+    if args.dataframe == 'usage':
+        df['cost'] = df.apply(compute_cost, axis=1)
+    return df
 
 
 def edit_df(df, args):
@@ -49,9 +49,15 @@ def edit_df(df, args):
         cutoff = now - timedelta(days=time_periods[args.period])
         df = df[df['timestamp'] >= cutoff]
 
+    # df = df.dropna(subset=[args.ind_var])
+    # print(df.head())
+
     if args.exp_var:
         if isinstance(df[args.ind_var], int) or isinstance(df[args.ind_var], float):
-            df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
+            if args.avg:
+                df_grouped = df.groupby(args.exp_var)[args.ind_var].average().reset_index()
+            else:
+                df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
         else:
             df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
     else:
@@ -61,6 +67,7 @@ def edit_df(df, args):
 
     return df_pretty
 
+## Not sure the best way to do this, it could turn into a long function of a bunch of if statements if it continues like this
 def prettify_df(df, args):
     if args.exp_var == 'guild_id':
         df['guild_name'] = df['guild_id'].map(guilds)
@@ -101,6 +108,7 @@ def parse_args():
     parser.add_argument("-ev", "--exp_var", help="Explanatory variable to pivot by.")
     parser.add_argument("-ev2", "--exp_var_2", help="Additional explanatory variable to pivot by.")
     parser.add_argument("-ln", "--log", action="store_true", help="Enable logarithmic scale for the y-axis.")
+    parser.add_argument("-avg", "--average", action="store_true", help="Averages, not sums, the ind_var")
     return parser.parse_args()
 
 
@@ -119,6 +127,8 @@ def arg_to_string(args):
 def main(args):
     #First select the dataframe you're interested in seeing
     df = select_dataframe(args.dataframe)
+
+    df = preprocessing(df, args)
 
     if args.ind_var not in df.columns:
         raise ArgumentError(None, f"Invalid independent variable: {args.ind_var}")
@@ -149,7 +159,7 @@ if __name__ == '__main__':
     iters = 0
     while iters < 1:
         iters += 1
-        # args = "-df usage -iv output_tokens -p month -ev guild_id"
+        # args = "-df usage -iv output_tokens -p month -ev guild_id -ln"
         args = parse_args()
         arg_string = arg_to_string(args)
         try:
