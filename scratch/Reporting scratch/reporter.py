@@ -20,12 +20,24 @@ guilds = {
     1.2353E+18: 'Unknown??'
 }
 
-pricing = {
+
+old_pricing = {
     'gpt-4': [0.03, 0.06],
     'gpt-4-1106-preview': [0.01, 0.03],
     'gpt-4-0125-preview': [0.01, 0.03],
     'gpt-4o-mini' : [.0003, .0012],
     'gpt-4-turbo-preview': [0.01, 0.03],
+    'gpt-3.5-turbo-1106': [0.001, 0.002],
+    'gpt-3.5-turbo': [0.001, 0.003]
+}
+
+pricing = {
+    'gpt-4': [0.03, 0.06],
+    'gpt-4o': [0.0025, 0.01],
+    'gpt-4-1106-preview': [0.01, 0.03],
+    'gpt-4-0125-preview': [0.01, 0.03],
+    'gpt-4o-mini' : [.000150, .0006],
+    'gpt-4-turbo': [0.01, 0.03],
     'gpt-3.5-turbo-1106': [0.001, 0.002],
     'gpt-3.5-turbo': [0.001, 0.003]
 }
@@ -54,7 +66,6 @@ def edit_df(df, args):
         df = df[df['timestamp'] >= cutoff]
 
     # df = df.dropna(subset=[args.ind_var])
-    # print(df.head())
 
     if args.exp_var:
         if isinstance(df[args.ind_var], int) or isinstance(df[args.ind_var], float):
