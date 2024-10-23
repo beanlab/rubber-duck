@@ -150,8 +150,15 @@ class Reporter():
             string += "-log_scale"
         return string
 
+    def get_args(self, arg_string):
+        args = arg_string.split()
+        sys.argv = args
+        return reporter.parse_args()
 
-    def get_report(self, args):
+
+    def get_report(self, arg_string):
+        args = self.get_args(arg_string)
+
         #First select the dataframe you're interested in seeing
         df = self.select_dataframe(args.dataframe)
 
@@ -168,7 +175,7 @@ class Reporter():
 
         df_limited = self.edit_df(df, args)
 
-        return self.visualize_graph(df_limited, args)
+        return arg_string, self.visualize_graph(df_limited, args)
 
 
 if __name__ == '__main__':
@@ -188,18 +195,17 @@ if __name__ == '__main__':
     """
     reporter = Reporter(None)
 
-    sys.argv = ['main.py', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
-    # sys.argv = ['main.py', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
-    # sys.argv = ['main.py', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
-    args = reporter.parse_args()
-    arg_string = reporter.arg_to_string(args)
+    sys_string = '!report -df feedback -iv feedback_score -p year -ev guild_id -ln'
+    # sys.argv = ['!report', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
+    # sys.argv = ['!report', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
+    # sys.argv = ['!report', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
 
     try:
-        if arg_string not in reporter.image_cache:
-            image_path = reporter.get_report(args)
-            reporter.image_cache[arg_string] = image_path
+        if sys_string not in reporter.image_cache:
+            arg_string, image_path = reporter.get_report(sys_string)
+            reporter.image_cache[sys_string] = image_path
         else:
-            image = reporter.image_cache[arg_string]
+            image = reporter.image_cache[sys_string]
 
     except Exception as e:
         print(f"An error occurred: {e}")

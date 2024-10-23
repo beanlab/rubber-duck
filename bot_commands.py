@@ -9,6 +9,8 @@ from quest import step
 
 from rubber_duck import Message
 
+from reporter import Reporter
+
 
 class BotCommands:
     def __init__(self, send_message):
@@ -54,7 +56,7 @@ class BotCommands:
                 await self._display_help(channel_id)
 
             elif content.startswith('!report'):
-                await self._send_report()
+                await self._send_report(channel_id, content)
 
             elif content.startswith('!state'):
                 await self._state(channel_id)
@@ -109,12 +111,15 @@ class BotCommands:
         await self._send_message(channel_id, 'log zip', file='log.zip')
 
     @step
-    async def _send_report(self, channel_id):
+    async def _send_report(self, channel_id, arg_string):
         ## Would this start a 'reporting feedback workflow'? How do we want it connected? Thinking out loud...
         # If split the string and if there are additional args, process them
-        #img_path = './images/img.png' = reporter.main(args) # Process the report and save the image to some path
+        #img_path = './images/img.png' = reporter.get_report(args) # Process the report and save the image to some path
         #await self._send_message(channel_id, img_path)
-        pass
+        reporter = Reporter(self._metrics_handler)
+        report_string, img_path = reporter.get_report(arg_string)
+        await self._send_message(channel_id, f'!report {report_string}')
+        await self._send_message(channel_id, img_path)
 
     @step
     async def _zip_metrics(self, channel_id):
