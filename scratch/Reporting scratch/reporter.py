@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 class Reporter():
+    image_cache = {}
+
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
 
     guilds = {
@@ -168,24 +170,20 @@ if __name__ == '__main__':
     >>> !report help
     *show the available list of flags and the order they'd need to be processed*
     """
-    arg_string = None
-    image_cache = {}
-    iters = 0
     reporter = Reporter(None)
-    while iters < 1:
-        iters += 1
-        sys.argv = ['main.py', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
-        # sys.argv = ['main.py', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
-        # sys.argv = ['main.py', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
-        args = reporter.parse_args()
-        arg_string = reporter.arg_to_string(args)
-        try:
-            if arg_string not in image_cache:
-                image_path = reporter.main(args)
-                image_cache[arg_string] = image_path
-            else:
-                image = image_cache[arg_string]
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            break
+    sys.argv = ['main.py', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
+    # sys.argv = ['main.py', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
+    # sys.argv = ['main.py', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
+    args = reporter.parse_args()
+    arg_string = reporter.arg_to_string(args)
+
+    try:
+        if arg_string not in reporter.image_cache:
+            image_path = reporter.main(args)
+            reporter.image_cache[arg_string] = image_path
+        else:
+            image = reporter.image_cache[arg_string]
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
