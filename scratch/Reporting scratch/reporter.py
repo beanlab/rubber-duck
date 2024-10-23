@@ -1,3 +1,4 @@
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 from reporting_handler import csvHandler
@@ -7,28 +8,14 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
+
 guilds = {
     1058490579799003187: 'BeanLab',
-    1.05849E+18: 'BeanLab',
     927616651409649675: 'CS 110',
-    9.27617E+17: 'CS 110',
     1008806488384483338: 'CS 111',
     747510855536738336: 'CS 235',
-    7.47511E+17: 'CS 235',
     748656649287368704: 'CS 260',
     1128355484039123065: 'CS 312',
-    1.2353E+18: 'Unknown??'
-}
-
-
-old_pricing = {
-    'gpt-4': [0.03, 0.06],
-    'gpt-4-1106-preview': [0.01, 0.03],
-    'gpt-4-0125-preview': [0.01, 0.03],
-    'gpt-4o-mini' : [.0003, .0012],
-    'gpt-4-turbo-preview': [0.01, 0.03],
-    'gpt-3.5-turbo-1106': [0.001, 0.002],
-    'gpt-3.5-turbo': [0.001, 0.003]
 }
 
 pricing = {
@@ -38,6 +25,7 @@ pricing = {
     'gpt-4-0125-preview': [0.01, 0.03],
     'gpt-4o-mini' : [.000150, .0006],
     'gpt-4-turbo': [0.01, 0.03],
+    'gpt-4-turbo-preview': [0.01, 0.03],
     'gpt-3.5-turbo-1106': [0.001, 0.002],
     'gpt-3.5-turbo': [0.001, 0.003]
 }
@@ -108,10 +96,12 @@ def visualize_graph(df, args):
     plt.xlabel(x_axis)
     plt.ylabel(args.ind_var)
     plt.tight_layout()
-    plt.show()
 
     path = f"graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
     plt.savefig(path)
+
+
+    plt.show()
     return path
 
 def parse_args():
@@ -162,14 +152,17 @@ if __name__ == '__main__':
     """
     Dr. Bean said an initial approach to the metrics would be to make flags that would specify the data desired.
     So, for example:
-    >>> !report cost week server
-    *Spit out an image that shows the last week's cost per server
+    >>> !report -df usage -ind_var cost -p week -exp_var server
+    *Spit out an image that shows the last week's cost per server*
     
-    Additionally, there would be some sort of help menu
+    Preferably there are some pre-baked reports that should just be accessible with certain key words. IE:
+    >>> !report report 1
+    *Spit out an image that shows the last week's cost per server*
+    
+    Additionally, there should be some sort of help menu?
     >>> !report help
-    *show the available list of flags and the order they'd need to be processed
+    *show the available list of flags and the order they'd need to be processed*
     """
-    import sys
     arg_string = None
     image_cache = {}
     iters = 0
@@ -186,13 +179,7 @@ if __name__ == '__main__':
                 image_cache[arg_string] = image_path
             else:
                 image = image_cache[arg_string]
-        except ArgumentError as e:
-            image_cache[args] = f'invalid argument: {e}'
-            print(e)
 
-        except StopIteration as e:
-            print(f"Error: {e}")
-            break
 
         except Exception as e:
             print(f"An error occurred: {e}")

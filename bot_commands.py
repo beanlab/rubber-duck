@@ -110,7 +110,10 @@ class BotCommands:
 
     @step
     async def _send_report(self, channel_id):
-        ## Would this start a 'reporting feedback workflow'? How do we want it connected?
+        ## Would this start a 'reporting feedback workflow'? How do we want it connected? Thinking out loud...
+        # If split the string and if there are additional args, process them
+        #img_path = './images/img.png' = reporter.main(args) # Process the report and save the image to some path
+        #await self._send_message(channel_id, img_path)
         pass
 
     @step
