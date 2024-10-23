@@ -104,7 +104,7 @@ class Reporter():
         plt.ylabel(args.ind_var)
         plt.tight_layout()
 
-        path = f"graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
+        path = f"./state/graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
         plt.savefig(path)
 
 
@@ -136,7 +136,7 @@ class Reporter():
             string += "-log_scale"
         return string
 
-    def main(self, args):
+    def get_report(self, args):
         #First select the dataframe you're interested in seeing
         df = self.select_dataframe(args.dataframe)
 
@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     try:
         if arg_string not in reporter.image_cache:
-            image_path = reporter.main(args)
+            image_path = reporter.get_report(args)
             reporter.image_cache[arg_string] = image_path
         else:
             image = reporter.image_cache[arg_string]

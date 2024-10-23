@@ -4,7 +4,7 @@ from argparse import ArgumentError
 
 class csvHandler():
     def __init__(self):
-        self.path = "./sample_metrics/"
+        self.path = "state/metrics/"
         self.df_options = {'feedback', 'usage', 'messages'}
 
     def select_dataframe(self, desired_df):
