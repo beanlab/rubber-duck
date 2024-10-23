@@ -1,11 +1,22 @@
 import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-from reporting_handler import csvHandler
 
+from metrics import MetricsHandler
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+class csvHandler():
+    def __init__(self):
+        self.path = "state/metrics/"
+        self.df_options = {'feedback', 'usage', 'messages'}
+
+    def select_dataframe(self, desired_df):
+        """Load the dataframe based on user input."""
+        if desired_df not in self.df_options:
+            raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
+        return pd.read_csv(f"{self.path}{desired_df}.csv")
 
 class Reporter():
     image_cache = {}
@@ -35,16 +46,18 @@ class Reporter():
 
     csvHandler = csvHandler()
 
-    def __init__(self, MetricsHandler):
-        pass
+    def __init__(self, metricsHandler):
+        self.metricsHandler = metricsHandler
 
 
     def select_dataframe(self, desired_df):
         return self.csvHandler.select_dataframe(desired_df)
 
+
     def compute_cost(self, row):
         ip, op = self.pricing.get(row.get('engine', 'gpt-4'), (0,0))
         return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
+
 
     def preprocessing(self, df, args):
         if args.dataframe == 'usage':
@@ -111,6 +124,7 @@ class Reporter():
         plt.show()
         return path
 
+
     def parse_args(self):
         """Parse command-line arguments using argparse."""
         parser = ArgumentParser(description="Visualize data from selected metrics.")
@@ -136,6 +150,7 @@ class Reporter():
             string += "-log_scale"
         return string
 
+
     def get_report(self, args):
         #First select the dataframe you're interested in seeing
         df = self.select_dataframe(args.dataframe)
@@ -154,6 +169,7 @@ class Reporter():
         df_limited = self.edit_df(df, args)
 
         return self.visualize_graph(df_limited, args)
+
 
 if __name__ == '__main__':
     """
