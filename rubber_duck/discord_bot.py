@@ -347,7 +347,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='wiley_config_v2.json')
+    parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
