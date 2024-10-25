@@ -1,0 +1,32 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Amazon ECR
+        env:
+          AWS_REGION: us-west-2
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 844825014198.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Build Docker image
+        run: docker build -t beanlab/rubber-duck .
+
+      - name: Tag Docker image
+        run: docker tag beanlab/rubber-duck:latest 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+
+      - name: Push Docker image to ECR
+        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
