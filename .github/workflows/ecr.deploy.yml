@@ -3,7 +3,7 @@ name: Build and Push to ECR
 on:
   push:
     branches:
-      - main
+      - ECR-Docker
 
 jobs:
   build:
