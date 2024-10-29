@@ -31,4 +31,4 @@ CMD ["python", "/rubber_duck/discord_bot.py", "--config", "/config.json", "--log
 
 EOF
 
-docker pull ${IMAGE_NAME}:${IMAGE_TAG}
+#docker pull ${IMAGE_NAME}:${IMAGE_TAG}
