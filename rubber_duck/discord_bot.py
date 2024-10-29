@@ -347,7 +347,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='wiley_config_v2.json')
+    parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
@@ -364,6 +364,20 @@ if __name__ == '__main__':
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
 
-    config = json.loads(args.config.read_text())
+    try:
+        if args.config.is_file():
+            config = json.loads(args.config.read_text())
+        else:
+            default_config_path = Path('config.json')
+            if default_config_path.is_file():
+                config = json.loads(default_config_path.read_text())
+            else:
+                raise FileNotFoundError
+
+    except FileNotFoundError:
+        print("No valid config file found. Please create a config.json or use the default template.")
+        print("You can find the default config template here: [https://github.com/beanlab/rubber-duck/blob/master/config.json](config.json)")
+        print("For detailed instructions, check the README here: [link_to_readme](README.md)")
+        exit(1)
 
     main(config)
