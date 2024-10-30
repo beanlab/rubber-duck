@@ -59,9 +59,17 @@ class Reporter():
         self.metricsHandler = metricsHandler
         self.show_fig = show_fig
 
-
     def select_dataframe(self, desired_df):
-        return self.csvHandler.select_dataframe(desired_df)
+        if desired_df == 'feedback':
+            data = metricsHandler.get_feedback()
+        elif desired_df == 'usage':
+            data = metricsHandler.get_usage()
+        elif desired_df == 'messages':
+            data = metricsHandler.get_message()
+        else:
+            raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
+        return data
+        # return pd.DataFrame(data)
 
 
     def compute_cost(self, row):

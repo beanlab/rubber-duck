@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pandas as pd
+
 
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
@@ -49,20 +51,29 @@ class MetricsHandler:
         except Exception as e:
             logging.error(f"Failed to record feedback: {e}")
 
-    async def get_message(self):
-        with self._messages_file.open('rt', newline='') as file:
-            reader = csv.DictReader(file, fieldnames=["timestamp", "guild_id", "thread_id", "user_id", "role", "message"])
-            messages = [row for row in reader]
-        return messages
+    def get_message(self):
+        df = pd.read_csv(self._messages_file)
+        return df
 
-    async def get_usage(self):
-        with self._messages_file.open('rt', newline='') as file:
-            reader = csv.DictReader(file, fieldnames=['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens', 'output_tokens'])
-            messages = [row for row in reader]
-        return messages
+        # with self._messages_file.open('rt', newline='') as file:
+        #     reader = csv.DictReader(file, fieldnames=["timestamp", "guild_id", "thread_id", "user_id", "role", "message"], )
+        #     messages = [row for row in reader]
+        # return messages
 
-    async def get_feedback(self):
-        with self._messages_file.open('rt', newline='') as file:
-            reader = csv.DictReader(file, fieldnames=['timestamp', 'guild_id', 'thread_id', 'user_id', 'reviewer_id', 'feedback_score'])
-            messages = [row for row in reader]
-        return messages
+    def get_usage(self):
+        df = pd.read_csv(self._usage_file)
+        return df
+
+        # with self._messages_file.open('rt', newline='') as file:
+        #     reader = csv.DictReader(file, fieldnames=['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens', 'output_tokens'])
+        #     messages = [row for row in reader]
+        # return messages
+
+    def get_feedback(self):
+        df = pd.read_csv(self._feedback_file)
+        return df
+
+        # with self._messages_file.open('rt', newline='') as file:
+        #     reader = csv.DictReader(file, fieldnames=['timestamp', 'guild_id', 'thread_id', 'user_id', 'reviewer_id', 'feedback_score'])
+        #     messages = [row for row in reader]
+        # return messages
