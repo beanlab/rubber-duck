@@ -1,4 +1,5 @@
 import sys
+import io
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -22,6 +23,7 @@ class Reporter():
     image_cache = {}
 
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
+    trend_period = {1: "W", 7: "M", 30: "Y"}
 
     guilds = {
         1058490579799003187: 'BeanLab',
@@ -44,10 +46,18 @@ class Reporter():
         'gpt-3.5-turbo': [0.001, 0.003]
     }
 
+    pre_baked = {
+        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
+        'f2': '!report -df feedback -iv feedback_score -p year -avg',
+        'u1': '!report -df usage -iv cost -ev guild_id -ln',
+        'u2': '!report -df usage -iv output_tokens -p year -ev guild_id -ln'
+    }
+
     csvHandler = csvHandler()
 
-    def __init__(self, metricsHandler):
+    def __init__(self, metricsHandler, show_fig=False):
         self.metricsHandler = metricsHandler
+        self.show_fig = show_fig
 
 
     def select_dataframe(self, desired_df):
@@ -62,6 +72,8 @@ class Reporter():
     def preprocessing(self, df, args):
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
+
+        df = df.dropna(subset=[args.ind_var])
         return df
 
 
@@ -70,15 +82,17 @@ class Reporter():
         if args.period:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             now = datetime.now(ZoneInfo('US/Mountain'))
-            cutoff = now - timedelta(days=self.time_periods[args.period])
+            if args.ind_var == 'timestamp':
+                cutoff = self.trend_period[self.time_periods[args.period]]
+            else:
+                cutoff = now - timedelta(days=self.time_periods[args.period])
+
             df = df[df['timestamp'] >= cutoff]
 
-        # df = df.dropna(subset=[args.ind_var])
-
         if args.exp_var:
-            if isinstance(df[args.ind_var], int) or isinstance(df[args.ind_var], float):
-                if args.avg:
-                    df_grouped = df.groupby(args.exp_var)[args.ind_var].average().reset_index()
+            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
+                if args.average:
+                    df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             else:
@@ -106,7 +120,7 @@ class Reporter():
         if args.log:
             plt.yscale('log')
 
-        x_axis = args.exp_var if args.exp_var else 'Index'
+        x_axis = args.exp_var if args.exp_var else 'index'
         df[x_axis] = df[x_axis].astype(str)
         df.sort_values(args.ind_var, ascending=True, inplace=True)
 
@@ -117,16 +131,28 @@ class Reporter():
         plt.ylabel(args.ind_var)
         plt.tight_layout()
 
+        if self.show_fig:
+            plt.show()
+
+        # Use the below instead of the buffer if needed
         path = f"./state/graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
         plt.savefig(path)
-
-
-        plt.show()
         return path
 
 
-    def parse_args(self):
+        # buffer = io.BytesIO()
+        # plt.savefig(buffer, format='png') #Save the file to a io.BytesIO object instead of a path
+        # buffer.seek(0)
+        # return buffer
+
+
+    def parse_args(self, arg_string):
         """Parse command-line arguments using argparse."""
+        args = arg_string.split()
+        if args[1] in self.pre_baked:
+            args = self.pre_baked[args[1]].split()
+        sys.argv = args
+
         parser = ArgumentParser(description="Visualize data from selected metrics.")
         parser.add_argument("-df", "--dataframe", required=True, choices=self.csvHandler.df_options, help="Choose the dataframe.")
         parser.add_argument("-iv", "--ind_var", required=True, help="Independent variable to analyze.")
@@ -137,29 +163,17 @@ class Reporter():
         parser.add_argument("-avg", "--average", action="store_true", help="Averages, not sums, the ind_var")
         return parser.parse_args()
 
-
     def arg_to_string(self, args):
-        string = args.dataframe + "-" + args.ind_var
-        if args.exp_var:
-            string += "-" + args.exp_var
-        if args.exp_var_2:
-            string += "-" + args.exp_var_2
-        if args.period:
-            string += "-" + args.period
+        components = [args.dataframe, args.ind_var]
+        components += [attr for attr in [args.exp_var, args.exp_var_2, args.period] if attr]
         if args.log:
-            string += "-log_scale"
-        return string
-
-    def get_args(self, arg_string):
-        args = arg_string.split()
-        sys.argv = args
-        return reporter.parse_args()
+            components.append("log_scale")
+        return "-".join(components)
 
 
     def get_report(self, arg_string):
-        args = self.get_args(arg_string)
+        args = self.parse_args(arg_string)
 
-        #First select the dataframe you're interested in seeing
         df = self.select_dataframe(args.dataframe)
 
         df = self.preprocessing(df, args)
@@ -175,7 +189,7 @@ class Reporter():
 
         df_limited = self.edit_df(df, args)
 
-        return arg_string, self.visualize_graph(df_limited, args)
+        return self.arg_to_string(args), self.visualize_graph(df_limited, args)
 
 
 if __name__ == '__main__':
@@ -193,12 +207,14 @@ if __name__ == '__main__':
     >>> !report help
     *show the available list of flags and the order they'd need to be processed*
     """
-    reporter = Reporter(None)
+    from pathlib import Path
 
-    sys_string = '!report -df feedback -iv feedback_score -p year -ev guild_id -ln'
-    # sys.argv = ['!report', '-df', 'feedback', '-iv', 'feedback_score', '-p', 'year', '-ev', 'guild_id', '-ln']
-    # sys.argv = ['!report', '-df', 'usage', '-iv', 'cost', '-ev', 'guild_id', '-ln']
-    # sys.argv = ['!report', '-df', 'usage', '-iv', 'output_tokens', '-p', 'month', '-ev', 'guild_id', '-ln']
+    # Convert a string into a Path object
+    metricsHandler = MetricsHandler(Path('./state/metrics'))
+    reporter = Reporter(metricsHandler, True)
+    #Initialize the metricsHandler, should be what's returning the table that I then convert in the reporter to a pd df
+    sys_string = '!report u2'
+
 
     try:
         if sys_string not in reporter.image_cache:

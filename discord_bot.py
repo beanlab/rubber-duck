@@ -5,6 +5,7 @@ from typing import TypedDict
 
 from metrics import MetricsHandler
 from feedback import FeedbackWorkflow
+from reporter import Reporter
 
 def load_env():
     with open('secrets.env') as file:
@@ -152,7 +153,8 @@ class MyClient(discord.Client, MessageHandler):
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message)
+                    reporter = Reporter(self.metrics_handler)
+                    return BotCommands(self.send_message, self.metrics_handler, reporter)
                 case 'duck':
                     async def start_feedback_workflow(guild_id, channel_id, user_id):
                         workflow_id = get_feedback_workflow_id(channel_id)

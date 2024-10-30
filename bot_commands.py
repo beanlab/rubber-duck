@@ -4,17 +4,18 @@ import re
 import subprocess
 import traceback
 from pathlib import Path
+from discord import File
 
 from quest import step
 
 from rubber_duck import Message
 
-from reporter import Reporter
-
 
 class BotCommands:
-    def __init__(self, send_message):
+    def __init__(self, send_message, metrics_handler, reporter):
         self._send_message = step(send_message)
+        self._metrics_handler = metrics_handler
+        self._reporter = reporter
 
     async def __call__(self, message: Message):
         return await self.handle_command(message)
@@ -112,14 +113,12 @@ class BotCommands:
 
     @step
     async def _send_report(self, channel_id, arg_string):
-        ## Would this start a 'reporting feedback workflow'? How do we want it connected? Thinking out loud...
-        # If split the string and if there are additional args, process them
-        #img_path = './images/img.png' = reporter.get_report(args) # Process the report and save the image to some path
-        #await self._send_message(channel_id, img_path)
-        reporter = Reporter(self._metrics_handler)
-        report_string, img_path = reporter.get_report(arg_string)
-        await self._send_message(channel_id, f'!report {report_string}')
-        await self._send_message(channel_id, img_path)
+        report_string, img = self._reporter.get_report(arg_string)
+        await self._send_message(channel_id, f'Graph: {report_string}', file=img)
+
+        # report_string, io_img = self._reporter.get_report(arg_string)
+        # img = File(io_img, filename=report_string)
+        # await self._send_message(channel_id, f'Graph: {report_string}', file=img)
 
     @step
     async def _zip_metrics(self, channel_id):
