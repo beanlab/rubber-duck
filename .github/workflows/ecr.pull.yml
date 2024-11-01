@@ -1,7 +1,10 @@
 name: Pull and Test Docker Image
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
 
 jobs:
   pull_and_test:
