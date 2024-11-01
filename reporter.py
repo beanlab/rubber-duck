@@ -142,7 +142,7 @@ class Reporter():
         df.sort_values(args.ind_var, ascending=True, inplace=True)
 
         #Plotting
-        sns.barplot(df, x=args.exp_var, y=args.ind_var)
+        sns.barplot(data=df, x=x_axis, y=args.ind_var, color='b')
         # plt.bar(df[x_axis], df[args.ind_var])
 
         #Labeling
