@@ -129,13 +129,6 @@ class MyClient(discord.Client, MessageHandler):
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
 
-        feedback_workflow = FeedbackWorkflow(
-                            self.send_message,
-                            fetch_message,
-                            self.metrics_handler.record_feedback,
-                            "Hello"
-                            )
-
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
@@ -150,7 +143,7 @@ class MyClient(discord.Client, MessageHandler):
                         workflow_id = get_feedback_workflow_id(channel_id)
                         self._workflow_manager.start_workflow(
                             'feedback', workflow_id, guild_id, channel_id, user_id,
-                            server_feedback_config
+                            server_feedback_config, first_message
                         )
 
                     return RubberDuck(self,
@@ -159,11 +152,16 @@ class MyClient(discord.Client, MessageHandler):
                                       start_feedback_workflow
                                       )
                 case 'feedback':
-                    return feedback_workflow
+                    return FeedbackWorkflow(
+                        self.send_message,
+                        fetch_message,
+                        self.metrics_handler.record_feedback
+                    )
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck', create_workflow)
+        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
+                                                           create_workflow)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -241,7 +239,7 @@ class MyClient(discord.Client, MessageHandler):
         if self._workflow_manager.has_workflow(workflow_id):
             await self._workflow_manager.send_event(
                 workflow_id, 'feedback', None, 'put',
-                (emoji,user.id)
+                (emoji, user.id)
             )
 
     async def start_duck_conversation(self, defaults, config, message: Message):
@@ -328,7 +326,7 @@ class MyClient(discord.Client, MessageHandler):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            #TODO make this assume one id
+            # TODO make this assume one id
             user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg

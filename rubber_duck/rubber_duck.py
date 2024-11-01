@@ -145,7 +145,6 @@ class RubberDuck:
                 guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
 
             await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
-            first_chunk = None
 
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
@@ -157,11 +156,6 @@ class RubberDuck:
 
                     except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                         break
-
-                    if not first_chunk:
-                        first_chunk = message['content']
-                        if len(first_chunk) > 124:
-                            first_chunk = first_chunk[:124]
 
                     if len(message['file']) > 0:
                         await self._send_message(
@@ -229,6 +223,7 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
+            first_chunk = message_history[1]['content'][:124] if len(message_history) > 1 else None
             await self.start_feedback_workflow(guild_id, thread_id, user_id, first_chunk)
 
     @step

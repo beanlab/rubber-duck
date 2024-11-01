@@ -13,13 +13,11 @@ class FeedbackWorkflow:
     def __init__(self,
                  send_message,
                  fetch_message,
-                 record_feedback,
-                 first_message
+                 record_feedback
                  ):
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
         self._record_feedback = step(record_feedback)
-        self._first_message = first_message
 
         self._reactions = {
             '1️⃣': 1,
@@ -33,20 +31,22 @@ class FeedbackWorkflow:
         return await self.ta_feedback(*args)
 
 
-    async def ta_feedback(self, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
+    async def ta_feedback(self, guild_id, thread_id, user_id, feedback_config: FeedbackConfig, first_message):
         """
         Takes thread_id, sends it to the ta-channel, collect's feedback
         """
-        if not self._first_message:
-            return
+        if first_message is None:
+            return  # If the user didn't say anything, don't get feedback
 
         feedback_channel_id = feedback_config['channel_id']
 
         async with queue("feedback", None) as feedback_queue:
 
-            message_content = f"\nOn a scale of 1 to 5, how helpful was this conversation https://discord.com/channels/{guild_id}/{thread_id}/{user_id} (Add your reaction below)"
+            message_content = (f"\nOn a scale of 1 to 5, how effective was this conversation: "
+                               f"https://discord.com/channels/{guild_id}/{thread_id}/{user_id}\n"
+                               f"> {first_message}")
             if 'reviewer_role_id' in feedback_config:
-                message_content = f"<@{feedback_config['reviewer_role_id']}>\n" + self._first_message + message_content #TODO add in the message summary before the message_content.
+                message_content = f"<@{feedback_config['reviewer_role_id']}>\n {message_content}"
 
             # TODO - when quest code-object support is implemented, use that to directly return a message object from _send_message
             message_id = await self._send_message(feedback_channel_id, message_content)
