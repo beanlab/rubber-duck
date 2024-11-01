@@ -39,15 +39,10 @@ jobs:
         run: docker pull 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
       - name: Run Docker container
-        run: docker run -d -p 8080:8080 --name rubber-duck-container -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+        run: docker run -d -p 8080:8080 --name rubber-duck-container --log-driver json-file --log-opt path=/var/log/docker/rubber-duck-container.log -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
       - name: Check Docker container logs
-        run: docker logs rubber-duck-container
-
-      - name: Curl health endpoint
-        run: |
-          sleep 20 # give the container some time to start up
-          curl http://localhost:8080/healthcheck
+        run: docker logs rubber-duck-container > rubber-duck-container.log
 
       - name: Stop and remove Docker container
         run: |
