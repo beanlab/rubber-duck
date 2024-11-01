@@ -2,6 +2,7 @@ import sys
 import io
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from metrics import MetricsHandler
 from argparse import ArgumentParser, ArgumentError
@@ -141,7 +142,8 @@ class Reporter():
         df.sort_values(args.ind_var, ascending=True, inplace=True)
 
         #Plotting
-        plt.bar(df[x_axis], df[args.ind_var])
+        sns.barplot(df, x=args.exp_var, y=args.ind_var)
+        # plt.bar(df[x_axis], df[args.ind_var])
 
         #Labeling
         title = f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
@@ -219,12 +221,8 @@ if __name__ == '__main__':
     #Initialize the metricsHandler, should be what's returning the table that I then convert in the reporter to a pd df
     sys_string = '!report u2'
 
-    try:
-        if sys_string not in reporter.image_cache:
-            arg_string, image_path = reporter.get_report(sys_string)
-            reporter.image_cache[sys_string] = image_path
-        else:
-            image_path = reporter.image_cache[sys_string]
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    if sys_string not in reporter.image_cache:
+        arg_string, image_path = reporter.get_report(sys_string)
+        reporter.image_cache[sys_string] = image_path
+    else:
+        image_path = reporter.image_cache[sys_string]
