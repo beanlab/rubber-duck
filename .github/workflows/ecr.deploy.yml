@@ -46,7 +46,7 @@ jobs:
 
       - name: Curl health endpoint
         run: |
-          sleep 10 # give the container some time to start up
+          sleep 20 # give the container some time to start up
           curl http://localhost:8080/healthcheck
 
       - name: Stop and remove Docker container

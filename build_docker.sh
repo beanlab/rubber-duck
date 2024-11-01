@@ -17,6 +17,7 @@ WORKDIR /rubber_duck
 RUN pip install poetry
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
+EXPOSE 8080
 CMD ["python", "/rubber_duck/discord_bot.py", "--config", "/config.json", "--log-console"]
 EOF
 
