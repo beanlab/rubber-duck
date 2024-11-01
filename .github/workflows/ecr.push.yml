@@ -1,4 +1,4 @@
-name: Build, Push, Pull, and Test Docker Image
+name: Build and Push Docker Image
 
 on:
   push:
@@ -34,17 +34,3 @@ jobs:
 
       - name: Push Docker image to ECR
         run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-
-      - name: Pull Docker image from ECR
-        run: docker pull 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-
-      - name: Run Docker container
-        run: docker run -d -p 8080:8080 --name rubber-duck-container --log-driver json-file --log-opt path=/var/log/docker/rubber-duck-container.log -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-
-      - name: Check Docker container logs
-        run: docker logs rubber-duck-container > rubber-duck-container.log
-
-      - name: Stop and remove Docker container
-        run: |
-          docker stop rubber-duck-container
-          docker rm rubber-duck-container
