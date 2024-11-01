@@ -1,29 +1,55 @@
-name: Build and Push to ECR
+name: Build, Push, Pull, and Test Docker Image
+
 on:
   push:
     branches:
       - ECR-Docker
 
 jobs:
-  build:
+  build_and_push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+
       - name: Make build_docker.sh executable
         run: chmod +x ./build_docker.sh
+
       - name: Run Docker build script
         run: ./build_docker.sh
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
+
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
+
       - name: Push Docker image to ECR
         run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+
+      - name: Pull Docker image from ECR
+        run: docker pull 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+
+      - name: Run Docker container
+        run: docker run -d -p 8080:8080 --name rubber-duck-container -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} -e DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }} 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+
+      - name: Check Docker container logs
+        run: docker logs rubber-duck-container
+
+      - name: Curl health endpoint
+        run: |
+          sleep 10 # give the container some time to start up
+          curl http://localhost:8080/healthcheck
+
+      - name: Stop and remove Docker container
+        run: |
+          docker stop rubber-duck-container
+          docker rm rubber-duck-container
