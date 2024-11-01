@@ -130,10 +130,11 @@ class MyClient(discord.Client, MessageHandler):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
 
         feedback_workflow = FeedbackWorkflow(
-            self.send_message,
-            fetch_message,
-            self.metrics_handler.record_feedback
-        )
+                            self.send_message,
+                            fetch_message,
+                            self.metrics_handler.record_feedback,
+                            "Hello"
+                            )
 
         def create_workflow(wtype: str):
             match wtype:
@@ -142,7 +143,7 @@ class MyClient(discord.Client, MessageHandler):
 
                 case 'duck':
 
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
+                    async def start_feedback_workflow(guild_id, channel_id, user_id, first_message):
                         if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
                             return
 
