@@ -1,9 +1,9 @@
 name: Build and Push Docker Image
-
+# This workflow will automatically create a new Docker Image tag it as latest, upload it to AWS ECR anytime a new update is made to main
 on:
   push:
     branches:
-      - ECR-Docker
+      - main
 
 jobs:
   build_and_push:
