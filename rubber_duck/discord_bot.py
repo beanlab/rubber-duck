@@ -344,7 +344,6 @@ def main(config):
     client = MyClient(config)
     client.run(os.environ['DISCORD_TOKEN'])
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
@@ -356,11 +355,10 @@ if __name__ == '__main__':
             level=logging.DEBUG,
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
-
     else:
         logging.basicConfig(
             level=logging.DEBUG,
-            filename=LOG_FILE,
+            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
 
@@ -372,12 +370,12 @@ if __name__ == '__main__':
             if default_config_path.is_file():
                 config = json.loads(default_config_path.read_text())
             else:
-                raise FileNotFoundError
+                raise FileNotFoundError(default_config_path)
 
-    except FileNotFoundError:
-        print("No valid config file found. Please create a config.json or use the default template.")
-        print("You can find the default config template here: [https://github.com/beanlab/rubber-duck/blob/master/config.json](config.json)")
-        print("For detailed instructions, check the README here: [link_to_readme](README.md)")
+    except FileNotFoundError as e:
+        print(f"No valid config file found: {e}. Please create a config.json or use the default template.")
+        print("You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
+        print("For detailed instructions, check the README here: link_to_readme")
         exit(1)
 
     main(config)
