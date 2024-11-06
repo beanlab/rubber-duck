@@ -10,7 +10,6 @@ import argparse
 import json
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
 from pathlib import Path
 
 import discord
@@ -19,6 +18,7 @@ from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from quest import create_filesystem_manager
 from bot_commands import BotCommands
 
+logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
@@ -111,17 +111,13 @@ class MyClient(discord.Client, MessageHandler):
         metrics_config = config['metrics']
         self.admin_settings = config['admin_settings']
         open_ai_retry_protocol = config['open_ai_retry_protocol']
-        rubber_duck_config = config['rubber_duck']
 
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
-        self._duck_channels = {
-            (cc.get('name') or cc.get('id')): cc
-            for cc in rubber_duck_config['channels']
-        }
-        self._defaults = rubber_duck_config['defaults']
+        self._duck_config = config['rubber_duck']
+        self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
@@ -152,17 +148,21 @@ class MyClient(discord.Client, MessageHandler):
                             server_feedback_config
                         )
 
-                    return RubberDuck(self,
-                                      self.metrics_handler,
-                                      open_ai_retry_protocol,
-                                      start_feedback_workflow
-                                      )
+                    return RubberDuck(
+                        self,
+                        self.metrics_handler,
+                        self._duck_config,
+                        open_ai_retry_protocol,
+                        start_feedback_workflow
+                    )
+
                 case 'feedback':
                     return feedback_workflow
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck', create_workflow)
+        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
+                                                           create_workflow)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -195,106 +195,44 @@ class MyClient(discord.Client, MessageHandler):
 
         # Command channel
         if message.channel.id == self._command_channel:
-            self._workflow_manager.start_workflow(
-                'command', str(message.id), as_message(message))
+            workflow_id = f'command-{message.id}'
+            self._workflow_manager.start_workflow_background(
+                'command', workflow_id, as_message(message))
             return
 
         # Duck channel
-        if message.channel.id in self._duck_channels:
-            return await self.start_duck_conversation(
-                self._defaults,
-                self._duck_channels[message.channel.id],
-                as_message(message)
-            )
-
-        if message.channel.name in self._duck_channels:
-            return await self.start_duck_conversation(
-                self._defaults,
-                self._duck_channels[message.channel.name],
-                as_message(message)
+        if (
+                message.channel.id in self._duck_channels
+                or message.channel.name in self._duck_channels
+        ):
+            workflow_id = f'duck-{message.id}'
+            self._workflow_manager.start_workflow_background(
+                'duck', workflow_id, as_message(message)
             )
 
         # Belongs to an existing conversation
         str_id = str(message.channel.id)
         if self._workflow_manager.has_workflow(str_id):
             await self._workflow_manager.send_event(
-                str_id, 'messages', str_id, 'put',
+                str_id, 'messages', None, 'put',
                 as_message(message)
             )
 
+        # If it didn't match anything above, we can ignore it.
+
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
+        # Ignore messages from the bot
         if user.id == self.user.id:
             return
-        message = reaction.message
+
+        workflow_alias = str(reaction.message.id)
         emoji = reaction.emoji
 
-        # parse channel ID from message text
-        # TODO - use quest workflow alias once implemented
-        m = re.search(r'https://discord.com/channels/(\d+)/(\d+)/(\d+)', message.content)
-        if m is None:
-            return
-
-        channel_id = m.group(2)
-        workflow_id = get_feedback_workflow_id(channel_id)
-
-        if self._workflow_manager.has_workflow(workflow_id):
+        if self._workflow_manager.has_workflow(workflow_alias):
             await self._workflow_manager.send_event(
-                workflow_id, 'feedback', None, 'put',
-                (emoji,user.id)
+                workflow_alias, 'feedback', None, 'put',
+                (emoji, user.id)
             )
-
-    async def start_duck_conversation(self, defaults, config, message: Message):
-
-        prompt = config.get('prompt', None)
-        if prompt is None:
-            prompt_file = config.get('prompt_file', None)
-            if prompt_file is None:
-                prompt = message['content']
-            else:
-                prompt = Path(prompt_file).read_text()
-
-        engine = config.get('engine', defaults['engine'])
-
-        timeout = config.get('timeout', defaults['timeout'])
-
-        thread_id = await self.create_thread(
-            message['channel_id'],
-            message['content'][:20],
-            message['author_id'],
-            message['message_id'],
-        )
-        # await send message
-        msg = await self.get_channel(message['channel_id']).fetch_message(
-            message['message_id']
-        )
-        # Add reaction to original message to indicate to user
-        #  that the message has been processed
-        if "duck" in message['content'].lower():
-            await msg.add_reaction('🦆')
-        else:
-            await msg.add_reaction('✅')
-
-        await self.send_message(message["channel_id"],
-                                f"<@{message['author_id']}> Click here to join the conversation: <#{thread_id}>")
-
-        self._workflow_manager.start_workflow_background(
-            'duck', str(thread_id), thread_id, engine, prompt, message, timeout
-        )
-        await asyncio.sleep(0.1)
-
-    async def create_thread(self, parent_channel_id: int, title: str, author_id: int, message_id: int) -> int:
-        # Create the private thread
-        # Users/roles with "Manage Threads" will be able to see the private threads
-        thread = await self.get_channel(parent_channel_id).create_thread(
-            name=title,
-            auto_archive_duration=60
-        )
-
-        # Grant access to the user
-        await thread._state.http.add_user_to_thread(thread.id, author_id)
-        msg = await self.get_channel(parent_channel_id).fetch_message(message_id)
-
-        return thread.id
 
     #
     # Methods for MessageHandler protocol
@@ -327,7 +265,7 @@ class MyClient(discord.Client, MessageHandler):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            #TODO make this assume one id
+            # TODO make this assume one id
             user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg
@@ -338,6 +276,15 @@ class MyClient(discord.Client, MessageHandler):
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
+
+    async def create_thread(self, parent_channel_id: int, title: str) -> int:
+        # Create the private thread
+        # Users/roles with "Manage Threads" will be able to see the private threads
+        thread = await self.get_channel(parent_channel_id).create_thread(
+            name=title,
+            auto_archive_duration=60
+        )
+        return thread.id
 
 
 def main(config):
