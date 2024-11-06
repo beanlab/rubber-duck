@@ -50,4 +50,3 @@ To kill on server:
 - `ps -e | python`
 - `kill <pid>`
 
-Testing Pirate Branch
