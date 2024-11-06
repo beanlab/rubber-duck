@@ -4,7 +4,7 @@ import os
 import openai
 import json
 
-from openai.openai_object import OpenAIObject
+from openai import OpenAI
 
 
 def load_env():
@@ -23,6 +23,8 @@ load_env()
 openai.api_key = os.environ['OPENAI_API_KEY']
 ENGINE = 'gpt-4-turbo-preview'
 
+client = OpenAI()
+
 
 def prompt_input():
     response = input('User: ')
@@ -32,7 +34,8 @@ def prompt_input():
     return dict(role=role, content=response.lstrip('!'))
 
 
-async def main(starter_history_file: str | None):
+def main(starter_history_file: str | None):
+
     if starter_history_file:
         with open(starter_history_file) as f:
             history = json.load(f)
@@ -47,7 +50,7 @@ async def main(starter_history_file: str | None):
         if history[-1]['role'] == 'system':
             continue
 
-        completion: OpenAIObject = await openai.ChatCompletion.acreate(
+        completion = client.chat.completions.create(
             model=ENGINE,
             messages=history
         )
@@ -56,4 +59,4 @@ async def main(starter_history_file: str | None):
 
 
 if __name__ == '__main__':
-    asyncio.run(main(None))
+    main(None)
