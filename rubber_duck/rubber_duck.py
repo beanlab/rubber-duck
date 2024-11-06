@@ -223,7 +223,8 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-            await self.start_feedback_workflow(guild_id, thread_id, user_id)
+            first_chunk = message_history[1]['content'][:124] if len(message_history) > 1 else None
+            await self.start_feedback_workflow(guild_id, thread_id, user_id, first_chunk)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
