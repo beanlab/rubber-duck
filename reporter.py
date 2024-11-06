@@ -10,19 +10,7 @@ from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# class csvHandler():
-#     def __init__(self):
-#         self.path = "state/metrics/"
-#         self.df_options = {'feedback', 'usage', 'messages'}
-#
-#     def select_dataframe(self, desired_df):
-#         """Load the dataframe based on user input."""
-#         if desired_df not in self.df_options:
-#             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
-#         return pd.read_csv(f"{self.path}{desired_df}.csv")
-
-class Reporter():
-    tz_offset = -7
+class Reporter:
     image_cache = {}
 
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
@@ -52,8 +40,10 @@ class Reporter():
     pre_baked = {
         'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per', #Percent of feedback being recorded by class
         'f2': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
-        'u1': '!report -df usage -iv count -ev hour_of_day -p year',
-        'u2': '!report -df usage -iv cost -p year -ev guild_id -ln -c'
+        'u1': '!report -df usage -iv thread_id -ev hour_of_day -p year -c',
+        'u4': '!report -df usage -iv cost -ev hour_of_day -p year -avg',
+        'u2': '!report -df usage -iv cost -p year -ev thread_id -avg',
+        'u3': '!report -df usage -iv cost -p year -ev guild_id -avg'
     }
 
 
@@ -94,7 +84,7 @@ class Reporter():
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
-            df["hour_of_day"] = (df.timestamp.dt.hour + self.tz_offset) % 24
+            df["hour_of_day"] = (df.timestamp.dt.hour) % 24
 
         if args.exp_var == 'guild_id':
             df['guild_name'] = df['guild_id'].map(self.guilds)
@@ -119,16 +109,14 @@ class Reporter():
     def prepare_df(self, df, args):
         df = self.preprocessing(df, args)
 
-        # self.catch_known_issues(df, args)
+        self.catch_known_issues(df, args)
 
         if args.exp_var:
-            if args.exp_var == 'hour_of_day':
-                df_grouped = df["hour_of_day"].value_counts().sort_index().reset_index()
-            elif pd.api.types.is_numeric_dtype(df[args.ind_var]):
+            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
                 elif args.count:
-                    df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
+                    df_grouped = df.groupby(args.exp_var)[args.ind_var].nunique().reset_index()
                 elif args.percent:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
                 else:
@@ -159,7 +147,7 @@ class Reporter():
         # plt.bar(df[x_axis], df[args.ind_var])
 
         #Labeling
-        title = f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
+        title = (f"Average " if args.average else "") + (f"Number of " if args.count else "") + (f"Percent of " if args.percent else "") + f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
         plt.title(title)
         plt.xlabel(x_axis)
         plt.ylabel(args.ind_var)
@@ -238,7 +226,16 @@ if __name__ == '__main__':
     metricsHandler = MetricsHandler(Path('./state/metrics'))
     reporter = Reporter(metricsHandler, True)
     #Initialize the metricsHandler, should be what's returning the table that I then convert in the reporter to a pd df
-    sys_string = '!report u2'
+    # for key in reporter.pre_baked:
+    #     sys_string = '!report ' + key
+    #
+    #     if sys_string not in reporter.image_cache:
+    #         arg_string, image_path = reporter.get_report(sys_string)
+    #         reporter.image_cache[sys_string] = image_path
+    #     else:
+    #         image_path = reporter.image_cache[sys_string]
+
+    sys_string = '!report u4'
 
     if sys_string not in reporter.image_cache:
         arg_string, image_path = reporter.get_report(sys_string)
