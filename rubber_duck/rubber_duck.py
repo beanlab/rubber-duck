@@ -133,7 +133,7 @@ class RubberDuck:
         thread_id = await self._setup_thread(initial_message)
 
         async with alias(str(thread_id)):
-            await self._have_conversation(thread_id, prompt, engine, initial_message, timeout)
+            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout)
 
     #
     # Begin Conversation

@@ -201,13 +201,16 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Duck channel
-        if (
-                message.channel.id in self._duck_channels
-                or message.channel.name in self._duck_channels
-        ):
+        channel_name = None
+        if message.channel.id in self._duck_channels:
+            channel_name = message.channel.id
+        elif message.channel.name in self._duck_channels:
+            channel_name = message.channel.name
+
+        if channel_name is not None:
             workflow_id = f'duck-{message.id}'
             self._workflow_manager.start_workflow_background(
-                'duck', workflow_id, as_message(message)
+                'duck', workflow_id, channel_name, as_message(message)
             )
 
         # Belongs to an existing conversation
