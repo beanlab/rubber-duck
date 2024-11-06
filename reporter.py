@@ -3,6 +3,7 @@ import io
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.ticker import PercentFormatter
 
 from metrics import MetricsHandler
 from argparse import ArgumentParser, ArgumentError
@@ -21,6 +22,7 @@ from zoneinfo import ZoneInfo
 #         return pd.read_csv(f"{self.path}{desired_df}.csv")
 
 class Reporter():
+    tz_offset = -7
     image_cache = {}
 
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
@@ -48,10 +50,10 @@ class Reporter():
     }
 
     pre_baked = {
-        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
-        'f2': '!report -df feedback -iv feedback_score -p year -avg',
-        'u1': '!report -df usage -iv cost -ev guild_id -ln',
-        'u2': '!report -df usage -iv output_tokens -p year -ev guild_id -ln'
+        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per', #Percent of feedback being recorded by class
+        'f2': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
+        'u1': '!report -df usage -iv count -ev hour_of_day -p year',
+        'u2': '!report -df usage -iv cost -p year -ev guild_id -ln -c'
     }
 
 
@@ -80,15 +82,26 @@ class Reporter():
 
     ## Not sure the best way to do this, it could turn into a long function of a bunch of if statements if it continues like this
     def preprocessing(self, df, args):
+        if args.period:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            now = datetime.now(ZoneInfo('US/Mountain'))
+            if args.ind_var == 'timestamp':
+                cutoff = self.trend_period[self.time_periods[args.period]]
+            else:
+                cutoff = now - timedelta(days=self.time_periods[args.period])
+
+            df = df[df['timestamp'] >= cutoff]
+
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
+            df["hour_of_day"] = (df.timestamp.dt.hour + self.tz_offset) % 24
 
         if args.exp_var == 'guild_id':
             df['guild_name'] = df['guild_id'].map(self.guilds)
             df = df.drop(columns=['guild_id'])#.rename(columns={'guild_name': 'guild_name'})
             args.exp_var = 'guild_name'
 
-        df = df.dropna(subset=[args.ind_var])
+        # df = df.dropna(subset=[args.ind_var])
         return df
 
 
@@ -106,22 +119,18 @@ class Reporter():
     def prepare_df(self, df, args):
         df = self.preprocessing(df, args)
 
-        self.catch_known_issues(df, args)
-
-        if args.period:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            now = datetime.now(ZoneInfo('US/Mountain'))
-            if args.ind_var == 'timestamp':
-                cutoff = self.trend_period[self.time_periods[args.period]]
-            else:
-                cutoff = now - timedelta(days=self.time_periods[args.period])
-
-            df = df[df['timestamp'] >= cutoff]
+        # self.catch_known_issues(df, args)
 
         if args.exp_var:
-            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
+            if args.exp_var == 'hour_of_day':
+                df_grouped = df["hour_of_day"].value_counts().sort_index().reset_index()
+            elif pd.api.types.is_numeric_dtype(df[args.ind_var]):
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
+                elif args.count:
+                    df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
+                elif args.percent:
+                    df_grouped = df.groupby(args.exp_var)[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             else:
@@ -132,14 +141,18 @@ class Reporter():
         return df_grouped
 
 
-    def prettify_graph(self, df, args):
+    def prettify_graph(self, df, args, title):
         if args.log:
             plt.yscale('log')
+
+        if args.percent:
+            plt.gca().yaxis.set_major_formatter(PercentFormatter())
 
         #Final df edits
         x_axis = args.exp_var if args.exp_var else 'index'
         df[x_axis] = df[x_axis].astype(str)
-        df.sort_values(args.ind_var, ascending=True, inplace=True)
+        if args.exp_var != 'timestamp' and args.exp_var != 'hour_of_day':
+            df.sort_values(args.ind_var, ascending=True, inplace=True)
 
         #Plotting
         sns.barplot(data=df, x=x_axis, y=args.ind_var, color='b')
@@ -153,11 +166,11 @@ class Reporter():
         plt.tight_layout()
 
 
-    def make_graph(self, df, args):
+    def make_graph(self, df, args, title):
         if len(df) == 0:
             raise Exception("The dataframe is empty")
 
-        self.prettify_graph(df, args)
+        self.prettify_graph(df, args, title)
 
         if self.show_fig:
             plt.show()
@@ -188,11 +201,17 @@ class Reporter():
         parser.add_argument("-ev2", "--exp_var_2", help="Additional explanatory variable to pivot by.")
         parser.add_argument("-ln", "--log", action="store_true", help="Enable logarithmic scale for the y-axis.")
         parser.add_argument("-avg", "--average", action="store_true", help="Averages, not sums, the ind_var")
+        parser.add_argument("-c", "--count", action="store_true", help="Counts, not sums, the ind_var")
+        parser.add_argument("-per", "--percent", action="store_true", help="Percent, not sums, the ind_var")
         return parser.parse_args()
 
 
     def arg_to_string(self, args):
         components = [args.dataframe, args.ind_var]
+        if args.percent:
+            components.append("percent")
+        if args.count:
+            components.append("count")
         components += [attr for attr in [args.exp_var, args.exp_var_2, args.period] if attr]
         if args.log:
             components.append("log_scale")
@@ -206,9 +225,9 @@ class Reporter():
 
         df_limited = self.prepare_df(df, args)
 
-        graph = self.make_graph(df_limited, args)
-
         graph_string = self.arg_to_string(args)
+
+        graph = self.make_graph(df_limited, args, graph_string)
 
         return graph_string, graph
 
