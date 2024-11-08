@@ -1,13 +1,14 @@
 # Rubber Duck Project
 
 ## Introduction 
-Welcome to the Rubber-Duck Project! This guide will help you set up the project on your local machine.
+Welcome to the Rubber-Duck Project! This guide will help you set up the project on your local machine. **This will approximately take two hours.** Contact Dr. Bean if you encounter any major issues.
 
 ## Prerequisites
 The following technologies each have their own section that you can read specifics about regarding rubber duck. **Please go in order** with this list to save time and to save yourself the headache. If these technologies are unfamiliar to you, don't worry! That's why this guide is here. You can read and learn more about these during your "Research time" each week.
 - **Do very first! Send the following to Dr.Bean your GitHub profile name, OPENAI username, your Discord Username**
 - Git
 - OPEN AI Account Creation and Organization Set-Up
+- Discord Bots
 - Customizing your config file
 - Docker
 - AWS CLI & ECR
@@ -27,7 +28,16 @@ The following technologies each have their own section that you can read specifi
   - Make sure your organization is set correctly. Go to the settings and look for API Keys.
     - Create a new secret key and record this information in a safe place. You will use this information for the rest of the semester. **Do not share this information with anyone! Don't accidently expose it to GitHub. This poses a serious security risk.** We will show you the proper way to protect this information later.
 
+## Discord Bots
+  - You are going to learn how to configure a Discord Bot using the intro assignment. This is part is key for learning how to configure your custom config file.
+  - The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this discord channel and finish all the parts. https://discord.gg/YGRXPCCT
+  - When you are finished with your bot put in on the channel "please-add-my-bot."
+  - After you do that you are good to 
 
+## Customizing your config file
+  - Check the repo for the config file and make a copy of it. Rename it to your name.
+    - On Bean Lab under Rubber-Duck add a bot channel and a admin channel.
+    - Under the channels section go to config section and change the name section to match the name of your discord bot.
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this *instructions* discord channel to test if everything is running correctly. https://discord.gg/YGRXPCCT
