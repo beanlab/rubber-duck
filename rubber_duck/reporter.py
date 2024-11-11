@@ -1,5 +1,4 @@
 import sys
-import io
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -38,12 +37,15 @@ class Reporter:
     }
 
     pre_baked = {
-        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per', #Percent of feedback being recorded by class
+        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per',
         'f2': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
         'u1': '!report -df usage -iv thread_id -ev hour_of_day -p year -c',
-        'u4': '!report -df usage -iv cost -ev hour_of_day -p year -avg',
-        'u2': '!report -df usage -iv cost -p year -ev thread_id -avg',
-        'u3': '!report -df usage -iv cost -p year -ev guild_id -avg'
+        'u2': '!report -df usage -iv cost -ev hour_of_day -p year -avg',
+        'u3': '!report -df usage -iv cost -p year -ev thread_id -avg',
+        'u4': '!report -df usage -iv cost -p year -ev guild_id -avg',
+        'u5': '!report -df usage -iv cost -p year -ev guild_id -c',
+        'u6': '!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c'
+        # 'u7': '!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -avg'
     }
 
 
@@ -62,7 +64,6 @@ class Reporter:
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
         return data
-        # return pd.DataFrame(data)
 
 
     def compute_cost(self, row):
@@ -70,7 +71,6 @@ class Reporter:
         return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
 
 
-    ## Not sure the best way to do this, it could turn into a long function of a bunch of if statements if it continues like this
     def preprocessing(self, df, args):
         if args.period:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -86,10 +86,13 @@ class Reporter:
             df['cost'] = df.apply(self.compute_cost, axis=1)
             df["hour_of_day"] = (df.timestamp.dt.hour) % 24
 
-        if args.exp_var == 'guild_id':
+        if args.exp_var == 'guild_id' or args.exp_var_2:
             df['guild_name'] = df['guild_id'].map(self.guilds)
-            df = df.drop(columns=['guild_id'])#.rename(columns={'guild_name': 'guild_name'})
-            args.exp_var = 'guild_name'
+            df = df.drop(columns=['guild_id'])
+            if args.exp_var == 'guild_id':
+                args.exp_var = 'guild_name'
+            else:
+                args.exp_var_2 = 'guild_name'
 
         # df = df.dropna(subset=[args.ind_var])
         return df
@@ -111,7 +114,20 @@ class Reporter:
 
         self.catch_known_issues(df, args)
 
-        if args.exp_var:
+        if args.exp_var_2:
+            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
+                if args.average:
+                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].mean().reset_index()
+                elif args.count:
+                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].nunique().reset_index()
+                elif args.percent:
+                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
+                else:
+                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].sum().reset_index()
+            else:
+                df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].count().reset_index()
+
+        elif args.exp_var:
             if pd.api.types.is_numeric_dtype(df[args.ind_var]):
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
@@ -143,8 +159,10 @@ class Reporter:
             df.sort_values(args.ind_var, ascending=True, inplace=True)
 
         #Plotting
-        sns.barplot(data=df, x=x_axis, y=args.ind_var, color='b')
-        # plt.bar(df[x_axis], df[args.ind_var])
+        if args.exp_var_2:
+            sns.barplot(data=df, x=x_axis, y=args.ind_var, hue=args.exp_var_2)
+        else:
+            sns.barplot(data=df, x=x_axis, y=args.ind_var, color='b')
 
         #Labeling
         title = (f"Average " if args.average else "") + (f"Number of " if args.count else "") + (f"Percent of " if args.percent else "") + f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
@@ -225,20 +243,20 @@ if __name__ == '__main__':
 
     metricsHandler = MetricsHandler(Path('./state/metrics'))
     reporter = Reporter(metricsHandler, True)
-    #Initialize the metricsHandler, should be what's returning the table that I then convert in the reporter to a pd df
-    # for key in reporter.pre_baked:
-    #     sys_string = '!report ' + key
+
+    for key in reporter.pre_baked:
+        sys_string = '!report ' + key
+
+        if sys_string not in reporter.image_cache:
+            arg_string, image_path = reporter.get_report(sys_string)
+            reporter.image_cache[sys_string] = image_path
+        else:
+            image_path = reporter.image_cache[sys_string]
+
+    # sys_string = '!report u6'
     #
-    #     if sys_string not in reporter.image_cache:
-    #         arg_string, image_path = reporter.get_report(sys_string)
-    #         reporter.image_cache[sys_string] = image_path
-    #     else:
-    #         image_path = reporter.image_cache[sys_string]
-
-    sys_string = '!report u4'
-
-    if sys_string not in reporter.image_cache:
-        arg_string, image_path = reporter.get_report(sys_string)
-        reporter.image_cache[sys_string] = image_path
-    else:
-        image_path = reporter.image_cache[sys_string]
+    # if sys_string not in reporter.image_cache:
+    #     arg_string, image_path = reporter.get_report(sys_string)
+    #     reporter.image_cache[sys_string] = image_path
+    # else:
+    #     image_path = reporter.image_cache[sys_string]
