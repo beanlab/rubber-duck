@@ -38,6 +38,13 @@ The following technologies each have their own section that you can read specifi
   - Check the repo for the config file and make a copy of it. Rename it to your name.
     - On Bean Lab under Rubber-Duck add a bot channel and a admin channel.
     - Under the channels section go to config section and change the name section to match the name of your discord bot.
+    - ![img.png](img.png)
+    - Use this reference above. Change that long id below the "feedback" to match the server id.
+    - After that change the "Channel ID" field to match the channel id.
+    - For the name section use any label that makes sense for your channel.
+
+## Docker
+ - The next thing you need is to download 
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this *instructions* discord channel to test if everything is running correctly. https://discord.gg/YGRXPCCT
