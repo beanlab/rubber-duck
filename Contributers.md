@@ -1,11 +1,14 @@
 # Rubber Duck Project
 
 ## Introduction 
-Welcome to the Rubber-Duck Project! This guide will help you set up the project on your local machine. **This will approximately take two hours.** Contact Dr. Bean if you encounter any major issues.
+Welcome to the Rubber-Duck Project! This guide will help you set up the project on your local machine and introduce you to the key technologies we use. **This will approximately take three hours.** Contact Dr. Bean if you encounter any major issues.
 
 ## Prerequisites
 The following technologies each have their own section that you can read specifics about regarding rubber duck. **Please go in order** with this list to save time and to save yourself the headache. If these technologies are unfamiliar to you, don't worry! That's why this guide is here. You can read and learn more about these during your "Research time" each week.
-- **Do very first! Send the following to Dr.Bean your GitHub profile name, OPENAI username, your Discord Username**
+- **Do this very first!** Send the following to Dr.Bean.
+  - Your GitHub profile name
+  - OPENAI username
+  - your Discord Username
 - Git
 - OPEN AI Account Creation and Organization Set-Up
 - Discord Bots
@@ -31,20 +34,33 @@ The following technologies each have their own section that you can read specifi
 ## Discord Bots
   - You are going to learn how to configure a Discord Bot using the intro assignment. This is part is key for learning how to configure your custom config file.
   - The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this discord channel and finish all the parts. https://discord.gg/YGRXPCCT
-  - When you are finished with your bot put in on the channel "please-add-my-bot."
-  - After you do that you are good to 
+  - When you are finished with your bot, upload it on the channel "please-add-my-bot."
+  - After you do that you are good to go.
 
 ## Customizing your config file
   - Check the repo for the config file and make a copy of it. Rename it to your name.
-    - On Bean Lab under Rubber-Duck add a bot channel and a admin channel.
+    - On Bean Lab discord server under Rubber-Duck add a bot channel and an admin channel.
     - Under the channels section go to config section and change the name section to match the name of your discord bot.
-    - ![img.png](img.png)
-    - Use this reference above. Change that long id below the "feedback" to match the server id.
-    - After that change the "Channel ID" field to match the channel id.
-    - For the name section use any label that makes sense for your channel.
+    - ![img.png](images/example-config.png)
+    - **Use this reference above**. Change that long id below the "feedback" to match the server id. This can be found by right-clicking the discord server icon. It should look like a seed.
+    - After that, change the "Channel ID" field to match the channel id.
+      - You are going to need to add a new channel to rubber duck. Name it to be your-name-chat-bot.
+      - After it is created, right click on it to get the channel ID
+    - You will need to repeat these steps for the admin channel as well.
+      - When the config file asks for a reviewer_role_id or admin_role_id you will need to put your personal discord id in those fields
+    - For the name section use any label that makes sense for your channel. This is here for organizational purposes.
+    - Your config file should look something like these when you are done.
+    - ![img.png](images/complete-example-config.png)
 
 ## Docker
- - The next thing you need is to download 
+ - If you haven't taken CS204 or haven't run into Docker, this section is for you. Rubber Duck production line uses Docker to create production ready applications. Knowing how to use it and what is for will bless you as a software engineer.
+ - This is going to be a short tutorial on how to get docker working.
+ - **Follow the tutorial below to get started. This should take about one hour.**
+ - https://byu.instructure.com/courses/25698/pages/docker-topic-preparation?module_item_id=2149065
+
+## AWS CLI & ECR (Optional)
+- This section is optional but if you need to access BYU AWS servers please contact Dr. Bean to access.
+- You should be able to use this link to go there https://byulogin.awsapps.com/start/#/?tab=accounts
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this *instructions* discord channel to test if everything is running correctly. https://discord.gg/YGRXPCCT
@@ -55,8 +71,8 @@ The bot listens to the configured channel, currently set in the source code as `
 When a user posts a message to the duck pond, the duck bot 
 creates a public thread in response. 
 
-To add a new listening channel, add a file named by the channel in the prompts folder.
-The file should contain the prompt to use for each thread in that channel.
+[//]: # (To add a new listening channel, add a file named by the channel in the prompts folder.)
+The file should contain the prompt to use for each thread in that channel. 
 
 
 ## Setup
@@ -84,6 +100,8 @@ The file should contain the prompt to use for each thread in that channel.
   - Clone this repo
     - requires python 3.11
     - run `poetry install`
+  - Your configuration should look something like this
+  - ![img_1.png](images/example-configuration.png)
 
 To run on server:
 - cd to project folder
