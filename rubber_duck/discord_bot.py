@@ -298,12 +298,12 @@ if __name__ == '__main__':
 
     if args.log_console:
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
     else:
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
