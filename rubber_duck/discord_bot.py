@@ -1,22 +1,17 @@
-import asyncio
-import os
-import re
-from typing import TypedDict
-
-from metrics import MetricsHandler
-from feedback import FeedbackWorkflow
-
 import argparse
 import json
 import logging
-
+import os
 from pathlib import Path
+from typing import TypedDict
 
 import discord
-
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from quest import create_filesystem_manager
+
 from bot_commands import BotCommands
+from feedback import FeedbackWorkflow
+from metrics import MetricsHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -294,6 +289,7 @@ def main(config):
     client = MyClient(config)
     client.run(os.environ['DISCORD_TOKEN'])
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
@@ -324,7 +320,8 @@ if __name__ == '__main__':
 
     except FileNotFoundError as e:
         print(f"No valid config file found: {e}. Please create a config.json or use the default template.")
-        print("You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
+        print(
+            "You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
         print("For detailed instructions, check the README here: link_to_readme")
         exit(1)
 

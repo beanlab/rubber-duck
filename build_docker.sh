@@ -12,6 +12,7 @@ docker build \
 FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 COPY rubber_duck /rubber_duck
+COPY prompts /prompts
 ADD pyproject.toml /rubber_duck/pyproject.toml
 WORKDIR /rubber_duck
 RUN pip install poetry
