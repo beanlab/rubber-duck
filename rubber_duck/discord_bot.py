@@ -12,6 +12,7 @@ from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from rubber_duck.registration import RegistrationWorkflow
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -126,6 +127,11 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
+        registration_workflow = RegistrationWorkflow(
+            self.send_message,
+            fetch_message
+        )
+
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
@@ -153,6 +159,9 @@ class MyClient(discord.Client, MessageHandler):
 
                 case 'feedback':
                     return feedback_workflow
+
+                case 'registration':
+                    return registration_workflow
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
