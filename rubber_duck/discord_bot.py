@@ -12,7 +12,7 @@ from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
-from rubber_duck.registration import RegistrationWorkflow
+from registration import RegistrationWorkflow
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
