@@ -14,7 +14,7 @@ class RegistrationWorkflow:
         await self._send_message(channel_id, f"Hello <@{user_id}>, welcome! Let's get you registered.")
         await self._send_message(channel_id, "What is your BYU net ID?")
         byu_id = await self._fetch_user_response(user_id,channel_id)
-        #TODO add canvas logic here to check if its valid or not.What
+        #TODO add canvas logic here to check if its valid or not.
         await self._send_message(channel_id, "What is your preferred username?")
         username_response = await self._fetch_user_response(user_id, channel_id)
 
