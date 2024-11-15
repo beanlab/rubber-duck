@@ -10,7 +10,18 @@ class RegistrationWorkflow:
         self._send_message = step(send_message)
         self._fetch_message = step(fetch_message)
 
+
     async def start(self, user_id, channel_id):
+        # Create a thread for the registration process
+        thread = await message.channel.create_thread(
+            name=f"Registration for {message.author.name}",
+            auto_archive_duration=1440  # Use the duration as required
+        )
+
+        # Send the initial registration message in the thread
+        await self._send_message(thread_id,
+            f"Hello {message.author.mention}, welcome to the registration process! Please follow the prompts."
+        )
         await self._send_message(channel_id, f"Hello <@{user_id}>, welcome! Let's get you registered.")
         await self._send_message(channel_id, "What is your BYU net ID?")
         byu_id = await self._fetch_user_response(user_id,channel_id)

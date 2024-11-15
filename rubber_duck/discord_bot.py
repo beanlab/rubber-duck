@@ -128,11 +128,6 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
-        registration_workflow = RegistrationWorkflow(
-            self.send_message,
-            fetch_message,
-        )
-
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
@@ -162,7 +157,10 @@ class MyClient(discord.Client, MessageHandler):
                     return feedback_workflow
 
                 case 'registration':
-                    return registration_workflow
+                    return RegistrationWorkflow(
+                        self.send_message,
+                        fetch_message,
+                    )
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
@@ -207,22 +205,10 @@ class MyClient(discord.Client, MessageHandler):
 
         # Check if the message is in the registration channel
         if message.channel.id == self.registration_channel_id:
-            # Create a thread for the registration process
-            thread = await message.channel.create_thread(
-                name=f"Registration for {message.author.name}",
-                auto_archive_duration=1440  # Use the duration as required
-            )
-
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
             self._workflow_manager.start_workflow_background(
                 'registration', workflow_id, as_message(message)
-            )
-
-            # Send the initial registration message in the thread
-            await self.send_message(
-                thread.id,
-                f"Hello {message.author.mention}, welcome to the registration process! Please follow the prompts."
             )
 
         # Duck channel
