@@ -1,5 +1,5 @@
 from quest import step
-
+import canvasapi
 
 class RegistrationWorkflow:
     def __init__(self,
