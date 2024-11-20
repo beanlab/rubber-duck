@@ -18,7 +18,9 @@ class RegistrationWorkflow:
         self._wait_for = wait_for
         self._canvas_users = {}
 
+
     async def __call__(self, *args):
+        self.get_canvas_users(API_TOKEN=token)
         return await self.start(*args)
 
     async def start(self, user_id, channel_id):
@@ -41,7 +43,7 @@ class RegistrationWorkflow:
             else:
                 break
 
-        await self._send_message(thread_id, "What is your preferred username?")
+        await self._send_message(thread_id, "What is your preferred name?")
         username_response = await self._fetch_user_response(user_id, thread_id)
 
         # Confirm registration
@@ -66,25 +68,32 @@ class RegistrationWorkflow:
             return None
 
     def get_canvas_users(self, API_TOKEN=None):
-        url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id"
+        url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id&per_page=100"
         headers = {
             "Authorization": f"Bearer {API_TOKEN}"
         }
 
         try:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                users = response.json()
-                for user in users:
-                    self._canvas_users[user['login_id']] = user['name']
-            else:
-                print(f"Error: {response.status_code}, {response.text}")
+            while url:
+                response = requests.get(url, headers=headers)
+                if response.status_code == 200:
+                    users = response.json()
+                    for user in users:
+                        self._canvas_users[user['login_id']] = user['name']
+                    # Check for pagination (next page URL)
+                    if 'next' in response.links:
+                        url = response.links['next']['url']
+                    else:
+                        url = None  # No more pages
+                else:
+                    print(f"Error: {response.status_code}, {response.text}")
+                    break
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
 
     def _validate_byu_id(self, byu_id):
         """Placeholder BYU Net ID validation logic."""
-        self.get_canvas_users(API_TOKEN=token)
-
-        # Replace with actual validation (e.g., regex or API check)
-        return byu_id.isalnum() and len(byu_id) == 9
+        if byu_id in self._canvas_users:
+            return True
+        else:
+            return False
