@@ -160,6 +160,8 @@ class MyClient(discord.Client, MessageHandler):
                     return RegistrationWorkflow(
                         self.send_message,
                         fetch_message,
+                        self.create_thread,
+                        self.wait_for
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
@@ -203,12 +205,15 @@ class MyClient(discord.Client, MessageHandler):
                 'command', workflow_id, as_message(message))
             return
 
-        # Check if the message is in the registration channel
+        # Registration channel
         if message.channel.id == self.registration_channel_id:
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
             self._workflow_manager.start_workflow_background(
-                'registration', workflow_id, as_message(message)
+                'registration',
+                workflow_id,
+                message.author.id,
+                message.channel.id
             )
 
         # Duck channel
