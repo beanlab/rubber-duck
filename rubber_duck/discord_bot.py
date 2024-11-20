@@ -8,7 +8,7 @@ from feedback import FeedbackWorkflow
 from reporter import Reporter
 
 def load_env():
-    with open('../secrets.env') as file:
+    with open('secrets.env') as file:
         for line in file:
             line = line.strip()
             if not line or line.startswith('#'):

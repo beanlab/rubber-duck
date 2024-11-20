@@ -9,6 +9,46 @@ from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+def fancy_preproccesing():
+    file_path = "state/metrics/feedback.csv"
+    df = pd.read_csv(file_path)
+
+    # Convert the timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    # Set the timestamp as the index (useful for resampling)
+    df.set_index('timestamp', inplace=True)
+
+    # Resample to weekly frequency
+    weekly_data = df.resample('W').agg(
+        avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
+        valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
+    ).reset_index()
+
+    return weekly_data
+
+
+def feed_fancy_graph(arg_string):
+    specific_str = arg_string.split()[2]
+    df = fancy_preproccesing()
+
+    # Plot the percentage of valid scores each week
+    plt.figure(figsize=(10, 6))
+    if specific_str == 'percent':
+        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange')
+        plt.gca().yaxis.set_major_formatter(PercentFormatter())
+
+    else:
+        sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
+    plt.title(f'{specific_str.title()} Valid Feedback Scores Per Week')
+    plt.xlabel('Week')
+    plt.ylabel(f'Valid Scores {specific_str.title()}')
+    plt.xticks(rotation=45)
+    plt.grid(visible=True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+
 class Reporter:
     image_cache = {}
 
@@ -37,6 +77,8 @@ class Reporter:
     }
 
     pre_baked = {
+        'ftrend percent': None,
+        'ftrend average': None,
         'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per',
         'f2': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
         'u1': '!report -df usage -iv thread_id -ev hour_of_day -p year -c',
@@ -45,7 +87,6 @@ class Reporter:
         'u4': '!report -df usage -iv cost -p year -ev guild_id -avg',
         'u5': '!report -df usage -iv cost -p year -ev guild_id -c',
         'u6': '!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c'
-        # 'u7': '!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -avg'
     }
 
 
@@ -84,7 +125,7 @@ class Reporter:
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
-            df["hour_of_day"] = (df.timestamp.dt.hour) % 24
+            df["hour_of_day"] = df.timestamp.dt.hour % 24
 
         if args.exp_var == 'guild_id' or args.exp_var_2:
             df['guild_name'] = df['guild_id'].map(self.guilds)
@@ -128,7 +169,8 @@ class Reporter:
                 df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].count().reset_index()
 
         elif args.exp_var:
-            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
+            try:
+                df[args.ind_var] = pd.to_numeric(df[args.ind_var])
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
                 elif args.count:
@@ -137,7 +179,7 @@ class Reporter:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
-            else:
+            except ValueError as e:
                 df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
         else:
             df_grouped = df[args.ind_var].reset_index()
@@ -225,6 +267,9 @@ class Reporter:
 
 
     def get_report(self, arg_string):
+        if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
+            return arg_string, feed_fancy_graph(arg_string)
+        
         args = self.parse_args(arg_string)
 
         df = self.select_dataframe(args.dataframe)
@@ -252,8 +297,8 @@ if __name__ == '__main__':
             reporter.image_cache[sys_string] = image_path
         else:
             image_path = reporter.image_cache[sys_string]
-
-    # sys_string = '!report u6'
+    #
+    # sys_string = 'feedback average'
     #
     # if sys_string not in reporter.image_cache:
     #     arg_string, image_path = reporter.get_report(sys_string)
