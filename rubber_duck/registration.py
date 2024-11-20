@@ -27,13 +27,10 @@ class RegistrationWorkflow:
         # Create a thread for the registration process
         thread_id = await self._create_thread(channel_id, f"Registration for <@{user_id}>")
 
-        # Send the initial registration message in the thread
         await self._send_message(
             thread_id,
             f"Hello <@{user_id}>, welcome to the registration process! Please follow the prompts."
         )
-
-        # Registration prompts
 
         await self._send_message(thread_id, "What is your BYU Net ID?")
         while True:
