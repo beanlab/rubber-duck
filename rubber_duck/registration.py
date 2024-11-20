@@ -1,6 +1,13 @@
 import asyncio
-
+import requests
+import os
+from dotenv import load_dotenv
 from quest import step
+
+load_dotenv()
+token = os.getenv("CANVAS_TOKEN")
+COURSE_ID = os.getenv("COURSE_ID")
+BASE_URL = "https://byu.instructure.com/api/v1"
 
 
 class RegistrationWorkflow:
@@ -9,6 +16,7 @@ class RegistrationWorkflow:
         self._fetch_message = fetch_message
         self._create_thread = step(create_thread)
         self._wait_for = wait_for
+        self._canvas_users = {}
 
     async def __call__(self, *args):
         return await self.start(*args)
@@ -57,7 +65,26 @@ class RegistrationWorkflow:
             await self._send_message(channel_id, "You took too long to respond. Please try again later.")
             return None
 
+    def get_canvas_users(self, API_TOKEN=None):
+        url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id"
+        headers = {
+            "Authorization": f"Bearer {API_TOKEN}"
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                users = response.json()
+                for user in users:
+                    self._canvas_users[user['login_id']] = user['name']
+            else:
+                print(f"Error: {response.status_code}, {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+
     def _validate_byu_id(self, byu_id):
         """Placeholder BYU Net ID validation logic."""
+        self.get_canvas_users(API_TOKEN=token)
+
         # Replace with actual validation (e.g., regex or API check)
         return byu_id.isalnum() and len(byu_id) == 9
