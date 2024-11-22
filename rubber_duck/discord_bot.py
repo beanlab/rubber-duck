@@ -157,11 +157,12 @@ class MyClient(discord.Client, MessageHandler):
                     return feedback_workflow
 
                 case 'registration':
-                    return RegistrationWorkflow(
+                     return RegistrationWorkflow(
                         self.send_message,
                         fetch_message,
                         self.create_thread,
-                        self.wait_for
+                        self.wait_for,
+                        self._assign_user_role
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
@@ -209,11 +210,16 @@ class MyClient(discord.Client, MessageHandler):
         if message.channel.id == self.registration_channel_id:
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
+            member = message.author
+            guild_id = message.guild.id
+
             self._workflow_manager.start_workflow_background(
                 'registration',
                 workflow_id,
                 message.author.id,
-                message.channel.id
+                message.channel.id,
+                guild_id,
+                member.id
             )
 
         # Duck channel
@@ -253,9 +259,45 @@ class MyClient(discord.Client, MessageHandler):
                 (emoji, user.id)
             )
 
-    #
-    # Methods for MessageHandler protocol
-    #
+    async def ensure_role_exists(self, guild, role_name):
+        role = discord.utils.get(guild.roles, name=role_name)
+        if role is None:
+            # Create the role if it doesn't exist
+            # print(f"Role '{role_name}' does not exist. Creating it...")
+            role = await guild.create_role(name=role_name)
+            # print(f"Role '{role_name}' created.")
+        return role
+
+    async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
+
+        guild = self.get_guild(guild_id)
+        if not guild:
+            pass
+            # await self.send_message(guild_id) #fix this
+
+        member = guild.get_member(member_id)
+        if not member:
+            pass
+            # await self.send_message(guild_id) #fix this
+
+
+        if ("TaEnrollment" in canvas_role) or len(canvas_role)>1:  # Example: if BYU ID starts with "TA", assign TA role
+            role_name = "TA"
+        elif "TeacherEnrollment" in canvas_role:  # Example: if BYU ID starts with "Teacher", assign Teacher role
+            role_name = "Teacher"
+        else:
+            role_name = "Student"  # Default role
+
+        role = self.ensure_role_exists(guild,role_name)
+
+        # Get the role from the guild
+        role = discord.utils.get(guild.roles, name=role_name)
+        if role:
+            # Assign the role to the member
+            await member.add_roles(role)
+            await self.send_message(thread_id, f"Assigned role '{role_name}' to {member.name}.")
+        else:
+            await self.send_message(thread_id, f"Role '{role_name}' not found.")
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
