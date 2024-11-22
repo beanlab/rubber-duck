@@ -18,9 +18,12 @@ class RegistrationWorkflow:
         self._wait_for = wait_for
         self._canvas_users = {}
 
+    def _get_canvas_users(self):
+        return self._canvas_users
+
 
     async def __call__(self, *args):
-        self.get_canvas_users(API_TOKEN=token)
+        self._get_canvas_users(API_TOKEN=token)
         return await self.start(*args)
 
     async def start(self, user_id, channel_id):
@@ -40,14 +43,8 @@ class RegistrationWorkflow:
             else:
                 break
 
-        await self._send_message(thread_id, "What is your preferred name?")
-        username_response = await self._fetch_user_response(user_id, thread_id)
-
         # Confirm registration
-        await self._send_message(
-            thread_id,
-            f"Thank you, {username_response.content}. Confirm registration by reacting with ✅."
-        )
+        await self._confirmation_check(byu_id_response.content, thread_id)
 
     async def _fetch_user_response(self, user_id, channel_id):
         """Fetch the next message from a user in the thread."""
@@ -64,7 +61,15 @@ class RegistrationWorkflow:
             await self._send_message(channel_id, "You took too long to respond. Please try again later.")
             return None
 
-    def get_canvas_users(self, API_TOKEN=None):
+    async def _confirmation_check(self, byu_id, thread_id):
+        # canvas_users=self._get_canvas_users();
+        name,email = self._canvas_users[byu_id]
+        #email
+        await self._send_message(thread_id, f"Is this correct?\n {name} \n {byu_id} \n {email}")
+
+
+
+    def _get_canvas_users(self, API_TOKEN=None):
         url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id&per_page=100"
         headers = {
             "Authorization": f"Bearer {API_TOKEN}"
@@ -76,7 +81,7 @@ class RegistrationWorkflow:
                 if response.status_code == 200:
                     users = response.json()
                     for user in users:
-                        self._canvas_users[user['login_id']] = user['name']
+                        self._canvas_users[user['login_id']] = user['name'], user['email']
                     # Check for pagination (next page URL)
                     if 'next' in response.links:
                         url = response.links['next']['url']
