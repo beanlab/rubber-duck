@@ -3,7 +3,6 @@
 ## Introduction 
 Welcome to the Rubber-Duck Project! This guide will help you set up the project on your local machine and introduce you to the key technologies we use. **This will approximately take three hours.** Contact Dr. Bean if you encounter any major issues.
 
-
 ## Do this very first! 
 Send the following information to Dr.Bean.
   - Your GitHub profile name
