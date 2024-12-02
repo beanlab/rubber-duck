@@ -69,34 +69,11 @@ class RegistrationWorkflow:
         return name,email,canvas_role
 
 
-    def _get_canvas_users(self, API_TOKEN=None):
-        url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id&include[]=enrollments&per_page=100"
-        headers = {
-            "Authorization": f"Bearer {API_TOKEN}"
-        }
-
-        try:
-            while url:
-                response = requests.get(url, headers=headers)
-                if response.status_code == 200:
-                    users = response.json()
-                    for user in users:
-                        roles = [enrollment['type'] for enrollment in user.get('enrollments', [])]
-                        self._canvas_users[user['login_id']] = user['name'], user['email'], roles
-                    if 'next' in response.links:
-                        url = response.links['next']['url']
-                    else:
-                        url = None  # No more pages
-                else:
-                    print(f"Error: {response.status_code}, {response.text}")
-                    break
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
 
     async def _validate_byu_id(self, byu_id,thread_id):
         """Placeholder BYU Net ID validation logic."""
         if len(self._canvas_users) == 0:
-            self._get_canvas_users(API_TOKEN=token)
+            # self._get_canvas_users(API_TOKEN=token)
             if self._canvas_users == 0:
                 await self._send_message(thread_id, "Canvas is processing too many requests. Please try again later.")
 
