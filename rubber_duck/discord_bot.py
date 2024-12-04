@@ -12,7 +12,9 @@ from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from canvas_api import CanvasApi
 from registration import RegistrationWorkflow
+from email_confirmation import EmailConfirmation
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -102,7 +104,11 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self.registration_channel_id = config['registration']["registration_channel_id"]
+        # registration channel feature
+        self._registration_channel_id = config['registration']["registration_channel_id"]
+        self._email_confirmation_class = EmailConfirmation()
+        self._canvas_api = CanvasApi()
+
         feedback_config = config['feedback']
         quest_config = config['quest']
         metrics_config = config['metrics']
@@ -162,7 +168,8 @@ class MyClient(discord.Client, MessageHandler):
                         fetch_message,
                         self.create_thread,
                         self.wait_for,
-                        self._assign_user_role
+                        self._assign_user_role,
+                        self._canvas_api
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
@@ -207,7 +214,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Registration channel
-        if message.channel.id == self.registration_channel_id:
+        if message.channel.id == self._registration_channel_id:
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
             member = message.author
@@ -221,6 +228,7 @@ class MyClient(discord.Client, MessageHandler):
                 guild_id,
                 member.id
             )
+
 
         # Duck channel
         channel_name = None

@@ -1,10 +1,9 @@
 import asyncio
 
-import discord
-import requests
 import os
 from dotenv import load_dotenv
 from quest import step
+from canvas_api import CanvasApi
 
 load_dotenv()
 token = os.getenv("CANVAS_TOKEN")
@@ -13,13 +12,14 @@ BASE_URL = "https://byu.instructure.com/api/v1"
 
 
 class RegistrationWorkflow:
-    def __init__(self, send_message, fetch_message, create_thread, wait_for, assign_role):
+    def __init__(self, send_message, fetch_message, create_thread, wait_for, assign_role, canvas_api: CanvasApi):
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
         self._create_thread = step(create_thread)
         self._wait_for = wait_for
         self._assign_user_role = assign_role
         self._canvas_users = {}
+        self._canvas_api = canvas_api
 
     async def __call__(self, user_id, channel_id, guild_id, member_id):
         return await self.start(user_id, channel_id, guild_id,member_id)
@@ -36,6 +36,7 @@ class RegistrationWorkflow:
         await self._send_message(thread_id, "What is your BYU Net ID?")
         while True:
             byu_id_response = await self._fetch_user_response(user_id, thread_id)
+            self._collect_canvas_data()
             if not self._validate_byu_id(byu_id_response.content, thread_id):
                 await self._send_message(thread_id, "Invalid BYU Net ID. Please try again.")
             else:
@@ -44,6 +45,13 @@ class RegistrationWorkflow:
         # Confirm registration
         name, email, canvas_role= await self._confirmation_check(byu_id_response.content, thread_id)
         await self._assign_user_role(member_id, canvas_role, guild_id,thread_id)
+
+    def _collect_canvas_data(self):
+        if not self._canvas_api.was_called_within_last_hour():
+            self._canvas_api._connect_canvas_api()
+            self._canvas_users = self._canvas_api.get_canvas_users()
+        else:
+            self._send_message(self._send_message, "Please wait an hour before continuing")
 
 
     async def _fetch_user_response(self, user_id, channel_id):

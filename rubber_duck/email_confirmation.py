@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 class EmailConfirmation:
     def __init__(self):
-        self.setup()
+        self._setup()
         self.token_store = {}
         self.ses_client = None
 
