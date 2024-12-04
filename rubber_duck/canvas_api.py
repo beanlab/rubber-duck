@@ -19,7 +19,7 @@ class CanvasApi:
     def get_canvas_users(self):
         return self.canvas_users
 
-    def _connect_canvas_api(self):
+    def connect_canvas_api(self):
         url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id&include[]=enrollments&per_page=100"
         headers = {
             "Authorization": f"Bearer {CANVAS_TOKEN}"

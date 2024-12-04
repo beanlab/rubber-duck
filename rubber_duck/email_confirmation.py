@@ -1,5 +1,3 @@
-from operator import truediv
-
 import boto3
 import uuid
 import os
@@ -7,9 +5,8 @@ from dotenv import load_dotenv
 
 class EmailConfirmation:
     def __init__(self):
-        self._setup()
         self.token_store = {}
-        self.ses_client = None
+        self._setup()
 
     def _setup(self):
         # Load environment variables from .env
@@ -23,33 +20,30 @@ class EmailConfirmation:
         if not aws_access_key_id or not aws_secret_access_key or not aws_region:
             raise EnvironmentError("AWS credentials or region not set in .env")
 
-        ses_client = boto3.client(
+        self.ses_client = boto3.client(
             "ses",
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             region_name=aws_region,
         )
 
-        self.ses_client=ses_client
+    def confirm_token(self, email, user_response_token) -> bool:
 
-    def confirm_token(self, user_response_token) -> bool:
-        if user_response_token in self.token_store:
-            return True
-        else:
-            return False
+        return user_response_token in self.token_store.values()
 
-    def _generate_token(self):
+    def generate_token(self, email):
         # Generate a UUID
         unique_id = uuid.uuid4()
         # Convert the UUID to a string and take the first 6 digits
         code = str(unique_id.int)[:6]
-
+        self.token_store[email] = code
         return code
 
-    def _retrieve_token(self,email):
+    def _retrieve_token(self, email):
         return self.token_store.get(email)
 
-    def _send_email_with_token(self, email, token, sender):
+    def send_email_with_token(self, email, sender):
+        token = self.generate_token(email)
         # Sender and recipient email
         subject = "Confirm Your Email Address"
         body = f"""
@@ -74,3 +68,4 @@ class EmailConfirmation:
             print("Email sent! Message ID:", response["MessageId"])
         except Exception as e:
             print("Error sending email:", e)
+

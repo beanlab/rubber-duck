@@ -106,7 +106,7 @@ class MyClient(discord.Client, MessageHandler):
 
         # registration channel feature
         self._registration_channel_id = config['registration']["registration_channel_id"]
-        self._email_confirmation_class = EmailConfirmation()
+        self._email_confirmation = EmailConfirmation()
         self._canvas_api = CanvasApi()
 
         feedback_config = config['feedback']
@@ -169,7 +169,9 @@ class MyClient(discord.Client, MessageHandler):
                         self.create_thread,
                         self.wait_for,
                         self._assign_user_role,
-                        self._canvas_api
+                        self._canvas_api,
+                        self._email_confirmation,
+                        self.get_guild
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
@@ -270,24 +272,18 @@ class MyClient(discord.Client, MessageHandler):
     async def ensure_role_exists(self, guild, role_name):
         role = discord.utils.get(guild.roles, name=role_name)
         if role is None:
-            # Create the role if it doesn't exist
-            # print(f"Role '{role_name}' does not exist. Creating it...")
             role = await guild.create_role(name=role_name)
-            # print(f"Role '{role_name}' created.")
         return role
 
     async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
-
         guild = self.get_guild(guild_id)
         if not guild:
-            pass
-            # await self.send_message(guild_id) #fix this
-
+            await self._send_message(guild_id, "Guild not found.")
+            return
         member = guild.get_member(member_id)
         if not member:
-            pass
-            # await self.send_message(guild_id) #fix this
-
+            await self._send_message(guild_id, "Member not found.")
+            return
 
         if ("TaEnrollment" in canvas_role) or len(canvas_role)>1:  # Example: if BYU ID starts with "TA", assign TA role
             role_name = "TA"
@@ -296,7 +292,7 @@ class MyClient(discord.Client, MessageHandler):
         else:
             role_name = "Student"  # Default role
 
-        role = self.ensure_role_exists(guild,role_name)
+        role = await self.ensure_role_exists(guild,role_name)
 
         # Get the role from the guild
         role = discord.utils.get(guild.roles, name=role_name)
@@ -306,6 +302,7 @@ class MyClient(discord.Client, MessageHandler):
             await self.send_message(thread_id, f"Assigned role '{role_name}' to {member.name}.")
         else:
             await self.send_message(thread_id, f"Role '{role_name}' not found.")
+
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
@@ -354,6 +351,8 @@ class MyClient(discord.Client, MessageHandler):
             auto_archive_duration=60
         )
         return thread.id
+
+
 
 
 def main(config):

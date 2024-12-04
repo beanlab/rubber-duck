@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from quest import step
 from canvas_api import CanvasApi
+from email_confirmation import EmailConfirmation
 
 load_dotenv()
 token = os.getenv("CANVAS_TOKEN")
@@ -12,7 +13,7 @@ BASE_URL = "https://byu.instructure.com/api/v1"
 
 
 class RegistrationWorkflow:
-    def __init__(self, send_message, fetch_message, create_thread, wait_for, assign_role, canvas_api: CanvasApi):
+    def __init__(self, send_message, fetch_message, create_thread, wait_for, assign_role, canvas_api: CanvasApi, email_confirmation: EmailConfirmation, get_guild):
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
         self._create_thread = step(create_thread)
@@ -20,13 +21,17 @@ class RegistrationWorkflow:
         self._assign_user_role = assign_role
         self._canvas_users = {}
         self._canvas_api = canvas_api
+        self._email_confirmation = email_confirmation
+        self._get_guild = get_guild
 
     async def __call__(self, user_id, channel_id, guild_id, member_id):
         return await self.start(user_id, channel_id, guild_id,member_id)
 
-    async def start(self, user_id, channel_id, guild_id,member_id):
+    async def start(self, user_id, channel_id, guild_id, member_id):
         # Create a thread for the registration process
-        thread_id = await self._create_thread(channel_id, f"Registration for <@{user_id}>")
+        guild = self._get_guild(guild_id)
+        member = await guild.fetch_member(member_id)
+        thread_id = await self._create_thread(channel_id, f"Registration for {member.name}")
 
         await self._send_message(
             thread_id,
@@ -44,15 +49,28 @@ class RegistrationWorkflow:
 
         # Confirm registration
         name, email, canvas_role= await self._confirmation_check(byu_id_response.content, thread_id)
+        # Email confirmation
+
+        await self._confirm_registration_via_email(thread_id, user_id, email)
         await self._assign_user_role(member_id, canvas_role, guild_id,thread_id)
+
+    async def _confirm_registration_via_email(self, thread_id, user_id, email):
+        self._email_confirmation.send_email_with_token(email, sender="<wjw37@byu.edu>")
+        await self._send_message(thread_id, "Check your BYU Email to confirm your registration. Type in your code into the chat to confirm your registration.")
+        while True:
+            users_token_response = await self._fetch_user_response(user_id, thread_id)
+            if self._email_confirmation.confirm_token(email,users_token_response.content):
+                await self._send_message(thread_id, "Your registration was successful.")
+                break
+            else:
+                await self._send_message(thread_id, "The code you entered is incorrect. Please try again.")
 
     def _collect_canvas_data(self):
         if not self._canvas_api.was_called_within_last_hour():
-            self._canvas_api._connect_canvas_api()
+            self._canvas_api.connect_canvas_api()
             self._canvas_users = self._canvas_api.get_canvas_users()
         else:
             self._send_message(self._send_message, "Please wait an hour before continuing")
-
 
     async def _fetch_user_response(self, user_id, channel_id):
         """Fetch the next message from a user in the thread."""
@@ -70,18 +88,13 @@ class RegistrationWorkflow:
             return None
 
     async def _confirmation_check(self, byu_id, thread_id):
-        # canvas_users=self._get_canvas_users();
         name,email,canvas_role = self._canvas_users[byu_id]
-        #email
-        await self._send_message(thread_id, f"Is this correct?\n {name} \n {byu_id} \n {email}")
+        await self._send_message(thread_id, f"Is this correct?\n{name}\n{byu_id}\n{email}")
+
         return name,email,canvas_role
 
-
-
     async def _validate_byu_id(self, byu_id,thread_id):
-        """Placeholder BYU Net ID validation logic."""
         if len(self._canvas_users) == 0:
-            # self._get_canvas_users(API_TOKEN=token)
             if self._canvas_users == 0:
                 await self._send_message(thread_id, "Canvas is processing too many requests. Please try again later.")
 
