@@ -107,7 +107,8 @@ class MyClient(discord.Client, MessageHandler):
         # registration channel feature
         self._registration_channel_id = config['registration']["registration_channel_id"]
         self._email_confirmation = EmailConfirmation()
-        self._canvas_api = CanvasApi()
+        canvas_config = config['canvas']
+        self._canvas_api = CanvasApi(canvas_config)
 
         feedback_config = config['feedback']
         quest_config = config['quest']
@@ -280,7 +281,7 @@ class MyClient(discord.Client, MessageHandler):
         if not guild:
             await self._send_message(guild_id, "Guild not found.")
             return
-        member = guild.get_member(member_id)
+        member = await guild.fetch_member(member_id)
         if not member:
             await self._send_message(guild_id, "Member not found.")
             return

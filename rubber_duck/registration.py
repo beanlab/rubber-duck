@@ -47,15 +47,14 @@ class RegistrationWorkflow:
             else:
                 break
 
-        # Confirm registration
         name, email, canvas_role= await self._confirmation_check(byu_id_response.content, thread_id)
-        # Email confirmation
 
         await self._confirm_registration_via_email(thread_id, user_id, email)
         await self._assign_user_role(member_id, canvas_role, guild_id,thread_id)
 
+    #put this in the config and byu-cs-course-ops@cs.byu.edu
     async def _confirm_registration_via_email(self, thread_id, user_id, email):
-        self._email_confirmation.send_email_with_token(email, sender="<wjw37@byu.edu>")
+        self._email_confirmation.send_email_with_token(email, sender="<byu-cs-course-ops@cs.byu.edu>")
         await self._send_message(thread_id, "Check your BYU Email to confirm your registration. Type in your code into the chat to confirm your registration.")
         while True:
             users_token_response = await self._fetch_user_response(user_id, thread_id)

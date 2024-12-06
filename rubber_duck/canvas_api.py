@@ -1,57 +1,61 @@
 import os
 
+import canvasapi.course
 import requests
 import time
+from canvasapi import Canvas
+from canvasapi.course import Course
 from dotenv import load_dotenv
 
-load_dotenv()
-token = os.getenv("CANVAS_TOKEN")
-COURSE_ID = os.getenv("COURSE_ID")
-BASE_URL = "https://byu.instructure.com/api/v1"
-CANVAS_TOKEN = os.getenv("CANVAS_TOKEN")
+# load_dotenv()
+# token = os.getenv("CANVAS_TOKEN")
+# COURSE_ID = os.getenv("COURSE_ID")
+# BASE_URL = "https://byu.instructure.com/api/v1"
+# CANVAS_TOKEN = os.getenv("CANVAS_TOKEN")
+
+#changes methods to private
+#add feature from Dr.Bean
+#given a course configuration create a canvas dict
+#config needs general url,api token,
+
+def _get_course(api_token: str, api_url: str, canvas_course_id: int) -> Course:
+    """
+    Returns a Canvas Course object for the given API URL, API token, and course ID.
+
+    :param api_url: str: The URL for the Canvas API.
+    :param api_token: str: The authentication token for the Canvas API.
+    :param canvas_course_id: int: The ID of the Canvas course.
+    :return: Course: A Canvas Course object.
+    """
+    canvas = Canvas(api_url, api_token)
+    course: Course = canvas.get_course(canvas_course_id)
+    return course
 
 class CanvasApi:
-    def __init__(self):
+    def __init__(self, config):
+        print("Config in CanvasApi:", config)  # Debugging line
+        self._courses = {
+            guild_id: _get_course(config['token'], config['url'], course_id)
+            for guild_id, course_id in config['courses'].items()
+        }
+        self._cache_timeout = config['cache_timeout']
+        self._url = config['url']
+        self._token = config['token']
         self.canvas_users = {}
-        self.last_called = None
+        self.last_called = {}
 
+    def get_canvas_users(self, guild_id):
+        if self._is_data_stale(guild_id):
+            self._retrieve_users(guild_id)
+        return self.canvas_users[guild_id]
 
-    def get_canvas_users(self):
-        return self.canvas_users
-
-    def connect_canvas_api(self):
-        url = f"{BASE_URL}/courses/{COURSE_ID}/users?include[]=email&include[]=login_id&include[]=enrollments&per_page=100"
-        headers = {
-            "Authorization": f"Bearer {CANVAS_TOKEN}"
+    def _retrieve_users(self, guild_id):
+        self.canvas_users[guild_id] = {
+            user.login_id: (user.name, user.email, user.enrollments)
+            for user in self._courses[guild_id].get_enrollments()
         }
 
-        try:
-            while url:
-                response = requests.get(url, headers=headers)
-                if response.status_code == 200:
-                    users = response.json()
-                    for user in users:
-                        roles = [enrollment['type'] for enrollment in user.get('enrollments', [])]
-                        self.canvas_users[user['login_id']] = user['name'], user['email'], roles
-                    if 'next' in response.links:
-                        url = response.links['next']['url']
-                    else:
-                        url = None  # No more pages
-                else:
-                    print(f"Error: {response.status_code}, {response.text}")
-                    break
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
+        self.last_called[guild_id] = time.time()
 
-        self.last_called = time.time()
-
-    def get_last_called(self):
-        if self.last_called:
-            return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.last_called))
-        else:
-            return "API has not been called yet."
-
-    def was_called_within_last_hour(self):
-        if self.last_called:
-            return (time.time() - self.last_called) <= 3600
-        return False
+    def _is_data_stale(self, guild_id):
+        return guild_id not in self.last_called or (self.last_called[guild_id] - time.time() > self._cache_timeout)

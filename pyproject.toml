@@ -11,6 +11,8 @@ discord = "^2.1.0"
 urllib3 = "<2.0"
 quest-py = "0.2.2"
 boto3 = "^1.26.0"
+canvasapi = "^3.3.0"
+
 
 [tool.poetry.dev-dependencies]
 
