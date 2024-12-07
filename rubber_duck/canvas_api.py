@@ -35,7 +35,7 @@ class CanvasApi:
     def __init__(self, config):
         print("Config in CanvasApi:", config)  # Debugging line
         self._courses = {
-            guild_id: _get_course(config['token'], config['url'], course_id)
+            guild_id: self._get_course(config['token'], config['url'], course_id)
             for guild_id, course_id in config['courses'].items()
         }
         self._cache_timeout = config['cache_timeout']
@@ -57,5 +57,5 @@ class CanvasApi:
 
         self.last_called[guild_id] = time.time()
 
-    def _is_data_stale(self, guild_id):
+    def is_data_stale(self, guild_id):
         return guild_id not in self.last_called or (self.last_called[guild_id] - time.time() > self._cache_timeout)

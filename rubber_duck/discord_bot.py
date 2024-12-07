@@ -107,8 +107,8 @@ class MyClient(discord.Client, MessageHandler):
         # registration channel feature
         self._registration_channel_id = config['registration']["registration_channel_id"]
         self._email_confirmation = EmailConfirmation()
-        canvas_config = config['canvas']
-        self._canvas_api = CanvasApi(canvas_config)
+        self._canvas_config = config['canvas']
+        self._canvas_api = CanvasApi(self._canvas_config)
 
         feedback_config = config['feedback']
         quest_config = config['quest']
@@ -172,7 +172,8 @@ class MyClient(discord.Client, MessageHandler):
                         self._assign_user_role,
                         self._canvas_api,
                         self._email_confirmation,
-                        self.get_guild
+                        self.get_guild,
+                        self._canvas_config
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
