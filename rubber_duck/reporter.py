@@ -40,7 +40,7 @@ def feed_fancy_graph(arg_string):
 
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
-    plt.title(f'{specific_str.title()} Valid Feedback Scores Per Week')
+    plt.title(f'{specific_str.title()} Recorded Feedback Scores Per Week')
     plt.xlabel('Week')
     plt.ylabel(f'Valid Scores {specific_str.title()}')
     plt.xticks(rotation=45)

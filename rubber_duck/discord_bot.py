@@ -1,38 +1,19 @@
-import asyncio
-import os
-import re
-from typing import TypedDict
-
-from metrics import MetricsHandler
-from feedback import FeedbackWorkflow
-from reporter import Reporter
-
-def load_env():
-    with open('secrets.env') as file:
-        for line in file:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            key, value = line.split('=')
-            os.environ[key] = value
-
-
-load_env()
-
 import argparse
 import json
 import logging
-
-logging.basicConfig(level=logging.DEBUG)
+import os
 from pathlib import Path
+from typing import TypedDict
 
 import discord
-
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from quest import create_filesystem_manager
-from bot_commands import BotCommands
 
+from bot_commands import BotCommands
+from feedback import FeedbackWorkflow
+from metrics import MetricsHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+
+logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
@@ -114,37 +95,32 @@ class RubberDuckConfig(TypedDict):
 
 
 class MyClient(discord.Client, MessageHandler):
-    def __init__(self, root_save_folder: Path, config):
+    def __init__(self, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self._rubber_duck_config = config['duck_settings']
-        self._ta_channel_config = config['feedback_config']
-        self._bot_config = config['bot_settings']
-        self._command_channels = self._bot_config['command_channels']
-        self._duck_channels = {
-            (cc.get('name') or cc.get('id')): cc
-            for cc in self._bot_config['channels']
-        }
-        self._admin_ids = self._bot_config['admin_ids']
-        self._defaults = self._bot_config['defaults']
+        feedback_config = config['feedback']
+        quest_config = config['quest']
+        metrics_config = config['metrics']
+        self.admin_settings = config['admin_settings']
+        open_ai_retry_protocol = config['open_ai_retry_protocol']
 
-        state_folder = root_save_folder / 'history'
-        metrics_folder = root_save_folder / 'metrics'
+        # Command channel feature
+        self._command_channel = self.admin_settings['admin_channel_id']
+
+        # Rubber duck feature
+        self._duck_config = config['rubber_duck']
+        self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
+
         # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(metrics_folder)
-
-        if self._ta_channel_config is None:
-            # TODO - Exception
-            print("ta_review_channel is not set in the configuration.")
+        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
 
         feedback_workflow = FeedbackWorkflow(
-            self._ta_channel_config,
             self.send_message,
             fetch_message,
             self.metrics_handler.record_feedback
@@ -153,26 +129,35 @@ class MyClient(discord.Client, MessageHandler):
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    reporter = Reporter(self.metrics_handler)
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
-                case 'duck':
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
-                        workflow_id = get_feedback_workflow_id(channel_id)
-                        result = await self._workflow_manager.start_workflow('feedback', workflow_id, guild_id, channel_id, user_id)
-                        if result is None:
-                            print("start_workflow returned None")
+                    return BotCommands(self.send_message)
 
-                    return RubberDuck(self,
-                                      self.metrics_handler,
-                                      self._rubber_duck_config,
-                                      start_feedback_workflow
-                                      )
+                case 'duck':
+
+                    async def start_feedback_workflow(guild_id, channel_id, user_id):
+                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
+                            return
+
+                        workflow_id = get_feedback_workflow_id(channel_id)
+                        self._workflow_manager.start_workflow(
+                            'feedback', workflow_id, guild_id, channel_id, user_id,
+                            server_feedback_config
+                        )
+
+                    return RubberDuck(
+                        self,
+                        self.metrics_handler,
+                        self._duck_config,
+                        open_ai_retry_protocol,
+                        start_feedback_workflow
+                    )
+
                 case 'feedback':
                     return feedback_workflow
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(state_folder, 'rubber-duck', create_workflow)
+        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
+                                                           create_workflow)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -181,16 +166,11 @@ class MyClient(discord.Client, MessageHandler):
         logging.info(self.user.id)
         logging.info('Starting workflow manager')
         self._workflow_manager = await self._workflow_manager.__aenter__()
-        await asyncio.sleep(0.1)
-        logging.info('Workflow manager ready')
 
-        #Create a ta
-
-        for channel_id in self._command_channels:
-            try:
-                await self.send_message(channel_id, 'Duck online')
-            except:
-                logging.exception(f'Unable to message channel {channel_id}')
+        try:
+            await self.send_message(self._command_channel, 'Duck online')
+        except:
+            logging.exception(f'Unable to message channel {self._command_channel}')
 
         logging.info('------')
 
@@ -209,109 +189,48 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Command channel
-        if message.channel.id in self._command_channels:
-            self._workflow_manager.start_workflow(
-                'command', str(message.id), as_message(message))
+        if message.channel.id == self._command_channel:
+            workflow_id = f'command-{message.id}'
+            self._workflow_manager.start_workflow_background(
+                'command', workflow_id, as_message(message))
             return
 
         # Duck channel
+        channel_name = None
         if message.channel.id in self._duck_channels:
-            return await self.start_duck_conversation(
-                self._defaults,
-                self._duck_channels[message.channel.id],
-                as_message(message)
-            )
+            channel_name = message.channel.id
+        elif message.channel.name in self._duck_channels:
+            channel_name = message.channel.name
 
-        if message.channel.name in self._duck_channels:
-            return await self.start_duck_conversation(
-                self._defaults,
-                self._duck_channels[message.channel.name],
-                as_message(message)
+        if channel_name is not None:
+            workflow_id = f'duck-{message.id}'
+            self._workflow_manager.start_workflow_background(
+                'duck', workflow_id, channel_name, as_message(message)
             )
 
         # Belongs to an existing conversation
         str_id = str(message.channel.id)
         if self._workflow_manager.has_workflow(str_id):
             await self._workflow_manager.send_event(
-                str_id, 'messages', str_id, 'put',
+                str_id, 'messages', None, 'put',
                 as_message(message)
             )
 
+        # If it didn't match anything above, we can ignore it.
+
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
+        # Ignore messages from the bot
         if user.id == self.user.id:
             return
 
-        message = reaction.message
+        workflow_alias = str(reaction.message.id)
         emoji = reaction.emoji
-        print('reaction received:', message.channel.id, message.id, emoji)
 
-        # parse channel ID from message text
-        # TODO - use quest workflow alias once implemented
-        m = re.search(r'https://discord.com/channels/(\d+)/(\d+)/(\d+)', message.content)
-        if m is None:
-            return
-
-        channel_id = m.group(2)
-        workflow_id = get_feedback_workflow_id(channel_id)
-
-        if self._workflow_manager.has_workflow(workflow_id):
+        if self._workflow_manager.has_workflow(workflow_alias):
             await self._workflow_manager.send_event(
-                workflow_id, 'feedback', None, 'put',
-                emoji
+                workflow_alias, 'feedback', None, 'put',
+                (emoji, user.id)
             )
-
-    async def start_duck_conversation(self, defaults, config, message: Message):
-
-        prompt = config.get('prompt', None)
-        if prompt is None:
-            prompt_file = config.get('prompt_file', None)
-            if prompt_file is None:
-                prompt = message['content']
-            else:
-                prompt = Path(prompt_file).read_text()
-
-        engine = config.get('engine', defaults['engine'])
-
-        timeout = config.get('timeout', defaults['timeout'])
-
-        thread_id = await self.create_thread(
-            message['channel_id'],
-            message['content'][:20],
-            message['author_id'],
-            message['message_id'],
-        )
-        # await send message
-        msg = await self.get_channel(message['channel_id']).fetch_message(
-            message['message_id']
-        )
-        # Add reaction to original message to indicate to user
-        #  that the message has been processed
-        if "duck" in message['content'].lower():
-            await msg.add_reaction('🦆')
-        else:
-            await msg.add_reaction('✅')
-
-        await self.send_message(message["channel_id"],
-                                f"<@{message['author_id']}> Click here to join the conversation: <#{thread_id}>")
-
-        self._workflow_manager.start_workflow_background(
-            'duck', str(thread_id), thread_id, engine, prompt, message, timeout
-        )
-        await asyncio.sleep(0.1)
-
-    async def create_thread(self, parent_channel_id: int, title: str, author_id: int, message_id: int) -> int:
-        # Create the private thread
-        # Users/roles with "Manage Threads" will be able to see the private threads
-        thread = await self.get_channel(parent_channel_id).create_thread(
-            name=title,
-            auto_archive_duration=60
-        )
-
-        # Grant access to the user
-        await thread._state.http.add_user_to_thread(thread.id, author_id)
-        msg = await self.get_channel(parent_channel_id).fetch_message(message_id)
-
-        return thread.id
 
     #
     # Methods for MessageHandler protocol
@@ -344,44 +263,66 @@ class MyClient(discord.Client, MessageHandler):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            user_ids_to_mention = self._bot_config["admin_ids"]
+            # TODO make this assume one id
+            user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg
-        for channel_id in self._command_channels:
             try:
-                await self.send_message(channel_id, msg)
+                await self.send_message(self._command_channel, msg)
             except:
-                logging.exception(f'Unable to message channel {channel_id}')
+                logging.exception(f'Unable to message channel {self._command_channel}')
 
     def typing(self, channel_id):
         return self.get_channel(channel_id).typing()
 
+    async def create_thread(self, parent_channel_id: int, title: str) -> int:
+        # Create the private thread
+        # Users/roles with "Manage Threads" will be able to see the private threads
+        thread = await self.get_channel(parent_channel_id).create_thread(
+            name=title,
+            auto_archive_duration=60
+        )
+        return thread.id
 
-def main(state_path: Path, config):
-    client = MyClient(state_path, config)
+
+def main(config):
+    client = MyClient(config)
     client.run(os.environ['DISCORD_TOKEN'])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--state', type=Path, default='state')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
     if args.log_console:
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
-
     else:
         logging.basicConfig(
-            level=logging.DEBUG,
-            filename=LOG_FILE,
+            level=logging.INFO,
+            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
 
-    config = json.loads(args.config.read_text())
+    try:
+        if args.config.is_file():
+            config = json.loads(args.config.read_text())
+        else:
+            default_config_path = Path('config.json')
+            if default_config_path.is_file():
+                config = json.loads(default_config_path.read_text())
+            else:
+                raise FileNotFoundError(default_config_path)
 
-    main(args.state, config)
+    except FileNotFoundError as e:
+        print(f"No valid config file found: {e}. Please create a config.json or use the default template.")
+        print(
+            "You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
+        print("For detailed instructions, check the README here: link_to_readme")
+        exit(1)
+
+    main(config)

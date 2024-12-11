@@ -1,11 +1,11 @@
 {
-  "bot_settings": {
-    "command_channels": [
-      1192895746672951340
-    ],
-    "ta_review_channel": [
-      1284224818698260490
-    ],
+  "quest": {
+    "state_path": "state/quest/"
+  },
+  "metrics": {
+    "metrics_path": "state/metrics/"
+  },
+  "rubber_duck": {
     "channels": [
       {
         "name": "duck-pond",
@@ -14,7 +14,7 @@
       {
         "name": "other-pond",
         "prompt_file": "prompts/standard-rubber-duck.txt",
-        "engine": "gpt-3.5-turbo-16k"
+        "engine": "gpt-4o-mini"
       },
       {
         "name": "gpt4",
@@ -30,19 +30,25 @@
         "timeout": 10
       }
     ],
-    "admin_ids": [
-      933123843038535741
-    ],
     "defaults": {
       "engine": "gpt-4o",
       "timeout": 600
     }
   },
-  "duck_settings": {
-    "retry_protocol": {
-      "max_retries": 2,
-      "delay": 2,
-      "backoff": 2
+  "feedback": {
+    "927616651409649675": {
+      "channel_id": 1296158078017736725,
+      "name": "cs110"
     }
+  },
+  "open_ai_retry_protocol": {
+    "max_retries": 2,
+    "delay": 2,
+    "backoff": 2
+  },
+  "admin_settings": {
+    "admin_channel_id": 1192895746672951340,
+    "admin_role_id": 933123843038535741
   }
 }
+
