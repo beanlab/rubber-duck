@@ -1,6 +1,8 @@
 import asyncio
 from typing import TypedDict
 
+import discord
+from quest import queue, step
 from quest import queue, step, alias
 
 
