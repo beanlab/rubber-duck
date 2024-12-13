@@ -8,7 +8,7 @@ from email_confirmation import EmailConfirmation
 
 # load_dotenv()
 # token = os.getenv("CANVAS_TOKEN")
-COURSE_ID = os.getenv("COURSE_ID")
+# COURSE_ID = os.getenv("COURSE_ID")
 # BASE_URL = "https://byu.instructure.com/api/v1"
 
 
@@ -24,6 +24,7 @@ class RegistrationWorkflow:
         self._email_confirmation = email_confirmation
         self._get_guild = get_guild
         self._canvas_config = canvas_config
+        self._guild_id = None
 
     async def __call__(self, user_id, channel_id, guild_id, member_id):
         return await self.start(user_id, channel_id, guild_id,member_id)
@@ -31,6 +32,7 @@ class RegistrationWorkflow:
     async def start(self, user_id, channel_id, guild_id, member_id):
         # Create a thread for the registration process
         guild = self._get_guild(guild_id)
+        self._guild_id = guild_id
         member = await guild.fetch_member(member_id)
         thread_id = await self._create_thread(channel_id, f"Registration for {member.name}")
 
@@ -48,13 +50,14 @@ class RegistrationWorkflow:
             else:
                 break
 
-        name, email, canvas_role= await self._confirmation_check(byu_id_response.content, thread_id)
+        name, email, canvas_role= await self._confirmation_check(byu_id_response.content, thread_id,user_id,channel_id)
 
         await self._confirm_registration_via_email(thread_id, user_id, email)
         await self._assign_user_role(member_id, canvas_role, guild_id,thread_id)
 
     async def _confirm_registration_via_email(self, thread_id, user_id, email):
-        await self._send_message(thread_id, "Check your BYU Email to confirm your registration. Type in your code into the chat to confirm your registration.")
+        await self._send_message(thread_id, "Check your BYU Email to confirm your registration. "
+                                            "Type in your code into the chat to confirm your registration.")
         while True:
             users_token_response = await self._fetch_user_response(user_id, thread_id)
             if self._email_confirmation.confirm_token(email,users_token_response.content):
@@ -67,7 +70,7 @@ class RegistrationWorkflow:
 
     def _collect_canvas_data(self):
         self._canvas_config = []
-        self._canvas_api.get_canvas_users(COURSE_ID)
+        self._canvas_api.get_canvas_users(self._guild_id)
         # if not self._canvas_api.was_called_within_last_hour():
         #     self._canvas_api.connect_canvas_api()
         #     self._canvas_users = self._canvas_api.get_canvas_users()
@@ -89,18 +92,24 @@ class RegistrationWorkflow:
             await self._send_message(channel_id, "You took too long to respond. Please try again later.")
             return None
 
-    async def _confirmation_check(self, byu_id, thread_id):
+    async def _confirmation_check(self, byu_id, thread_id, user_id,channel_id):
         name,email,canvas_role = self._canvas_users[byu_id]
-        await self._send_message(thread_id, f"Is this correct?\n{name}\n{byu_id}\n{email}")
+        await self._send_message(thread_id, f"Is this correct?\n{name}\n{email}")
+        answer = await self._fetch_user_response(user_id, channel_id)
+        if answer == "Yes":
+            await self._send_message(channel_id, "Thank you for confirming.")
+        else:
+            await self._send_message(channel_id, "Thank you for your time, "
+                                                 "please return back to the registration channel.")
+            quit()
 
         return name,email,canvas_role
 
     async def _validate_byu_id(self, byu_id,thread_id):
         if len(self._canvas_users) == 0:
             if self._canvas_users == 0:
-                await self._send_message(thread_id, "Canvas is processing too many requests. Please try again later.")
-
-
+                await self._send_message(thread_id, "Canvas is processing too many requests. "
+                                                    "Please try again later.")
         if byu_id in self._canvas_users:
             return True
         else:

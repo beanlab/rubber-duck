@@ -104,7 +104,7 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        # registration channel feature
+        # Registration channel feature
         self._registration_channel_id = config['registration']["registration_channel_id"]
         self._email_confirmation = EmailConfirmation()
         self._canvas_config = config['canvas']
@@ -223,6 +223,7 @@ class MyClient(discord.Client, MessageHandler):
             workflow_id = f'registration-{message.id}'
             member = message.author
             guild_id = message.guild.id
+            self._canvas_api.first_time(guild_id)
 
             self._workflow_manager.start_workflow_background(
                 'registration',
