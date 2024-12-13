@@ -9,10 +9,10 @@ from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# NOTE: These 2 functions below are outside of the class because they aren't generalized, they are very specific reports per Dr. Bean's request
+# NOTE: These 2 functions below are outside the class because they aren't generalized, they are very specific reports per Dr. Bean's request
 def fancy_preproccesing():
     file_path = "state/metrics/feedback.csv"
-    df = pd.read_csv(file_path, parse_dates = True, date_parser=pd.to_datetime, infer_datetime_format=True)
+    df = pd.read_csv(file_path, parse_dates = True, date_parser=pd.to_datetime, infer_datetime_format=True) # Not sure how many of the arguements/2 following lines of code are necessary
     df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
     df = df.set_index(pd.DatetimeIndex(df['timestamp']))
 
@@ -266,6 +266,7 @@ class Reporter:
         if args.log:
             components.append("log_scale")
         return "-".join(components)
+
 
     def help_menu(self):
         lines = ["Type '!report', followed by any of the following commands to see the metrics for it:"]
