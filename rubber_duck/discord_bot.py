@@ -242,7 +242,7 @@ class MyClient(discord.Client, MessageHandler):
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
         curr_message = None
-        if file is not None:
+        if file is not None and not isinstance(file, discord.File):
             file = discord.File(file)
 
         for block in parse_blocks(message):

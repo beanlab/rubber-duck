@@ -4,8 +4,8 @@ import re
 import subprocess
 import traceback
 from pathlib import Path
-from discord import File
 
+import discord
 from quest import step
 
 from rubber_duck import Message
@@ -113,15 +113,11 @@ class BotCommands:
 
     @step
     async def _send_report(self, channel_id, arg_string):
-        report_string, img = self._reporter.get_report(arg_string)
-        await self._send_message(channel_id, f'{report_string}', file=img)
-
-        # report_string, io_img = self._reporter.get_report(arg_string)
-        # img = File(io_img, filename=report_string)
-        # await self._send_message(channel_id, f'Graph: {report_string}', file=img)
+        img_name, img = self._reporter.get_report(arg_string)
+        await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
 
     @step
-    #TODO - we want eventually the reporter to zip this up
+    # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
         await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
         await self._send_message(channel_id, 'messages zip', file='messages.zip')

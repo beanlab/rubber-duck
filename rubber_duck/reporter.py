@@ -1,33 +1,34 @@
+import io
 import sys
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from matplotlib.ticker import PercentFormatter
-
-from metrics import MetricsHandler
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-# NOTE: These 2 functions below are outside of the class because they aren't generalized, they are very specific reports per Dr. Bean's request
-def fancy_preproccesing():
-    file_path = "state/metrics/feedback.csv"
-    df = pd.read_csv(file_path, parse_dates = True, date_parser=pd.to_datetime, infer_datetime_format=True)
-    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-    df = df.set_index(pd.DatetimeIndex(df['timestamp']))
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from matplotlib.ticker import PercentFormatter
 
+from metrics import MetricsHandler
+
+
+def fancy_preproccesing(df):
     # Resample to weekly frequency
-    weekly_data = df.resample('W').agg(
-        avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
-        valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
-    ).reset_index()
+    return (
+        df
+        .set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
+        .resample('W')
+        .agg(
+            avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
+            valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
+        )
+        .reset_index()
+    )
 
-    return weekly_data
 
-
-def feed_fancy_graph(arg_string, show_fig):
+def feed_fancy_graph(df_feedback, arg_string, show_fig):
     specific_str = arg_string.split()[2]
-    df = fancy_preproccesing()
+    df = fancy_preproccesing(df_feedback)
 
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
@@ -46,16 +47,16 @@ def feed_fancy_graph(arg_string, show_fig):
     plt.grid(visible=True, linestyle='--', alpha=0.5)
     plt.tight_layout()
 
-    path = f"./state/graphs/{main_string}.png"
-    plt.savefig(path)
+    img_name = f"{main_string}.png"
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
     if show_fig:
         plt.show()
-    return main_string, path
+    return img_name, buffer
 
 
 class Reporter:
-    image_cache = {}
-
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
     trend_period = {1: "W", 7: "M", 30: "Y"}
 
@@ -86,21 +87,27 @@ class Reporter:
     pre_baked = {
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
-        'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per', "What percent of threads are scored by class over the past year?"),
-        'f2': ('!report -df feedback -iv feedback_score -p year -ev guild_id -avg', "What is the average feedback score by class over the past year?"),
-        'u1': ('!report -df usage -iv thread_id -ev hour_of_day -p year -c', "What time are threads being opened over the past year?"),
-        'u2': ('!report -df usage -iv cost -ev hour_of_day -p year -avg', "How expensive is the average thread based on the time of day over the past year?"),
-        'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg', "What does the distribution of thread cost look like over the past year?"),
-        'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg', "How expensive is the average thread based on the class over the past year?"),
-        'u5': ('!report -df usage -iv cost -p year -ev guild_id -c', "What is the total cost of the duck based on the class over the past year"),
-        'u6': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c', "How many threads being opened per class during what time over the past year?")
+        'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
+               "What percent of threads are scored by class over the past year?"),
+        'f2': ('!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
+               "What is the average feedback score by class over the past year?"),
+        'u1': ('!report -df usage -iv thread_id -ev hour_of_day -p year -c',
+               "What time are threads being opened over the past year?"),
+        'u2': ('!report -df usage -iv cost -ev hour_of_day -p year -avg',
+               "How expensive is the average thread based on the time of day over the past year?"),
+        'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg',
+               "What does the distribution of thread cost look like over the past year?"),
+        'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg',
+               "How expensive is the average thread based on the class over the past year?"),
+        'u5': ('!report -df usage -iv cost -p year -ev guild_id -c',
+               "What is the total cost of the duck based on the class over the past year"),
+        'u6': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
+               "How many threads being opened per class during what time over the past year?")
     }
-
 
     def __init__(self, metricsHandler, show_fig=False):
         self.metricsHandler = metricsHandler
         self.show_fig = show_fig
-
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
@@ -113,11 +120,9 @@ class Reporter:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
         return data
 
-
     def compute_cost(self, row):
-        ip, op = self.pricing.get(row.get('engine', 'gpt-4'), (0,0))
+        ip, op = self.pricing.get(row.get('engine', 'gpt-4'), (0, 0))
         return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
-
 
     def preprocessing(self, df, args):
         if 'timestamp' in df.columns:
@@ -146,7 +151,6 @@ class Reporter:
         # df = df.dropna(subset=[args.ind_var])
         return df
 
-
     def catch_known_issues(self, df, args):
         if args.ind_var not in df.columns:
             raise ArgumentError(None, f"Invalid independent variable: {args.ind_var}")
@@ -156,7 +160,6 @@ class Reporter:
 
         if args.period and args.period not in self.time_periods:
             raise ArgumentError(None, f"Invalid time period: {args.period}")
-
 
     def prepare_df(self, df, args):
         df = self.preprocessing(df, args)
@@ -170,7 +173,8 @@ class Reporter:
                 elif args.count:
                     df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].nunique().reset_index()
                 elif args.percent:
-                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
+                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].apply(
+                        lambda x: x.notna().mean() * 100).reset_index()
                 else:
                     df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].sum().reset_index()
             else:
@@ -184,7 +188,8 @@ class Reporter:
                 elif args.count:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].nunique().reset_index()
                 elif args.percent:
-                    df_grouped = df.groupby(args.exp_var)[args.ind_var].apply(lambda x: x.notna().mean() * 100).reset_index()
+                    df_grouped = df.groupby(args.exp_var)[args.ind_var].apply(
+                        lambda x: x.notna().mean() * 100).reset_index()
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             except ValueError as e:
@@ -194,47 +199,49 @@ class Reporter:
 
         return df_grouped
 
-
-    def prettify_graph(self, df, args, title):
+    def prettify_graph(self, df, args):
         if args.log:
             plt.yscale('log')
 
         if args.percent:
             plt.gca().yaxis.set_major_formatter(PercentFormatter())
 
-        #Final df edits
+        # Final df edits
         x_axis = args.exp_var if args.exp_var else 'index'
         df[x_axis] = df[x_axis].astype(str)
         if args.exp_var != 'timestamp' and args.exp_var != 'hour_of_day':
             df.sort_values(args.ind_var, ascending=True, inplace=True)
 
-        #Plotting
+        # Plotting
         if args.exp_var_2:
             sns.barplot(data=df, x=x_axis, y=args.ind_var, hue=args.exp_var_2)
         else:
             sns.barplot(data=df, x=x_axis, y=args.ind_var, color='b')
 
-        #Labeling
-        title = (f"Average " if args.average else "") + (f"Number of " if args.count else "") + (f"Percent of " if args.percent else "") + f"{args.ind_var} by {x_axis}" + (f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
+        # Labeling
+        title = (f"Average " if args.average else "") + (f"Number of " if args.count else "") + (
+            f"Percent of " if args.percent else "") + f"{args.ind_var} by {x_axis}" + (
+                    f" over the past {args.period}" if args.period else "") + (f" (log scale)" if args.log else "")
         plt.title(title)
         plt.xlabel(x_axis)
         plt.ylabel(args.ind_var)
         plt.tight_layout()
 
-
-    def make_graph(self, df, args, title):
+    def make_graph(self, df, args):
         if len(df) == 0:
             raise Exception("The dataframe is empty")
 
-        self.prettify_graph(df, args, title)
+        self.prettify_graph(df, args)
 
         if self.show_fig:
             plt.show()
 
-        path = f"./state/graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
-        plt.savefig(path)
-        return path
+        graph_name = f"{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)
 
+        return graph_name, buffer
 
     def parse_args(self, arg_string):
         """Parse command-line arguments using argparse."""
@@ -255,7 +262,6 @@ class Reporter:
         parser.add_argument("-per", "--percent", action="store_true", help="Percent, not sums, the ind_var")
         return parser.parse_args()
 
-
     def arg_to_string(self, args):
         components = [args.dataframe, args.ind_var]
         if args.percent:
@@ -272,25 +278,22 @@ class Reporter:
         lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
         return "\n\n".join(lines)
 
-
     def get_report(self, arg_string):
         if arg_string == '!report help' or arg_string == '!report h':
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(arg_string, self.show_fig)
-        
+            return feed_fancy_graph(self.metricsHandler.get_feedback(), arg_string, self.show_fig)
+
         args = self.parse_args(arg_string)
 
         df = self.select_dataframe(args.dataframe)
 
         df_limited = self.prepare_df(df, args)
 
-        graph_string = self.arg_to_string(args)
+        graph_name, graph = self.make_graph(df_limited, args)
 
-        graph = self.make_graph(df_limited, args, graph_string)
-
-        return graph_string, graph
+        return graph_name, graph
 
 
 if __name__ == '__main__':
@@ -301,12 +304,7 @@ if __name__ == '__main__':
 
     for key in reporter.pre_baked:
         sys_string = '!report ' + key
-
-        if sys_string not in reporter.image_cache:
-            arg_string, image_path = reporter.get_report(sys_string)
-            reporter.image_cache[sys_string] = image_path
-        else:
-            image_path = reporter.image_cache[sys_string]
+        img_name, image = reporter.get_report(sys_string)
 
     # # Doing only one graph (for debugging mostly)
     # sys_string = 'feedback average'
