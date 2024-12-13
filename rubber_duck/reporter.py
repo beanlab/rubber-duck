@@ -2,7 +2,6 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import io
 from matplotlib.ticker import PercentFormatter
 
 from metrics import MetricsHandler
@@ -10,15 +9,11 @@ from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+# NOTE: These 2 functions below are outside of the class because they aren't generalized, they are very specific reports per Dr. Bean's request
 def fancy_preproccesing():
     file_path = "state/metrics/feedback.csv"
     df = pd.read_csv(file_path, parse_dates = True, date_parser=pd.to_datetime, infer_datetime_format=True)
-
-    # df = pd.read_csv(file_path)
-    # # Convert the timestamp to datetime
     df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-    #
-    # # Set the timestamp as the index (useful for resampling)
     df = df.set_index(pd.DatetimeIndex(df['timestamp']))
 
     # Resample to weekly frequency
@@ -42,6 +37,7 @@ def feed_fancy_graph(arg_string):
 
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
+
     main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week"
     plt.title(main_string + ".png")
     plt.xlabel('Week')
@@ -229,15 +225,9 @@ class Reporter:
         if self.show_fig:
             plt.show()
 
-        # Use the below instead of the buffer if needed
         path = f"./state/graphs/{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
         plt.savefig(path)
         return path
-
-        # buffer = io.BytesIO()
-        # plt.savefig(buffer, format='png') #Save the file to a io.BytesIO object instead of a path
-        # buffer.seek(0)
-        # return buffer
 
 
     def parse_args(self, arg_string):
@@ -303,7 +293,8 @@ if __name__ == '__main__':
             reporter.image_cache[sys_string] = image_path
         else:
             image_path = reporter.image_cache[sys_string]
-    #
+
+    # # Doing only one graph (for debugging mostly)
     # sys_string = 'feedback average'
     #
     # if sys_string not in reporter.image_cache:
