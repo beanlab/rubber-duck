@@ -11,13 +11,14 @@ from zoneinfo import ZoneInfo
 
 def fancy_preproccesing():
     file_path = "state/metrics/feedback.csv"
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path, parse_dates = True, date_parser=pd.to_datetime, infer_datetime_format=True)
 
-    # Convert the timestamp to datetime
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-
-    # Set the timestamp as the index (useful for resampling)
-    df.set_index('timestamp', inplace=True)
+    # df = pd.read_csv(file_path)
+    # # Convert the timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    #
+    # # Set the timestamp as the index (useful for resampling)
+    df = df.set_index(pd.DatetimeIndex(df['timestamp']))
 
     # Resample to weekly frequency
     weekly_data = df.resample('W').agg(
@@ -40,13 +41,18 @@ def feed_fancy_graph(arg_string):
 
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
-    plt.title(f'{specific_str.title()} Recorded Feedback Scores Per Week')
+    main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week.png"
+    plt.title(main_string)
     plt.xlabel('Week')
     plt.ylabel(f'Valid Scores {specific_str.title()}')
     plt.xticks(rotation=45)
     plt.grid(visible=True, linestyle='--', alpha=0.5)
     plt.tight_layout()
     plt.show()
+
+    path = f"./state/graphs/{main_string}"
+    plt.savefig(path)
+    return main_string, path
 
 
 class Reporter:
@@ -268,7 +274,7 @@ class Reporter:
 
     def get_report(self, arg_string):
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return arg_string, feed_fancy_graph(arg_string)
+            return feed_fancy_graph(arg_string)
         
         args = self.parse_args(arg_string)
 

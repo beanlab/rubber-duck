@@ -121,6 +121,7 @@ class BotCommands:
         # await self._send_message(channel_id, f'Graph: {report_string}', file=img)
 
     @step
+    #TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
         await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
         await self._send_message(channel_id, 'messages zip', file='messages.zip')

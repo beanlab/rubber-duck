@@ -19,7 +19,7 @@ class FeedbackWorkflow:
                  ):
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
-        self._record_feedback = step(record_feedback)
+        self._record_feedback = record_feedback
 
         self._reactions = {
             '1️⃣': 1,

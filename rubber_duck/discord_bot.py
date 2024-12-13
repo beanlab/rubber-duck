@@ -12,6 +12,7 @@ from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from reporter import Reporter
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -126,10 +127,12 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
+        reporter = Reporter(self.metrics_handler)
+
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message)
+                    return BotCommands(self.send_message, self.metrics_handler, reporter)
 
                 case 'duck':
 
