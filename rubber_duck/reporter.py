@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import io
 from matplotlib.ticker import PercentFormatter
 
 from metrics import MetricsHandler
@@ -41,16 +42,15 @@ def feed_fancy_graph(arg_string):
 
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
-    main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week.png"
-    plt.title(main_string)
+    main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week"
+    plt.title(main_string + ".png")
     plt.xlabel('Week')
     plt.ylabel(f'Valid Scores {specific_str.title()}')
     plt.xticks(rotation=45)
     plt.grid(visible=True, linestyle='--', alpha=0.5)
     plt.tight_layout()
-    plt.show()
 
-    path = f"./state/graphs/{main_string}"
+    path = f"./state/graphs/{main_string}.png"
     plt.savefig(path)
     return main_string, path
 
@@ -103,11 +103,11 @@ class Reporter:
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
-            data = metricsHandler.get_feedback()
+            data = self.metricsHandler.get_feedback()
         elif desired_df == 'usage':
-            data = metricsHandler.get_usage()
+            data = self.metricsHandler.get_usage()
         elif desired_df == 'messages':
-            data = metricsHandler.get_message()
+            data = self.metricsHandler.get_message()
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
         return data
