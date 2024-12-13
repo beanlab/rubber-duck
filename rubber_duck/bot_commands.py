@@ -5,14 +5,17 @@ import subprocess
 import traceback
 from pathlib import Path
 
+import discord
 from quest import step
 
 from rubber_duck import Message
 
 
 class BotCommands:
-    def __init__(self, send_message):
+    def __init__(self, send_message, metrics_handler, reporter):
         self._send_message = step(send_message)
+        self._metrics_handler = metrics_handler
+        self._reporter = reporter
 
     async def __call__(self, message: Message):
         return await self.handle_command(message)
@@ -45,13 +48,16 @@ class BotCommands:
                 await self._log(channel_id)
 
             elif content.startswith('!metrics'):
-                await self._report_metrics(channel_id)
+                await self._zip_metrics(channel_id)
 
             elif content.startswith('!status'):
                 await self._send_message(channel_id, 'I am alive. 🦆')
 
             elif content.startswith('!help'):
                 await self._display_help(channel_id)
+
+            elif content.startswith('!report'):
+                await self._send_report(channel_id, content)
 
             elif content.startswith('!state'):
                 await self._state(channel_id)
@@ -106,12 +112,21 @@ class BotCommands:
         await self._send_message(channel_id, 'log zip', file='log.zip')
 
     @step
-    async def _report_metrics(self, channel_id):
+    async def _send_report(self, channel_id, arg_string):
+        img_name, img = self._reporter.get_report(arg_string)
+        await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
+
+    @step
+    # TODO - we want eventually the reporter to zip this up
+    async def _zip_metrics(self, channel_id):
         await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
         await self._send_message(channel_id, 'messages zip', file='messages.zip')
 
         await self._execute_command(channel_id, f'zip -q -r usage.zip {self._metrics_handler._usage_file}')
         await self._send_message(channel_id, 'usage zip', file='usage.zip')
+
+        # await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._metrics_handler._feedback_file}')
+        # await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
 
     @step
     async def _restart(self, channel_id, clean=False):

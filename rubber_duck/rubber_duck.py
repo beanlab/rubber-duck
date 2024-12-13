@@ -122,7 +122,10 @@ class RubberDuck:
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
         self._default_config = duck_config['defaults']
         self._retry_config = retry_config
-        self._metrics_handler = wrap_steps(metrics_handler)
+        self._metrics_handler = metrics_handler
+        # self._metrics_handler.record_message = step(self._metrics_handler.record_message)
+        # self._metrics_handler.record_feedback = step(self._metrics_handler.record_feedback)
+        # self._metrics_handler.record_usage = step(self._metrics_handler.record_usage)
         self._error_message_id = None
 
         self.start_feedback_workflow = step(start_feedback_workflow)
