@@ -25,7 +25,7 @@ def fancy_preproccesing():
     return weekly_data
 
 
-def feed_fancy_graph(arg_string):
+def feed_fancy_graph(arg_string, show_fig):
     specific_str = arg_string.split()[2]
     df = fancy_preproccesing()
 
@@ -48,6 +48,8 @@ def feed_fancy_graph(arg_string):
 
     path = f"./state/graphs/{main_string}.png"
     plt.savefig(path)
+    if show_fig:
+        plt.show()
     return main_string, path
 
 
@@ -78,6 +80,9 @@ class Reporter:
         'gpt-3.5-turbo': [0.001, 0.003]
     }
 
+    # key: what to type after '!report' to display the graph
+    # tuple[0]: string required to run the code
+    # tuple[1]: description of the graph
     pre_baked = {
         'ftrend percent': None,
         'ftrend average': None,
@@ -115,8 +120,9 @@ class Reporter:
 
 
     def preprocessing(self, df, args):
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
         if args.period:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
             now = datetime.now(ZoneInfo('US/Mountain'))
             if args.ind_var == 'timestamp':
                 cutoff = self.trend_period[self.time_periods[args.period]]
@@ -127,7 +133,7 @@ class Reporter:
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
-            df["hour_of_day"] = df.timestamp.dt.hour % 24
+            df["hour_of_day"] = df['timestamp'].dt.hour % 24
 
         if args.exp_var == 'guild_id' or args.exp_var_2:
             df['guild_name'] = df['guild_id'].map(self.guilds)
@@ -261,10 +267,17 @@ class Reporter:
             components.append("log_scale")
         return "-".join(components)
 
+    def help_menu(self):
+        help_string = f"Type '!report', followed by any of the following commands to see the metrics for it:"
+        return "Unfinished"
+
 
     def get_report(self, arg_string):
+        if arg_string == '!report help':
+            return self.help_menu(), None
+
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(arg_string)
+            return feed_fancy_graph(arg_string, self.show_fig)
         
         args = self.parse_args(arg_string)
 
