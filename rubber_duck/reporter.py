@@ -84,16 +84,16 @@ class Reporter:
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
-        'ftrend percent': None,
-        'ftrend average': None,
-        'f1': '!report -df feedback -iv feedback_score -p year -ev guild_id -per',
-        'f2': '!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
-        'u1': '!report -df usage -iv thread_id -ev hour_of_day -p year -c',
-        'u2': '!report -df usage -iv cost -ev hour_of_day -p year -avg',
-        'u3': '!report -df usage -iv cost -p year -ev thread_id -avg',
-        'u4': '!report -df usage -iv cost -p year -ev guild_id -avg',
-        'u5': '!report -df usage -iv cost -p year -ev guild_id -c',
-        'u6': '!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c'
+        'ftrend percent': (None, "What percent of threads are scored over time?"),
+        'ftrend average': (None, "How has the feedback score changed over time?"),
+        'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per', "What percent of threads are scored by class over the past year?"),
+        'f2': ('!report -df feedback -iv feedback_score -p year -ev guild_id -avg', "What is the average feedback score by class over the past year?"),
+        'u1': ('!report -df usage -iv thread_id -ev hour_of_day -p year -c', "What time are threads being opened over the past year?"),
+        'u2': ('!report -df usage -iv cost -ev hour_of_day -p year -avg', "How expensive is the average thread based on the time of day over the past year?"),
+        'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg', "What does the distribution of thread cost look like over the past year?"),
+        'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg', "How expensive is the average thread based on the class over the past year?"),
+        'u5': ('!report -df usage -iv cost -p year -ev guild_id -c', "What is the total cost of the duck based on the class over the past year"),
+        'u6': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c', "How many threads being opened per class during what time over the past year?")
     }
 
 
@@ -240,7 +240,7 @@ class Reporter:
         """Parse command-line arguments using argparse."""
         args = arg_string.split()
         if args[1] in self.pre_baked:
-            args = self.pre_baked[args[1]].split()
+            args = self.pre_baked[args[1]][0].split()
         sys.argv = args
 
         parser = ArgumentParser(description="Visualize data from selected metrics.")
@@ -268,12 +268,13 @@ class Reporter:
         return "-".join(components)
 
     def help_menu(self):
-        help_string = f"Type '!report', followed by any of the following commands to see the metrics for it:"
-        return "Unfinished"
+        lines = ["Type '!report', followed by any of the following commands to see the metrics for it:"]
+        lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
+        return "\n\n".join(lines)
 
 
     def get_report(self, arg_string):
-        if arg_string == '!report help':
+        if arg_string == '!report help' or arg_string == '!report h':
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':

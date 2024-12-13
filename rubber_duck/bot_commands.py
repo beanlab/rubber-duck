@@ -114,7 +114,7 @@ class BotCommands:
     @step
     async def _send_report(self, channel_id, arg_string):
         report_string, img = self._reporter.get_report(arg_string)
-        await self._send_message(channel_id, f'Graph: {report_string}', file=img)
+        await self._send_message(channel_id, f'{report_string}', file=img)
 
         # report_string, io_img = self._reporter.get_report(arg_string)
         # img = File(io_img, filename=report_string)
