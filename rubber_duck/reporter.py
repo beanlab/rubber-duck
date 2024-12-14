@@ -99,9 +99,7 @@ class Reporter:
                "What does the distribution of thread cost look like over the past year?"),
         'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg',
                "How expensive is the average thread based on the class over the past year?"),
-        'u5': ('!report -df usage -iv cost -p year -ev guild_id -c',
-               "What is the total cost of the duck based on the class over the past year"),
-        'u6': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
+        'u5': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
                "How many threads being opened per class during what time over the past year?")
     }
 
