@@ -7,7 +7,6 @@ from pathlib import Path
 
 import discord
 from quest import step
-
 from rubber_duck import Message
 
 

@@ -26,7 +26,6 @@ class MetricsHandler:
                 ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens',
                           'output_tokens']) + '\n')
 
-        # Added feedback metrics file
         self._feedback_file = metrics_folder / 'feedback.csv'
         if not self._feedback_file.exists():
             self._feedback_file.write_text(

@@ -13,11 +13,11 @@ from metrics import MetricsHandler
 
 
 def fancy_preproccesing(df):
-    # Resample to weekly frequency
+
     return (
         df
         .set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
-        .resample('W')
+        .resample('W') # Resample to weekly frequency
         .agg(
             avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
             valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
