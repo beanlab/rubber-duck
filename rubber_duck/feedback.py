@@ -64,7 +64,7 @@ class FeedbackWorkflow:
 
             except asyncio.TimeoutError:
                 await feedback_message.add_reaction('❌')
-                feedback_score = 'na'
+                feedback_score = 'None'
 
             # Record score
             await self._record_feedback(guild_id, thread_id, user_id, feedback_score)

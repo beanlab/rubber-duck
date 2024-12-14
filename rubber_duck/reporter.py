@@ -136,7 +136,7 @@ class Reporter:
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
-            df["hour_of_day"] = df['timestamp'].dt.hour % 24
+            df["hour_of_day"] = (df['timestamp'].dt.hour - 7 )% 24
 
         if args.exp_var == 'guild_id' or args.exp_var_2:
             df['guild_name'] = df['guild_id'].map(self.guilds)
@@ -300,15 +300,11 @@ if __name__ == '__main__':
     metricsHandler = MetricsHandler(Path('./state/metrics'))
     reporter = Reporter(metricsHandler, True)
 
+    # Doing all the graphs
     for key in reporter.pre_baked:
         sys_string = '!report ' + key
         img_name, image = reporter.get_report(sys_string)
 
     # # Doing only one graph (for debugging mostly)
-    # sys_string = 'feedback average'
-    #
-    # if sys_string not in reporter.image_cache:
-    #     arg_string, image_path = reporter.get_report(sys_string)
-    #     reporter.image_cache[sys_string] = image_path
-    # else:
-    #     image_path = reporter.image_cache[sys_string]
+    # sys_string = '!report f1'
+    # arg_string, image_path = reporter.get_report(sys_string)
