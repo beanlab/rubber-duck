@@ -55,7 +55,7 @@ class FeedbackWorkflow:
                 await feedback_message.add_reaction(reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
             try:
-                feedback_emoji, user_id = await asyncio.wait_for(
+                feedback_emoji, reviewer_id = await asyncio.wait_for(
                     feedback_queue.get(),
                     timeout=60 * 60 * 24 * 7  # TODO - make this timeout configurable
                 )
@@ -64,9 +64,11 @@ class FeedbackWorkflow:
 
             except asyncio.TimeoutError:
                 await feedback_message.add_reaction('❌')
-                feedback_score = 'None'
+                feedback_score = 'nan'
+                reviewer_id = 'nan'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, feedback_score, user_id)
+
+            await self._record_feedback(guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done
