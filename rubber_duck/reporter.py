@@ -100,7 +100,7 @@ class Reporter:
     def __init__(self, metricsHandler, report_config, show_fig=False):
         self.metricsHandler = metricsHandler
         self.show_fig = show_fig
-        self._guilds = report_config
+        self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
