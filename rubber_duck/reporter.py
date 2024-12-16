@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
@@ -11,33 +12,24 @@ from matplotlib.ticker import PercentFormatter
 
 from metrics import MetricsHandler
 
-GUILDS = {
-        1058490579799003187: 'BeanLab',
-        927616651409649675: 'CS 110',
-        1008806488384483338: 'CS 111',
-        747510855536738336: 'CS 235',
-        748656649287368704: 'CS 260',
-        1128355484039123065: 'CS 312',
-    }
 
-
-def fancy_preproccesing(df):
-    df['guild_name'] = df['guild_id'].map(GUILDS)
+def fancy_preproccesing(df, guilds):
+    df['guild_name'] = df['guild_id'].map(guilds)
     df = df.drop(columns=['guild_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
             .groupby('guild_name')
             .resample('W')
             .agg(
-              avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
-              valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
-            )
+        avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
+        valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
+    )
             .reset_index()
             )
 
 
-def feed_fancy_graph(df_feedback, arg_string, show_fig):
+def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
     specific_str = arg_string.split()[2]
-    df = fancy_preproccesing(df_feedback)
+    df = fancy_preproccesing(df_feedback, guilds)
 
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
@@ -69,8 +61,6 @@ def feed_fancy_graph(df_feedback, arg_string, show_fig):
 class Reporter:
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
     trend_period = {1: "W", 7: "M", 30: "Y"}
-
-    guilds = GUILDS
 
     pricing = {
         'gpt-4': [0.03, 0.06],
@@ -107,9 +97,10 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, metricsHandler, show_fig=False):
+    def __init__(self, metricsHandler, report_config, show_fig=False):
         self.metricsHandler = metricsHandler
         self.show_fig = show_fig
+        self._guilds = report_config
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
@@ -129,7 +120,8 @@ class Reporter:
     def preprocessing(self, df, args):
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-            df["hour_of_day"] = (df['timestamp'].dt.hour - 7) % 24 # TODO: adjust both the timestamp and hour_of_day by the right time
+            df["hour_of_day"] = (df[
+                                     'timestamp'].dt.hour - 7) % 24  # TODO: adjust both the timestamp and hour_of_day by the right time
 
         if args.period:
             now = datetime.now(ZoneInfo('US/Mountain'))
@@ -144,7 +136,7 @@ class Reporter:
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
         if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            df['guild_name'] = df['guild_id'].map(self.guilds)
+            df['guild_name'] = df['guild_id'].map(self._guilds)
             df = df.drop(columns=['guild_id'])
             if args.exp_var == 'guild_id':
                 args.exp_var = 'guild_name'
@@ -230,9 +222,6 @@ class Reporter:
         plt.tight_layout()
 
     def make_graph(self, df, args):
-        if len(df) == 0:
-            raise Exception("The dataframe is empty")
-
         self.prettify_graph(df, args)
 
         if self.show_fig:
@@ -280,12 +269,11 @@ class Reporter:
         lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
         return "\n\n".join(lines)
 
-
     def get_all_prebaked(self):
         imgs = []
         titles = []
         for key in self.pre_baked:
-            if len(imgs) == 10: # Discord's limit of number of images you can send at once
+            if len(imgs) == 10:  # Discord's limit of number of images you can send at once
                 break
             if key != 'all':
                 sys_string = '!report ' + key
@@ -294,7 +282,6 @@ class Reporter:
                 titles.append(title)
         return imgs, titles
 
-
     def get_report(self, arg_string):
         # if arg_string == '!report all': #TODO: get working
         #     return self.get_all_prebaked()
@@ -302,13 +289,15 @@ class Reporter:
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self.metricsHandler.get_feedback(), arg_string, self.show_fig)
+            return feed_fancy_graph(self._guilds, self.metricsHandler.get_feedback(), arg_string, self.show_fig)
 
         args = self.parse_args(arg_string)
 
         df = self.select_dataframe(args.dataframe)
 
         df_limited = self.prepare_df(df, args)
+        if len(df_limited) == 0:
+            return "No data available for this plot.", None
 
         graph_name, graph = self.make_graph(df_limited, args)
 
@@ -318,7 +307,9 @@ class Reporter:
 if __name__ == '__main__':
     from pathlib import Path
 
-    metricsHandler = MetricsHandler(Path('./state/metrics'))
-    reporter = Reporter(metricsHandler, True)
+    this_file = Path(__file__)
+    config = json.loads((this_file.parent.parent / 'config.json').read_text())
+    metricsHandler = MetricsHandler(this_file.parent.parent / 'state' / 'metrics')
+    reporter = Reporter(metricsHandler, config['reporting'], show_fig=True)
 
     reporter.get_report('!report f1')

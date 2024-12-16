@@ -7,6 +7,7 @@ from pathlib import Path
 
 import discord
 from quest import step
+
 from rubber_duck import Message
 
 
@@ -115,9 +116,11 @@ class BotCommands:
         img_name, img = self._reporter.get_report(arg_string)
         if img is None:
             await self._send_message(channel_id, img_name)
+
         elif isinstance(img, list):
             imgs = [discord.File(fp=image, filename=image_name) for image, image_name in zip(img, img_name)]
-            await self._send_message(channel_id, img_name, file=imgs)
+            await self._send_message(channel_id, img_name, files=imgs)
+
         else:
             await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
 

@@ -127,7 +127,7 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
-        reporter = Reporter(self.metrics_handler)
+        reporter = Reporter(self.metrics_handler, config['reporting'])
 
         def create_workflow(wtype: str):
             match wtype:
