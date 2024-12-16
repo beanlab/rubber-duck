@@ -88,7 +88,7 @@ class Reporter:
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
-        'all': (None, 'All of the following charts.'),
+        # 'all': (None, 'All of the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
@@ -296,8 +296,8 @@ class Reporter:
 
 
     def get_report(self, arg_string):
-        if arg_string == '!report all':
-            return self.get_all_prebaked()
+        # if arg_string == '!report all': #TODO: get working
+        #     return self.get_all_prebaked()
         if arg_string == '!report help' or arg_string == '!report h':
             return self.help_menu(), None
 
