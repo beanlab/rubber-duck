@@ -67,6 +67,6 @@ class FeedbackWorkflow:
                 feedback_score = 'None'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
+            await self._record_feedback(guild_id, thread_id, feedback_score, user_id)
 
             # Done

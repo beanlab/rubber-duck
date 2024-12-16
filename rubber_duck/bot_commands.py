@@ -113,7 +113,13 @@ class BotCommands:
     @step
     async def _send_report(self, channel_id, arg_string):
         img_name, img = self._reporter.get_report(arg_string)
-        await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
+        if img is None:
+            await self._send_message(channel_id, img_name)
+        elif isinstance(img, list):
+            imgs = [discord.File(fp=image, filename=image_name) for image, image_name in zip(img, img_name)]
+            await self._send_message(channel_id, img_name, file=imgs)
+        else:
+            await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
 
     @step
     # TODO - we want eventually the reporter to zip this up
@@ -124,8 +130,8 @@ class BotCommands:
         await self._execute_command(channel_id, f'zip -q -r usage.zip {self._metrics_handler._usage_file}')
         await self._send_message(channel_id, 'usage zip', file='usage.zip')
 
-        # await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._metrics_handler._feedback_file}')
-        # await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
+        await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._metrics_handler._feedback_file}')
+        await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
 
     @step
     async def _restart(self, channel_id, clean=False):

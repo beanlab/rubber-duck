@@ -11,19 +11,28 @@ from matplotlib.ticker import PercentFormatter
 
 from metrics import MetricsHandler
 
+GUILDS = {
+        1058490579799003187: 'BeanLab',
+        927616651409649675: 'CS 110',
+        1008806488384483338: 'CS 111',
+        747510855536738336: 'CS 235',
+        748656649287368704: 'CS 260',
+        1128355484039123065: 'CS 312',
+    }
+
 
 def fancy_preproccesing(df):
-
-    return (
-        df
-        .set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
-        .resample('W') # Resample to weekly frequency
-        .agg(
-            avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
-            valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
-        )
-        .reset_index()
-    )
+    df['guild_name'] = df['guild_id'].map(GUILDS)
+    df = df.drop(columns=['guild_id'])
+    return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
+            .groupby('guild_name')
+            .resample('W')
+            .agg(
+              avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
+              valid_scores_pct=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').notna().mean() * 100)
+            )
+            .reset_index()
+            )
 
 
 def feed_fancy_graph(df_feedback, arg_string, show_fig):
@@ -33,7 +42,7 @@ def feed_fancy_graph(df_feedback, arg_string, show_fig):
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
     if specific_str == 'percent':
-        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange')
+        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='guild_name')
         plt.gca().yaxis.set_major_formatter(PercentFormatter())
 
     else:
@@ -53,6 +62,7 @@ def feed_fancy_graph(df_feedback, arg_string, show_fig):
     buffer.seek(0)
     if show_fig:
         plt.show()
+    plt.close()
     return img_name, buffer
 
 
@@ -60,14 +70,7 @@ class Reporter:
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
     trend_period = {1: "W", 7: "M", 30: "Y"}
 
-    guilds = {
-        1058490579799003187: 'BeanLab',
-        927616651409649675: 'CS 110',
-        1008806488384483338: 'CS 111',
-        747510855536738336: 'CS 235',
-        748656649287368704: 'CS 260',
-        1128355484039123065: 'CS 312',
-    }
+    guilds = GUILDS
 
     pricing = {
         'gpt-4': [0.03, 0.06],
@@ -85,6 +88,7 @@ class Reporter:
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
+        'all': (None, 'All of the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
@@ -125,6 +129,8 @@ class Reporter:
     def preprocessing(self, df, args):
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+            df["hour_of_day"] = (df['timestamp'].dt.hour - 7) % 24 # TODO: adjust both the timestamp and hour_of_day by the right time
+
         if args.period:
             now = datetime.now(ZoneInfo('US/Mountain'))
             if args.ind_var == 'timestamp':
@@ -136,9 +142,8 @@ class Reporter:
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
-            df["hour_of_day"] = (df['timestamp'].dt.hour - 7 )% 24
 
-        if args.exp_var == 'guild_id' or args.exp_var_2:
+        if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
             df['guild_name'] = df['guild_id'].map(self.guilds)
             df = df.drop(columns=['guild_id'])
             if args.exp_var == 'guild_id':
@@ -146,7 +151,6 @@ class Reporter:
             else:
                 args.exp_var_2 = 'guild_name'
 
-        # df = df.dropna(subset=[args.ind_var])
         return df
 
     def catch_known_issues(self, df, args):
@@ -165,18 +169,17 @@ class Reporter:
         self.catch_known_issues(df, args)
 
         if args.exp_var_2:
-            if pd.api.types.is_numeric_dtype(df[args.ind_var]):
-                if args.average:
-                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].mean().reset_index()
-                elif args.count:
-                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].nunique().reset_index()
-                elif args.percent:
-                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].apply(
-                        lambda x: x.notna().mean() * 100).reset_index()
-                else:
-                    df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].sum().reset_index()
-            else:
+            if not pd.api.types.is_numeric_dtype(df[args.ind_var]):
                 df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].count().reset_index()
+            elif args.average:
+                df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].mean().reset_index()
+            elif args.count:
+                df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].nunique().reset_index()
+            elif args.percent:
+                df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].apply(
+                    lambda x: x.notna().mean() * 100).reset_index()
+            else:
+                df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].sum().reset_index()
 
         elif args.exp_var:
             try:
@@ -192,6 +195,7 @@ class Reporter:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             except ValueError as e:
                 df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
+
         else:
             df_grouped = df[args.ind_var].reset_index()
 
@@ -238,7 +242,7 @@ class Reporter:
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png')
         buffer.seek(0)
-
+        plt.close()
         return graph_name, buffer
 
     def parse_args(self, arg_string):
@@ -276,7 +280,24 @@ class Reporter:
         lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
         return "\n\n".join(lines)
 
+
+    def get_all_prebaked(self):
+        imgs = []
+        titles = []
+        for key in self.pre_baked:
+            if len(imgs) == 10: # Discord's limit of number of images you can send at once
+                break
+            if key != 'all':
+                sys_string = '!report ' + key
+                title, image = self.get_report(sys_string)
+                imgs.append(image)
+                titles.append(title)
+        return imgs, titles
+
+
     def get_report(self, arg_string):
+        if arg_string == '!report all':
+            return self.get_all_prebaked()
         if arg_string == '!report help' or arg_string == '!report h':
             return self.help_menu(), None
 
@@ -300,11 +321,4 @@ if __name__ == '__main__':
     metricsHandler = MetricsHandler(Path('./state/metrics'))
     reporter = Reporter(metricsHandler, True)
 
-    # Doing all the graphs
-    for key in reporter.pre_baked:
-        sys_string = '!report ' + key
-        img_name, image = reporter.get_report(sys_string)
-
-    # # Doing only one graph (for debugging mostly)
-    # sys_string = '!report f1'
-    # arg_string, image_path = reporter.get_report(sys_string)
+    reporter.get_report('!report f1')
