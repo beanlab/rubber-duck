@@ -99,16 +99,18 @@ class RubberDuckConfig(TypedDict):
 
 class MyClient(discord.Client, MessageHandler):
     def __init__(self, config):
-        # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
-        intents = discord.Intents.default()  # Select all the intents in your bot settings
+        intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(intents=intents)
 
         # Registration channel feature
-        self._registration_channel_id = config['registration']["registration_channel_id"]
+        self._registration_channels = [int(key) for key in config['registration']]
         self._email_confirmation = EmailConfirmation()
         self._canvas_config = config['canvas']
-        self._canvas_api = CanvasApi(self._canvas_config)
+        self._canvas_api = CanvasApi(
+            self._canvas_config,
+            {guild: conf['canvas'] for guild, conf in config['registration'].items()}
+        )
 
         feedback_config = config['feedback']
         quest_config = config['quest']
@@ -218,22 +220,17 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Registration channel
-        if message.channel.id == self._registration_channel_id:
+        if message.channel.id in self._registration_channels:
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
-            member = message.author
-            guild_id = message.guild.id
-            self._canvas_api.first_time(guild_id)
 
             self._workflow_manager.start_workflow_background(
                 'registration',
                 workflow_id,
                 message.author.id,
                 message.channel.id,
-                guild_id,
-                member.id
+                message.guild.id,
             )
-
 
         # Duck channel
         channel_name = None

@@ -1,16 +1,16 @@
+import logging
+
 import boto3
 import uuid
 import os
-from dotenv import load_dotenv
+
 
 class EmailConfirmation:
-    def __init__(self):
-        self.token_store = {}
+    def __init__(self, sender_email):
+        self._sender_email = sender_email
         self._setup()
 
     def _setup(self):
-        # Load environment variables from .env
-        load_dotenv(dotenv_path=r"C:\Users\18019\OneDrive\Desktop\cs301R\rubber-duck\secrets.env")
 
         # AWS SES setup
         aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
@@ -18,18 +18,14 @@ class EmailConfirmation:
         aws_region = os.getenv("AWS_REGION")
 
         if not aws_access_key_id or not aws_secret_access_key or not aws_region:
-            raise EnvironmentError("AWS credentials or region not set in .env")
+            raise EnvironmentError("AWS credentials or region not set in environment")
 
-        self.ses_client = boto3.client(
+        self._ses_client = boto3.client(
             "ses",
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
             region_name=aws_region,
         )
-
-    def confirm_token(self, email, user_response_token) -> bool:
-
-        return user_response_token in self.token_store.values()
 
     def generate_token(self, email):
         # Generate a UUID
@@ -41,6 +37,22 @@ class EmailConfirmation:
 
     def _retrieve_token(self, email):
         return self.token_store.get(email)
+
+    async def send_email(self, email, subject, body):
+        try:
+            response = self._ses_client.send_email(  # TODO - is there an async boto3 option?
+                Source=self._sender_email,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": subject},
+                    "Body": {"Html": {"Data": body}},
+                },
+            )
+            return True
+
+        except Exception as e:
+            logging.exception("Error sending email")
+            return False
 
     def send_email_with_token(self, email, sender):
         token = self.generate_token(email)
@@ -56,16 +68,3 @@ class EmailConfirmation:
         </body>
         </html>
         """
-        try:
-            response = self.ses_client.send_email(
-                Source=sender,
-                Destination={"ToAddresses": [email]},
-                Message={
-                    "Subject": {"Data": subject},
-                    "Body": {"Html": {"Data": body}},
-                },
-            )
-            print("Email sent! Message ID:", response["MessageId"])
-        except Exception as e:
-            print("Error sending email:", e)
-
