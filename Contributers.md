@@ -9,6 +9,7 @@ Send the following information to Dr.Bean.
   - Your GitHub profile name
   - OPENAI username
   - your Discord Username
+  - Your byu email so you can use AWS
 
 ## Prerequisites
 The following technologies each have their own section that you can read specifics about regarding rubber duck. 
@@ -43,7 +44,7 @@ The following technologies each have their own section that you can read specifi
 
 ## Discord Bots
   - You are going to learn how to configure a Discord Bot using the intro assignment. This is part is key for learning how to configure your custom config file.
-  - The assignment is to create your own discord bot or rubber duck. Follow the instructions posted on this [discord channel](https://discord.gg/YGRXPCCT) and finish all the parts.
+  - The assignment is to create your own discord bot or rubber duck. Follow the instructions posted on this Dr Bean's WICS Build A Bot Server (message him or ask another student for the link) and finish all the parts.
   - When you are finished with your bot, upload it on the channel "please-add-my-bot."
   - After you do that you are good to go.
 
@@ -75,7 +76,8 @@ You should now be ready to do all the local machine set up for Rubber Duck. If y
 
 ## AWS CLI & ECR (Optional)
 - This section is optional but if you need to access BYU AWS servers please contact Dr. Bean to access.
-- You should be able to use this [link](https://byulogin.awsapps.com/start/#/?tab=accounts) to go there
+- You need to send your byu email to him.
+- You should be able to use this [link](https://byulogin.awsapps.com/start/#/?tab=accounts) to go there.
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this [instructions](https://discord.gg/YGRXPCCT) discord channel to test if everything is running correctly.
