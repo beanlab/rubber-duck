@@ -1,6 +1,7 @@
 import asyncio
 from typing import TypedDict
 
+import discord
 from quest import queue, step, alias
 
 
@@ -17,7 +18,7 @@ class FeedbackWorkflow:
                  ):
         self._send_message = step(send_message)
         self._fetch_message = fetch_message
-        self._record_feedback = step(record_feedback)
+        self._record_feedback = record_feedback
 
         self._reactions = {
             '1️⃣': 1,
@@ -54,7 +55,7 @@ class FeedbackWorkflow:
                 await feedback_message.add_reaction(reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
             try:
-                feedback_emoji, user_id = await asyncio.wait_for(
+                feedback_emoji, reviewer_id = await asyncio.wait_for(
                     feedback_queue.get(),
                     timeout=60 * 60 * 24 * 7  # TODO - make this timeout configurable
                 )
@@ -63,9 +64,11 @@ class FeedbackWorkflow:
 
             except asyncio.TimeoutError:
                 await feedback_message.add_reaction('❌')
-                feedback_score = 'na'
+                feedback_score = 'nan'
+                reviewer_id = 'nan'
 
             # Record score
-            await self._record_feedback(guild_id, thread_id, user_id, feedback_score)
+
+            await self._record_feedback(guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done

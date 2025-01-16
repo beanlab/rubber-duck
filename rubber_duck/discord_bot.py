@@ -15,6 +15,7 @@ from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from canvas_api import CanvasApi
 from registration import RegistrationWorkflow
 from email_confirmation import EmailConfirmation
+from reporter import Reporter
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -137,10 +138,12 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
+        reporter = Reporter(self.metrics_handler, config['reporting'])
+
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message)
+                    return BotCommands(self.send_message, self.metrics_handler, reporter)
 
                 case 'duck':
 
@@ -307,14 +310,18 @@ class MyClient(discord.Client, MessageHandler):
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
         curr_message = None
-        if file is not None:
-            file = discord.File(file)
 
         for block in parse_blocks(message):
             curr_message = await channel.send(block)
 
         if file is not None:
-            curr_message = await channel.send("", file=file)
+            if isinstance(file, list):
+                curr_message = await channel.send("", files=file) #TODO: check that all instances are discord.File objects
+            elif not isinstance(file, discord.File):
+                file = discord.File(file)
+                curr_message = await channel.send("", file=file)
+            else:
+                curr_message = await channel.send("", file=file)
 
         if view is not None:
             await channel.send("", view=view)
