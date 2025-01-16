@@ -23,7 +23,7 @@ class CanvasApi:
         self._cache_timeout = canvas_config['cache_timeout']
         self._courses = {
             guild_id: _get_course(os.getenv(details['token_name']), details['url'], details['course_id'])
-            for guild_id, details in guild_config["courses"].items()
+            for guild_id, details in guild_config.items()  # Use guild_config directly
         }
         self.canvas_users = {}  # guild_id -> users
         self.last_called = {}  # guild_id -> timestamp

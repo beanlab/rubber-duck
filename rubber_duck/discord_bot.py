@@ -104,12 +104,12 @@ class MyClient(discord.Client, MessageHandler):
         super().__init__(intents=intents)
 
         # Registration channel feature
-        self._registration_channels = [int(key) for key in config['registration']]
-        self._email_confirmation = EmailConfirmation()
+        self._registration_channels = [int(key) for key in config['registration']['guilds']]
+        self._email_confirmation = EmailConfirmation(config['registration']['email'])
         self._canvas_config = config['canvas']
         self._canvas_api = CanvasApi(
             self._canvas_config,
-            {guild: conf['canvas'] for guild, conf in config['registration'].items()}
+            {guild: conf['canvas'] for guild, conf in config['registration']['guilds'].items()}
         )
 
         feedback_config = config['feedback']
@@ -175,7 +175,7 @@ class MyClient(discord.Client, MessageHandler):
                         self._canvas_api,
                         self._email_confirmation,
                         self.get_guild,
-                        self._canvas_config
+                        # self._canvas_config
                     )
 
             raise NotImplemented(f'No workflow of type {wtype}')
@@ -220,7 +220,7 @@ class MyClient(discord.Client, MessageHandler):
             return
 
         # Registration channel
-        if message.channel.id in self._registration_channels:
+        if message.channel.id in self._registration_channels: #changed registration_channel in config to 1058490579799003187
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
 
