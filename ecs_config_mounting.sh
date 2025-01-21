@@ -20,12 +20,12 @@ fi
 cat <<EOF > task-definition.json
 {
   "family": "$TASK_FAMILY",
-  "networkMode": "awsvpc",  // Required for Fargate
+  "networkMode": "awsvpc",
   "requiresCompatibilities": [
-    "FARGATE"  // Specifies that this task is for Fargate
+    "FARGATE"
   ],
-  "cpu": "$CPU",  // CPU required for Fargate
-  "memory": "$MEMORY",  // Memory required for Fargate
+  "cpu": "$CPU",
+  "memory": "$MEMORY",
   "containerDefinitions": [
     {
       "name": "$CONTAINER_NAME",
@@ -41,7 +41,6 @@ cat <<EOF > task-definition.json
     }
   ]
 }
-
 EOF
 
 # Register the task definition
