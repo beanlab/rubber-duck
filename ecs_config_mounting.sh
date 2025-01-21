@@ -8,7 +8,7 @@ CONTAINER_NAME="rubber-duck-container"
 IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"
 MEMORY="512"
 CPU="256"
-CONFIG_FILE_PATH= "$(pwd)/config.json"
+CONFIG_FILE_PATH="$(pwd)/config.json"
 CONTAINER_CONFIG_PATH="/rubber-duck"
 
 if [[ ! -f "$CONFIG_FILE_PATH" ]]; then

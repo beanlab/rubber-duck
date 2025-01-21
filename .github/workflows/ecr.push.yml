@@ -51,7 +51,7 @@ jobs:
         run: chmod 644 ./config.json
 
       - name: Register ECS Task Definition
-        run: bash ecs_config_mounting.sh
+        run: bash ./ecs_config_mounting.sh
 
       - name: Verify Task Definition Registration
         run: aws ecs list-task-definitions
