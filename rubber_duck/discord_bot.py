@@ -100,6 +100,7 @@ class RubberDuckConfig(TypedDict):
 
 class MyClient(discord.Client, MessageHandler):
     def __init__(self, config):
+
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(intents=intents)
@@ -169,6 +170,8 @@ class MyClient(discord.Client, MessageHandler):
                     return feedback_workflow
 
                 case 'registration':
+                     # self.get_guild(guild_id)
+                     # logging.info('') #where is the guild ID getting called from?
                      return RegistrationWorkflow(
                         self.send_message,
                         fetch_message,
@@ -226,7 +229,6 @@ class MyClient(discord.Client, MessageHandler):
         if message.channel.id in self._registration_channels: #changed registration_channel in config to 1058490579799003187
             # Start the registration workflow
             workflow_id = f'registration-{message.id}'
-
             self._workflow_manager.start_workflow_background(
                 'registration',
                 workflow_id,
@@ -278,6 +280,13 @@ class MyClient(discord.Client, MessageHandler):
             role = await guild.create_role(name=role_name)
         return role
 
+    async def get_guild(self, guild_id: int):
+        """Get a guild by ID, validating its existence."""
+        guild = super().get_guild(guild_id)  # Use `super().get_guild` since `self` is a Client
+        if not guild:
+            print(f"Warning: Guild with ID {guild_id} not found in cache.")
+        return guild
+
     async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
         guild = self.get_guild(guild_id)
         if not guild:
@@ -309,6 +318,9 @@ class MyClient(discord.Client, MessageHandler):
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
+        if channel is None:
+            logging.error(f'Channel {channel_id} not found.')
+            raise ValueError(channel_id)
         curr_message = None
 
         for block in parse_blocks(message):

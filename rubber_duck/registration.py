@@ -22,15 +22,7 @@ class RegistrationWorkflow:
         return await self.start(user_id, channel_id, guild_id)
 
     async def start(self, user_id, channel_id, guild_id):
-        # Create a thread for the registration process
-        thread_id = self._setup_thread(guild_id, channel_id, user_id)
-
-        await self._send_message(
-            thread_id,
-            f"Hello <@{user_id}>, welcome to the registration process! Please follow the prompts."
-        )
-
-        net_id = await self._get_net_id(guild_id, thread_id, user_id)
+        thread_id, net_id = await self._create_thread_and_get_net_id(user_id, channel_id, guild_id)
 
         if not await self._confirm_registration_via_email(guild_id, thread_id, user_id, net_id):
             await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
@@ -39,8 +31,19 @@ class RegistrationWorkflow:
         await self._assign_user_role(user_id, canvas_role, guild_id, thread_id)
 
     @step
+    async def _create_thread_and_get_net_id(self,guild_id,channel_id,user_id)-> tuple:
+        thread_id = await self._setup_thread(guild_id, channel_id, user_id)
+        await self._send_message(
+            thread_id,
+            f"Hello <@{user_id}>, welcome to the registration process! Please follow the prompts."
+        )
+        net_id = await self._get_net_id(guild_id, thread_id, user_id)
+        return (thread_id,net_id)
+
+
+    @step
     async def _setup_thread(self, guild_id, parent_channel_id, user_id) -> int:
-        guild = self._get_guild(guild_id)
+        guild = await self._get_guild(guild_id)
         member = await guild.fetch_member(user_id)
         return await self._create_thread(parent_channel_id, f"Registration for {member.name}")
 
