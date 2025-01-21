@@ -3,7 +3,7 @@ name: Build, Push, and Deploy to AWS Fargate
 on:
   push:
     branches:
-      - master
+      - '*'
   workflow_dispatch:
 
 jobs:
