@@ -20,12 +20,12 @@ fi
 cat <<EOF > task-definition.json
 {
   "family": "$TASK_FAMILY",
-  "networkMode": "awsvpc",
+  "networkMode": "awsvpc",  // Required for Fargate
   "requiresCompatibilities": [
-    "FARGATE"
+    "FARGATE"  // Specifies that this task is for Fargate
   ],
-  "cpu": "$CPU",
-  "memory": "$MEMORY",
+  "cpu": "$CPU",  // CPU required for Fargate
+  "memory": "$MEMORY",  // Memory required for Fargate
   "containerDefinitions": [
     {
       "name": "$CONTAINER_NAME",
@@ -33,20 +33,11 @@ cat <<EOF > task-definition.json
       "essential": true,
       "memory": $MEMORY,
       "cpu": $CPU,
-      "mountPoints": [
-        {
-          "sourceVolume": "config-volume",
-          "containerPath": "$CONTAINER_CONFIG_PATH"
-        }
+      "command": [
+        "sh",
+        "-c",
+        "aws s3 cp s3://rubber-duck-config/config.json /rubber-duck/config.json && python3 /rubber_duck/discord_bot.py"
       ]
-    }
-  ],
-  "volumes": [
-    {
-      "name": "config-volume",
-      "host": {
-        "sourcePath": "$CONFIG_FILE_PATH"
-      }
     }
   ]
 }
