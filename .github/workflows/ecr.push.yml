@@ -17,7 +17,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Run Docker build script
-        run: bash .scripts/build_docker.sh
+        run: bash build_docker.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -47,8 +47,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
+      - name: Change permissions of config file
+        run: chmod 644 ./config.json
+
       - name: Register ECS Task Definition
-        run: bash .scripts/ecs_config_mounting.sh
+        run: bash ecs_config_mounting.sh
 
       - name: Verify Task Definition Registration
         run: aws ecs list-task-definitions
