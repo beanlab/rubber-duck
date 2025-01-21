@@ -20,6 +20,12 @@ fi
 cat <<EOF > task-definition.json
 {
   "family": "$TASK_FAMILY",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "$CPU",
+  "memory": "$MEMORY",
   "containerDefinitions": [
     {
       "name": "$CONTAINER_NAME",
@@ -44,6 +50,7 @@ cat <<EOF > task-definition.json
     }
   ]
 }
+
 EOF
 
 # Register the task definition
