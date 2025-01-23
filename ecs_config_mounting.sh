@@ -7,7 +7,7 @@ MEMORY="512"
 CPU="256"
 CONFIG_FILE_PATH="$(pwd)/config.json"
 CONTAINER_CONFIG_PATH="/rubber-duck"
-ENV_FILE_PATH="$(pwd)/.env"  # Path to .env file
+ENV_FILE_PATH="$(pwd)/secrets.env"  # Path to secrets.env file
 
 # Check for config.json
 if [[ ! -f "$CONFIG_FILE_PATH" ]]; then
@@ -15,9 +15,9 @@ if [[ ! -f "$CONFIG_FILE_PATH" ]]; then
   exit 1
 fi
 
-# Check for .env file
+# Check for secrets.env file
 if [[ ! -f "$ENV_FILE_PATH" ]]; then
-  echo "Warning: .env file not found. Skipping."
+  echo "Warning: secrets.env file not found. Skipping."
 fi
 
 # Create the task definition JSON
@@ -47,7 +47,7 @@ cat <<EOF > task-definition.json
       "command": [
         "sh",
         "-c",
-        "aws s3 cp s3://rubber-duck-config/config.json /rubber-duck/config.json && aws s3 cp s3://rubber-duck-config/.env /rubber-duck/.env && source /rubber-duck/.env && python3 /rubber_duck/discord_bot.py"
+        "aws s3 cp s3://rubber-duck-config/config.json /rubber-duck/config.json && aws s3 cp s3://rubber-duck-config/secrets.env /rubber-duck/secrets.env && source /rubber-duck/secrets.env && python3 /rubber_duck/discord_bot.py"
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
@@ -66,19 +66,4 @@ cat <<EOF > task-definition.json
     "EC2",
     "FARGATE"
   ],
-  "placementConstraints": [],
-  "tags": []
-}
-EOF
 
-# Register the task definition with ECS
-echo "Registering task definition..."
-TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
-  --cli-input-json file://task-definition.json \
-  --query "taskDefinition.taskDefinitionArn" \
-  --output text)
-
-echo "Task definition registered successfully: $TASK_DEFINITION_ARN"
-
-# Clean up
-rm task-definition.json
