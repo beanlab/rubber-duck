@@ -7,33 +7,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_and_push:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+#  build_and_push:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v1
+#
+#      - name: Run Docker build script
+#        run: bash build_docker.sh
+#
+#      - name: Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v1
+#        with:
+#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          aws-region: ${{ secrets.AWS_REGION }}
+#
+#      - name: Log in to Amazon ECR
+#        run: |
+#          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
+#
+#      - name: Push Docker image to ECR
+#        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Run Docker build script
-        run: bash build_docker.sh
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
-
-      - name: Push Docker image to ECR
-        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-
-  upload_config_to_s3:
+  upload_config_and_env_to_s3:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -49,9 +49,11 @@ jobs:
       - name: Upload config.json to S3
         run: |
           aws s3 cp ./config.json s3://rubber-duck-config/config.json
+          aws s3 cp ./.env s3://rubber-duck-config/.env
+
 
   deploy_to_fargate:
-    needs: [build_and_push, upload_config_to_s3]
+    needs: upload_config_and_env_to_s3
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
