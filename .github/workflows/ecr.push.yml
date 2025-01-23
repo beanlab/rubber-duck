@@ -64,9 +64,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-      - name: Change permissions of config file
-        run: chmod 644 ./config.json
-
       - name: Register ECS Task Definition
         run: bash ./ecs_config_mounting.sh
 
