@@ -52,8 +52,9 @@ jobs:
 
 
   deploy_to_fargate:
-    needs: upload_config_and_env_to_s3
+    needs: upload_config_and_env_to_s3  # Ensure the S3 upload step is completed first
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -66,20 +67,23 @@ jobs:
           aws-region: us-west-2
 
       - name: Register ECS Task Definition
-        run: bash ./ecs_config_mounting.sh
+        run: bash ./esc_setup.sh  # Ensure this script registers the task definition properly
 
       - name: Verify Task Definition Registration
-        run: aws ecs list-task-definitions
+        run: |
+          aws ecs list-task-definitions --family Deploy-Duck --region us-west-2
 
       - name: Update ECS service
         run: |
           aws ecs update-service \
             --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
             --service ${{ secrets.ECS_SERVICE_NAME }} \
-            --force-new-deployment
+            --force-new-deployment \
+            --region us-west-2
 
       - name: Check ECS Service Status
         run: |
           aws ecs describe-services \
             --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --services ${{ secrets.ECS_SERVICE_NAME }}
+            --services ${{ secrets.ECS_SERVICE_NAME }} \
+            --region us-west-2
