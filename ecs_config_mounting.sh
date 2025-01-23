@@ -17,7 +17,8 @@ fi
 
 # Download the .env file from S3
 echo "Downloading secrets.env from S3..."
-aws s3 cp s3://rubber-duck-config/secrets.env $ENV_FILE_PATH
+aws s3 cp s3://rubber-duck-config/secrets.env ./rubber-duck/secrets.env
+
 
 # Check if secrets.env was downloaded successfully
 if [[ ! -f "$ENV_FILE_PATH" ]]; then
@@ -129,14 +130,15 @@ cat <<EOF > task-definition.json
 
 EOF
 
-# Register the task definition with ECS
-echo "Registering task definition..."
-TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
-  --cli-input-json file://task-definition.json \
-  --query "taskDefinition.taskDefinitionArn" \
-  --output text)
-
-echo "Task definition registered successfully: $TASK_DEFINITION_ARN"
+CONFIG_DIR="./rubber-duck"
+mkdir -p "$CONFIG_DIR"
+echo "Downloading secrets.env from S3..."
+aws s3 cp s3://rubber-duck-config/secrets.env "$CONFIG_DIR/secrets.env"
+if [ ! -f "$CONFIG_DIR/secrets.env" ]; then
+  echo "Error: secrets.env file not found after download."
+  exit 1
+fi
+echo "Downloaded secrets.env to $CONFIG_DIR"
 
 # Clean up
 rm task-definition.json
