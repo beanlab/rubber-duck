@@ -28,6 +28,7 @@ fi
 # Create the task definition JSON
 cat <<EOF > task-definition.json
 {
+{
     "taskDefinitionArn": "arn:aws:ecs:us-west-2:844825014198:task-definition/Deploy-Duck:1",
     "containerDefinitions": [
         {
@@ -40,7 +41,7 @@ cat <<EOF > task-definition.json
             "environment": [],
             "environmentFiles": [
                 {
-                    "value": "arn:aws:s3:::rubber-duck-config/config.json.env",
+                    "value": "arn:aws:s3:::rubber-duck-config/secrets.env",
                     "type": "s3"
                 }
             ],
@@ -125,6 +126,7 @@ cat <<EOF > task-definition.json
     "enableFaultInjection": false,
     "tags": []
 }
+
 EOF
 
 # Register the task definition with ECS
