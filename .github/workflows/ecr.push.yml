@@ -7,31 +7,31 @@ on:
   workflow_dispatch:
 
 jobs:
-#  build_and_push:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout code
-#        uses: actions/checkout@v2
-#
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v1
-#
-#      - name: Run Docker build script
-#        run: bash build_docker.sh
-#
-#      - name: Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v1
-#        with:
-#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ secrets.AWS_REGION }}
-#
-#      - name: Log in to Amazon ECR
-#        run: |
-#          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
-#
-#      - name: Push Docker image to ECR
-#        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Run Docker build script
+        run: bash build_docker.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
+
+      - name: Push Docker image to ECR
+        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
   upload_config_and_env_to_s3:
     runs-on: ubuntu-latest
@@ -52,7 +52,7 @@ jobs:
 
 
   deploy_to_fargate:
-    needs: upload_config_and_env_to_s3  # Ensure the S3 upload step is completed first
+    needs: [upload_config_and_env_to_s3, build_and_push]  # Ensure the S3 upload step is completed first
     runs-on: ubuntu-latest
 
     steps:
