@@ -12,6 +12,8 @@ urllib3 = "<2.0"
 quest-py = "0.2.3"
 seaborn = "0.13.2"
 pandas = "^2.2.2"
+boto3 = "^1.36.6"
+requests = "^2.32.3"
 
 [tool.poetry.dev-dependencies]
 
