@@ -360,6 +360,4 @@ if __name__ == '__main__':
     if config is None:
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
-    else:
-        logging.info(f"Config file is working here is the config: {json.dumps(config, indent=2)}")
     main(config)
