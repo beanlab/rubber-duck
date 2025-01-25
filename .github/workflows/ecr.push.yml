@@ -33,7 +33,7 @@ jobs:
       - name: Push Docker image to ECR
         run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
-  upload_config_s3:
+  upload_config_and_env_to_s3:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
