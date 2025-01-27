@@ -12,3 +12,4 @@ poetry.lock
 /bryce_config.json
 /wiley_config_v2.json
 state/
+/aubry.json
