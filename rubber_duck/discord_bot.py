@@ -6,13 +6,16 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
-from quest import create_filesystem_manager
+from models import create_sql_manager
 
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from reporter import Reporter
+
+
+namespace = 'rubber-duck'
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -159,8 +162,10 @@ class MyClient(discord.Client, MessageHandler):
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
-                                                           create_workflow)
+        self._workflow_manager = create_sql_manager(namespace, create_workflow)
+
+        #self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck', create_workflow)
+
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -248,7 +253,8 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             if isinstance(file, list):
-                curr_message = await channel.send("", files=file) #TODO: check that all instances are discord.File objects
+                curr_message = await channel.send("",
+                                                  files=file)  # TODO: check that all instances are discord.File objects
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
