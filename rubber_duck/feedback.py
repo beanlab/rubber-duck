@@ -61,7 +61,7 @@ class FeedbackWorkflow:
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
             try:
-                feedback_emoji, reviewer_id = await self.verify_ta_id(user_id, feedback_queue)
+                feedback_emoji, reviewer_id = await self.get_reviewer_feedback(user_id, feedback_queue)
                 feedback_score = self._reactions[feedback_emoji]
                 await feedback_message.add_reaction('✅')
                 await review_message.add_reaction('✅')
@@ -76,12 +76,16 @@ class FeedbackWorkflow:
             await self._record_feedback(guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done
-    async def verify_ta_id(self, user_id, feedback_queue):
+
+    #gets reviewer feedback and checks that feedback came from someone other than the student
+    async def get_reviewer_feedback(self, user_id, feedback_queue):
         while True:
+            #gets feedback
             feedback_emoji, reviewer_id = await asyncio.wait_for(
                 feedback_queue.get(),
                 timeout=60 * 60 * 24 * 7
             )
+            #verifies feedback came from someone other than the student
             if reviewer_id != user_id:
                 break
 
