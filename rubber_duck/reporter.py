@@ -308,7 +308,7 @@ if __name__ == '__main__':
     from pathlib import Path
 
     this_file = Path(__file__)
-    config = json.loads((this_file.parent.parent / 'config.json').read_text())
+    config = json.loads((this_file.parent.parent / 'production-config.json').read_text())
     metricsHandler = MetricsHandler(this_file.parent.parent / 'state' / 'metrics')
     reporter = Reporter(metricsHandler, config['reporting'], show_fig=True)
 

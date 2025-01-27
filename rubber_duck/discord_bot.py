@@ -319,7 +319,7 @@ def fetch_config_from_s3():
         return None
 
 # Function to load the configuration from a local file (if needed)
-def load_local_config(file_path='config.json'):
+def load_local_config(file_path='production-config.json'):
     try:
         if Path(file_path).is_file():
             with open(file_path, 'r') as f:
@@ -327,7 +327,7 @@ def load_local_config(file_path='config.json'):
         else:
             raise FileNotFoundError(f"{file_path} not found.")
     except FileNotFoundError as e:
-        print(f"No valid config file found: {e}. Please create a config.json.")
+        print(f"No valid config file found: {e}. Please create a production-config.json.")
         exit(1)
 
 def main(config):
@@ -337,7 +337,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='production-config.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 

@@ -3,7 +3,8 @@ name: Build, Push, and Deploy to AWS Fargate
 on:
   push:
     branches:
-      - '*'
+      - 'master'
+      - '#69 on 62-aws-s3-and-fargate-deployment'
   workflow_dispatch:
 
 jobs:
@@ -46,9 +47,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Upload config.json to S3
+      - name: Upload production-config.json to S3
         run: |
-          aws s3 cp ./config.json s3://rubber-duck-config/config.json
+          aws s3 cp ./production-config.json s3://rubber-duck-config/config.json
 
 
   deploy_to_fargate:
