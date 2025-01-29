@@ -30,6 +30,12 @@ TASK_DEFINITION_JSON=$(cat <<EOF
       "memory": $MEMORY,
       "portMappings": [],
       "essential": true,
+      "environment": [
+          {
+              "name": "$CONFIG_FILE_NAME",
+              "value": "s3://rubber-duck-config/$CONFIG_FILE_S3_PATH"
+          }
+      ],
       "environmentFiles": [
         {
           "value": "$S3_ENV_FILE",
@@ -64,7 +70,7 @@ EOF
 )
 
 # Register Task Definition
-echo $TASK_DEFINITION_JSON | aws ecs register-task-definition --cli-input-json file:///dev/stdin --region $REGION
+echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION
 
 # Step 2: Update the ECS Service
 echo "Updating ECS service with new task definition..."
