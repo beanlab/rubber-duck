@@ -1,11 +1,12 @@
 #!/bin/bash
 
+source .env
 # Variables
 CLUSTER_NAME="DuckCluster"
 SERVICE_NAME="DuckService"
 TASK_DEFINITION_FAMILY="Deploy-Duck"
 IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"  # Docker image in ECR
-S3_ENV_FILE="arn:aws:s3:::rubber-duck-config/secrets.env"
+S3_ENV_FILE=$ENV_FILE_S3_PATH # get this from the settings.txt
 REGION="us-west-2"
 AWS_ACCOUNT_ID="844825014198"
 EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"

@@ -63,6 +63,7 @@ You should now be ready to do all the local machine set up for Rubber Duck. If y
     - For the name section use any label that makes sense for your channel. This is here for organizational purposes.
     - Your config file should look something like [this](images/complete-example-config.png) when you are done.
 
+
 ## Docker (Optional)
  - If you haven't taken CS204 or haven't run into Docker, this section is for you. Rubber Duck production line uses Docker to create production ready applications. Knowing how to use it and what is for will bless you as a software engineer.
  - This is going to be a short tutorial on how to get docker working.
@@ -78,6 +79,10 @@ You should now be ready to do all the local machine set up for Rubber Duck. If y
 - This section is optional but if you need to access BYU AWS servers please contact Dr. Bean to access.
 - You need to send your byu email to him.
 - You should be able to use this [link](https://byulogin.awsapps.com/start/#/?tab=accounts) to go there.
+
+## Cloud Deployment (AWS ECS, S3, and Fargate)
+- This section is meant to go over everything that is necessary to set up the CI/CD deployment pipeline in AWS.
+- In ECS you are going 
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this [instructions](https://discord.gg/YGRXPCCT) discord channel to test if everything is running correctly.
