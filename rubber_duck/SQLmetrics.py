@@ -84,23 +84,21 @@ class SQLMetricsHandler:
 
     def get_message(self):
         try:
-            messagesTable = """ SELECT * FROM messages """
-            return self.cursor.execute(messagesTable)
+
+            return self.session.query(MessagesModel).all()
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
 
     def get_usage(self):
         try:
-            usageTable = """ SELECT * FROM usage """
-            return self.cursor.execute(usageTable)
+            return self.session.query(UsageModel).all()
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
 
     def get_feedback(self):
         try:
-            feedbackTable = """ SELECT * FROM feedback """
-            return self.cursor.execute(feedbackTable)
+            return self.session.query(FeedbackModel).all()
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
