@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source .env
+source wiley-secrets.env
+
 # Variables
 CLUSTER_NAME="DuckCluster"
 SERVICE_NAME="DuckService"
