@@ -1,13 +1,42 @@
 #!/bin/bash
 
-source wiley-secrets.env
+# Define the S3 path for the settings file
+S3_SETTINGS_FILE="s3://rubber-duck-config/settings.txt"
+
+# Temporary local paths
+LOCAL_SETTINGS_FILE="/tmp/settings.txt"
+LOCAL_ENV_FILE="/tmp/wiley-secrets.env"
+
+# Download the settings file from S3
+aws s3 cp "$S3_SETTINGS_FILE" "$LOCAL_SETTINGS_FILE"
+
+# Check if settings file exists
+if [[ -f "$LOCAL_SETTINGS_FILE" ]]; then
+    echo "Successfully downloaded settings.txt"
+
+    # Read key-value pairs into environment variables
+    while IFS='=' read -r key value; do
+        key=$(echo "$key" | xargs)  # Trim whitespace
+        value=$(echo "$value" | xargs)  # Trim whitespace
+        if [[ -n "$key" && ! "$key" =~ ^# ]]; then
+            export "$key"="$value"
+        fi
+    done < "$LOCAL_SETTINGS_FILE"
+
+    echo "Settings loaded successfully"
+else
+    echo "Failed to download settings.txt" >&2
+    exit 1
+fi
+
+# Now download and source wiley-secrets.env
+aws s3 cp "$ENV_FILE_S3_PATH" "$LOCAL_ENV_FILE"
 
 # Variables
 CLUSTER_NAME="DuckCluster"
 SERVICE_NAME="DuckService"
 TASK_DEFINITION_FAMILY="Deploy-Duck"
 IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"  # Docker image in ECR
-S3_ENV_FILE=$ENV_FILE_S3_PATH # get this from the settings.txt
 REGION="us-west-2"
 AWS_ACCOUNT_ID="844825014198"
 EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
@@ -39,7 +68,7 @@ TASK_DEFINITION_JSON=$(cat <<EOF
       ],
       "environmentFiles": [
         {
-          "value": "$S3_ENV_FILE",
+          "value": "$ENV_FILE_S3_PATH",
           "type": "s3"
         }
       ],
