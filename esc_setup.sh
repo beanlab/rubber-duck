@@ -1,20 +1,18 @@
 #!/bin/bash
 
-# Define the S3 path for the settings file
+# Define S3 paths
 S3_SETTINGS_FILE="s3://rubber-duck-config/settings.txt"
+LOCAL_SETTINGS_FILE="wiley-settings.txt"
+LOCAL_ENV_FILE="wiley-secrets.env"
 
-# Temporary local paths
-LOCAL_SETTINGS_FILE="/tmp/settings.txt"
-LOCAL_ENV_FILE="/tmp/wiley-secrets.env"
-
-# Download the settings file from S3
+# Step 1: Download and load settings.txt
 aws s3 cp "$S3_SETTINGS_FILE" "$LOCAL_SETTINGS_FILE"
 
-# Check if settings file exists
+# Check if settings.txt exists
 if [[ -f "$LOCAL_SETTINGS_FILE" ]]; then
     echo "Successfully downloaded settings.txt"
 
-    # Read key-value pairs into environment variables
+    # Load key-value pairs into environment variables
     while IFS='=' read -r key value; do
         key=$(echo "$key" | xargs)  # Trim whitespace
         value=$(echo "$value" | xargs)  # Trim whitespace
@@ -29,14 +27,23 @@ else
     exit 1
 fi
 
-# Now download and source wiley-secrets.env
+# Step 2: Download and source wiley-secrets.env
 aws s3 cp "$ENV_FILE_S3_PATH" "$LOCAL_ENV_FILE"
 
-# Variables
+# Check if wiley-secrets.env exists
+if [[ -f "$LOCAL_ENV_FILE" ]]; then
+    echo "Successfully downloaded wiley-secrets.env"
+    source "$LOCAL_ENV_FILE"
+else
+    echo "Failed to download wiley-secrets.env" >&2
+    exit 1
+fi
+
+# Step 3: Define Variables (Now environment variables are available)
 CLUSTER_NAME="DuckCluster"
 SERVICE_NAME="DuckService"
 TASK_DEFINITION_FAMILY="Deploy-Duck"
-IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"  # Docker image in ECR
+IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"
 REGION="us-west-2"
 AWS_ACCOUNT_ID="844825014198"
 EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
@@ -45,7 +52,7 @@ EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
 CPU="1024"
 MEMORY="2048"
 
-# Step 1: Register the ECS Task Definition
+# Step 4: Register the ECS Task Definition
 echo "Registering new ECS Task Definition..."
 TASK_DEFINITION_JSON=$(cat <<EOF
 {
@@ -102,7 +109,7 @@ EOF
 # Register Task Definition
 echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION
 
-# Step 2: Update the ECS Service
+# Step 5: Update the ECS Service
 echo "Updating ECS service with new task definition..."
 aws ecs update-service \
   --cluster $CLUSTER_NAME \
