@@ -51,9 +51,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Run Deployment Script with Arguments
+      - name: Register ECS Task Definition and Deploy
         run: |
-          ./deploy.sh \
+          bash ./esc_setup.sh \
             "${{ secrets.ECS_CLUSTER_NAME }}" \
             "${{ secrets.ECS_SERVICE_NAME }}" \
             "${{ secrets.TASK_DEFINITION_FAMILY }}" \
@@ -61,9 +61,6 @@ jobs:
             "${{ secrets.AWS_REGION }}" \
             "${{ secrets.EXECUTION_ROLE }}" \
             "${{ secrets.ENV_FILE_S3_PATH }}"
-
-      - name: Register ECS Task Definition
-        run: bash ./esc_setup.sh  # Ensure this script registers the task definition properly
 
       - name: Verify Task Definition Registration
         run: |
