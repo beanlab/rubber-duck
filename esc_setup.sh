@@ -8,8 +8,7 @@ IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:late
 REGION="us-west-2"
 AWS_ACCOUNT_ID="844825014198"
 EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
-CONFIG_FILE_NAME=wiley-config.json
-CONFIG_FILE_S3_PATH=arn:aws:s3:::rubber-duck-config/secrets.env
+ENV_FILE_S3_PATH=s3://rubber-duck-config/wiley-secrets.env
 
 # Set the desired CPU and memory for the task definition
 CPU="1024"
@@ -29,12 +28,6 @@ TASK_DEFINITION_JSON=$(cat <<EOF
       "memory": $MEMORY,
       "portMappings": [],
       "essential": true,
-      "environment": [
-          {
-              "name": "$CONFIG_FILE_NAME",
-              "value": "s3://rubber-duck-config/$CONFIG_FILE_S3_PATH"
-          }
-      ],
       "environmentFiles": [
         {
           "value": "$ENV_FILE_S3_PATH",
