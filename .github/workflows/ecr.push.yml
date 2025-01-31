@@ -8,74 +8,74 @@ on:
   workflow_dispatch:
 
 jobs:
-#  load-production-settings:
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - name: Checkout Repository
-#        uses: actions/checkout@v4
-#
-#      - name: Check for Production Settings File
-#        id: check_settings
-#        run: |
-#          if [[ -f production-settings.txt ]]; then
-#            echo "settings_found=true" >> $GITHUB_ENV
-#          else
-#            echo "settings_found=false" >> $GITHUB_ENV
-#          fi
-#
-#      - name: Load Production Settings as Environment Variables
-#        if: env.settings_found == 'true'
-#        run: |
-#          echo "Loading production settings..."
-#          while IFS='=' read -r key value; do
-#            [[ -z "$key" || "$key" =~ ^# ]] && continue
-#            echo "$key=$value" >> $GITHUB_ENV
-#          done < production-settings.txt
-#
-#      - name: Modify .env if Production Settings Exist
-#        if: env.settings_found == 'true'
-#        run: |
-#          echo "Overwriting ENV_FILE_S3_PATH and CONFIG_FILE_S3_PATH in .env"
-#          sed -i 's|^ENV_FILE_S3_PATH=.*|ENV_FILE_S3_PATH="s3://rubber-duck-config/production-secrets.env"|' .env
-#          sed -i 's|^CONFIG_FILE_S3_PATH=.*|CONFIG_FILE_S3_PATH="arn:aws:s3:::rubber-duck-config/production-secrets.env"|' .env
-#
-#      - name: Verify Environment Variables and .env File
-#        if: env.settings_found == 'true'
-#        run: |
-#          echo "Final environment variables:"
-#          env | grep -E 'ENV_FILE_S3_PATH|CONFIG_FILE_S3_PATH'
-#          echo "Final .env file contents:"
-#          cat .env
-#
-#  build_and_push:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout code
-#        uses: actions/checkout@v2
-#
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v1
-#
-#      - name: Run Docker build script
-#        run: bash build_docker.sh
-#
-#      - name: Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v1
-#        with:
-#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ secrets.AWS_REGION }}
-#
-#      - name: Log in to Amazon ECR
-#        run: |
-#          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
-#
-#      - name: Push Docker image to ECR
-#        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
+  load-production-settings:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check for Production Settings File
+        id: check_settings
+        run: |
+          if [[ -f production-settings.txt ]]; then
+            echo "settings_found=true" >> $GITHUB_ENV
+          else
+            echo "settings_found=false" >> $GITHUB_ENV
+          fi
+
+      - name: Load Production Settings as Environment Variables
+        if: env.settings_found == 'true'
+        run: |
+          echo "Loading production settings..."
+          while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" =~ ^# ]] && continue
+            echo "$key=$value" >> $GITHUB_ENV
+          done < production-settings.txt
+
+      - name: Modify .env if Production Settings Exist
+        if: env.settings_found == 'true'
+        run: |
+          echo "Overwriting ENV_FILE_S3_PATH and CONFIG_FILE_S3_PATH in .env"
+          sed -i 's|^ENV_FILE_S3_PATH=.*|ENV_FILE_S3_PATH="s3://rubber-duck-config/production-secrets.env"|' .env
+          sed -i 's|^CONFIG_FILE_S3_PATH=.*|CONFIG_FILE_S3_PATH="arn:aws:s3:::rubber-duck-config/production-secrets.env"|' .env
+
+      - name: Verify Environment Variables and .env File
+        if: env.settings_found == 'true'
+        run: |
+          echo "Final environment variables:"
+          env | grep -E 'ENV_FILE_S3_PATH|CONFIG_FILE_S3_PATH'
+          echo "Final .env file contents:"
+          cat .env
+
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Run Docker build script
+        run: bash build_docker.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com
+
+      - name: Push Docker image to ECR
+        run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
   deploy_to_fargate:
-#    needs: [build_and_push,load-production-settings]  # Ensure the S3 upload step is completed first
+    needs: [build_and_push,load-production-settings]  # Ensure the S3 upload step is completed first
     runs-on: ubuntu-latest
 
     steps:
