@@ -1,14 +1,19 @@
 #!/bin/bash
 
 
-CLUSTER_NAME="DuckCluster"
-SERVICE_NAME="DuckService"
-TASK_DEFINITION_FAMILY="Deploy-Duck"
-IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest"
-REGION="us-west-2"
-AWS_ACCOUNT_ID="844825014198"
-EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
-ENV_FILE_S3_PATH="s3://rubber-duck-config/wiley-secrets.env"
+if [ "$#" -ne 7 ]; then
+    echo "Usage: $0 <CLUSTER_NAME> <SERVICE_NAME> <TASK_DEFINITION_FAMILY> <IMAGE_URI> <REGION> <EXECUTION_ROLE> <ENV_FILE_S3_PATH>"
+    exit 1
+fi
+
+# Assign arguments to variables
+CLUSTER_NAME="$1"
+SERVICE_NAME="$2"
+TASK_DEFINITION_FAMILY="$3"
+IMAGE_URI="$4"
+REGION="$5"
+EXECUTION_ROLE="$6"
+ENV_FILE_S3_PATH="$7"
 
 # Set the desired CPU and memory for the task definition
 CPU="1024"

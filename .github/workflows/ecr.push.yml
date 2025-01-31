@@ -5,49 +5,11 @@ on:
     branches:
       - 'master'
       - '62-aws-s3-and-fargate-deployment'
+      - 'production'
+      - 'test'
   workflow_dispatch:
 
 jobs:
-  load-production-settings:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Check for Production Settings File
-        id: check_settings
-        run: |
-          if [[ -f production-settings.txt ]]; then
-            echo "settings_found=true" >> $GITHUB_ENV
-          else
-            echo "settings_found=false" >> $GITHUB_ENV
-          fi
-
-      - name: Load Production Settings as Environment Variables
-        if: env.settings_found == 'true'
-        run: |
-          echo "Loading production settings..."
-          while IFS='=' read -r key value; do
-            [[ -z "$key" || "$key" =~ ^# ]] && continue
-            echo "$key=$value" >> $GITHUB_ENV
-          done < production-settings.txt
-
-      - name: Modify .env if Production Settings Exist
-        if: env.settings_found == 'true'
-        run: |
-          echo "Overwriting ENV_FILE_S3_PATH and CONFIG_FILE_S3_PATH in .env"
-          sed -i 's|^ENV_FILE_S3_PATH=.*|ENV_FILE_S3_PATH="s3://rubber-duck-config/production-secrets.env"|' .env
-          sed -i 's|^CONFIG_FILE_S3_PATH=.*|CONFIG_FILE_S3_PATH="arn:aws:s3:::rubber-duck-config/production-secrets.env"|' .env
-
-      - name: Verify Environment Variables and .env File
-        if: env.settings_found == 'true'
-        run: |
-          echo "Final environment variables:"
-          env | grep -E 'ENV_FILE_S3_PATH|CONFIG_FILE_S3_PATH'
-          echo "Final .env file contents:"
-          cat .env
-
   build_and_push:
     runs-on: ubuntu-latest
     steps:
@@ -75,38 +37,49 @@ jobs:
         run: docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
 
   deploy_to_fargate:
-    needs: [build_and_push,load-production-settings]  # Ensure the S3 upload step is completed first
+    needs: [build_and_push]  # Ensure the S3 upload step is completed first
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3  # Updated to v3 if available
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2  # Consider updating to v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Run Deployment Script with Arguments
+        run: |
+          ./deploy.sh \
+            "${{ secrets.ECS_CLUSTER_NAME }}" \
+            "${{ secrets.ECS_SERVICE_NAME }}" \
+            "${{ secrets.TASK_DEFINITION_FAMILY }}" \
+            "${{ secrets.IMAGE_URI }}" \
+            "${{ secrets.AWS_REGION }}" \
+            "${{ secrets.EXECUTION_ROLE }}" \
+            "${{ secrets.ENV_FILE_S3_PATH }}"
 
       - name: Register ECS Task Definition
         run: bash ./esc_setup.sh  # Ensure this script registers the task definition properly
 
       - name: Verify Task Definition Registration
         run: |
-          aws ecs list-task-definitions --family Deploy-Duck --region us-west-2
+          aws ecs list-task-definitions --family "${{ secrets.TASK_DEFINITION_FAMILY }}" --region ${{ secrets.AWS_REGION }}
 
       - name: Update ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --service ${{ secrets.ECS_SERVICE_NAME }} \
+            --cluster "${{ secrets.ECS_CLUSTER_NAME }}" \
+            --service "${{ secrets.ECS_SERVICE_NAME }}" \
             --force-new-deployment \
-            --region us-west-2
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Check ECS Service Status
         run: |
           aws ecs describe-services \
-            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --services ${{ secrets.ECS_SERVICE_NAME }} \
-            --region us-west-2
+            --cluster "${{ secrets.ECS_CLUSTER_NAME }}" \
+            --services "${{ secrets.ECS_SERVICE_NAME }}" \
+            --region ${{ secrets.AWS_REGION }}
