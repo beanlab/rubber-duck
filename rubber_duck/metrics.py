@@ -46,7 +46,7 @@ class MetricsHandler:
         try:
             with self._feedback_file.open('at', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow([get_timestamp(), workflow_type, guild_id, thread_id, user_id, feedback_score, reviewer_id])
+                writer.writerow([get_timestamp(), workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score])
         except Exception as e:
             logging.error(f"Failed to record feedback: {e}")
 
