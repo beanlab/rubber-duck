@@ -8,7 +8,7 @@ IMAGE_URI="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:late
 REGION="us-west-2"
 AWS_ACCOUNT_ID="844825014198"
 EXECUTION_ROLE="arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole"
-ENV_FILE_S3_PATH=s3://rubber-duck-config/wiley-secrets.env
+ENV_FILE_S3_PATH="s3://rubber-duck-config/wiley-secrets.env"
 
 # Set the desired CPU and memory for the task definition
 CPU="1024"
