@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 
 from rubber_duck import Message
 from quest import step, queue
@@ -22,7 +23,7 @@ class RegistrationWorkflow:
         return await self.start(user_id, channel_id, guild_id)
 
     async def start(self, user_id, channel_id, guild_id):
-        thread_id, net_id = await self._create_thread_and_get_net_id(user_id, channel_id, guild_id)
+        thread_id, net_id = await self._create_thread_and_get_net_id(guild_id, channel_id, user_id)
 
         if not await self._confirm_registration_via_email(guild_id, thread_id, user_id, net_id):
             await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
@@ -50,8 +51,7 @@ class RegistrationWorkflow:
     @step
     async def _get_net_id(self, guild_id, thread_id, user_id) -> str:
         await self._send_message(thread_id, "What is your BYU Net ID?")
-
-        timeout = 60
+        timeout = 120
         async with queue('messages', None) as messages:
             while True:
                 message: Message = await asyncio.wait_for(messages.get(), timeout)
@@ -67,7 +67,7 @@ class RegistrationWorkflow:
 
     async def _confirm_registration_via_email(self, guild_id, thread_id, user_id, net_id):
 
-        token = self._generate_token()
+        token = str(uuid.uuid4())
 
         email = f'{net_id}@byu.edu'
         subject = "Registration confirmation"  # TODO - discord server name?

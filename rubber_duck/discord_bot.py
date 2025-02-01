@@ -288,13 +288,14 @@ class MyClient(discord.Client, MessageHandler):
         return guild
 
     async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
-        guild = self.get_guild(guild_id)
+        guild = await self.get_guild(guild_id)
         if not guild:
-            await self._send_message(guild_id, "Guild not found.")
+            await self.send_message(guild_id, "Guild not found.")
             return
-        member = await guild.fetch_member(member_id)
-        if not member:
-            await self._send_message(guild_id, "Member not found.")
+        try:
+            member = await guild.fetch_member(member_id)
+        except discord.NotFound:
+            await self.send_message(guild_id, "Member not found.")
             return
 
         if ("TaEnrollment" in canvas_role) or len(canvas_role)>1:  # Example: if BYU ID starts with "TA", assign TA role
@@ -370,9 +371,6 @@ class MyClient(discord.Client, MessageHandler):
             auto_archive_duration=60
         )
         return thread.id
-
-
-
 
 def main(config):
     client = MyClient(config)
