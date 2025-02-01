@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'master'
-      - '62-aws-s3-and-fargate-deployment'
       - 'production'
       - 'test'
   workflow_dispatch:

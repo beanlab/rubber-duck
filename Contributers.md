@@ -101,7 +101,7 @@ You should now be ready to do all the local machine set up for Rubber Duck. If y
     - You are going to need the S3 policies listed above.
     - You are then going to need the following Docker-ECR-Read Policies listed in the image below
     - ![docker-read-permissions.jpg](images/docker-read-permissions.jpg)
-    - EXECUTION_ROLE, This is what your role should look like when finished. Create the role and then copy the arn for the GitHub Secrets
+    - EXECUTION_ROLE, This is what your role should look like when finished. Create the role and then copy the arn for the GitHub Secrets.
     - ![exucution-role-task.jpg](images/exucution-role-task.jpg)
 - Once you are finished you should now have everything you need to run the project.
 
