@@ -75,14 +75,35 @@ You should now be ready to do all the local machine set up for Rubber Duck. If y
    - [Final Instructions](images/docker_tutorial_img2.jpg) and [Docker Hello-World Output Screenshot Description](images/docker_tutorial_img3.jpg)
 
 
-## AWS CLI & ECR (Optional)
-- This section is optional but if you need to access BYU AWS servers please contact Dr. Bean to access.
-- You need to send your byu email to him.
-- You should be able to use this [link](https://byulogin.awsapps.com/start/#/?tab=accounts) to go there.
-
-## Cloud Deployment (AWS ECS, S3, and Fargate)
+## AWS Cloud Deployment: ECS, S3, Fargate, IAM, and Cloudwatch
 - This section is meant to go over everything that is necessary to set up the CI/CD deployment pipeline in AWS.
-- In ECS you are going 
+- This section is optional but if you need to access BYU AWS servers please contact Dr. Bean. You need to send your byu email to him.
+- You should be able to use this [link](https://byulogin.awsapps.com/start/#/?tab=accounts) to go there.
+- In **ECS** you are going to set up a cluster, service, and a task and storing the naming inside of GitHub Secrets.
+  - You can find more about how to set up clusters, services, and tasks in the tutorial section of AWS. 
+  - For the **task definition** you can look in esc_setup.sh file to see what it should look like.
+  - Here is the list of variables you are going to need to set up in GitHub Secrets
+  - CLUSTER_NAME, this is name of your cluster. 
+  - SERVICE_NAME, this is name of your service.
+  - TASK_DEFINITION_FAMILY, this is the name of your task definition.
+  - IMAGE_URI, this is the image that comes from your docker container.
+  - REGION, This is the region you are deploying from.
+- The next thing you need to do is set up a **S3 bucket** that you want to store your information inside.
+- When you set up your bucket make sure you include the  "Action": "s3:GetObject", and "Resource": "arn:aws:s3:::rubber-duck-config/*" permissions. This allows your ECS to access the S3 bucket.
+  - ENV_FILE_S3_PATH, this is the path in your S3 bucket to your file. You can find this by clicking on the file in S3 and copying the part that starts with arn.
+- The last thing you need to include is **Cloudwatch** permissions to you IAM user. If you haven't set up a user you are going to need to have one.
+  - Cloudwatch is great for knowing what is going inside your application, and it is required for you to run your ECS product.
+    - "Action":"logs:CreateLogStream", "logs:PutLogEvents"
+-  **IAM** This is where you set up the execution role for your program. 
+  - You are going to need to make a role for your ECS service to execute all the necessary steps.
+  - So you are going to need to make three policies total. If you don't already have them.
+    - You are going to need the Cloudwatch policies listed above.
+    - You are going to need the S3 policies listed above.
+    - You are then going to need the following Docker-ECR-Read Policies listed in the image below
+    - ![docker-read-permissions.jpg](images/docker-read-permissions.jpg)
+    - EXECUTION_ROLE, This is what your role should look like when finished. Create the role and then copy the arn for the GitHub Secrets
+    - ![exucution-role-task.jpg](images/exucution-role-task.jpg)
+- Once you are finished you should now have everything you need to run the project.
 
 # Intro Assignment
 The assignment it to create your own discord bot or rubber duck. Follow the instructions posted on this [instructions](https://discord.gg/YGRXPCCT) discord channel to test if everything is running correctly.
