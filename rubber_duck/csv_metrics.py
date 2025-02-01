@@ -11,7 +11,7 @@ def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
 
-class MetricsHandler:
+class csv_metrics_handler:
     def __init__(self, metrics_folder: Path):
         metrics_folder.mkdir(parents=True, exist_ok=True)
 
