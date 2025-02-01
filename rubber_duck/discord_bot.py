@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
-from models import create_sql_manager
+from SQLquest import create_sql_manager
 
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
@@ -163,9 +163,6 @@ class MyClient(discord.Client, MessageHandler):
             raise NotImplemented(f'No workflow of type {wtype}')
 
         self._workflow_manager = create_sql_manager(namespace, create_workflow)
-
-        #self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck', create_workflow)
-
 
     async def on_ready(self):
         # print out information when the bot wakes up

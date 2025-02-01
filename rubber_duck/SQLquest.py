@@ -31,14 +31,15 @@ class SqlBlobStorage(BlobStorage):
         return self._session
 
     def write_blob(self, key: str, blob: Blob):
-        # Check to see if a blob exists, if so rewrite it
-        record_to_update = self._get_session().query(RecordModel).filter(RecordModel.name == self._name).one_or_none()
+        session = self._get_session()
+        record_to_update = session.query(RecordModel).filter(RecordModel.name == self._name,
+                                                             RecordModel.key == key).one_or_none()
         if record_to_update:
             record_to_update.blob = blob
         else:
             new_record = RecordModel(name=self._name, key=key, blob=blob)
-            self._get_session().add(new_record)
-        self._get_session().commit()
+            session.add(new_record)
+        session.commit()
 
     # noinspection PyTypeChecker
     def read_blob(self, key: str) -> Blob | None:
