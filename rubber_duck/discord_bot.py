@@ -11,8 +11,8 @@ from quest import create_filesystem_manager
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from reporter import Reporter
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -108,59 +108,62 @@ class MyClient(discord.Client, MessageHandler):
         self.admin_settings = config['admin_settings']
         open_ai_retry_protocol = config['open_ai_retry_protocol']
 
-        # Command channel feature
-        self._command_channel = self.admin_settings['admin_channel_id']
-
-        # Rubber duck feature
-        self._duck_config = config['rubber_duck']
-        self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
-
         # MetricsHandler initialization
         self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
 
-        async def fetch_message(channel_id, message_id):
-            return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        # Command channel feature
+        self._command_channel = self.admin_settings['admin_channel_id']
+
+        reporter = Reporter(self.metrics_handler, config['reporting'])
+        commands_workflow = BotCommands(self.send_message, self.metrics_handler, reporter)
+
+        # Rubber duck feature
+        self._duck_config = config['rubber_duck']
+        self._duck_channels = set(conf.get('name') or conf['id'] for conf in self._duck_config['channels'])
 
         feedback_workflow = FeedbackWorkflow(
             self.send_message,
-            fetch_message,
+            self.add_reaction,
             self.metrics_handler.record_feedback
         )
 
-        reporter = Reporter(self.metrics_handler, config['reporting'])
+        async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
+            if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
+                return
+
+            workflow_id = get_feedback_workflow_id(channel_id)
+            self._workflow_manager.start_workflow(
+                'feedback', workflow_id,
+                workflow_type, guild_id, channel_id, user_id,
+                server_feedback_config
+            )
+
+        duck_workflow = RubberDuck(
+            self,
+            self.metrics_handler,
+            self._duck_config,
+            open_ai_retry_protocol,
+            start_feedback_workflow
+        )
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
+                    return commands_workflow
 
                 case 'duck':
-
-                    async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
-                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
-                            return
-
-                        workflow_id = get_feedback_workflow_id(channel_id)
-                        self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, workflow_type, guild_id, channel_id, user_id,
-                            server_feedback_config
-                        )
-
-                    return RubberDuck(
-                        self,
-                        self.metrics_handler,
-                        self._duck_config,
-                        open_ai_retry_protocol,
-                        start_feedback_workflow
-                    )
+                    return duck_workflow
 
                 case 'feedback':
                     return feedback_workflow
 
             raise NotImplemented(f'No workflow of type {wtype}')
 
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
-                                                           create_workflow)
+        self._workflow_manager = create_filesystem_manager(
+            Path(quest_config['state_path']),
+            'rubber-duck',
+            create_workflow
+        )
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -248,7 +251,8 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             if isinstance(file, list):
-                curr_message = await channel.send("", files=file) #TODO: check that all instances are discord.File objects
+                curr_message = await channel.send("",
+                                                  files=file)  # TODO: check that all instances are discord.File objects
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -267,6 +271,10 @@ class MyClient(discord.Client, MessageHandler):
             await msg.edit(content=new_content)
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+
+    async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
+        message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.add_reaction(reaction)
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
