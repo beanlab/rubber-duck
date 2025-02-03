@@ -126,7 +126,6 @@ class RubberDuck:
         # self._metrics_handler.record_message = step(self._metrics_handler.record_message)
         # self._metrics_handler.record_feedback = step(self._metrics_handler.record_feedback)
         # self._metrics_handler.record_usage = step(self._metrics_handler.record_usage)
-        self._error_message_id = None
 
         self.start_feedback_workflow = step(start_feedback_workflow)
 
@@ -239,7 +238,7 @@ class RubberDuck:
 
                 except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                     error_message, _ = generate_error_message(guild_id, thread_id, ex)
-                    await self._edit_message(thread_id, self._error_message_id,
+                    await self._send_message(thread_id,
                                              'I\'m having trouble connecting to the OpenAI servers, '
                                              'please open up a separate conversation and try again')
                     await self._report_error(error_message)
@@ -296,8 +295,7 @@ class RubberDuck:
                 return await self._get_completion(thread_id, engine, message_history)
             except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                 if retries == -1:
-                    processing_message_id = await self._send_message(thread_id, 'Trying to contact servers...')
-                    self._error_message_id = processing_message_id
+                    await self._send_message(thread_id, 'Trying to contact servers...')
                 retries += 1
                 if retries >= max_retries:
                     raise
