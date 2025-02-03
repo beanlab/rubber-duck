@@ -10,6 +10,5 @@ scratch/suites/.DS_Store
 poetry.lock
 /wiley-config.json
 /bryce_config.json
-/wiley-config.json
 state/
 settings.txt

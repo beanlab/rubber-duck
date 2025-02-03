@@ -66,11 +66,8 @@ TASK_DEFINITION_JSON=$(cat <<EOF
 EOF
 )
 
-# Register Task Definition
 echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION
 
-
-# Step 5: Update the ECS Service
 echo "Updating ECS service with new task definition..."
 aws ecs update-service \
   --cluster $CLUSTER_NAME \
