@@ -104,7 +104,7 @@ class Reporter:
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
-            data = self.metricsHandler.get_feedback()
+            data = self.metricsHandler._get_feedback()
         elif desired_df == 'usage':
             data = self.metricsHandler.get_usage()
         elif desired_df == 'messages':
@@ -289,7 +289,7 @@ class Reporter:
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self._guilds, self.metricsHandler.get_feedback(), arg_string, self.show_fig)
+            return feed_fancy_graph(self._guilds, self.metricsHandler._get_feedback(), arg_string, self.show_fig)
 
         args = self.parse_args(arg_string)
 

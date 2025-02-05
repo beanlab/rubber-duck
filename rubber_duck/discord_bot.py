@@ -12,7 +12,7 @@ from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from metrics import MetricsHandler
 from reporter import Reporter
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, SetupPrivateThread, HaveStandardGptConversation
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -127,6 +127,33 @@ class MyClient(discord.Client, MessageHandler):
             self.metrics_handler.record_feedback
         )
 
+        setup_thread = SetupPrivateThread(
+            self.create_thread,
+            self.send_message
+        )
+
+        have_conversation = HaveStandardGptConversation(
+            open_ai_retry_protocol,
+            self.metrics_handler.record_message,
+            self.metrics_handler.record_usage,
+            self.send_message,
+            self.report_error,
+            self.typing
+        )
+
+        get_feedback = FeedbackWorkflow(
+            self.send_message,
+            self.add_reaction,
+            self.metrics_handler.record_feedback
+        )
+
+        duck_workflow = RubberDuck(
+            self._duck_config,
+            setup_thread,
+            have_conversation,
+            get_feedback
+        )
+
         async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
             if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
                 return
@@ -137,14 +164,6 @@ class MyClient(discord.Client, MessageHandler):
                 workflow_type, guild_id, channel_id, user_id,
                 server_feedback_config
             )
-
-        duck_workflow = RubberDuck(
-            self,
-            self.metrics_handler,
-            self._duck_config,
-            open_ai_retry_protocol,
-            start_feedback_workflow
-        )
 
         def create_workflow(wtype: str):
             match wtype:
