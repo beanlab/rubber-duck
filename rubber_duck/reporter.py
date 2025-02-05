@@ -10,7 +10,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 
-from metrics import MetricsHandler
+from sql_metrics import SQLMetricsHandler
 
 
 def fancy_preproccesing(df, guilds):
@@ -97,18 +97,18 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, metricsHandler, report_config, show_fig=False):
-        self.metricsHandler = metricsHandler
+    def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
+        self.SQLMetricsHandler = SQLMetricsHandler
         self.show_fig = show_fig
         self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
-            data = self.metricsHandler.get_feedback()
+            data = self.SQLMetricsHandler.get_feedback()
         elif desired_df == 'usage':
-            data = self.metricsHandler.get_usage()
+            data = self.SQLMetricsHandler.get_usage()
         elif desired_df == 'messages':
-            data = self.metricsHandler.get_message()
+            data = self.SQLMetricsHandler.get_message()
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
         return data
@@ -289,7 +289,7 @@ class Reporter:
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self._guilds, self.metricsHandler.get_feedback(), arg_string, self.show_fig)
+            return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
 
         args = self.parse_args(arg_string)
 
@@ -309,7 +309,7 @@ if __name__ == '__main__':
 
     this_file = Path(__file__)
     config = json.loads((this_file.parent.parent / 'config.json').read_text())
-    metricsHandler = MetricsHandler(this_file.parent.parent / 'state' / 'metrics')
-    reporter = Reporter(metricsHandler, config['reporting'], show_fig=True)
+    SQLMetricsHandler = SQLMetricsHandler(this_file.parent.parent / 'state' / 'metrics')
+    reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
 
     reporter.get_report('!report f1')
