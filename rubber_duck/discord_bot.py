@@ -1,4 +1,5 @@
 import argparse
+import asyncio.taskgroups
 import json
 import logging
 import os
@@ -10,7 +11,7 @@ from models import create_sql_manager
 
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
-from metrics import MetricsHandler
+from sql_metrics import SQLMetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from reporter import Reporter
 
@@ -20,6 +21,7 @@ namespace = 'rubber-duck'
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
+# def wrap_for_quest():
 
 def parse_blocks(text: str, limit=1990):
     tick = '`'
@@ -118,8 +120,10 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_config = config['rubber_duck']
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
-        # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
+        # SQLMetricsHandler initialization
+        # wrap the SQLMetrics Handler to only
+        # wrap_for_quest(SQLMetricsHandler(), ["record_message", "record_usage", "record_feedback"])
+        self.sql_metrics_handler = SQLMetricsHandler()
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
@@ -127,15 +131,15 @@ class MyClient(discord.Client, MessageHandler):
         feedback_workflow = FeedbackWorkflow(
             self.send_message,
             fetch_message,
-            self.metrics_handler.record_feedback
+            self.sql_metrics_handler.record_feedback
         )
 
-        reporter = Reporter(self.metrics_handler, config['reporting'])
+        reporter = Reporter(self.sql_metrics_handler, config['reporting'])
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
+                    return BotCommands(self.send_message, self.sql_metrics_handler, reporter)
 
                 case 'duck':
 
@@ -151,7 +155,7 @@ class MyClient(discord.Client, MessageHandler):
 
                     return RubberDuck(
                         self,
-                        self.metrics_handler,
+                        self.sql_metrics_handler,
                         self._duck_config,
                         open_ai_retry_protocol,
                         start_feedback_workflow

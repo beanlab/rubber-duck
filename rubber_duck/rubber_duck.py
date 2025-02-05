@@ -11,7 +11,7 @@ from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue, alias
 
-from metrics import MetricsHandler
+from sql_metrics import SQLMetricsHandler
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -95,6 +95,7 @@ def wrap_steps(obj: T) -> T:
 def generate_error_message(guild_id, thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
     logging.exception('Error getting completion: ' + error_code)
+    logging.exception('Error getting completion: ' + error_code)
     error_message = (
         f'😵 **Error code {error_code}** 😵'
         f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
@@ -107,7 +108,7 @@ def generate_error_message(guild_id, thread_id, ex):
 class RubberDuck:
     def __init__(self,
                  message_handler: MessageHandler,
-                 metrics_handler: MetricsHandler,
+                 sql_metrics_handler : SQLMetricsHandler,
                  duck_config: DuckConfig,
                  retry_config: RetryConfig,
                  start_feedback_workflow
@@ -122,7 +123,7 @@ class RubberDuck:
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
         self._default_config = duck_config['defaults']
         self._retry_config = retry_config
-        self._metrics_handler = metrics_handler
+        self._sql_metrics_handler = sql_metrics_handler
         # self._metrics_handler.record_message = step(self._metrics_handler.record_message)
         # self._metrics_handler.record_feedback = step(self._metrics_handler.record_feedback)
         # self._metrics_handler.record_usage = step(self._metrics_handler.record_usage)
@@ -189,9 +190,8 @@ class RubberDuck:
             guild_id = initial_message['guild_id']
 
             # Record the prompt
-            await self._metrics_handler.record_message(
+            await self._sql_metrics_handler.record_message(
                 guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
-
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
@@ -217,7 +217,7 @@ class RubberDuck:
                     user_id = message['author_id']
                     guild_id = message['guild_id']
 
-                    await self._metrics_handler.record_message(
+                    await self._sql_metrics_handler.record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
@@ -225,12 +225,12 @@ class RubberDuck:
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
-                    await self._metrics_handler.record_usage(guild_id, thread_id, user_id,
+                    await self._sql_metrics_handler.record_usage(guild_id, thread_id, user_id,
                                                              engine,
                                                              usage['prompt_tokens'],
                                                              usage['completion_tokens'])
 
-                    await self._metrics_handler.record_message(
+                    await self._sql_metrics_handler.record_message(
                         guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))

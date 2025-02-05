@@ -44,7 +44,6 @@ class UsageModel(Base):
     input_tokens = Column(String)
     output_tokens = Column(String)
 
-
 class FeedbackModel(Base):
     __tablename__ = 'feedback'
 
@@ -56,11 +55,11 @@ class FeedbackModel(Base):
     reviewer_role_id = Column(Integer)
     feedback_score = Column(Integer)
 
-@pytest.mark.asyncio
-async def test_sql_metrics_handler():
-    connection = DatabaseConnection(Base, 'sqlite:///:memory:')
-    sql_handler = SQLMetricsHandler(connection)
+connection = DatabaseConnection(Base, 'sqlite:///:memory:')
+sql_handler = SQLMetricsHandler(connection)
 
+@pytest.mark.asyncio
+async def test_messages_table():
     # Record message to the memory database
     await sql_handler.record_message(testValuesDict["guild_id"], testValuesDict["thread_id"],testValuesDict["user_id"],testValuesDict["role"], testValuesDict["message"])
 
@@ -74,7 +73,8 @@ async def test_sql_metrics_handler():
     assert recorded_messages[0].role == testValuesDict["role"]
     assert recorded_messages[0].message == testValuesDict["message"]
 
-
+@pytest.mark.asyncio
+async def test_usage_table():
     # Record usage to the memory database
     await sql_handler.record_usage(testValuesDict["guild_id"], testValuesDict["thread_id"], testValuesDict["user_id"],
                                      testValuesDict["engine"], testValuesDict["input_tokens"], testValuesDict["output_tokens"])
@@ -90,6 +90,8 @@ async def test_sql_metrics_handler():
     assert recorded_usages[0].input_tokens == testValuesDict["input_tokens"]
     assert recorded_usages[0].output_tokens == testValuesDict["output_tokens"]
 
+@pytest.mark.asyncio
+async def test_feedback_table():
     # Record feedback to the memory database
     await sql_handler.record_feedback(testValuesDict["guild_id"], testValuesDict["thread_id"], testValuesDict["user_id"],
                                    testValuesDict["feedback_score"], testValuesDict["reviewer_role_id"])
