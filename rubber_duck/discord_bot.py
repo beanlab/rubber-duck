@@ -143,13 +143,13 @@ class MyClient(discord.Client, MessageHandler):
 
                 case 'duck':
 
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
+                    async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
                         if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
                             return
 
                         workflow_id = get_feedback_workflow_id(channel_id)
                         self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, guild_id, channel_id, user_id,
+                            'feedback', workflow_id, workflow_type, guild_id, channel_id, user_id,
                             server_feedback_config
                         )
 
