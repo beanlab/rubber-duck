@@ -182,7 +182,7 @@ class RubberDuck:
 
         async with queue('messages', None) as messages:
             message_history = [
-                GPTMessage(role='system', content=prompt)
+                GPTMessage(role='developer', content=prompt)
             ]
 
             user_id = initial_message['author_id']
