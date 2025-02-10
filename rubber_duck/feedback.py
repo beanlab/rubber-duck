@@ -31,7 +31,7 @@ class FeedbackWorkflow:
     async def __call__(self, *args):
         return await self.ta_feedback(*args)
 
-    async def ta_feedback(self, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
+    async def ta_feedback(self, workflow_type, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
         """
         Takes thread_id, sends it to the ta-channel, collect's feedback
         """
@@ -73,7 +73,7 @@ class FeedbackWorkflow:
 
             # Record score
 
-            await self._record_feedback(guild_id, thread_id, user_id, feedback_score, reviewer_id)
+            await self._record_feedback(workflow_type, guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done
 
@@ -88,5 +88,4 @@ class FeedbackWorkflow:
             #verifies feedback came from someone other than the student
             if reviewer_id != user_id:
                 break
-
         return feedback_emoji, reviewer_id

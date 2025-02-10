@@ -1,4 +1,5 @@
 import argparse
+import asyncio.taskgroups
 import json
 import logging
 import os
@@ -6,12 +7,18 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
+
 from SQLquest import create_sql_manager
+
+#from quest import step
+
+#from models import create_sql_manager
+
 
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
-from metrics import MetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from sql_metrics import SQLMetricsHandler
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, T, _Wrapped
 from reporter import Reporter
 
 
@@ -20,6 +27,16 @@ namespace = 'rubber-duck'
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
+def wrap_steps(obj: T, methods: list[str] = None):
+    wrapped = _Wrapped()
+
+    for field in dir(obj):
+        if field.startswith('_'):
+            continue
+
+        if ((method := getattr(obj, field)) is None or method in methods) and callable(method):
+            method = step(method)
+            setattr(wrapped, field, method)
 
 def parse_blocks(text: str, limit=1990):
     tick = '`'
@@ -118,8 +135,10 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_config = config['rubber_duck']
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
-        # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
+        # SQLMetricsHandler initialization
+        self.sql_metrics_handler = SQLMetricsHandler()
+        wrap_steps(self.sql_metrics_handler, ["record_message", "record_usage", "record_feedback"])
+
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
@@ -127,31 +146,31 @@ class MyClient(discord.Client, MessageHandler):
         feedback_workflow = FeedbackWorkflow(
             self.send_message,
             fetch_message,
-            self.metrics_handler.record_feedback
+            self.sql_metrics_handler.record_feedback
         )
 
-        reporter = Reporter(self.metrics_handler, config['reporting'])
+        reporter = Reporter(self.sql_metrics_handler, config['reporting'])
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
+                    return BotCommands(self.send_message, self.sql_metrics_handler, reporter)
 
                 case 'duck':
 
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
+                    async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
                         if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
                             return
 
                         workflow_id = get_feedback_workflow_id(channel_id)
                         self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, guild_id, channel_id, user_id,
+                            'feedback', workflow_id, workflow_type, guild_id, channel_id, user_id,
                             server_feedback_config
                         )
 
                     return RubberDuck(
                         self,
-                        self.metrics_handler,
+                        self.sql_metrics_handler,
                         self._duck_config,
                         open_ai_retry_protocol,
                         start_feedback_workflow
