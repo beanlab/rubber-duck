@@ -1,11 +1,10 @@
 import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from quest import step
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import declarative_base
 
-from rubber_duck.connection import DatabaseConnection
+from connection import DatabaseConnection
 
 Base = declarative_base()
 

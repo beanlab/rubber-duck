@@ -7,12 +7,14 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
+from quest import step
+
 from models import create_sql_manager
 
 from bot_commands import BotCommands
 from feedback import FeedbackWorkflow
 from sql_metrics import SQLMetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, T, _Wrapped
 from reporter import Reporter
 
 
@@ -21,7 +23,16 @@ namespace = 'rubber-duck'
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
-# def wrap_for_quest():
+def wrap_steps(obj: T, methods: list[str] = None):
+    wrapped = _Wrapped()
+
+    for field in dir(obj):
+        if field.startswith('_'):
+            continue
+
+        if ((method := getattr(obj, field)) is None or method in methods) and callable(method):
+            method = step(method)
+            setattr(wrapped, field, method)
 
 def parse_blocks(text: str, limit=1990):
     tick = '`'
@@ -121,9 +132,9 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
         # SQLMetricsHandler initialization
-        # wrap the SQLMetrics Handler to only
-        # wrap_for_quest(SQLMetricsHandler(), ["record_message", "record_usage", "record_feedback"])
         self.sql_metrics_handler = SQLMetricsHandler()
+        wrap_steps(self.sql_metrics_handler, ["record_message", "record_usage", "record_feedback"])
+
 
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
