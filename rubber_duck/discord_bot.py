@@ -15,10 +15,11 @@ from feedback import GetTAFeedback, GetConvoFeedback
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
-from sql_metrics import SQLMetricsHandler, create_sqlite_session
+from sql_metrics import SQLMetricsHandler
+from sqlite import create_sqlite_session
 from threads import SetupPrivateThread
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 

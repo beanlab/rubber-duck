@@ -5,14 +5,14 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-Base = declarative_base()
+MetricsBase = declarative_base()
 
 
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
 
-class MessagesModel(Base):
+class MessagesModel(MetricsBase):
     __tablename__ = 'messages'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -24,7 +24,7 @@ class MessagesModel(Base):
     message = Column(String)
 
 
-class UsageModel(Base):
+class UsageModel(MetricsBase):
     __tablename__ = 'usage'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -37,7 +37,7 @@ class UsageModel(Base):
     output_tokens = Column(String)
 
 
-class FeedbackModel(Base):
+class FeedbackModel(MetricsBase):
     __tablename__ = 'feedback'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -50,18 +50,11 @@ class FeedbackModel(Base):
     feedback_score = Column(Integer)
 
 
-# This probably needs to be run AFTER the classes above are defined
-# By having this method in this module, you can't get this method
-# without loading the module, which will define the classes above.
-# :)
-def create_sqlite_session(db_url: str) -> Session:
-    engine = create_engine(db_url)
-    Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)()
 
 
 class SQLMetricsHandler:
-    def __init__(self, session):
+    def __init__(self, session: Session):
+        MetricsBase.metadata.create_all(session.connection())
         self.session = session
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
