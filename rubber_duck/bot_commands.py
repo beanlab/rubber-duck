@@ -12,9 +12,9 @@ from rubber_duck import Message
 
 
 class BotCommands:
-    def __init__(self, send_message, sql_metrics_handler, reporter):
+    def __init__(self, send_message, metrics_handler, reporter):
         self._send_message = step(send_message)
-        self._sql_metrics_handler = sql_metrics_handler
+        self._metrics_handler = metrics_handler
         self._reporter = reporter
 
     async def __call__(self, message: Message):
@@ -127,13 +127,13 @@ class BotCommands:
     @step
     # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
-        await self._execute_command(channel_id, f'zip -q -r messages.zip {self._sql_metrics_handler._messages_file}')
+        await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
         await self._send_message(channel_id, 'messages zip', file='messages.zip')
 
-        await self._execute_command(channel_id, f'zip -q -r usage.zip {self._sql_metrics_handler._usage_file}')
+        await self._execute_command(channel_id, f'zip -q -r usage.zip {self._metrics_handler._usage_file}')
         await self._send_message(channel_id, 'usage zip', file='usage.zip')
 
-        await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._sql_metrics_handler._feedback_file}')
+        await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._metrics_handler._feedback_file}')
         await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
 
     @step
