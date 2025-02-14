@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from quest import step
+
 import pandas as pd
 
 
@@ -29,7 +29,8 @@ class CSVMetricsHandler:
         self._feedback_file = metrics_folder / 'feedback.csv'
         if not self._feedback_file.exists():
             self._feedback_file.write_text(
-                ','.join(['timestamp', 'workflow_type', 'guild_id', 'thread_id', 'user_id', 'reviewer_role_id', 'feedback_score']) + '\n')
+                ','.join(['timestamp', 'workflow_type', 'guild_id', 'thread_id', 'user_id', 'reviewer_role_id',
+                          'feedback_score']) + '\n')
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         with self._messages_file.open('at', newline='') as file:
@@ -41,12 +42,13 @@ class CSVMetricsHandler:
             writer = csv.writer(file)
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
 
-
-    async def record_feedback(self, workflow_type, guild_id: int, thread_id: int, user_id: int, feedback_score: int, reviewer_id: int):
+    async def record_feedback(self, workflow_type, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
+                              feedback_score: int):
         try:
             with self._feedback_file.open('at', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow([get_timestamp(), workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score])
+                writer.writerow(
+                    [get_timestamp(), workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score])
         except Exception as e:
             logging.error(f"Failed to record feedback: {e}")
 
@@ -54,11 +56,9 @@ class CSVMetricsHandler:
         df = pd.read_csv(self._messages_file)
         return df
 
-
     def get_usage(self):
         df = pd.read_csv(self._usage_file)
         return df
-
 
     def get_feedback(self):
         df = pd.read_csv(self._feedback_file)
