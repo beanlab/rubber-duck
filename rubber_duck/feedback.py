@@ -22,7 +22,7 @@ class GetConvoFeedback:
         self._get_feedback = get_feedback
 
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int):
-        if config := self._feedback_configs.get(str(guild_id)) is not None:
+        if (config := self._feedback_configs.get(str(guild_id))) is not None:
             await self._get_feedback(workflow_type, guild_id, thread_id, user_id, config)
 
 
