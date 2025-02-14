@@ -1,5 +1,4 @@
 import argparse
-import asyncio.taskgroups
 import json
 import logging
 import os
@@ -7,38 +6,19 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
-from quest import step
+from quest import wrap_steps
 
 from SQLquest import create_sql_manager
-
-#from quest import step
-
-#from models import create_sql_manager
-
-
 from bot_commands import BotCommands
-from feedback import FeedbackWorkflow, GetTAFeedback, GetFeedback
-from sql_metrics import SQLMetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, T, _Wrapped, SetupPrivateThread, \
-    HaveStandardGptConversation
+from feedback import GetTAFeedback, GetConvoFeedback
 from reporter import Reporter
-
-
-namespace = 'rubber-duck'
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, SetupPrivateThread, \
+    HaveStandardGptConversation
+from sql_metrics import SQLMetricsHandler, create_sqlite_session
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
-def wrap_steps(obj: T, methods: list[str] = None):
-    wrapped = _Wrapped()
-
-    for field in dir(obj):
-        if field.startswith('_'):
-            continue
-
-        if ((method := getattr(obj, field)) is None or method in methods) and callable(method):
-            method = step(method)
-            setattr(wrapped, field, method)
 
 def parse_blocks(text: str, limit=1990):
     tick = '`'
@@ -124,9 +104,6 @@ class MyClient(discord.Client, MessageHandler):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        feedback_config = config['feedback']
-        quest_config = config['quest']
-        metrics_config = config['metrics']
         self.admin_settings = config['admin_settings']
         open_ai_retry_protocol = config['open_ai_retry_protocol']
 
@@ -138,24 +115,26 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
         # SQLMetricsHandler initialization
-        self.sql_metrics_handler = SQLMetricsHandler()
-        wrap_steps(self.sql_metrics_handler, ["record_message", "record_usage", "record_feedback"])
+        db_url = config["sql"]["db_url"]
+        sql_session = create_sqlite_session(db_url)
+        self.metrics_handler = SQLMetricsHandler(sql_session)
+        wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
+        reporter = Reporter(self.metrics_handler, config['reporting'])
+        commands_workflow = BotCommands(self.send_message, self.metrics_handler, reporter)
 
-        async def fetch_message(channel_id, message_id):
-            return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
-
-        reporter = Reporter(self.sql_metrics_handler, config['reporting'])
-        commands_workflow = BotCommands(self.send_message, self.sql_metrics_handler, reporter)
-
+        # Feedback
         get_ta_feedback = GetTAFeedback(
             self.send_message,
-            fetch_message,
-            self.sql_metrics_handler.record_feedback
+            self.add_reaction,
+            self.metrics_handler.record_feedback,
         )
 
-        feedback_workflow = FeedbackWorkflow(
-            get_ta_feedback,
+        feedback_configs = config['feedback']
+
+        get_feedback = GetConvoFeedback(
+            feedback_configs,
+            get_ta_feedback
         )
 
         setup_thread = SetupPrivateThread(
@@ -165,8 +144,8 @@ class MyClient(discord.Client, MessageHandler):
 
         have_conversation = HaveStandardGptConversation(
             open_ai_retry_protocol,
-            self.sql_metrics_handler.record_message,
-            self.sql_metrics_handler.record_usage,
+            self.metrics_handler.record_message,
+            self.metrics_handler.record_usage,
             self.send_message,
             self.report_error,
             self.typing
@@ -176,9 +155,8 @@ class MyClient(discord.Client, MessageHandler):
             self._duck_config,
             setup_thread,
             have_conversation,
-            feedback_workflow,
+            get_feedback,
         )
-
 
         def create_workflow(wtype: str):
             match wtype:
@@ -188,12 +166,10 @@ class MyClient(discord.Client, MessageHandler):
                 case 'duck':
                     return duck_workflow
 
-                case 'feedback':
-                    return feedback_workflow
+            raise NotImplementedError(f'No workflow of type {wtype}')
 
-            raise NotImplemented(f'No workflow of type {wtype}')
-
-        self._workflow_manager = create_sql_manager(namespace, create_workflow)
+        namespace = 'rubber-duck'  # TODO - move to config
+        self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
     async def on_ready(self):
         # print out information when the bot wakes up

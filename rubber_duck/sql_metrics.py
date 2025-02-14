@@ -1,12 +1,12 @@
 import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import declarative_base
 
-from connection import DatabaseConnection
+from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 Base = declarative_base()
+
 
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
@@ -49,15 +49,24 @@ class FeedbackModel(Base):
     feedback_score = Column(Integer)
 
 
+# This probably needs to be run AFTER the classes above are defined
+# By having this method in this module, you can't get this method
+# without loading the module, which will define the classes above.
+# :)
+def create_sqlite_session(db_url: str) -> Session:
+    engine = create_engine(db_url)
+    Base.metadata.create_all(engine)
+    return sessionmaker(bind=engine)()
+
+
 class SQLMetricsHandler:
-    def __init__(self, connection=DatabaseConnection(Base)):
-        self.connection = connection
-        self.session = self.connection.get_session()
+    def __init__(self, session):
+        self.session = session
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
             new_message_row = MessagesModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
-                                          user_id=user_id, role=role, message=message)
+                                            user_id=user_id, role=role, message=message)
             self.session.add(new_message_row)
             self.session.commit()
         except sqlite3.Error as e:
@@ -65,8 +74,9 @@ class SQLMetricsHandler:
 
     async def record_usage(self, guild_id, thread_id, user_id, engine, input_tokens, output_tokens):
         try:
-            new_usage_row = UsageModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id, user_id=user_id,
-                                     engine=engine, input_tokens=input_tokens, output_tokens=output_tokens)
+            new_usage_row = UsageModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
+                                       user_id=user_id,
+                                       engine=engine, input_tokens=input_tokens, output_tokens=output_tokens)
             self.session.add(new_usage_row)
             self.session.commit()
         except sqlite3.Error as e:
@@ -75,7 +85,8 @@ class SQLMetricsHandler:
     async def record_feedback(self, guild_id: int, thread_id: int, user_id: int, feedback_score: int, reviewer_id: int):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
-                                           user_id=user_id, reviewer_role_id=reviewer_id, feedback_score=feedback_score)
+                                             user_id=user_id, reviewer_role_id=reviewer_id,
+                                             feedback_score=feedback_score)
             self.session.add(new_feedback_row)
             self.session.commit()
         except sqlite3.Error as e:

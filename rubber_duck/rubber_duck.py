@@ -4,14 +4,14 @@ import os
 import traceback as tb
 import uuid
 from pathlib import Path
-from typing import TypedDict, Protocol, ContextManager, TypeVar
+from typing import TypedDict, Protocol, ContextManager
 
 import openai
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue, alias
 
-from feedback import GetFeedback
+from feedback import GetConvoFeedback
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -73,27 +73,6 @@ class MessageHandler(Protocol):
     async def create_thread(self, parent_channel_id: int, title: str) -> int: ...
 
 
-class _Wrapped:
-    pass
-
-
-T = TypeVar('T')
-
-
-def wrap_steps(obj: T, methods: list[str] = None) -> T:
-    wrapped = _Wrapped()
-
-    for field in dir(obj):
-        if field.startswith('_'):
-            continue
-
-        if ((method := getattr(obj, field)) is None or method in methods) and callable(method):
-            method = step(method)
-            setattr(wrapped, field, method)
-
-    return wrapped
-
-
 def generate_error_message(guild_id, thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
     logging.exception('Error getting completion: ' + error_code)
@@ -116,12 +95,13 @@ class SetupThread(Protocol):
 class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600): ...
 
+
 class RubberDuck:
     def __init__(self,
                  duck_config: DuckConfig,
                  setup_thread: SetupThread,
                  have_conversation: HaveConversation,
-                 get_feedback: GetFeedback,
+                 get_feedback: GetConvoFeedback,
                  ):
 
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
@@ -242,9 +222,9 @@ class HaveStandardGptConversation:
                     response = response_message['content'].strip()
 
                     await self._record_usage(guild_id, thread_id, user_id,
-                                                                 engine,
-                                                                 usage['prompt_tokens'],
-                                                                 usage['completion_tokens'])
+                                             engine,
+                                             usage['prompt_tokens'],
+                                             usage['completion_tokens'])
 
                     await self._record_message(
                         guild_id, thread_id, user_id, response_message['role'], response_message['content'])
