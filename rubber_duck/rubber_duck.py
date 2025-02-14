@@ -11,7 +11,7 @@ from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
 from quest import step, queue, alias
 
-from sql_metrics import SQLMetricsHandler
+from feedback import GetFeedback
 
 client = AsyncOpenAI(api_key=os.environ['OPENAI_API_KEY'])
 
@@ -115,11 +115,6 @@ class SetupThread(Protocol):
 
 class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600): ...
-
-
-class GetFeedback(Protocol):
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int): ...
-
 
 class RubberDuck:
     def __init__(self,
@@ -291,7 +286,6 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-            ### await self.start_feedback_workflow("rubber-duck", guild_id, thread_id, user_id)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:

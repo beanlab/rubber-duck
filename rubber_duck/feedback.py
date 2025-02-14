@@ -1,5 +1,5 @@
 import asyncio
-from typing import TypedDict
+from typing import TypedDict, Protocol
 
 from quest import queue, step, alias
 
@@ -10,13 +10,20 @@ class FeedbackConfig(TypedDict):
     allow_self_feedback: bool
     feedback_timeout: int
 
+class GetFeedback(Protocol):
+    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int): ...
 
-class FeedbackWorkflow:
+
+class GetTAFeedback:
     def __init__(self,
                  send_message,
                  add_reaction,
-                 record_feedback
+                 record_feedback,
+                 feedback_config=None
                  ):
+        if feedback_config is None:
+            feedback_config = {}
+        self._feedback_config = feedback_config
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
         self._record_feedback = record_feedback
@@ -29,14 +36,7 @@ class FeedbackWorkflow:
             '5️⃣': 5
         }
 
-    async def __call__(self, *args):
-        return await self.ta_feedback(*args)
-
-    async def ta_feedback(self, workflow_type, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
-        """
-        Takes thread_id, sends it to the ta-channel, collect's feedback
-        """
-
+    async def __call__(self, workflow_type, guild_id, thread_id, user_id):
         review_message_content = (
             f"How effective was this conversation: "
             f"https://discord.com/channels/{guild_id}/{thread_id}/{user_id}"
@@ -46,8 +46,8 @@ class FeedbackWorkflow:
             f"how effective was this conversation: "
         )
 
-        if 'reviewer_role_id' in feedback_config:
-            review_message_content = f"<@{feedback_config['reviewer_role_id']}> {review_message_content}"
+        if 'reviewer_role_id' in self._feedback_config:
+            review_message_content = f"<@{self._feedback_config['reviewer_role_id']}> {review_message_content}"
 
         feedback_message_id = await self._send_message(thread_id, feedback_message_content)
 
@@ -56,17 +56,17 @@ class FeedbackWorkflow:
                 await self._add_reaction(thread_id, feedback_message_id, reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
-            reviewer_channel_id = feedback_config['channel_id']
+            reviewer_channel_id = self._feedback_config['channel_id']
             review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
             try:
                 feedback_emoji, reviewer_id = await self.get_reviewer_feedback(
                     user_id, feedback_queue,
-                    feedback_config.get('allow_self_feedback', False),
-                    feedback_config.get('feedback_timeout', 604800)
+                    self._feedback_config.get('allow_self_feedback', False),
+                    self._feedback_config.get('feedback_timeout', 604800)
                 )
                 feedback_score = self._reactions[feedback_emoji]
-                await self._add_reaction(thread_id, feedback_message_id,'✅')
+                await self._add_reaction(thread_id, feedback_message_id, '✅')
                 await self._add_reaction(reviewer_channel_id, review_message_id, '✅')
 
             except asyncio.TimeoutError:
@@ -90,3 +90,12 @@ class FeedbackWorkflow:
             #Verify that the feedback came from someone other than the student
             if allow_self_feedback or reviewer_id != user_id:
                 return feedback_emoji, reviewer_id
+
+class FeedbackWorkflow:
+    def __init__(self,
+                 get_feedback: GetFeedback
+                 ):
+        self._get_feedback = get_feedback
+
+    async def __call__(self, *args):
+        return await self._get_feedback(*args)

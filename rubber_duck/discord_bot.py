@@ -17,9 +17,10 @@ from SQLquest import create_sql_manager
 
 
 from bot_commands import BotCommands
-from feedback import FeedbackWorkflow
+from feedback import FeedbackWorkflow, GetTAFeedback, GetFeedback
 from sql_metrics import SQLMetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, T, _Wrapped
+from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, T, _Wrapped, SetupPrivateThread, \
+    HaveStandardGptConversation
 from reporter import Reporter
 
 
@@ -147,10 +148,14 @@ class MyClient(discord.Client, MessageHandler):
         reporter = Reporter(self.sql_metrics_handler, config['reporting'])
         commands_workflow = BotCommands(self.send_message, self.sql_metrics_handler, reporter)
 
-        feedback_workflow = FeedbackWorkflow(
+        get_ta_feedback = GetTAFeedback(
             self.send_message,
             fetch_message,
             self.sql_metrics_handler.record_feedback
+        )
+
+        feedback_workflow = FeedbackWorkflow(
+            get_ta_feedback,
         )
 
         setup_thread = SetupPrivateThread(
@@ -167,17 +172,11 @@ class MyClient(discord.Client, MessageHandler):
             self.typing
         )
 
-        get_feedback = FeedbackWorkflow(
-            self.send_message,
-            self.add_reaction,
-            self.sql_metrics_handler.record_feedback
-        )
-
         duck_workflow = RubberDuck(
             self._duck_config,
             setup_thread,
             have_conversation,
-            get_feedback,
+            feedback_workflow,
         )
 
 
