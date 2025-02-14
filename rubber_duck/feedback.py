@@ -3,12 +3,19 @@ from typing import TypedDict, Protocol
 
 from quest import queue, step, alias
 
+from protocols import AddReaction, SendMessage
+
 
 class FeedbackConfig(TypedDict):
     channel_id: int
     reviewer_role_id: int
     allow_self_feedback: bool
     feedback_timeout: int
+
+
+class RecordFeedback(Protocol):
+    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
+                       feedback_score: int): ...
 
 
 class GetFeedback(Protocol):
@@ -28,9 +35,9 @@ class GetConvoFeedback:
 
 class GetTAFeedback:
     def __init__(self,
-                 send_message,
-                 add_reaction,
-                 record_feedback
+                 send_message: SendMessage,
+                 add_reaction: AddReaction,
+                 record_feedback: RecordFeedback
                  ):
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
@@ -69,7 +76,7 @@ class GetTAFeedback:
             review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
             try:
-                feedback_emoji, reviewer_id = await self.get_reviewer_feedback(
+                feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
                     user_id, feedback_queue,
                     feedback_config.get('allow_self_feedback', False),
                     feedback_config.get('feedback_timeout', 604800)
@@ -85,11 +92,12 @@ class GetTAFeedback:
 
             # Record score
 
-            await self._record_feedback(workflow_type, guild_id, thread_id, user_id, feedback_score, reviewer_id)
+            await self._record_feedback(workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score)
 
             # Done
 
-    async def get_reviewer_feedback(self, user_id, feedback_queue, allow_self_feedback, feedback_timeout):
+    @staticmethod
+    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
         while True:
             # Wait for feedback to be given
             feedback_emoji, reviewer_id = await asyncio.wait_for(

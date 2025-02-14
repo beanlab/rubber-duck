@@ -10,11 +10,13 @@ from quest import wrap_steps
 
 from SQLquest import create_sql_manager
 from bot_commands import BotCommands
+from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
+from protocols import Attachment, Message
 from reporter import Reporter
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment, SetupPrivateThread, \
-    HaveStandardGptConversation
+from rubber_duck import RubberDuck
 from sql_metrics import SQLMetricsHandler, create_sqlite_session
+from threads import SetupPrivateThread
 
 logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -78,10 +80,6 @@ def as_attachment(attachment):
     )
 
 
-def get_feedback_workflow_id(thread_id):
-    return f'feedback-{thread_id}'
-
-
 class ChannelConfig(TypedDict):
     name: str | None
     id: int | None
@@ -97,7 +95,8 @@ class RubberDuckConfig(TypedDict):
     channels: list[ChannelConfig]
 
 
-class MyClient(discord.Client, MessageHandler):
+# noinspection PyBroadException
+class MyClient(discord.Client):
     def __init__(self, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
@@ -143,6 +142,7 @@ class MyClient(discord.Client, MessageHandler):
         )
 
         have_conversation = HaveStandardGptConversation(
+            os.environ['OPENAI_API_KEY'],
             open_ai_retry_protocol,
             self.metrics_handler.record_message,
             self.metrics_handler.record_usage,
@@ -245,7 +245,7 @@ class MyClient(discord.Client, MessageHandler):
             )
 
     #
-    # Methods for MessageHandler protocol
+    # Methods for message-handling protocols
     #
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
@@ -293,7 +293,7 @@ class MyClient(discord.Client, MessageHandler):
             except:
                 logging.exception(f'Unable to message channel {self._command_channel}')
 
-    def typing(self, channel_id):
+    def typing(self, channel_id: int):
         return self.get_channel(channel_id).typing()
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
@@ -331,19 +331,19 @@ if __name__ == '__main__':
 
     try:
         if args.config.is_file():
-            config = json.loads(args.config.read_text())
+            app_config = json.loads(args.config.read_text())
         else:
             default_config_path = Path('config.json')
             if default_config_path.is_file():
-                config = json.loads(default_config_path.read_text())
+                app_config = json.loads(default_config_path.read_text())
             else:
                 raise FileNotFoundError(default_config_path)
 
-    except FileNotFoundError as e:
-        print(f"No valid config file found: {e}. Please create a config.json or use the default template.")
-        print(
-            "You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
+    except FileNotFoundError as fnf:
+        print(f"No valid config file found: {fnf}. Please create a config.json or use the default template.")
+        print("You can find the default config template here: "
+              "https://github.com/beanlab/rubber-duck/blob/master/config.json")
         print("For detailed instructions, check the README here: link_to_readme")
         exit(1)
 
-    main(config)
+    main(app_config)
