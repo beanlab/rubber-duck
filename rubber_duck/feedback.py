@@ -60,35 +60,33 @@ class FeedbackWorkflow:
             review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
             try:
-                feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
+                feedback_emoji, reviewer_id = await self.get_reviewer_feedback(
                     user_id, feedback_queue,
                     feedback_config.get('allow_self_feedback', False),
                     feedback_config.get('feedback_timeout', 604800)
                 )
                 feedback_score = self._reactions[feedback_emoji]
-                await self._add_reaction(thread_id, feedback_message_id, '✅')
+                await self._add_reaction(thread_id, feedback_message_id,'✅')
                 await self._add_reaction(reviewer_channel_id, review_message_id, '✅')
 
             except asyncio.TimeoutError:
-                self._add_reaction(reviewer_channel_id, review_message_id, '❌')
+                await self._add_reaction('❌')
                 feedback_score = 'nan'
                 reviewer_id = 'nan'
 
             # Record score
+
             await self._record_feedback(workflow_type, guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done
 
-    async def _get_reviewer_feedback(self, user_id, feedback_queue, allow_self_feedback, feedback_timeout):
+    async def get_reviewer_feedback(self, user_id, feedback_queue, allow_self_feedback, feedback_timeout):
         while True:
-            # Wait for feedback to be given
+            #Wait for feedback to be given
             feedback_emoji, reviewer_id = await asyncio.wait_for(
                 feedback_queue.get(),
                 timeout=feedback_timeout
             )
-
-            # Verify that the feedback came from someone other than the student
+            #Verify that the feedback came from someone other than the student
             if allow_self_feedback or reviewer_id != user_id:
                 return feedback_emoji, reviewer_id
-
-

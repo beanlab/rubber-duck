@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
+from quest import step
 
 from SQLquest import create_sql_manager
 
@@ -143,38 +144,50 @@ class MyClient(discord.Client, MessageHandler):
         async def fetch_message(channel_id, message_id):
             return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
 
+        reporter = Reporter(self.sql_metrics_handler, config['reporting'])
+        commands_workflow = BotCommands(self.send_message, self.sql_metrics_handler, reporter)
+
         feedback_workflow = FeedbackWorkflow(
             self.send_message,
             fetch_message,
             self.sql_metrics_handler.record_feedback
         )
 
-        reporter = Reporter(self.sql_metrics_handler, config['reporting'])
+        setup_thread = SetupPrivateThread(
+            self.create_thread,
+            self.send_message
+        )
+
+        have_conversation = HaveStandardGptConversation(
+            open_ai_retry_protocol,
+            self.sql_metrics_handler.record_message,
+            self.sql_metrics_handler.record_usage,
+            self.send_message,
+            self.report_error,
+            self.typing
+        )
+
+        get_feedback = FeedbackWorkflow(
+            self.send_message,
+            self.add_reaction,
+            self.sql_metrics_handler.record_feedback
+        )
+
+        duck_workflow = RubberDuck(
+            self._duck_config,
+            setup_thread,
+            have_conversation,
+            get_feedback,
+        )
+
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.sql_metrics_handler, reporter)
+                    return commands_workflow
 
                 case 'duck':
-
-                    async def start_feedback_workflow(workflow_type, guild_id, channel_id, user_id):
-                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
-                            return
-
-                        workflow_id = get_feedback_workflow_id(channel_id)
-                        self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, workflow_type, guild_id, channel_id, user_id,
-                            server_feedback_config
-                        )
-
-                    return RubberDuck(
-                        self,
-                        self.sql_metrics_handler,
-                        self._duck_config,
-                        open_ai_retry_protocol,
-                        start_feedback_workflow
-                    )
+                    return duck_workflow
 
                 case 'feedback':
                     return feedback_workflow
@@ -289,6 +302,10 @@ class MyClient(discord.Client, MessageHandler):
             await msg.edit(content=new_content)
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+
+    async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
+        message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.add_reaction(reaction)
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:

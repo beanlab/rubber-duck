@@ -80,14 +80,14 @@ class _Wrapped:
 T = TypeVar('T')
 
 
-def wrap_steps(obj: T) -> T:
+def wrap_steps(obj: T, methods: list[str] = None) -> T:
     wrapped = _Wrapped()
 
     for field in dir(obj):
         if field.startswith('_'):
             continue
 
-        if callable(method := getattr(obj, field)):
+        if ((method := getattr(obj, field)) is None or method in methods) and callable(method):
             method = step(method)
             setattr(wrapped, field, method)
 
@@ -107,42 +107,34 @@ def generate_error_message(guild_id, thread_id, ex):
     return error_message, error_code
 
 
+class SetupThread(Protocol):
+    async def __call__(self, initial_message: Message) -> int: ...
+
+    """Returns the thread ID"""
+
+
+class HaveConversation(Protocol):
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600): ...
+
+
+class GetFeedback(Protocol):
+    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int): ...
+
+
 class RubberDuck:
     def __init__(self,
-                 message_handler: MessageHandler,
-                 sql_metrics_handler : SQLMetricsHandler,
                  duck_config: DuckConfig,
-                 retry_config: RetryConfig,
-                 start_feedback_workflow
+                 setup_thread: SetupThread,
+                 have_conversation: HaveConversation,
+                 get_feedback: GetFeedback,
                  ):
-        self._send_raw_message = message_handler.send_message
-        self._send_message = step(message_handler.send_message)
-        self._edit_message = step(message_handler.edit_message)
-        self._report_error = step(message_handler.report_error)
-        self._create_thread = step(message_handler.create_thread)
-        self._typing = message_handler.typing
 
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
         self._default_config = duck_config['defaults']
-        self._retry_config = retry_config
-        self._sql_metrics_handler = sql_metrics_handler
-        # self._metrics_handler.record_message = step(self._metrics_handler.record_message)
-        # self._metrics_handler.record_feedback = step(self._metrics_handler.record_feedback)
-        # self._metrics_handler.record_usage = step(self._metrics_handler.record_usage)
+        self._setup_thread = step(setup_thread)
+        self._have_conversation = step(have_conversation)
+        self._get_feedback = step(get_feedback)
 
-        self.start_feedback_workflow = step(start_feedback_workflow)
-
-    async def __call__(self, channel_name: str, initial_message: Message, timeout=600):
-        prompt, engine, timeout = self._get_channel_settings(channel_name, initial_message)
-
-        thread_id = await self._setup_thread(initial_message)
-
-        async with alias(str(thread_id)):
-            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout)
-
-    #
-    # Begin Conversation
-    #
     def _get_channel_settings(self, channel_name: str, initial_message: Message):
         channel_config = self._channel_configs[channel_name]
 
@@ -160,9 +152,25 @@ class RubberDuck:
 
         return prompt, engine, timeout
 
-    @step
-    async def _setup_thread(self, initial_message: Message):
+    async def __call__(self, channel_name: str, initial_message: Message, timeout=600):
+        prompt, engine, timeout = self._get_channel_settings(channel_name, initial_message)
 
+        thread_id = await self._setup_thread(initial_message)
+
+        async with alias(str(thread_id)):
+            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout)
+
+        guild_id = initial_message['guild_id']
+        user_id = initial_message['author_id']
+        await self._get_feedback("rubber-duck", guild_id, thread_id, user_id)
+
+
+class SetupPrivateThread:
+    def __init__(self, create_thread, send_message):
+        self._create_thread = create_thread
+        self._send_message = send_message
+
+    async def __call__(self, initial_message: Message) -> int:
         thread_id = await self._create_thread(
             initial_message['channel_id'],
             initial_message['content'][:20]
@@ -179,9 +187,21 @@ class RubberDuck:
 
         return thread_id
 
-    @step
-    async def _have_conversation(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
 
+class HaveStandardGptConversation:
+    def __init__(self, retry_config: RetryConfig,
+                 # Metrics Handler
+                 record_message, record_usage,
+                 # Message Handler
+                 send_message, report_error, typing):
+        self._retry_config = retry_config
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
+        self._send_message = step(send_message)
+        self._report_error = step(report_error)
+        self._typing = typing
+
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         async with queue('messages', None) as messages:
             message_history = [
                 GPTMessage(role='system', content=prompt)
@@ -191,7 +211,7 @@ class RubberDuck:
             guild_id = initial_message['guild_id']
 
             # Record the prompt
-            await self._sql_metrics_handler.record_message(
+            await self._record_message(
                 guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
@@ -218,7 +238,7 @@ class RubberDuck:
                     user_id = message['author_id']
                     guild_id = message['guild_id']
 
-                    await self._sql_metrics_handler.record_message(
+                    await self._record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
@@ -226,12 +246,12 @@ class RubberDuck:
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
-                    await self._sql_metrics_handler.record_usage(guild_id, thread_id, user_id,
-                                                             engine,
-                                                             usage['prompt_tokens'],
-                                                             usage['completion_tokens'])
+                    await self._record_usage(guild_id, thread_id, user_id,
+                                                                 engine,
+                                                                 usage['prompt_tokens'],
+                                                                 usage['completion_tokens'])
 
-                    await self._sql_metrics_handler.record_message(
+                    await self._record_message(
                         guild_id, thread_id, user_id, response_message['role'], response_message['content'])
 
                     message_history.append(GPTMessage(role='assistant', content=response))
@@ -271,7 +291,7 @@ class RubberDuck:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-            await self.start_feedback_workflow("rubber-duck", guild_id, thread_id, user_id)
+            ### await self.start_feedback_workflow("rubber-duck", guild_id, thread_id, user_id)
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
