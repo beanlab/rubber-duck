@@ -279,7 +279,6 @@ class RubberDuck:
                 model=engine,
                 messages=message_history
             )
-            logging.debug(f"Completion: {completion}")
             completion_dict = completion.dict()
             choices = completion_dict['choices']
             usage = completion_dict['usage']

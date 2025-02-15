@@ -15,7 +15,6 @@ from metrics import MetricsHandler
 from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
 from reporter import Reporter
 
-logging.basicConfig(level=logging.DEBUG)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
