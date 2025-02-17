@@ -72,7 +72,7 @@ class FeedbackWorkflow:
                 reviewer_id = 'nan'
 
             # Record score
-
+            print("recording feedback YUH")
             await self._record_feedback(workflow_type, guild_id, thread_id, user_id, feedback_score, reviewer_id)
 
             # Done

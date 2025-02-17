@@ -30,11 +30,11 @@ class BotCommands:
         channel_id = message['channel_id']
         try:
             if content.startswith('!restart'):
-                await self._send_message('The restart command has been temporarily disabled.')
+                await self._send_message(channel_id, 'The restart command has been temporarily disabled.')
                 # await self._restart(channel_id)
 
             elif content.startswith('!clean-restart'):
-                await self._send_message('The restart command has been temporarily disabled.')
+                await self._send_message(channel_id, 'The clean-restart command has been temporarily disabled.')
                 # await self._restart(channel_id, clean=True)
 
             elif content.startswith('!branch'):
@@ -130,11 +130,11 @@ class BotCommands:
         await self._execute_command(channel_id, f'zip -q -r messages.zip {self._sql_metrics_handler._messages_file}')
         await self._send_message(channel_id, 'messages zip', file='messages.zip')
 
-        await self._execute_command(channel_id, f'zip -q -r usage.zip {self._sql_metrics_handler._usage_file}')
-        await self._send_message(channel_id, 'usage zip', file='usage.zip')
+        #await self._execute_command(channel_id, f'zip -q -r usage.zip {self._sql_metrics_handler._usage_file}')
+        #await self._send_message(channel_id, 'usage zip', file='usage.zip')
 
-        await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._sql_metrics_handler._feedback_file}')
-        await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
+        #await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._sql_metrics_handler._feedback_file}')
+        #await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
 
     @step
     async def _restart(self, channel_id, clean=False):
