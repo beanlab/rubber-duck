@@ -1,4 +1,11 @@
+import csv
+import io
+import os
 import sqlite3
+import tempfile
+import zipfile
+
+import aiofiles
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from sqlalchemy import Column, Integer, String
@@ -54,6 +61,10 @@ class SQLMetricsHandler:
         self.connection = connection
         self.session = self.connection.get_session()
 
+        self._messages_file = self.get_message()
+        self._usage_file = ''
+        self._feedback_file = ''
+
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
             new_message_row = MessagesModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
@@ -98,3 +109,41 @@ class SQLMetricsHandler:
             return self.session.query(FeedbackModel).all()
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
+
+    def create_temp_csv(self, messages):
+        """Creates a temporary CSV file and returns its file path."""
+        if not messages:
+            print("⚠️ No messages found, returning None.")
+            return None
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8",
+                                         newline='') as temp_csv:
+            csv_writer = csv.writer(temp_csv)
+
+            # Extract column names dynamically
+            column_names = MessagesModel.__table__.columns.keys()
+            csv_writer.writerow(column_names)
+
+            # Write row data
+            for message in messages:
+                csv_writer.writerow([getattr(message, col) for col in column_names])
+
+            temp_csv_path = temp_csv.name  # Get file path
+
+        print(f"✅ CSV created at {temp_csv_path}")
+        return temp_csv_path
+
+    def create_temp_zip(self, files):
+        """Creates a temporary ZIP file containing the provided files and returns its file path."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_zip:
+            zip_path = temp_zip.name  # Get ZIP file path
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in files:
+                if file_path and os.path.exists(file_path):
+                    zipf.write(file_path, arcname=os.path.basename(file_path))
+                else:
+                    print(f"⚠️ Warning: File '{file_path}' not found, skipping.")
+
+        print(f"✅ ZIP created at {zip_path}")
+        return zip_path

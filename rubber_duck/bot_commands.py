@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 import re
 import subprocess
 import traceback
@@ -127,8 +128,19 @@ class BotCommands:
     @step
     # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
-        await self._execute_command(channel_id, f'zip -q -r messages.zip {self._sql_metrics_handler._messages_file}')
-        await self._send_message(channel_id, 'messages zip', file='messages.zip')
+        if not self._sql_metrics_handler._messages_file:
+            print("Nothing is HERE")
+            return
+        csv_path = self._sql_metrics_handler._messages_file
+        zip_buffer = self._sql_metrics_handler.zip_files_in_memory([csv_path])
+
+        # Send zip file directly from memory
+        await self._send_message(channel_id, 'messages zip', file=zip_buffer)
+
+        # Cleanup temp CSV file
+        os.remove(csv_path)
+        #await self._execute_command(channel_id, f'zip -q -r messages.zip {self._sql_metrics_handler._messages_file}')
+        #await self._send_message(channel_id, 'messages zip', file='messages.zip')
 
         #await self._execute_command(channel_id, f'zip -q -r usage.zip {self._sql_metrics_handler._usage_file}')
         #await self._send_message(channel_id, 'usage zip', file='usage.zip')

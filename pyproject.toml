@@ -12,6 +12,7 @@ urllib3 = "<2.0"
 quest-py = "0.2.3"
 seaborn = "0.13.2"
 pandas = "^2.2.2"
+aiofiles = "^24.1.0"
 
 [tool.poetry.dev-dependencies]
 
