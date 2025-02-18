@@ -1,8 +1,5 @@
 import csv
-import io
 import logging
-import os
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -43,6 +40,7 @@ class CSVMetricsHandler:
         with self._usage_file.open('at', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
+
 
     async def record_feedback(self, workflow_type, guild_id: int, thread_id: int, user_id: int, feedback_score: int, reviewer_id: int):
         try:

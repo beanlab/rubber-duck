@@ -13,3 +13,4 @@ poetry.lock
 /wiley_config_v2.json
 state/
 /aubry.json
+*.db
