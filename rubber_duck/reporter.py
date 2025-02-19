@@ -1,6 +1,8 @@
+import csv
 import io
 import json
 import sys
+import zipfile
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -56,6 +58,26 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
         plt.show()
     plt.close()
     return img_name, buffer
+
+def zipDataFiles(sql_metric_handler: SQLMetricsHandler):
+    # Create an in-memory CSV file
+    csv_buffer = io.StringIO()
+    csv_writer = csv.writer(csv_buffer)
+    csv_writer.writerow(["Name", "Age", "City"])
+    csv_writer.writerow(["Alice", 30, "New York"])
+    csv_writer.writerow(["Bob", 25, "Los Angeles"])
+
+    # Convert CSV to bytes
+    csv_bytes = csv_buffer.getvalue().encode("utf-8")
+
+    # Create an in-memory zip file
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr("data.csv", csv_bytes)
+
+    # Move cursor to the beginning so it can be read from elsewhere
+    zip_buffer.seek(0)
+    return zip_buffer
 
 
 class Reporter:
