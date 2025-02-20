@@ -9,7 +9,7 @@ import boto3
 import discord
 from quest import wrap_steps
 
-from SQLquest import create_sql_manager
+from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
