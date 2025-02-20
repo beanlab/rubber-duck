@@ -7,14 +7,20 @@ from typing import TypedDict
 
 import boto3
 import discord
-from quest import create_filesystem_manager
+from quest import wrap_steps
 
+from SQLquest import create_sql_manager
 from bot_commands import BotCommands
-from feedback import FeedbackWorkflow
-from metrics import MetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from conversation import HaveStandardGptConversation
+from feedback import GetTAFeedback, GetConvoFeedback
+from protocols import Attachment, Message
 from reporter import Reporter
+from rubber_duck import RubberDuck
+from sql_metrics import SQLMetricsHandler
+from sqlite import create_sqlite_session
+from threads import SetupPrivateThread
 
+logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
@@ -76,10 +82,6 @@ def as_attachment(attachment):
     )
 
 
-def get_feedback_workflow_id(thread_id):
-    return f'feedback-{thread_id}'
-
-
 class ChannelConfig(TypedDict):
     name: str | None
     id: int | None
@@ -95,16 +97,14 @@ class RubberDuckConfig(TypedDict):
     channels: list[ChannelConfig]
 
 
-class MyClient(discord.Client, MessageHandler):
+# noinspection PyBroadException
+class MyClient(discord.Client):
     def __init__(self, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
 
-        feedback_config = config['feedback']
-        quest_config = config['quest']
-        metrics_config = config['metrics']
         self.admin_settings = config['admin_settings']
         open_ai_retry_protocol = config['open_ai_retry_protocol']
 
@@ -115,52 +115,63 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_config = config['rubber_duck']
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
-        # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
-
-        async def fetch_message(channel_id, message_id):
-            return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
-
-        feedback_workflow = FeedbackWorkflow(
-            self.send_message,
-            fetch_message,
-            self.metrics_handler.record_feedback
-        )
+        # SQLMetricsHandler initialization
+        db_url = config["sql"]["db_url"]
+        sql_session = create_sqlite_session(db_url)
+        self.metrics_handler = SQLMetricsHandler(sql_session)
+        wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
         reporter = Reporter(self.metrics_handler, config['reporting'])
+        commands_workflow = BotCommands(self.send_message, self.metrics_handler, reporter)
+
+        # Feedback
+        get_ta_feedback = GetTAFeedback(
+            self.send_message,
+            self.add_reaction,
+            self.metrics_handler.record_feedback,
+        )
+
+        feedback_configs = config['feedback']
+
+        get_feedback = GetConvoFeedback(
+            feedback_configs,
+            get_ta_feedback
+        )
+
+        setup_thread = SetupPrivateThread(
+            self.create_thread,
+            self.send_message
+        )
+
+        have_conversation = HaveStandardGptConversation(
+            os.environ['OPENAI_API_KEY'],
+            open_ai_retry_protocol,
+            self.metrics_handler.record_message,
+            self.metrics_handler.record_usage,
+            self.send_message,
+            self.report_error,
+            self.typing
+        )
+
+        duck_workflow = RubberDuck(
+            self._duck_config,
+            setup_thread,
+            have_conversation,
+            get_feedback,
+        )
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
+                    return commands_workflow
 
                 case 'duck':
+                    return duck_workflow
 
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
-                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
-                            return
+            raise NotImplementedError(f'No workflow of type {wtype}')
 
-                        workflow_id = get_feedback_workflow_id(channel_id)
-                        self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, guild_id, channel_id, user_id,
-                            server_feedback_config
-                        )
-
-                    return RubberDuck(
-                        self,
-                        self.metrics_handler,
-                        self._duck_config,
-                        open_ai_retry_protocol,
-                        start_feedback_workflow
-                    )
-
-                case 'feedback':
-                    return feedback_workflow
-
-            raise NotImplemented(f'No workflow of type {wtype}')
-
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
-                                                           create_workflow)
+        namespace = 'rubber-duck'  # TODO - move to config
+        self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -236,7 +247,7 @@ class MyClient(discord.Client, MessageHandler):
             )
 
     #
-    # Methods for MessageHandler protocol
+    # Methods for message-handling protocols
     #
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
@@ -248,7 +259,8 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             if isinstance(file, list):
-                curr_message = await channel.send("", files=file) #TODO: check that all instances are discord.File objects
+                curr_message = await channel.send("",
+                                                  files=file)  # TODO: check that all instances are discord.File objects
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -268,6 +280,10 @@ class MyClient(discord.Client, MessageHandler):
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
+    async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
+        message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.add_reaction(reaction)
+
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
             # TODO make this assume one id
@@ -279,7 +295,7 @@ class MyClient(discord.Client, MessageHandler):
             except:
                 logging.exception(f'Unable to message channel {self._command_channel}')
 
-    def typing(self, channel_id):
+    def typing(self, channel_id: int):
         return self.get_channel(channel_id).typing()
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
@@ -349,7 +365,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(
             level=logging.INFO,
-            filename='logfile.log',  # Replace with actual log file path if needed
+            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
 

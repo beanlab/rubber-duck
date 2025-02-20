@@ -1,9 +1,6 @@
 {
-  "quest": {
-    "state_path": "state/quest/"
-  },
-  "metrics": {
-    "metrics_path": "state/metrics/"
+  "sql": {
+    "db_url": "sqlite:///rubber_duck_database.db"
   },
   "rubber_duck": {
     "channels": [
