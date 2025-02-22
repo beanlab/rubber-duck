@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 from typing import TypedDict
 
+import boto3
 import discord
 from quest import wrap_steps
 
-from SQLquest import create_sql_manager
+from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
@@ -306,6 +307,43 @@ class MyClient(discord.Client):
         )
         return thread.id
 
+def fetch_config_from_s3():
+    # Initialize S3 client
+    s3 = boto3.client('s3')
+
+    # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
+    s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
+
+    if not s3_path:
+        raise ValueError("S3 path not set in environment variable 'CONFIG_FILE_S3_PATH'")
+
+    # Parse bucket name and key from the S3 path (s3://bucket-name/key)
+    bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
+
+    try:
+        # Download file from S3
+        response = s3.get_object(Bucket=bucket_name, Key=key)
+
+        # Read the content of the file and parse it as JSON
+        config = json.loads(response['Body'].read().decode('utf-8'))
+        print("Config file content:", config)
+        return config
+
+    except Exception as e:
+        print(f"Failed to fetch config from S3: {e}")
+        return None
+
+# Function to load the configuration from a local file (if needed)
+def load_local_config(file_path='production-config.json'):
+    try:
+        if Path(file_path).is_file():
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        else:
+            raise FileNotFoundError(f"{file_path} not found.")
+    except FileNotFoundError as e:
+        print(f"No valid config file found: {e}. Please create a production-config.json.")
+        exit(1)
 
 def main(config):
     client = MyClient(config)
@@ -314,10 +352,11 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='production-config.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
+    # Set up logging based on user preference
     if args.log_console:
         logging.basicConfig(
             level=logging.INFO,
@@ -330,21 +369,10 @@ if __name__ == '__main__':
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
 
-    try:
-        if args.config.is_file():
-            app_config = json.loads(args.config.read_text())
-        else:
-            default_config_path = Path('config.json')
-            if default_config_path.is_file():
-                app_config = json.loads(default_config_path.read_text())
-            else:
-                raise FileNotFoundError(default_config_path)
+    # Try fetching the config from S3 first
+    config = fetch_config_from_s3()
 
-    except FileNotFoundError as fnf:
-        print(f"No valid config file found: {fnf}. Please create a config.json or use the default template.")
-        print("You can find the default config template here: "
-              "https://github.com/beanlab/rubber-duck/blob/master/config.json")
-        print("For detailed instructions, check the README here: link_to_readme")
-        exit(1)
-
-    main(app_config)
+    if config is None:
+        # If fetching from S3 failed, load from local file
+        config = load_local_config(args.config)
+    main(config)
