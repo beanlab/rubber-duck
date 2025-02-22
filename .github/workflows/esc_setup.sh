@@ -15,6 +15,13 @@ REGION="$5"
 EXECUTION_ROLE="$6"
 ENV_FILE_S3_PATH="$7"
 
+# Sensitive environment variables from GitHub Secrets
+DB_HOST="${DB_HOST}"
+DB_PORT="${DB_PORT}"
+DB_NAME="${DB_NAME}"
+DB_USER="${DB_USER}"
+DB_PASSWORD="${DB_PASSWORD}"
+
 # Set the desired CPU and memory for the task definition
 CPU="1024"
 MEMORY="2048"
@@ -33,6 +40,13 @@ TASK_DEFINITION_JSON=$(cat <<EOF
       "memory": $MEMORY,
       "portMappings": [],
       "essential": true,
+      "environment": [
+        { "name": "DB_HOST", "value": "$DB_HOST" },
+        { "name": "DB_PORT", "value": "$DB_PORT" },
+        { "name": "DB_NAME", "value": "$DB_NAME" },
+        { "name": "DB_USER", "value": "$DB_USER" },
+        { "name": "DB_PASSWORD", "value": "$DB_PASSWORD" }
+      ],
       "environmentFiles": [
         {
           "value": "$ENV_FILE_S3_PATH",

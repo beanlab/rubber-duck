@@ -58,6 +58,12 @@ jobs:
             "${{ secrets.AWS_REGION }}" \
             "${{ secrets.EXECUTION_ROLE }}" \
             "${{ secrets.ENV_FILE_S3_PATH }}"
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
       - name: Verify Task Definition Registration
         run: |
