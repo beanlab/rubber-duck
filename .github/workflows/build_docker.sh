@@ -1,6 +1,7 @@
 # Build Rubber Duck Docker
 # this is the command to build the docker image
 # ./build_docker.sh
+# TODO make image_tag dynamic based on the git commit we are trying to deploy.
 
 IMAGE_NAME="rubber-duck"
 IMAGE_TAG="latest"

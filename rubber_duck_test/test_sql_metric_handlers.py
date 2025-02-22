@@ -61,7 +61,7 @@ class TestSQLMetrics:
     async def test_feedback_table(self):
         """Test recording and retrieving feedback."""
         await self.sql_handler.record_feedback(
-            self.test_values["workflow_type"],  # <-- Add this argument
+            self.test_values["workflow_type"],
             self.test_values["guild_id"],
             self.test_values["thread_id"],
             self.test_values["user_id"],
