@@ -128,17 +128,17 @@ class BotCommands:
     @step
     # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
-        messages_zip = reporter.zipDataFiles(self._sql_metrics_handler)
-        #usage_zip = reporter.zipDataFiles()
-        #feedback_zip = reporter.zipDataFiles()
+        messages_zip = reporter.zipDataFiles(self._sql_metrics_handler, "messages")
+        usage_zip = reporter.zipDataFiles(self._sql_metrics_handler, "usage")
+        feedback_zip = reporter.zipDataFiles(self._sql_metrics_handler, "feedback")
 
         discord_messages_file = discord.File(messages_zip, filename="messages.zip")
-        #discord_usage_file = discord.File(usage_zip, filename="usage.zip")
-        #discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
+        discord_usage_file = discord.File(usage_zip, filename="usage.zip")
+        discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
 
         await self._send_message(channel_id, "", file=discord_messages_file)
-        #await self._send_message(channel_id, "", file=discord_usage_file)
-        #await self._send_message(channel_id, "", file=discord_feedback_file)
+        await self._send_message(channel_id, "", file=discord_usage_file)
+        await self._send_message(channel_id, "", file=discord_feedback_file)
 
     @step
     async def _restart(self, channel_id, clean=False):
