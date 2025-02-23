@@ -59,67 +59,52 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
     plt.close()
     return img_name, buffer
 
-def createMessagesCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    # Fetch all messages
+def messagesCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
     messages = sql_metric_handler.get_message()
-    # Write header
     csv_writer.writerow(["id", "timestamp", "guild_id", "thread_id", "user_id", "role", "message"])
 
-    # Write data rows
     for msg in messages:
         csv_writer.writerow([msg.id, msg.timestamp, msg.guild_id, msg.thread_id, msg.user_id, msg.role, msg.message])
 
-def createUsageCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    # Fetch all messages
+def usageCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
     messages = sql_metric_handler.get_usage()
-
-    # Write header
     csv_writer.writerow(["id", "timestamp", "guild_id", "thread_id", "user_id", "engine", "input_tokens", "output_tokens"])
 
-    # Write data rows
     for msg in messages:
         csv_writer.writerow([msg.id, msg.timestamp, msg.guild_id, msg.thread_id, msg.user_id, msg.engine, msg.input_tokens, msg.output_tokens])
 
-def createFeedbackCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    # Fetch all messages
+def feedbackCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
     messages = sql_metric_handler.get_feedback()
-
-    # Write header
     csv_writer.writerow(["id", "timestamp", "workflow_type", "guild_id", "thread_id", "user_id", "reviewer_role_id", "feedback_score"])
 
-    # Write data rows
     for msg in messages:
         csv_writer.writerow([msg.id, msg.timestamp, msg.workflow_type, msg.guild_id, msg.thread_id, msg.user_id, msg.reviewer_role_id, msg.feedback_score])
 
 
 def zipDataFiles(sql_metric_handler: SQLMetricsHandler, fileType: str):
     try:
-        # Create an in-memory CSV file
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer)
 
         match fileType:
             case "messages":
-                createMessagesCSV(sql_metric_handler, csv_writer)
+                messagesCSV(sql_metric_handler, csv_writer)
             case "usage":
-                createUsageCSV(sql_metric_handler, csv_writer)
+                usageCSV(sql_metric_handler, csv_writer)
             case "feedback":
-                createFeedbackCSV(sql_metric_handler, csv_writer)
+                feedbackCSV(sql_metric_handler, csv_writer)
 
-        # Convert CSV to bytes
         csv_bytes = csv_buffer.getvalue().encode("utf-8")
 
-        # Create an in-memory zip file
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             zip_file.writestr("data.csv", csv_bytes)
 
-        # Move cursor to the beginning so it can be read from elsewhere
         zip_buffer.seek(0)
         return zip_buffer
     except Exception as e:
-        print(f"Error exporting messages: {e}")
-        return None  # Handle errors gracefully
+        print(f"Error exporting csvs: {e}")
+        return None
 
 class Reporter:
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
