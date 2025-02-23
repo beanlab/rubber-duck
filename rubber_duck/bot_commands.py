@@ -101,6 +101,7 @@ class BotCommands:
             "!status - print a status message\n"
             "!help - print this message\n"
             "!log - get the log file\n"
+            "!metrics - get the zips of the data tables\n"
             "!state - get a zip of the state folder\n"
             "!restart - restart the bot\n"
             "!clean-restart - wipe the state and restart the bot\n"
@@ -126,7 +127,6 @@ class BotCommands:
             await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
 
     @step
-    # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
         messages_zip = reporter.zipDataFiles(self._sql_metrics_handler, "messages")
         usage_zip = reporter.zipDataFiles(self._sql_metrics_handler, "usage")

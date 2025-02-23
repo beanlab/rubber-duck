@@ -81,12 +81,12 @@ def feedbackCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
         csv_writer.writerow([msg.id, msg.timestamp, msg.workflow_type, msg.guild_id, msg.thread_id, msg.user_id, msg.reviewer_role_id, msg.feedback_score])
 
 
-def zipDataFiles(sql_metric_handler: SQLMetricsHandler, fileType: str):
+def zipDataFiles(sql_metric_handler: SQLMetricsHandler, desired_table: str):
     try:
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer)
 
-        match fileType:
+        match desired_table:
             case "messages":
                 messagesCSV(sql_metric_handler, csv_writer)
             case "usage":
