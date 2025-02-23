@@ -14,8 +14,8 @@ class RecordModel(QuestRecordBase):
     __tablename__ = 'records'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)  # TODO good name for this?
-    key = Column(String)
+    name = Column(String(255))  # TODO good name for this?
+    key = Column(String(255))
     blob = Column(JSON)
 
     def __repr__(self):
