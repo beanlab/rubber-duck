@@ -62,11 +62,8 @@ class GetTAFeedback:
             f"how effective was this conversation: "
         )
 
-        reviewer_role_id = None
-
         if 'reviewer_role_id' in feedback_config:
             review_message_content = f"<@{feedback_config['reviewer_role_id']}> {review_message_content}"
-            reviewer_role_id = feedback_config.get('reviewer_role_id')
 
         feedback_message_id = await self._send_message(thread_id, feedback_message_content)
 
@@ -82,8 +79,7 @@ class GetTAFeedback:
                 feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
                     user_id, feedback_queue,
                     feedback_config.get('allow_self_feedback', False),
-                    feedback_config.get('feedback_timeout', 604800),
-                    reviewer_role_id
+                    feedback_config.get('feedback_timeout', 604800)
                 )
                 feedback_score = self._reactions[feedback_emoji]
                 await self._add_reaction(thread_id, feedback_message_id, '✅')
@@ -98,7 +94,7 @@ class GetTAFeedback:
 
 
     @staticmethod
-    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout, reviewer_role_id):
+    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
         while True:
             # Wait for feedback to be given
             feedback_emoji, reviewer_id = await asyncio.wait_for(
@@ -106,5 +102,5 @@ class GetTAFeedback:
                 timeout=feedback_timeout
             )
             # Verify that the feedback came from someone other than the student
-            if allow_self_feedback or reviewer_id != user_id or reviewer_role_id == reviewer_id:
+            if allow_self_feedback or reviewer_id != user_id:
                 return feedback_emoji, reviewer_id
