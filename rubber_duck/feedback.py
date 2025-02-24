@@ -90,11 +90,11 @@ class GetTAFeedback:
                 feedback_score = 'nan'
                 reviewer_id = 'nan'
 
-            #Record score
+            # Record score
 
             await self._record_feedback(workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score)
 
-    #Done
+            # Done
 
     @staticmethod
     async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
