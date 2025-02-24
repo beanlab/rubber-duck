@@ -106,5 +106,5 @@ class GetTAFeedback:
                 timeout=feedback_timeout
             )
             # Verify that the feedback came from someone other than the student
-            if allow_self_feedback or reviewer_id != user_id or reviewer_role_id is not None:
+            if allow_self_feedback or reviewer_id != user_id or reviewer_role_id == reviewer_id:
                 return feedback_emoji, reviewer_id
