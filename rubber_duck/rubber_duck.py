@@ -1,10 +1,11 @@
 from pathlib import Path
-from typing import TypedDict, Protocol
+from typing import TypedDict, Protocol, List
 
 from quest import step, alias
 
 from feedback import GetConvoFeedback
 from protocols import Message
+from conversation import GPTMessage
 
 
 class ChannelConfig(TypedDict):
@@ -28,7 +29,7 @@ class SetupThread(Protocol):
 
 
 class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600): ...
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600, conversation_history: List[GPTMessage] = None): ...
 
 
 class RubberDuck:
@@ -62,13 +63,13 @@ class RubberDuck:
 
         return prompt, engine, timeout
 
-    async def __call__(self, channel_name: str, initial_message: Message, timeout=600):
+    async def __call__(self, channel_name: str, initial_message: Message, conversation_history=None, timeout=600):
         prompt, engine, timeout = self._get_channel_settings(channel_name, initial_message)
 
         thread_id = await self._setup_thread(initial_message)
 
         async with alias(str(thread_id)):
-            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout)
+            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout, conversation_history)
 
         guild_id = initial_message['guild_id']
         user_id = initial_message['author_id']

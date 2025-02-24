@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
-from typing import TypedDict, Protocol
+from typing import TypedDict, Protocol, List
 
 import openai
 from openai import AsyncOpenAI
@@ -45,9 +45,12 @@ class HaveStandardGptConversation:
         self._typing = typing
         self._client = AsyncOpenAI(api_key=openai_api_key)
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600, conversation_history: List[GPTMessage] = None):
         async with queue('messages', None) as messages:
-            message_history = [
+            if conversation_history is None:
+                conversation_history = []
+
+            message_history = conversation_history + [
                 GPTMessage(role='system', content=prompt)
             ]
 
