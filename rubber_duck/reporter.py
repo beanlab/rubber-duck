@@ -60,7 +60,7 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
     return img_name, buffer
 
 def messagesCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    messages = sql_metric_handler.get_message()
+    messages = sql_metric_handler.get_messages()
     csv_writer.writerow(["id", "timestamp", "guild_id", "thread_id", "user_id", "role", "message"])
 
     for msg in messages:

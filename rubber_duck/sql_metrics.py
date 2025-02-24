@@ -94,7 +94,7 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    def get_message(self):
+    def get_messages(self):
         try:
             return self.session.query(MessagesModel).all()
         except sqlite3.Error as e:
