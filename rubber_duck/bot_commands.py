@@ -13,9 +13,9 @@ from rubber_duck import Message
 
 
 class BotCommands:
-    def __init__(self, send_message, sql_metrics_handler, reporter):
+    def __init__(self, send_message, metrics_handler, reporter):
         self._send_message = step(send_message)
-        self._sql_metrics_handler = sql_metrics_handler
+        self._metrics_handler = metrics_handler
         self._reporter = reporter
 
     async def __call__(self, message: Message):
@@ -128,9 +128,9 @@ class BotCommands:
 
     @step
     async def _zip_metrics(self, channel_id):
-        messages_zip = reporter.zipDataFiles(self._sql_metrics_handler, "messages")
-        usage_zip = reporter.zipDataFiles(self._sql_metrics_handler, "usage")
-        feedback_zip = reporter.zipDataFiles(self._sql_metrics_handler, "feedback")
+        messages_zip = reporter.zipDataFiles(self._metrics_handler, "messages")
+        usage_zip = reporter.zipDataFiles(self._metrics_handler, "usage")
+        feedback_zip = reporter.zipDataFiles(self._metrics_handler, "feedback")
 
         discord_messages_file = discord.File(messages_zip, filename="messages.zip")
         discord_usage_file = discord.File(usage_zip, filename="usage.zip")
