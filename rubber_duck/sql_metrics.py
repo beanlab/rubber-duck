@@ -12,7 +12,14 @@ MetricsBase = declarative_base()
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
+def add_iter(cls):
+    def __iter__(self):
+        for key in self.__table__.columns.keys():
+            yield key, getattr(self, key)
+    cls.__iter__ = __iter__
+    return cls
 
+@add_iter
 class MessagesModel(MetricsBase):
     __tablename__ = 'messages'
 
@@ -24,11 +31,8 @@ class MessagesModel(MetricsBase):
     role = Column(String)
     message = Column(String)
 
-    def __iter__(self):
-        for key in self.__table__.columns.keys():
-            yield key, getattr(self, key)
 
-
+@add_iter
 class UsageModel(MetricsBase):
     __tablename__ = 'usage'
 
@@ -41,11 +45,8 @@ class UsageModel(MetricsBase):
     input_tokens = Column(String)
     output_tokens = Column(String)
 
-    def __iter__(self):
-        for key in self.__table__.columns.keys():
-            yield key, getattr(self, key)
 
-
+@add_iter
 class FeedbackModel(MetricsBase):
     __tablename__ = 'feedback'
 
@@ -57,10 +58,6 @@ class FeedbackModel(MetricsBase):
     user_id = Column(Integer)
     reviewer_role_id = Column(Integer)
     feedback_score = Column(Integer)
-
-    def __iter__(self):
-        for key in self.__table__.columns.keys():
-            yield key, getattr(self, key)
 
 
 class SQLMetricsHandler:
