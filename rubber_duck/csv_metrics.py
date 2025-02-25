@@ -42,8 +42,7 @@ class CSVMetricsHandler:
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
 
 
-    async def record_feedback(self, workflow_type, guild_id: int, thread_id: int, user_id: int,
-                              reviewer_id: int, feedback_score: int):
+    async def record_feedback(self, workflow_type, guild_id: int, thread_id: int, user_id: int, reviewer_id: int, feedback_score: int):
         try:
             with self._feedback_file.open('at', newline='') as file:
                 writer = csv.writer(file)
