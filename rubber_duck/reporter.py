@@ -59,42 +59,28 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
     plt.close()
     return img_name, buffer
 
-def messagesCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    messages = sql_metric_handler.get_messages()
-    csv_writer.writerow(["id", "timestamp", "guild_id", "thread_id", "user_id", "role", "message"])
 
-    for msg in messages:
-        csv_writer.writerow([msg.id, msg.timestamp, msg.guild_id, msg.thread_id, msg.user_id, msg.role, msg.message])
-
-def usageCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    messages = sql_metric_handler.get_usage()
-    csv_writer.writerow(["id", "timestamp", "guild_id", "thread_id", "user_id", "engine", "input_tokens", "output_tokens"])
-
-    for msg in messages:
-        csv_writer.writerow([msg.id, msg.timestamp, msg.guild_id, msg.thread_id, msg.user_id, msg.engine, msg.input_tokens, msg.output_tokens])
-
-def feedbackCSV(sql_metric_handler: SQLMetricsHandler, csv_writer):
-    messages = sql_metric_handler.get_feedback()
-    csv_writer.writerow(["id", "timestamp", "workflow_type", "guild_id", "thread_id", "user_id", "reviewer_role_id", "feedback_score"])
-
-    for msg in messages:
-        csv_writer.writerow([msg.id, msg.timestamp, msg.workflow_type, msg.guild_id, msg.thread_id, msg.user_id, msg.reviewer_role_id, msg.feedback_score])
-
-
-def zipDataFiles(sql_metric_handler: SQLMetricsHandler, desired_table: str):
+def zipDataFiles(metric_handler: SQLMetricsHandler, desired_table: str):
     try:
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer)
 
         match desired_table:
             case "messages":
-                messagesCSV(sql_metric_handler, csv_writer)
+                messages_data = metric_handler.get_messages()
+                csv_writer.writerows(messages_data)
             case "usage":
-                usageCSV(sql_metric_handler, csv_writer)
+                usage_data = metric_handler.get_usage()
+                csv_writer.writerows(usage_data)
             case "feedback":
-                feedbackCSV(sql_metric_handler, csv_writer)
+                feedback_data = metric_handler.get_feedback()
+                csv_writer.writerows(feedback_data)
+            case _:
+                raise ValueError(f"Invalid table name: {desired_table}")
 
+        csv_buffer.seek(0)
         csv_bytes = csv_buffer.getvalue().encode("utf-8")
+        csv_buffer.close()
 
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:

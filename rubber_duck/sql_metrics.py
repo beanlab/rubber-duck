@@ -24,6 +24,10 @@ class MessagesModel(MetricsBase):
     role = Column(String)
     message = Column(String)
 
+    def __iter__(self):
+        for key in self.__table__.columns.keys():
+            yield key, getattr(self, key)
+
 
 class UsageModel(MetricsBase):
     __tablename__ = 'usage'
@@ -36,6 +40,10 @@ class UsageModel(MetricsBase):
     engine = Column(String)
     input_tokens = Column(String)
     output_tokens = Column(String)
+
+    def __iter__(self):
+        for key in self.__table__.columns.keys():
+            yield key, getattr(self, key)
 
 
 class FeedbackModel(MetricsBase):
@@ -50,17 +58,15 @@ class FeedbackModel(MetricsBase):
     reviewer_role_id = Column(Integer)
     feedback_score = Column(Integer)
 
-
+    def __iter__(self):
+        for key in self.__table__.columns.keys():
+            yield key, getattr(self, key)
 
 
 class SQLMetricsHandler:
     def __init__(self, session: Session):
         MetricsBase.metadata.create_all(session.connection())
         self.session = session
-
-        self._messages_file = self.get_message()
-        self._usage_file = ''
-        self._feedback_file = ''
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
@@ -81,8 +87,7 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
-                              feedback_score: int):
+    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int, feedback_score: int):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
@@ -94,20 +99,29 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    def get_messages(self):
+    def reformat_model(self, table_model):
         try:
-            return self.session.query(MessagesModel).all()
+            model_list = self.session.query(table_model).all()
+            data = []
+            for model in model_list:
+                values = [value for key, value in iter(model)]
+
+                # If data is empty, add the keys as the first row
+                if not data:
+                    keys = [key for key, _ in iter(model)]
+                    data.append(keys)
+
+                # Add the values
+                data.append(values)
+            return data
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
+
+    def get_messages(self):
+        return self.reformat_model(MessagesModel)
 
     def get_usage(self):
-        try:
-            return self.session.query(UsageModel).all()
-        except sqlite3.Error as e:
-            print(f"An error occured: {e}")
+        return self.reformat_model(UsageModel)
 
     def get_feedback(self):
-        try:
-            return self.session.query(FeedbackModel).all()
-        except sqlite3.Error as e:
-            print(f"An error occured: {e}")
+        return self.reformat_model(FeedbackModel)
