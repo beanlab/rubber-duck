@@ -96,29 +96,26 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    def reformat_model(self, table_model):
+    def sql_model_to_data_list(self, table_model):
         try:
-            model_list = self.session.query(table_model).all()
             data = []
-            for model in model_list:
-                values = [value for key, value in iter(model)]
+            records = iter(self.session.query(table_model).all())
+            header = next(records)
+            data.append([key for key, _ in header])
+            data.append([value for _, value in header])
 
-                # If data is empty, add the keys as the first row
-                if not data:
-                    keys = [key for key, _ in iter(model)]
-                    data.append(keys)
+            for record in records:
+                data.append([value for _, value in record])
 
-                # Add the values
-                data.append(values)
             return data
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
     def get_messages(self):
-        return self.reformat_model(MessagesModel)
+        return self.sql_model_to_data_list(MessagesModel)
 
     def get_usage(self):
-        return self.reformat_model(UsageModel)
+        return self.sql_model_to_data_list(UsageModel)
 
     def get_feedback(self):
-        return self.reformat_model(FeedbackModel)
+        return self.sql_model_to_data_list(FeedbackModel)
