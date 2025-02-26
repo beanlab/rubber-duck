@@ -128,9 +128,9 @@ class BotCommands:
 
     @step
     async def _zip_metrics(self, channel_id):
-        messages_zip = reporter.zipDataFiles(self._metrics_handler, "messages")
-        usage_zip = reporter.zipDataFiles(self._metrics_handler, "usage")
-        feedback_zip = reporter.zipDataFiles(self._metrics_handler, "feedback")
+        messages_zip = reporter.zip_data_file(self._metrics_handler.get_messages())
+        usage_zip = reporter.zip_data_file(self._metrics_handler.get_usage())
+        feedback_zip = reporter.zip_data_file(self._metrics_handler.get_feedback())
 
         discord_messages_file = discord.File(messages_zip, filename="messages.zip")
         discord_usage_file = discord.File(usage_zip, filename="usage.zip")

@@ -60,23 +60,12 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
     return img_name, buffer
 
 
-def zipDataFiles(metric_handler: SQLMetricsHandler, desired_table: str):
+def zip_data_file(table_data):
     try:
         csv_buffer = io.StringIO()
         csv_writer = csv.writer(csv_buffer)
 
-        match desired_table:
-            case "messages":
-                messages_data = metric_handler.get_messages()
-                csv_writer.writerows(messages_data)
-            case "usage":
-                usage_data = metric_handler.get_usage()
-                csv_writer.writerows(usage_data)
-            case "feedback":
-                feedback_data = metric_handler.get_feedback()
-                csv_writer.writerows(feedback_data)
-            case _:
-                raise ValueError(f"Invalid table name: {desired_table}")
+        csv_writer.writerows(table_data)
 
         csv_buffer.seek(0)
         csv_bytes = csv_buffer.getvalue().encode("utf-8")
