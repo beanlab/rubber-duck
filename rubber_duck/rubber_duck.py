@@ -1,3 +1,4 @@
+import random
 from pathlib import Path
 from typing import TypedDict, Protocol
 
@@ -6,6 +7,12 @@ from quest import step, alias
 from feedback import GetConvoFeedback
 from protocols import Message
 
+class DuckTypes(TypedDict):
+    prompt: str | None
+    prompt_file: str | None
+    engine: str | None
+    timeout: int | None
+    weight: int | None
 
 class ChannelConfig(TypedDict):
     name: str | None
@@ -14,6 +21,7 @@ class ChannelConfig(TypedDict):
     prompt_file: str | None
     engine: str | None
     timeout: int | None
+    ducks: list[DuckTypes]
 
 
 class DuckConfig(TypedDict):
@@ -47,6 +55,15 @@ class RubberDuck:
 
     def _get_channel_settings(self, channel_name: str, initial_message: Message):
         channel_config = self._channel_configs[channel_name]
+
+        config_options = []
+        config_weights = []
+        for duck in channel_config['ducks']:
+            config_options.append(duck)
+            config_weights.append(duck.get('weight', 0))
+
+        channel_config = random.choices(config_options, weights=config_weights)[0]
+
 
         prompt = channel_config.get('prompt', None)
         if prompt is None:
