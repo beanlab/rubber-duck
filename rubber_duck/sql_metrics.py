@@ -1,9 +1,10 @@
 import sqlite3
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import declarative_base, Session
 
 MetricsBase = declarative_base()
 
@@ -11,7 +12,14 @@ MetricsBase = declarative_base()
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
+def add_iter(cls):
+    def __iter__(self):
+        for key in self.__table__.columns.keys():
+            yield key, getattr(self, key)
+    cls.__iter__ = __iter__
+    return cls
 
+@add_iter
 class MessagesModel(MetricsBase):
     __tablename__ = 'messages'
 
@@ -24,6 +32,7 @@ class MessagesModel(MetricsBase):
     message = Column(String)
 
 
+@add_iter
 class UsageModel(MetricsBase):
     __tablename__ = 'usage'
 
@@ -37,6 +46,7 @@ class UsageModel(MetricsBase):
     output_tokens = Column(String)
 
 
+@add_iter
 class FeedbackModel(MetricsBase):
     __tablename__ = 'feedback'
 
@@ -48,8 +58,6 @@ class FeedbackModel(MetricsBase):
     user_id = Column(Integer)
     reviewer_role_id = Column(Integer)
     feedback_score = Column(Integer)
-
-
 
 
 class SQLMetricsHandler:
@@ -76,8 +84,7 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
-                              feedback_score: int):
+    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int, feedback_score: int):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
@@ -89,20 +96,26 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    def get_message(self):
+    def sql_model_to_data_list(self, table_model):
         try:
-            return self.session.query(MessagesModel).all()
+            data = []
+            records = iter(self.session.query(table_model).all())
+            header = next(records)
+            data.append([key for key, _ in header])
+            data.append([value for _, value in header])
+
+            for record in records:
+                data.append([value for _, value in record])
+
+            return data
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
+
+    def get_messages(self):
+        return self.sql_model_to_data_list(MessagesModel)
 
     def get_usage(self):
-        try:
-            return self.session.query(UsageModel).all()
-        except sqlite3.Error as e:
-            print(f"An error occured: {e}")
+        return self.sql_model_to_data_list(UsageModel)
 
     def get_feedback(self):
-        try:
-            return self.session.query(FeedbackModel).all()
-        except sqlite3.Error as e:
-            print(f"An error occured: {e}")
+        return self.sql_model_to_data_list(FeedbackModel)

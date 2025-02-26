@@ -8,6 +8,7 @@ from pathlib import Path
 import discord
 from quest import step
 
+import reporter
 from rubber_duck import Message
 
 
@@ -30,11 +31,11 @@ class BotCommands:
         channel_id = message['channel_id']
         try:
             if content.startswith('!restart'):
-                await self._send_message('The restart command has been temporarily disabled.')
+                await self._send_message(channel_id, 'The restart command has been temporarily disabled.')
                 # await self._restart(channel_id)
 
             elif content.startswith('!clean-restart'):
-                await self._send_message('The restart command has been temporarily disabled.')
+                await self._send_message(channel_id, 'The clean-restart command has been temporarily disabled.')
                 # await self._restart(channel_id, clean=True)
 
             elif content.startswith('!branch'):
@@ -100,6 +101,7 @@ class BotCommands:
             "!status - print a status message\n"
             "!help - print this message\n"
             "!log - get the log file\n"
+            "!metrics - get the zips of the data tables\n"
             "!state - get a zip of the state folder\n"
             "!restart - restart the bot\n"
             "!clean-restart - wipe the state and restart the bot\n"
@@ -125,16 +127,18 @@ class BotCommands:
             await self._send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
 
     @step
-    # TODO - we want eventually the reporter to zip this up
     async def _zip_metrics(self, channel_id):
-        await self._execute_command(channel_id, f'zip -q -r messages.zip {self._metrics_handler._messages_file}')
-        await self._send_message(channel_id, 'messages zip', file='messages.zip')
+        messages_zip = reporter.zip_data_file(self._metrics_handler.get_messages())
+        usage_zip = reporter.zip_data_file(self._metrics_handler.get_usage())
+        feedback_zip = reporter.zip_data_file(self._metrics_handler.get_feedback())
 
-        await self._execute_command(channel_id, f'zip -q -r usage.zip {self._metrics_handler._usage_file}')
-        await self._send_message(channel_id, 'usage zip', file='usage.zip')
+        discord_messages_file = discord.File(messages_zip, filename="messages.zip")
+        discord_usage_file = discord.File(usage_zip, filename="usage.zip")
+        discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
 
-        await self._execute_command(channel_id, f'zip -q -r feedback.zip {self._metrics_handler._feedback_file}')
-        await self._send_message(channel_id, 'feedback zip', file='feedback.zip')
+        await self._send_message(channel_id, "", file=discord_messages_file)
+        await self._send_message(channel_id, "", file=discord_usage_file)
+        await self._send_message(channel_id, "", file=discord_feedback_file)
 
     @step
     async def _restart(self, channel_id, clean=False):
