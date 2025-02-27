@@ -15,8 +15,8 @@ from feedback import GetTAFeedback, GetConvoFeedback
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
-from conversation import GPTMessage
 from conversation import BasicSetupConversation
+from AI import GenAI
 from sql_metrics import SQLMetricsHandler
 from sqlite import create_sqlite_session
 from threads import SetupPrivateThread
@@ -144,18 +144,23 @@ class MyClient(discord.Client):
             self.send_message
         )
 
-        have_conversation = HaveStandardGptConversation(
+        setup_conversation = BasicSetupConversation(
+            self.metrics_handler.record_message,
+        )
+
+        ai_client = GenAI(
             os.environ['OPENAI_API_KEY'],
             open_ai_retry_protocol,
+            self.typing,
+            self.send_message,
+        )
+
+        have_conversation = HaveStandardGptConversation(
+            ai_client,
             self.metrics_handler.record_message,
             self.metrics_handler.record_usage,
             self.send_message,
             self.report_error,
-            self.typing
-        )
-
-        setup_conversation = BasicSetupConversation(
-            self.metrics_handler.record_message,
         )
 
         duck_workflow = RubberDuck(

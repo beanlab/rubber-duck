@@ -31,6 +31,9 @@ class RecordUsage(Protocol):
     async def __call__(self, guild_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
                        output_tokens: int): ...
 
+class AIClient(Protocol):
+    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:...
+    async def get_completion_with_retry(self, thread_id, engine, message_history) -> tuple[list, dict]:...
 
 class BasicSetupConversation:
     def __init__(self, record_message):
@@ -46,17 +49,14 @@ class BasicSetupConversation:
         return message_history
 
 class HaveStandardGptConversation:
-    def __init__(self, openai_api_key: str,
-                 retry_config: RetryConfig,
+    def __init__(self, ai_client: AIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping):
-        self._retry_config = retry_config
+                 send_message: SendMessage, report_error: ReportError):
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
-        self._typing = typing
-        self._client = AsyncOpenAI(api_key=openai_api_key)
+        self._ai_client = ai_client
 
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600):
         async with queue('messages', None) as messages:
@@ -89,7 +89,7 @@ class HaveStandardGptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
+                    choices, usage = await self._ai_client.get_completion_with_retry(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
@@ -138,40 +138,6 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-
-    @step
-    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
-        async with self._typing(thread_id):
-            completion: ChatCompletion = await self._client.chat.completions.create(
-                model=engine,
-                messages=message_history
-            )
-            logging.debug(f"Completion: {completion}")
-            completion_dict = completion.dict()
-            choices = completion_dict['choices']
-            usage = completion_dict['usage']
-            return choices, usage
-
-    @step
-    async def _get_completion_with_retry(self, thread_id, engine, message_history):
-        max_retries = self._retry_config['max_retries']
-        delay = self._retry_config['delay']
-        backoff = self._retry_config['backoff']
-        retries = -1
-        while retries < max_retries:
-            try:
-                return await self._get_completion(thread_id, engine, message_history)
-            except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
-                if retries == -1:
-                    await self._send_message(thread_id, 'Trying to contact servers...')
-                retries += 1
-                if retries >= max_retries:
-                    raise
-
-                logging.warning(
-                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                await asyncio.sleep(delay)
-                delay *= backoff
 
     @staticmethod
     def _generate_error_message(guild_id, thread_id, ex):
