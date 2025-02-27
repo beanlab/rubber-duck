@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rubber_duck"
-version = "0.2.3"
+version = "0.2.4"
 description = ""
 authors = ["Gordon Bean <gbean@cs.byu.edu>"]
 
@@ -9,9 +9,10 @@ python = "^3.11"
 openai = "^1.11.1"
 discord = "^2.1.0"
 urllib3 = "<2.0"
-quest-py = "0.2.6"
+quest-py = "0.2.7"
 seaborn = "0.13.2"
 pandas = "^2.2.2"
+aiofiles = "^24.1.0"
 sqlalchemy = "^2.0.38"
 
 [tool.poetry.dev-dependencies]
