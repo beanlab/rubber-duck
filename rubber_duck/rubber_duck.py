@@ -36,6 +36,7 @@ class RubberDuck:
     def __init__(self,
                  duck_config: DuckConfig,
                  setup_thread: SetupThread,
+                 preprocess_conversation,
                  have_conversation: HaveConversation,
                  get_feedback: GetConvoFeedback,
                  ):
@@ -43,6 +44,7 @@ class RubberDuck:
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
         self._default_config = duck_config['defaults']
         self._setup_thread = step(setup_thread)
+        self._preprocess_conversation = preprocess_conversation
         self._have_conversation = step(have_conversation)
         self._get_feedback = step(get_feedback)
 
@@ -63,10 +65,12 @@ class RubberDuck:
 
         return prompt, engine, timeout
 
-    async def __call__(self, channel_name: str, initial_message: Message, conversation_history=None, timeout=600):
+    async def __call__(self, channel_name: str, initial_message: Message, timeout=600):
         prompt, engine, timeout = self._get_channel_settings(channel_name, initial_message)
 
         thread_id = await self._setup_thread(initial_message)
+
+        conversation_history = await self._preprocess_conversation()
 
         async with alias(str(thread_id)):
             await self._have_conversation(thread_id, engine, prompt, initial_message, timeout, conversation_history)
