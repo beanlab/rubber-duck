@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
-from typing import TypedDict, Protocol
+from typing import TypedDict, Protocol, List
 
 import openai
 from openai import AsyncOpenAI
@@ -32,6 +32,19 @@ class RecordUsage(Protocol):
                        output_tokens: int): ...
 
 
+class BasicSetupConversation:
+    def __init__(self, record_message):
+        self._record_message = step(record_message)
+
+    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]:
+        message_history = [GPTMessage(role='system', content=prompt)]
+        user_id = initial_message['author_id']
+        guild_id = initial_message['guild_id']
+
+        await self._record_message(
+            guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
+        return message_history
+
 class HaveStandardGptConversation:
     def __init__(self, openai_api_key: str,
                  retry_config: RetryConfig,
@@ -45,18 +58,8 @@ class HaveStandardGptConversation:
         self._typing = typing
         self._client = AsyncOpenAI(api_key=openai_api_key)
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600):
         async with queue('messages', None) as messages:
-            message_history = [
-                GPTMessage(role='system', content=prompt)
-            ]
-
-            user_id = initial_message['author_id']
-            guild_id = initial_message['guild_id']
-
-            # Record the prompt
-            await self._record_message(
-                guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
