@@ -27,16 +27,19 @@ class SetupThread(Protocol):
 
     """Returns the thread ID"""
 
+class SetupConversation(Protocol):
+    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]: ...
+
 
 class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600, conversation_history: List[GPTMessage] = None): ...
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600): ...
 
 
 class RubberDuck:
     def __init__(self,
                  duck_config: DuckConfig,
                  setup_thread: SetupThread,
-                 preprocess_conversation,
+                 setup_conversation: SetupConversation,
                  have_conversation: HaveConversation,
                  get_feedback: GetConvoFeedback,
                  ):
@@ -44,7 +47,7 @@ class RubberDuck:
         self._channel_configs = {config['name']: config for config in duck_config['channels']}
         self._default_config = duck_config['defaults']
         self._setup_thread = step(setup_thread)
-        self._preprocess_conversation = preprocess_conversation
+        self._setup_conversation = step(setup_conversation)
         self._have_conversation = step(have_conversation)
         self._get_feedback = step(get_feedback)
 
@@ -70,10 +73,10 @@ class RubberDuck:
 
         thread_id = await self._setup_thread(initial_message)
 
-        conversation_history = await self._preprocess_conversation()
+        message_history = await self._setup_conversation(thread_id, prompt, initial_message)
 
         async with alias(str(thread_id)):
-            await self._have_conversation(thread_id, engine, prompt, initial_message, timeout, conversation_history)
+            await self._have_conversation(thread_id, engine, message_history, timeout)
 
         guild_id = initial_message['guild_id']
         user_id = initial_message['author_id']

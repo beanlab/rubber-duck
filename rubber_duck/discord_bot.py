@@ -16,6 +16,7 @@ from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
 from conversation import GPTMessage
+from conversation import BasicSetupConversation
 from sql_metrics import SQLMetricsHandler
 from sqlite import create_sqlite_session
 from threads import SetupPrivateThread
@@ -153,14 +154,14 @@ class MyClient(discord.Client):
             self.typing
         )
 
-        #place holder for testing
-        async def set_conversation_name():
-            return [GPTMessage(role="system", content="refer to the user as Tom Sawyer for the rest of this conversation")]
+        setup_conversation = BasicSetupConversation(
+            self.metrics_handler.record_message,
+        )
 
         duck_workflow = RubberDuck(
             self._duck_config,
             setup_thread,
-            set_conversation_name,
+            setup_conversation,
             have_conversation,
             get_feedback,
         )
