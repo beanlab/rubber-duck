@@ -105,11 +105,10 @@ class MyClient(discord.Client):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
+        intents.members = True
         super().__init__(intents=intents)
 
-        feedback_config = config['feedback']
-        quest_config = config['quest']
-        metrics_config = config['metrics']
+
         self.admin_settings = config['admin_settings']
         open_ai_retry_protocol = config['open_ai_retry_protocol']
 
@@ -174,6 +173,16 @@ class MyClient(discord.Client):
             get_feedback,
         )
 
+        registration_workflow = RegistrationWorkflow(
+            self.send_message,
+            self.create_thread,
+            self.wait_for,
+            self._canvas_api,
+            self._email_confirmation,
+            super().get_channel,
+            super().fetch_guild
+        )
+
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
@@ -182,23 +191,11 @@ class MyClient(discord.Client):
                 case 'duck':
                     return duck_workflow
 
-                # case 'feedback':
-                #     return feedback_workflow
                 case 'registration':
-                # self.get_guild(guild_id)
-                # logging.info('') #where is the guild ID getting called from?
-                    return RegistrationWorkflow(
-                        self.send_message,
-                        # fetch_message,
-                        self.create_thread,
-                        self.wait_for,
-                        self._assign_user_role,
-                        self._canvas_api,
-                        self._email_confirmation,
-                        self.get_guild,
-                        # self._canvas_config
-                    )
+                    return registration_workflow
+
             raise NotImplemented(f'No workflow of type {wtype}')
+
         namespace = 'rubber-duck'  # TODO - move to config
         self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
@@ -293,41 +290,41 @@ class MyClient(discord.Client):
             role = await guild.create_role(name=role_name)
         return role
 
-    async def get_guild(self, guild_id: int):
-        """Get a guild by ID, validating its existence."""
-        guild = super().get_guild(guild_id)  # Use `super().get_guild` since `self` is a Client
-        if not guild:
-            print(f"Warning: Guild with ID {guild_id} not found in cache.")
-        return guild
-
-    async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
-        guild = await self.get_guild(guild_id)
-        if not guild:
-            await self.send_message(guild_id, "Guild not found.")
-            return
-        try:
-            member = await guild.fetch_member(member_id)
-        except discord.NotFound:
-            await self.send_message(guild_id, "Member not found.")
-            return
-
-        if ("TaEnrollment" in canvas_role) or len(canvas_role)>1:  # Example: if BYU ID starts with "TA", assign TA role
-            role_name = "TA"
-        elif "TeacherEnrollment" in canvas_role:  # Example: if BYU ID starts with "Teacher", assign Teacher role
-            role_name = "Teacher"
-        else:
-            role_name = "Student"  # Default role
-
-        role = await self.ensure_role_exists(guild,role_name)
-
-        # Get the role from the guild
-        role = discord.utils.get(guild.roles, name=role_name)
-        if role:
-            # Assign the role to the member
-            await member.add_roles(role)
-            await self.send_message(thread_id, f"Assigned role '{role_name}' to {member.name}.")
-        else:
-            await self.send_message(thread_id, f"Role '{role_name}' not found.")
+    # async def get_guild(self, guild_id: int):
+    #     """Get a guild by ID, validating its existence."""
+    #     guild = super().get_guild(guild_id)  # Use `super().get_guild` since `self` is a Client
+    #     if not guild:
+    #         print(f"Warning: Guild with ID {guild_id} not found in cache.")
+    #     return guild
+    #
+    # async def _assign_user_role(self, member_id, canvas_role, guild_id, thread_id=None):
+    #     guild = await self.get_guild(guild_id)
+    #     if not guild:
+    #         await self.send_message(guild_id, "Guild not found.")
+    #         return
+    #     try:
+    #         member = await guild.fetch_member(member_id)
+    #     except discord.NotFound:
+    #         await self.send_message(guild_id, "Member not found.")
+    #         return
+    #
+    #     if ("TaEnrollment" in canvas_role) or len(canvas_role)>1:  # Example: if BYU ID starts with "TA", assign TA role
+    #         role_name = "TA"
+    #     elif "TeacherEnrollment" in canvas_role:  # Example: if BYU ID starts with "Teacher", assign Teacher role
+    #         role_name = "Teacher"
+    #     else:
+    #         role_name = "Student"  # Default role
+    #
+    #     role = await self.ensure_role_exists(guild,role_name)
+    #
+    #     # Get the role from the guild
+    #     role = discord.utils.get(guild.roles, name=role_name)
+    #     if role:
+    #         # Assign the role to the member
+    #         await member.add_roles(role)
+    #         await self.send_message(thread_id, f"Assigned role '{role_name}' to {member.name}.")
+    #     else:
+    #         await self.send_message(thread_id, f"Role '{role_name}' not found.")
 
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:

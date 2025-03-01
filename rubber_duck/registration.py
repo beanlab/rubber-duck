@@ -1,6 +1,8 @@
 import asyncio
 import uuid
 
+from discord import Guild, Member
+
 from rubber_duck import Message
 from quest import step, queue
 from canvas_api import CanvasApi
@@ -8,48 +10,55 @@ from email_confirmation import EmailConfirmation
 
 
 class RegistrationWorkflow:
-    def __init__(self, send_message, fetch_message, create_thread, wait_for, assign_role, canvas_api: CanvasApi,
-                 email_confirmation: EmailConfirmation, get_guild):
+    def __init__(self,
+                 send_message,
+                 create_thread,
+                 wait_for,
+                 canvas_api: CanvasApi,
+                 email_confirmation: EmailConfirmation,
+                 get_channel,
+                 fetch_guild
+                 ):
         self._send_message = step(send_message)
-        self._fetch_message = fetch_message
         self._create_thread = step(create_thread)
-        self._get_guild = get_guild
-        self._assign_user_role = assign_role
-
+        self._wait_for = wait_for
         self._canvas_api = canvas_api
         self._email_confirmation = email_confirmation
+        self._get_channel = get_channel
+        self._get_guild = fetch_guild
+        self.current_user:Member = None
 
-    async def __call__(self, user_id, channel_id, guild_id):
-        return await self.start(user_id, channel_id, guild_id)
+    async def __call__(self, user_id, channel_id, server_id, ):
+        return await self.start(user_id, channel_id, server_id)
 
-    async def start(self, user_id, channel_id, guild_id):
-        thread_id, net_id = await self._create_thread_and_get_net_id(guild_id, channel_id, user_id)
+    async def start(self, user_id, channel_id, server_id):
+        thread_id, net_id = await self._create_thread_and_get_net_id(user_id, channel_id, server_id)
 
-        if not await self._confirm_registration_via_email(guild_id, thread_id, user_id, net_id):
+        if not await self._confirm_registration_via_email(server_id, thread_id, user_id, net_id):
             await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
-        await self._assign_user_role(user_id, canvas_role, guild_id, thread_id)
+        # await self._assign_user_role(user_id, canvas_role, guild_id, thread_id)
 
     @step
-    async def _create_thread_and_get_net_id(self,guild_id,channel_id,user_id)-> tuple:
-        thread_id = await self._setup_thread(guild_id, channel_id, user_id)
+    async def _create_thread_and_get_net_id(self,user_id, channel_id, server_id)-> tuple:
+        thread_id = await self._setup_thread(user_id, channel_id, server_id)
         await self._send_message(
             thread_id,
             f"Hello <@{user_id}>, welcome to the registration process! Please follow the prompts."
         )
-        net_id = await self._get_net_id(guild_id, thread_id, user_id)
+        net_id = await self._get_net_id(server_id, thread_id)
         return (thread_id,net_id)
 
 
-    @step
-    async def _setup_thread(self, guild_id, parent_channel_id, user_id) -> int:
-        guild = await self._get_guild(guild_id)
+    async def _setup_thread(self, user_id, parent_channel_id, server_id) -> int:
+        guild = await self._get_guild(server_id) #1058490579799003187
         member = await guild.fetch_member(user_id)
+        self.current_user = member
         return await self._create_thread(parent_channel_id, f"Registration for {member.name}")
 
     @step
-    async def _get_net_id(self, guild_id, thread_id, user_id) -> str:
+    async def _get_net_id(self, guild_id, thread_id) -> str:
         await self._send_message(thread_id, "What is your BYU Net ID?")
         timeout = 120
         async with queue('messages', None) as messages:
