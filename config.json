@@ -55,6 +55,14 @@
   "admin_settings": {
     "admin_channel_id": 1192895746672951340,
     "admin_role_id": 933123843038535741
+  },
+  "sql": {
+    "db_type": "mysql+pymysql",
+    "username": "SQL_DB_USER",
+    "password":"SQL_DB_PASSWORD",
+    "host":"localhost",
+    "port":"3306",
+    "database":"test_db"
   }
 }
 
