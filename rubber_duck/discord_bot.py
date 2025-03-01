@@ -6,18 +6,23 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
-from quest import create_filesystem_manager
+from quest import wrap_steps
 
+from SQLquest import create_sql_manager
 from bot_commands import BotCommands
-from feedback import FeedbackWorkflow
-from metrics import MetricsHandler
-from rubber_duck import Message, RubberDuck, MessageHandler, Attachment
+from conversation import HaveStandardGptConversation
+from feedback import GetTAFeedback, GetConvoFeedback
+from protocols import Attachment, Message
+from reporter import Reporter
+from rubber_duck import RubberDuck
+from sql_metrics import SQLMetricsHandler
+from sqlite import create_sqlite_session
+from threads import SetupPrivateThread
+from email_confirmation import EmailConfirmation
 from canvas_api import CanvasApi
 from registration import RegistrationWorkflow
-from email_confirmation import EmailConfirmation
-from reporter import Reporter
-
-logging.basicConfig(level=logging.DEBUG)
+# from feedback import FeedbackWorkflow
+logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
 
 
@@ -79,10 +84,6 @@ def as_attachment(attachment):
     )
 
 
-def get_feedback_workflow_id(thread_id):
-    return f'feedback-{thread_id}'
-
-
 class ChannelConfig(TypedDict):
     name: str | None
     id: int | None
@@ -98,21 +99,13 @@ class RubberDuckConfig(TypedDict):
     channels: list[ChannelConfig]
 
 
-class MyClient(discord.Client, MessageHandler):
+# noinspection PyBroadException
+class MyClient(discord.Client):
     def __init__(self, config):
-
-        intents = discord.Intents.default()
+        # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
+        intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
-
-        # Registration channel feature
-        self._registration_channels = [int(key) for key in config['registration']['guilds']]
-        self._email_confirmation = EmailConfirmation(config['registration']['email'])
-        self._canvas_config = config['canvas']
-        self._canvas_api = CanvasApi(
-            self._canvas_config,
-            {guild: conf['canvas'] for guild, conf in config['registration']['guilds'].items()}
-        )
 
         feedback_config = config['feedback']
         quest_config = config['quest']
@@ -127,54 +120,76 @@ class MyClient(discord.Client, MessageHandler):
         self._duck_config = config['rubber_duck']
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
-        # MetricsHandler initialization
-        self.metrics_handler = MetricsHandler(Path(metrics_config['metrics_path']))
-
-        async def fetch_message(channel_id, message_id):
-            return await (await self.fetch_channel(channel_id)).fetch_message(message_id)
-
-        feedback_workflow = FeedbackWorkflow(
-            self.send_message,
-            fetch_message,
-            self.metrics_handler.record_feedback
+        # Registration channel feature
+        self._registration_channels = [int(key) for key in config['registration']['guilds']]
+        self._email_confirmation = EmailConfirmation(config['registration']['email'])
+        self._canvas_config = config['canvas']
+        self._canvas_api = CanvasApi(
+            self._canvas_config,
+            {guild: conf['canvas'] for guild, conf in config['registration']['guilds'].items()}
         )
 
+        # SQLMetricsHandler initialization
+        db_url = config["sql"]["db_url"]
+        sql_session = create_sqlite_session(db_url)
+        self.metrics_handler = SQLMetricsHandler(sql_session)
+        wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
+
         reporter = Reporter(self.metrics_handler, config['reporting'])
+        commands_workflow = BotCommands(self.send_message, self.metrics_handler, reporter)
+
+        # Feedback
+        get_ta_feedback = GetTAFeedback(
+            self.send_message,
+            self.add_reaction,
+            self.metrics_handler.record_feedback,
+        )
+
+        feedback_configs = config['feedback']
+
+        get_feedback = GetConvoFeedback(
+            feedback_configs,
+            get_ta_feedback
+        )
+
+        setup_thread = SetupPrivateThread(
+            self.create_thread,
+            self.send_message
+        )
+
+        have_conversation = HaveStandardGptConversation(
+            os.environ['OPENAI_API_KEY'],
+            open_ai_retry_protocol,
+            self.metrics_handler.record_message,
+            self.metrics_handler.record_usage,
+            self.send_message,
+            self.report_error,
+            self.typing
+        )
+
+        duck_workflow = RubberDuck(
+            self._duck_config,
+            setup_thread,
+            have_conversation,
+            get_feedback,
+        )
 
         def create_workflow(wtype: str):
             match wtype:
                 case 'command':
-                    return BotCommands(self.send_message, self.metrics_handler, reporter)
+                    return commands_workflow
 
                 case 'duck':
+                    return duck_workflow
 
-                    async def start_feedback_workflow(guild_id, channel_id, user_id):
-                        if (server_feedback_config := feedback_config.get(str(guild_id))) is None:
-                            return
-
-                        workflow_id = get_feedback_workflow_id(channel_id)
-                        self._workflow_manager.start_workflow(
-                            'feedback', workflow_id, guild_id, channel_id, user_id,
-                            server_feedback_config
-                        )
-
-                    return RubberDuck(
-                        self,
-                        self.metrics_handler,
-                        self._duck_config,
-                        open_ai_retry_protocol,
-                        start_feedback_workflow
-                    )
-
-                case 'feedback':
-                    return feedback_workflow
-
+                # case 'feedback':
+                #     return feedback_workflow
                 case 'registration':
-                     # self.get_guild(guild_id)
-                     # logging.info('') #where is the guild ID getting called from?
-                     return RegistrationWorkflow(
+                # self.get_guild(guild_id)
+                # logging.info('') #where is the guild ID getting called from?
+                    return RegistrationWorkflow(
                         self.send_message,
-                        fetch_message,
+                        # fetch_message,
                         self.create_thread,
                         self.wait_for,
                         self._assign_user_role,
@@ -183,11 +198,9 @@ class MyClient(discord.Client, MessageHandler):
                         self.get_guild,
                         # self._canvas_config
                     )
-
             raise NotImplemented(f'No workflow of type {wtype}')
-
-        self._workflow_manager = create_filesystem_manager(Path(quest_config['state_path']), 'rubber-duck',
-                                                           create_workflow)
+        namespace = 'rubber-duck'  # TODO - move to config
+        self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -329,7 +342,8 @@ class MyClient(discord.Client, MessageHandler):
 
         if file is not None:
             if isinstance(file, list):
-                curr_message = await channel.send("", files=file) #TODO: check that all instances are discord.File objects
+                curr_message = await channel.send("",
+                                                  files=file)  # TODO: check that all instances are discord.File objects
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -349,6 +363,10 @@ class MyClient(discord.Client, MessageHandler):
         except Exception as e:
             logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
+    async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
+        message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.add_reaction(reaction)
+
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
             # TODO make this assume one id
@@ -360,7 +378,7 @@ class MyClient(discord.Client, MessageHandler):
             except:
                 logging.exception(f'Unable to message channel {self._command_channel}')
 
-    def typing(self, channel_id):
+    def typing(self, channel_id: int):
         return self.get_channel(channel_id).typing()
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
@@ -371,6 +389,7 @@ class MyClient(discord.Client, MessageHandler):
             auto_archive_duration=60
         )
         return thread.id
+
 
 def main(config):
     client = MyClient(config)
@@ -397,19 +416,19 @@ if __name__ == '__main__':
 
     try:
         if args.config.is_file():
-            config = json.loads(args.config.read_text())
+            app_config = json.loads(args.config.read_text())
         else:
             default_config_path = Path('config.json')
             if default_config_path.is_file():
-                config = json.loads(default_config_path.read_text())
+                app_config = json.loads(default_config_path.read_text())
             else:
                 raise FileNotFoundError(default_config_path)
 
-    except FileNotFoundError as e:
-        print(f"No valid config file found: {e}. Please create a config.json or use the default template.")
-        print(
-            "You can find the default config template here: https://github.com/beanlab/rubber-duck/blob/master/config.json")
+    except FileNotFoundError as fnf:
+        print(f"No valid config file found: {fnf}. Please create a config.json or use the default template.")
+        print("You can find the default config template here: "
+              "https://github.com/beanlab/rubber-duck/blob/master/config.json")
         print("For detailed instructions, check the README here: link_to_readme")
         exit(1)
 
-    main(config)
+    main(app_config)
