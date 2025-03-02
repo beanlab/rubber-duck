@@ -176,7 +176,6 @@ class MyClient(discord.Client):
         registration_workflow = RegistrationWorkflow(
             self.send_message,
             self.create_thread,
-            self.wait_for,
             self._canvas_api,
             self._email_confirmation,
             super().get_channel,

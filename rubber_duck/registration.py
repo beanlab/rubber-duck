@@ -4,7 +4,7 @@ import uuid
 from discord import Guild, Member
 
 from rubber_duck import Message
-from quest import step, queue
+from quest import step, queue, alias
 from canvas_api import CanvasApi
 from email_confirmation import EmailConfirmation
 
@@ -13,7 +13,6 @@ class RegistrationWorkflow:
     def __init__(self,
                  send_message,
                  create_thread,
-                 wait_for,
                  canvas_api: CanvasApi,
                  email_confirmation: EmailConfirmation,
                  get_channel,
@@ -21,7 +20,6 @@ class RegistrationWorkflow:
                  ):
         self._send_message = step(send_message)
         self._create_thread = step(create_thread)
-        self._wait_for = wait_for
         self._canvas_api = canvas_api
         self._email_confirmation = email_confirmation
         self._get_channel = get_channel
@@ -60,13 +58,17 @@ class RegistrationWorkflow:
     @step
     async def _get_net_id(self, guild_id, thread_id) -> str:
         await self._send_message(thread_id, "What is your BYU Net ID?")
-        timeout = 120
-        async with queue('messages', None) as messages:
+        timeout = 120  # Set to 120 seconds (2 minutes)
+
+        async with alias(str(thread_id)), queue("messages", None) as message_queue:
             while True:
-                message: Message = await asyncio.wait_for(messages.get(), timeout)
+                message: Message = await asyncio.wait_for(message_queue.get(), timeout)
                 net_id = message['content'].strip()
+
                 if not await self._is_valid_net_id(guild_id, net_id):
                     await self._send_message(thread_id, "Invalid BYU Net ID. Please try again.")
+                    continue
+
                 return net_id
 
     @step
