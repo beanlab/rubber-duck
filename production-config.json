@@ -2,11 +2,11 @@
 
   "sql": {
     "db_type": "mysql+pymysql",
-    "username": "SQL_DB_USER",
-    "password":"SQL_DB_PASSWORD",
-    "host":"SQL_DB_HOST",
-    "port":"3306",
-    "database":"rubberduckdb"
+    "username": "env:DB_USER",
+    "password":"env:DB_PASSWORD",
+    "host":"env:DB_HOST",
+    "port":"env:DB_PORT",
+    "database":"env:DB_NAME"
   },
   "rubber_duck": {
     "channels": [
