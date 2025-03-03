@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 if [ "$#" -ne 7 ]; then
     echo "Usage: $0 <CLUSTER_NAME> <SERVICE_NAME> <TASK_DEFINITION_FAMILY> <IMAGE_URI> <REGION> <EXECUTION_ROLE> <ENV_FILE_S3_PATH>"
     exit 1
@@ -66,7 +66,7 @@ TASK_DEFINITION_JSON=$(cat <<EOF
 EOF
 )
 
-NEW_TASK_DEFINITION=$(echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION --query 'taskDefinition.taskDefinitionArn' --output text)
+NEW_TASK_DEFINITION=$(echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json - --region $REGION --query 'taskDefinition.taskDefinitionArn' --output text)
 
 echo "Updating ECS service with new task definition..."
 aws ecs update-service \
