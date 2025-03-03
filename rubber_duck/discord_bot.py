@@ -17,7 +17,7 @@ from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
 from sql_metrics import SQLMetricsHandler
-from sqlite import create_sqlite_session
+from sqlite import create_sql_session
 from threads import SetupPrivateThread
 
 logging.basicConfig(level=logging.INFO)
@@ -116,8 +116,13 @@ class MyClient(discord.Client):
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
         # SQLMetricsHandler initialization
-        db_url = config["sql"]["db_url"]
-        sql_session = create_sqlite_session(db_url)
+        db_type = config["sql"]["db_type"]
+        username = config["sql"]["username"]
+        password = config["sql"]["password"]
+        host = config["sql"]["host"]
+        port = config["sql"]["port"]
+        database = config["sql"]["database"]
+        sql_session = create_sql_session(db_type, username, password, host, port, database)
         self.metrics_handler = SQLMetricsHandler(sql_session)
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
