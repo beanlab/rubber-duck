@@ -1,7 +1,6 @@
 import os
 from typing import TypedDict
 
-from distlib.util import resolve
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -13,7 +12,7 @@ def _create_sqlite_session(db_name: str) -> Session:
 
 
 def _create_sql_session(db_type: str, username: str, password: str, host: str, port: str, database: str) -> Session:
-    db_url = f"{db_type}://{username}:{password}@{host}:{port}/{database}"
+    db_url = f"{db_type}://{username}:{password}@{host}:{port}/{database}" #the db_url is correct.
     engine = create_engine(db_url)
     return sessionmaker(bind=engine)()
 
