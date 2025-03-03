@@ -1,6 +1,12 @@
 {
+
   "sql": {
-    "db_url": "sqlite:///rubber_duck_database.db"
+    "db_type": "mysql+pymysql",
+    "username": "SQL_DB_USER",
+    "password":"SQL_DB_PASSWORD",
+    "host":"SQL_DB_HOST",
+    "port":"3306",
+    "database":"rubberduckdb"
   },
   "rubber_duck": {
     "channels": [
