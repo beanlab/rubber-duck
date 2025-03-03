@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [ "$#" -ne 7 ]; then
     echo "Usage: $0 <CLUSTER_NAME> <SERVICE_NAME> <TASK_DEFINITION_FAMILY> <IMAGE_URI> <REGION> <EXECUTION_ROLE> <ENV_FILE_S3_PATH>"
     exit 1
@@ -14,7 +13,6 @@ IMAGE_URI="$4"
 REGION="$5"
 EXECUTION_ROLE="$6"
 ENV_FILE_S3_PATH="$7"
-
 
 # Set the desired CPU and memory for the task definition
 CPU="1024"
@@ -68,13 +66,13 @@ TASK_DEFINITION_JSON=$(cat <<EOF
 EOF
 )
 
-echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION
+NEW_TASK_DEFINITION=$(echo "$TASK_DEFINITION_JSON" | aws ecs register-task-definition --cli-input-json file://- --region $REGION --query 'taskDefinition.taskDefinitionArn' --output text)
 
 echo "Updating ECS service with new task definition..."
 aws ecs update-service \
   --cluster $CLUSTER_NAME \
   --service $SERVICE_NAME \
-  --task-definition $TASK_DEFINITION_FAMILY \
+  --task-definition $NEW_TASK_DEFINITION \
   --desired-count 1 \
   --force-new-deployment \
   --region $REGION
