@@ -306,6 +306,7 @@ class MyClient(discord.Client):
         )
         return thread.id
 
+
 def fetch_config_from_s3():
     # Initialize S3 client
     s3 = boto3.client('s3')
@@ -318,31 +319,26 @@ def fetch_config_from_s3():
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-
+    logging.info(bucket_name)
+    logging.info(key)
     try:
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
-        # Read the content of the file and parse it as JSON
-        config = json.loads(response['Body'].read().decode('utf-8'))
-        print("Config file content:", config)
-        return config
+        # # Read the content of the file and parse it as JSON
+        # config = json.loads(response['Body'].read().decode('utf-8'))
+        # print("Config file content:", config)
+        # return config
 
     except Exception as e:
         print(f"Failed to fetch config from S3: {e}")
         return None
 
+
 # Function to load the configuration from a local file (if needed)
-def load_local_config(file_path='production-config.json'):
-    try:
-        if Path(file_path).is_file():
-            with open(file_path, 'r') as f:
-                return json.load(f)
-        else:
-            raise FileNotFoundError(f"{file_path} not found.")
-    except FileNotFoundError as e:
-        print(f"No valid config file found: {e}. Please create a production-config.json.")
-        exit(1)
+def load_local_config(file_path: Path):
+    return json.loads(file_path.read_text())
+
 
 def main(config):
     client = MyClient(config)
@@ -351,7 +347,7 @@ def main(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='production-config.json')
+    parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
     args = parser.parse_args()
 
