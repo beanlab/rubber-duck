@@ -2,14 +2,12 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
-from typing import TypedDict, Protocol, List
+from typing import TypedDict, Protocol
 
 import openai
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
 from quest import step, queue
 
-from protocols import Message, SendMessage, ReportError, IndicateTyping
+from protocols import Message, SendMessage, ReportError
 
 
 class RetryConfig(TypedDict):
