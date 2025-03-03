@@ -15,7 +15,7 @@ class RetryConfig(TypedDict):
     backoff: int
 
 
-class GenAI():
+class OpenAI():
     def __init__(self, openai_api_key: str,
                  retry_config: RetryConfig,
                  typing: IndicateTyping,

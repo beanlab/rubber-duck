@@ -16,7 +16,7 @@ from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
 from conversation import BasicSetupConversation
-from AI import GenAI
+from genAI import OpenAI
 from sql_metrics import SQLMetricsHandler
 from sqlite import create_sqlite_session
 from threads import SetupPrivateThread
@@ -148,7 +148,7 @@ class MyClient(discord.Client):
             self.metrics_handler.record_message,
         )
 
-        ai_client = GenAI(
+        ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
             open_ai_retry_protocol,
             self.typing,

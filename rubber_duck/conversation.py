@@ -31,7 +31,7 @@ class RecordUsage(Protocol):
     async def __call__(self, guild_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
                        output_tokens: int): ...
 
-class AIClient(Protocol):
+class GenAIClient(Protocol):
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:...
     async def get_completion_with_retry(self, thread_id, engine, message_history) -> tuple[list, dict]:...
 
@@ -49,7 +49,7 @@ class BasicSetupConversation:
         return message_history
 
 class HaveStandardGptConversation:
-    def __init__(self, ai_client: AIClient,
+    def __init__(self, ai_client: GenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
                  send_message: SendMessage, report_error: ReportError):
         self._record_message = step(record_message)
