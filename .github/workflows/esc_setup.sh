@@ -40,13 +40,7 @@ TASK_DEFINITION_JSON=$(cat <<EOF
       "memory": $MEMORY,
       "portMappings": [],
       "essential": true,
-      "environment": [
-        { "name": "DB_HOST", "value": "$DB_HOST" },
-        { "name": "DB_PORT", "value": "$DB_PORT" },
-        { "name": "DB_NAME", "value": "$DB_NAME" },
-        { "name": "DB_USER", "value": "$DB_USER" },
-        { "name": "DB_PASSWORD", "value": "$DB_PASSWORD" }
-      ],
+      "environment": [],
       "environmentFiles": [
         {
           "value": "$ENV_FILE_S3_PATH",
