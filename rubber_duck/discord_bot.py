@@ -325,10 +325,9 @@ def fetch_config_from_s3():
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
-        # # Read the content of the file and parse it as JSON
-        # config = json.loads(response['Body'].read().decode('utf-8'))
-        # print("Config file content:", config)
-        # return config
+        # Read the content of the file and parse it as JSON
+        config = json.loads(response['Body'].read().decode('utf-8'))
+        return config
 
     except Exception as e:
         print(f"Failed to fetch config from S3: {e}")
