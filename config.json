@@ -5,29 +5,60 @@
   "rubber_duck": {
     "channels": [
       {
-        "name": "duck-pond",
-        "prompt_file": "prompts/standard-rubber-duck.txt"
+        "channel_name": "duck-pond",
+        "ducks": [
+          {
+            "name": "standard-rubber-duck",
+            "weight": 1,
+            "prompt_file": "prompts/standard-rubber-duck.txt"
+          }
+        ]
       },
       {
-        "name": "other-pond",
-        "prompt_file": "prompts/standard-rubber-duck.txt",
-        "engine": "gpt-4o-mini"
+        "channel_name": "other-pond",
+        "ducks": [
+          {
+            "name": "standard-gpt-4o-mini",
+            "weight": 1,
+            "prompt_file": "prompts/standard-rubber-duck.txt",
+            "engine": "gpt-4o-mini"
+          }
+        ]
       },
       {
-        "name": "gpt4",
-        "engine": "gpt-4o"
+        "channel_name": "gpt4",
+        "ducks": [
+          {
+            "name": "gpt-4o",
+            "weight": 1,
+            "engine": "gpt-4o"
+          }
+        ]
       },
       {
-        "name": "gpt-3.5-turbo",
-        "engine": "gpt-3.5-turbo"
+        "channel_name": "gpt-3.5-turbo",
+        "ducks": [
+          {
+            "name": "gpt-3.5-turbo",
+            "weight": 1,
+            "engine": "gpt-3.5-turbo"
+          }
+        ]
       },
       {
-        "name": "fast",
-        "engine": "gpt-3.5-turbo",
-        "timeout": 10
+        "channel_name": "fast",
+        "ducks": [
+          {
+            "name": "gpt-3.5-turbo",
+            "weight": 1,
+            "engine": "gpt-3.5-turbo",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "defaults": {
+      "name": "default-duck",
       "engine": "gpt-4o",
       "timeout": 600
     }
