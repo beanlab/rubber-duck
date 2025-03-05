@@ -32,8 +32,6 @@ jobs:
             echo "IMAGE_TAG=test-latest" >> $GITHUB_ENV
           fi
 
-
-
       - name: Run Docker build script
         run: bash ./build_docker.sh
 
