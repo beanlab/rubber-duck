@@ -19,7 +19,10 @@ jobs:
 
       - name: Set environment variables
         run: |
+          echo "Branch name: ${GITHUB_REF}"
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "Extracted branch name: $BRANCH_NAME"
+          
           if [[ "$BRANCH_NAME" == "master" ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
@@ -27,6 +30,7 @@ jobs:
             echo "ENVIRONMENT=test" >> $GITHUB_ENV
             echo "IMAGE_TAG=test-latest" >> $GITHUB_ENV
           fi
+
 
 
       - name: Run Docker build script
