@@ -19,6 +19,7 @@ jobs:
 
       - name: Set environment variables
         run: |
+          set -x  # Enable shell debugging to see all commands being run
           echo "Branch name: ${GITHUB_REF}"
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           echo "Extracted branch name: $BRANCH_NAME"
