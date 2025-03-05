@@ -41,8 +41,24 @@ jobs:
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
-      - name: Push Docker image to ECR
-        run: docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
+      - name: Push Docker image with "test-latest" tag to ECR
+        run: |
+          if [[ "${{ env.IMAGE_TAG }}" == "test-latest" ]]; then
+            docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }} 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
+            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
+          fi
+
+      - name: Push Docker image with "production-latest" tag to ECR
+        run: |
+          if [[ "${{ env.IMAGE_TAG }}" == "latest" ]]; then
+            docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }} 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
+            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
+          fi
+
+      - name: Complete Docker push
+        run: echo "Docker images pushed to ECR successfully!"
+#      - name: Push Docker image to ECR
+#        run: docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
 
   deploy_to_cloudformation:
     needs: [build_and_push]

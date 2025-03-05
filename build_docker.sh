@@ -6,11 +6,12 @@ IMAGE_TAG=$(git rev-parse --abbrev-ref HEAD) # Use branch name
 
 ECR_REPO="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck"
 
+echo "Building Docker image for ${IMAGE_NAME}:${IMAGE_TAG}..."
+
 set -e
 
 # Build the Docker image
-cd ../../
-docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f - ../../ <<EOF
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f - . <<EOF
 FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 COPY rubber_duck /rubber_duck
