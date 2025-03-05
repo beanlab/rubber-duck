@@ -10,13 +10,13 @@ from quest import wrap_steps
 
 from SQLquest import create_sql_manager
 from bot_commands import BotCommands
+from conversation import BasicSetupConversation
 from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
+from genAI import OpenAI
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
-from conversation import BasicSetupConversation
-from genAI import OpenAI
 from sql_metrics import SQLMetricsHandler
 from sqlite import create_sqlite_session
 from threads import SetupPrivateThread
@@ -150,8 +150,6 @@ class MyClient(discord.Client):
 
         ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
-            open_ai_retry_protocol,
-            self.send_message,
         )
 
         have_conversation = HaveStandardGptConversation(
@@ -160,7 +158,8 @@ class MyClient(discord.Client):
             self.metrics_handler.record_usage,
             self.send_message,
             self.report_error,
-            self.typing
+            self.typing,
+            open_ai_retry_protocol,
         )
 
         duck_workflow = RubberDuck(

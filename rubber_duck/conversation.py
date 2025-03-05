@@ -29,8 +29,10 @@ class RecordUsage(Protocol):
     async def __call__(self, guild_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
                        output_tokens: int): ...
 
+
 class GenAIClient(Protocol):
-    async def get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:...
+    async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
+
 
 class BasicSetupConversation:
     def __init__(self, record_message):
@@ -45,18 +47,21 @@ class BasicSetupConversation:
             guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
         return message_history
 
+
 class HaveStandardGptConversation:
     def __init__(self, ai_client: GenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping):
+                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
+                 retry_config: RetryConfig):
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._ai_client = ai_client
         self._typing = typing
+        self._retry_config = retry_config
 
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600):
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
         async with queue('messages', None) as messages:
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
@@ -87,7 +92,28 @@ class HaveStandardGptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
                     async with self._typing(thread_id):
-                        choices, usage = await self._ai_client.get_completion(thread_id, engine, message_history)
+                        choices, usage = await self._ai_client.get_completion(engine, message_history)
+                        max_retries = self._retry_config['max_retries']
+                        delay = self._retry_config['delay']
+                        backoff = self._retry_config['backoff']
+                        retries = -1
+                        while retries < max_retries:
+                            try:
+                                choices, usage = await self._ai_client.get_completion(engine, message_history)
+                                break
+                            except (
+                                    openai.APITimeoutError, openai.InternalServerError,
+                                    openai.UnprocessableEntityError) as ex:
+                                if retries == -1:
+                                    await self._send_message(thread_id, 'Trying to contact servers...')
+                                retries += 1
+                                if retries >= max_retries:
+                                    raise
+
+                                logging.warning(
+                                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
+                                await asyncio.sleep(delay)
+                                delay *= backoff
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
