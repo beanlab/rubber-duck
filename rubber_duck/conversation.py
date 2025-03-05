@@ -7,7 +7,7 @@ from typing import TypedDict, Protocol
 import openai
 from quest import step, queue
 
-from protocols import Message, SendMessage, ReportError
+from protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
 class RetryConfig(TypedDict):
@@ -30,8 +30,7 @@ class RecordUsage(Protocol):
                        output_tokens: int): ...
 
 class GenAIClient(Protocol):
-    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:...
-    async def get_completion_with_retry(self, thread_id, engine, message_history) -> tuple[list, dict]:...
+    async def get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:...
 
 class BasicSetupConversation:
     def __init__(self, record_message):
@@ -49,12 +48,13 @@ class BasicSetupConversation:
 class HaveStandardGptConversation:
     def __init__(self, ai_client: GenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError):
+                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping):
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._ai_client = ai_client
+        self._typing = typing
 
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600):
         async with queue('messages', None) as messages:
@@ -86,8 +86,8 @@ class HaveStandardGptConversation:
                     await self._record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
-
-                    choices, usage = await self._ai_client.get_completion_with_retry(thread_id, engine, message_history)
+                    async with self._typing(thread_id):
+                        choices, usage = await self._ai_client.get_completion(thread_id, engine, message_history)
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 

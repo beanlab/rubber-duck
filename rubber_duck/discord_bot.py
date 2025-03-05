@@ -151,7 +151,6 @@ class MyClient(discord.Client):
         ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
             open_ai_retry_protocol,
-            self.typing,
             self.send_message,
         )
 
@@ -161,6 +160,7 @@ class MyClient(discord.Client):
             self.metrics_handler.record_usage,
             self.send_message,
             self.report_error,
+            self.typing
         )
 
         duck_workflow = RubberDuck(
