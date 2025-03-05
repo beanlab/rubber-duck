@@ -91,29 +91,28 @@ class HaveStandardGptConversation:
                     await self._record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
-                    async with self._typing(thread_id):
-                        choices, usage = await self._ai_client.get_completion(engine, message_history)
-                        max_retries = self._retry_config['max_retries']
-                        delay = self._retry_config['delay']
-                        backoff = self._retry_config['backoff']
-                        retries = -1
-                        while retries < max_retries:
-                            try:
+                    max_retries = self._retry_config['max_retries']
+                    delay = self._retry_config['delay']
+                    backoff = self._retry_config['backoff']
+                    retries = -1
+                    while retries < max_retries:
+                        try:
+                            async with self._typing(thread_id):
                                 choices, usage = await self._ai_client.get_completion(engine, message_history)
-                                break
-                            except (
-                                    openai.APITimeoutError, openai.InternalServerError,
-                                    openai.UnprocessableEntityError) as ex:
-                                if retries == -1:
-                                    await self._send_message(thread_id, 'Trying to contact servers...')
-                                retries += 1
-                                if retries >= max_retries:
-                                    raise
+                            break
+                        except (
+                                openai.APITimeoutError, openai.InternalServerError,
+                                openai.UnprocessableEntityError) as ex:
+                            if retries == -1:
+                                await self._send_message(thread_id, 'Trying to contact servers...')
+                            retries += 1
+                            if retries >= max_retries:
+                                raise
 
-                                logging.warning(
-                                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                                await asyncio.sleep(delay)
-                                delay *= backoff
+                            logging.warning(
+                                f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
+                            await asyncio.sleep(delay)
+                            delay *= backoff
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
