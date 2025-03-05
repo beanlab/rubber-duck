@@ -8,9 +8,6 @@ ECR_REPO="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck"
 
 set -e
 
-# Change to the repository root
-cd ../../
-
 # Build the Docker image using the repository root ('.') as the build context
 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f - . <<EOF
 FROM python:3.11.9
