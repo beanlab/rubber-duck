@@ -63,57 +63,6 @@ class Command(ABC):
             await self._send_message(channel_id, f'```{output}```')
 
 
-@Command.register("!restart")
-class RestartCommand(Command):
-    async def execute(self, content: str, channel_id: int):
-        await self._send_message(channel_id, 'The restart command has been temporarily disabled.')
-        # await self._restart(channel_id)
-
-
-@Command.register("!clean-restart")
-class CleanRestartCommand(Command):
-    async def execute(self, content: str, channel_id: int):
-        await self._send_message(channel_id, 'The clean-restart command has been temporarily disabled.')
-        # await self._restart(channel_id, clean=True)
-
-
-@step
-async def _restart(self, channel_id, clean=False):
-    """
-    Restart the bot
-    """
-    await self._send_message(channel_id, f'Restart requested.')
-    await self._execute_command(channel_id, 'git fetch')
-    await self._execute_command(channel_id, 'git reset --hard')
-    await self._execute_command(channel_id, 'git clean -f')
-    await self._execute_command(channel_id, 'git pull --rebase=false')
-    await self._execute_command(channel_id, 'rm poetry.lock')
-    await self._execute_command(channel_id, 'poetry install')
-    await self._send_message(channel_id, f'Restarting.')
-
-    if clean:
-        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d-%H%M%S")
-        await self._send_message(channel_id, f'mv state state-{timestamp}.')
-
-        # Don't run this as a step, as we are essentially deleting the state folder
-        subprocess.check_output(f'mv state state-{timestamp}')
-
-    # This script will kill and restart the python process
-    subprocess.Popen(["bash", "restart.sh"])
-    return
-
-
-@Command.register("!branch")
-class BranchCommand(Command):
-    async def execute(self, content: str, channel_id: int):
-        m = re.match(r'!branch\s+(\S+)', content)
-        if m is None:
-            await self._send_message(channel_id, 'Error. Usage: !branch <branch name>')
-        else:
-            await self._execute_command(channel_id, ['git', 'fetch'])
-            await self._execute_command(channel_id, ['git', 'switch', m.group(1)])
-
-
 @Command.register("!log")
 class LogCommand(Command):
     @step
