@@ -149,18 +149,16 @@ class StatusCommand(Command):
 @Command.register("!help")
 class HelpCommand(Command):
     async def execute(self, content: str, channel_id: int):
-        await self._send_message(
-            channel_id,
-            "```\n"
-            "!status - print a status message\n"
-            "!help - print this message\n"
-            "!log - get the log file\n"
-            "!metrics - get the zips of the data tables\n"
-            "!state - get a zip of the state folder\n"
-            "!restart - restart the bot\n"
-            "!clean-restart - wipe the state and restart the bot\n"
-            "```\n"
-        )
+        commands_list = "\n".join(Command._registry.keys())  # Get all registered commands
+        help_message = f"```\n{commands_list}\n```"
+        await self._send_message(channel_id, help_message)
+        # "!status - print a status message\n"
+        # "!help - print this message\n"
+        # "!log - get the log file\n"
+        # "!metrics - get the zips of the data tables\n"
+        # "!state - get a zip of the state folder\n"
+        # "!restart - restart the bot\n"
+        # "!clean-restart - wipe the state and restart the bot\n"
 
 
 @Command.register("!report")
