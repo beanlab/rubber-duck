@@ -1,12 +1,18 @@
+#!/bin/bash
 # Build Rubber Duck Docker
 # this is the command to build the docker image
 # ./build_docker.sh
-# TODO make image_tag dynamic based on the git commit we are trying to deploy.
 
+# Fetch the Git commit hash or branch name to create a unique tag
 IMAGE_NAME="rubber-duck"
-IMAGE_TAG="latest"
+IMAGE_TAG=$(git rev-parse --abbrev-ref HEAD) #use branch name if you prefer: IMAGE_TAG=$(git rev-parse --abbrev-ref HEAD)
+
+
 ECR_REPO="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck"
+
 set -e
+
+# Build the Docker image
 docker build \
     -t ${IMAGE_NAME}:${IMAGE_TAG} \
     -f - . <<EOF
@@ -24,5 +30,8 @@ WORKDIR /
 CMD ["python", "/rubber_duck/discord_bot.py", "--config", "/config.json", "--log-console"]
 EOF
 
-# Tag the image for ECR
+# Tag the image for ECR with the unique tag (commit hash or branch name)
 docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
+
+# Optionally, also tag as "latest" for easier reference
+docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REPO}:latest
