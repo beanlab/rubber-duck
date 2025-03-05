@@ -19,12 +19,12 @@ jobs:
 
       - name: Set environment variables
         run: |
-          set -x  # Enable shell debugging to see all commands being run
+          set -x
           echo "Branch name: ${GITHUB_REF}"
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           echo "Extracted branch name: $BRANCH_NAME"
           
-          if [[ "$BRANCH_NAME" == "master" ]]; then
+          if [[ "$BRANCH_NAME" = "master" ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
             echo "IMAGE_TAG=latest" >> $GITHUB_ENV
           else
