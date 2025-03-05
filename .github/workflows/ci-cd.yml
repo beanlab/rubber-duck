@@ -53,61 +53,61 @@ jobs:
       - name: Complete Docker push
         run: echo "Docker images pushed to ECR successfully!"
 
-deploy_to_cloudformation:
-  needs: [build_and_push]
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+  deploy_to_cloudformation:
+    needs: [build_and_push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Set environment variables
-      run: bash .github/workflows/set-env.sh
+      - name: Set environment variables
+        run: bash .github/workflows/set-env.sh
 
-    - name: What is the environment?
-      run: echo "Environment is ${{ env.ENVIRONMENT }}"
+      - name: What is the environment?
+        run: echo "Environment is ${{ env.ENVIRONMENT }}"
 
-    - name: Deploy ECS Infrastructure with CloudFormation
-      run: |
-        aws cloudformation deploy \
-          --stack-name rubber-duck-${{ env.IMAGE_TAG }} \
-          --template-file infra/ecs-infra.yml \
-          --capabilities CAPABILITY_NAMED_IAM \
-          --parameter-overrides \
-            Environment=${{ env.ENVIRONMENT }} \
-            ClusterName=DuckCluster-${{ env.IMAGE_TAG }} \
-            TaskDefinitionFamily=rubber-duck-${{ env.ENVIRONMENT }} \
-            ContainerName=duck-container-${{ env.ENVIRONMENT }} \
-            ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
+      - name: Deploy ECS Infrastructure with CloudFormation
+        run: |
+          aws cloudformation deploy \
+            --stack-name rubber-duck-${{ env.IMAGE_TAG }} \
+            --template-file infra/ecs-infra.yml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              ClusterName=DuckCluster-${{ env.IMAGE_TAG }} \
+              TaskDefinitionFamily=rubber-duck-${{ env.ENVIRONMENT }} \
+              ContainerName=duck-container-${{ env.ENVIRONMENT }} \
+              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
 
-    - name: Register ECS Task Definition and Deploy
-      run: |
-        bash .github/workflows/esc_setup.sh \
-          "DuckCluster-${{ env.ENVIRONMENT }}" \
-          "DuckService-${{ env.ENVIRONMENT }}" \
-          "rubber-duck-${{ env.ENVIRONMENT }}" \
-          "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}" \
-          "${{ secrets.AWS_REGION }}" \
-          "${{ secrets.EXECUTION_ROLE }}" \
-          "${{ secrets.ENV_FILE_S3_PATH }}"
+      - name: Register ECS Task Definition and Deploy
+        run: |
+          bash .github/workflows/esc_setup.sh \
+            "DuckCluster-${{ env.ENVIRONMENT }}" \
+            "DuckService-${{ env.ENVIRONMENT }}" \
+            "rubber-duck-${{ env.ENVIRONMENT }}" \
+            "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}" \
+            "${{ secrets.AWS_REGION }}" \
+            "${{ secrets.EXECUTION_ROLE }}" \
+            "${{ secrets.ENV_FILE_S3_PATH }}"
 
-    - name: Update ECS service
-      run: |
-        aws ecs update-service \
-          --cluster DuckCluster-${{ env.ENVIRONMENT }} \
-          --service DuckService-${{ env.ENVIRONMENT }} \
-          --force-new-deployment \
-          --region ${{ secrets.AWS_REGION }}
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster DuckCluster-${{ env.ENVIRONMENT }} \
+            --service DuckService-${{ env.ENVIRONMENT }} \
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
 
-    - name: Check ECS Service Status
-      run: |
-        aws ecs describe-services \
-          --cluster DuckCluster-${{ env.ENVIRONMENT }} \
-          --services DuckService-${{ env.ENVIRONMENT }} \
-          --region ${{ secrets.AWS_REGION }}
+      - name: Check ECS Service Status
+        run: |
+          aws ecs describe-services \
+            --cluster DuckCluster-${{ env.ENVIRONMENT }} \
+            --services DuckService-${{ env.ENVIRONMENT }} \
+            --region ${{ secrets.AWS_REGION }}
