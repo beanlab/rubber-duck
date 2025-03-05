@@ -8,7 +8,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  setup-environment:
+    uses: ./.github/workflows/set-environment.yml
+
+  deploy:
+    needs: setup-environment
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_ENV: ${{ needs.setup-environment.outputs.environment }}
+      IMAGE_TAG: ${{ needs.setup-environment.outputs.image_tag }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        run: |
+          echo "Deploying to $DEPLOY_ENV with image tag $IMAGE_TAG"
+
   build_and_push:
+    needs: [setup-environment]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

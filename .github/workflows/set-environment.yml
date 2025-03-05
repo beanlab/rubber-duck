@@ -1,0 +1,35 @@
+name: Set Environment
+on:
+  workflow_call:
+    outputs:
+      environment:
+        description: "The deployment environment"
+        value: ${{ jobs.set-env.outputs.environment }}
+      image_tag:
+        description: "The image tag"
+        value: ${{ jobs.set-env.outputs.image_tag }}
+
+jobs:
+  set-env:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-vars.outputs.environment }}
+      image_tag: ${{ steps.set-vars.outputs.image_tag }}
+    steps:
+      - name: Determine Environment Variables
+        id: set-vars
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          if [[ "$BRANCH_NAME" == "master" ]]; then
+            echo "environment=production" >> $GITHUB_ENV
+            echo "image_tag=latest" >> $GITHUB_ENV
+          else
+            echo "environment=test" >> $GITHUB_ENV
+            echo "image_tag=test-latest" >> $GITHUB_ENV
+          fi
+
+      - name: Export Environment Variables
+        id: export-vars
+        run: |
+          echo "environment=${environment}" >> $GITHUB_ENV
+          echo "image_tag=${image_tag}" >> $GITHUB_ENV
