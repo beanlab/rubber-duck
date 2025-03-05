@@ -8,26 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  setup-environment:
-    uses: ./.github/workflows/set-environment.yml
-
-  deploy:
-    needs: setup-environment
-    runs-on: ubuntu-latest
-    env:
-      DEPLOY_ENV: ${{ needs.setup-environment.outputs.environment }}
-      IMAGE_TAG: ${{ needs.setup-environment.outputs.image_tag }}
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Deploy
-        run: |
-          echo "Deploying to $DEPLOY_ENV with image tag $IMAGE_TAG"
-
   build_and_push:
-    needs: [setup-environment]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -37,19 +18,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Set environment variables
-        run: |
-          set -x
-          echo "Branch name: ${GITHUB_REF}"
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          echo "Extracted branch name: $BRANCH_NAME"
-          
-          if [[ "$BRANCH_NAME" = "master" ]]; then
-            echo "ENVIRONMENT=production" >> $GITHUB_ENV
-            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
-          else
-            echo "ENVIRONMENT=test" >> $GITHUB_ENV
-            echo "IMAGE_TAG=test-latest" >> $GITHUB_ENV
-          fi
+        run: bash .github/workflows/set_env_vars.sh
 
       - name: Run Docker build script
         run: bash ./build_docker.sh
@@ -65,19 +34,21 @@ jobs:
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
-      - name: Push Docker image with "test-latest" tag to ECR
+      - name: Push Docker image to ECR
         run: |
           if [[ "${{ env.IMAGE_TAG }}" == "test-latest" ]]; then
-            docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }} 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
-            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
+            TAG="test-latest"
+          elif [[ "${{ env.IMAGE_TAG }}" == "latest" ]]; then
+            TAG="production-latest"
+          else
+            echo "No valid tag found. Skipping push."
+            exit 0
           fi
+      
+          docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }} \
+                     844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$TAG
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$TAG
 
-      - name: Push Docker image with "production-latest" tag to ECR
-        run: |
-          if [[ "${{ env.IMAGE_TAG }}" == "latest" ]]; then
-            docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }} 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
-            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
-          fi
 
       - name: Complete Docker push
         run: echo "Docker images pushed to ECR successfully!"
