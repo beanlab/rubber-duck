@@ -1,7 +1,5 @@
 #!/bin/bash
-# Build Rubber Duck Docker
-# this is the command to build the docker image
-# ./build_docker.sh
+
 
 # Fetch the Git commit hash or branch name to create a unique tag
 IMAGE_NAME="rubber-duck"
@@ -13,9 +11,8 @@ ECR_REPO="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck"
 set -e
 
 # Build the Docker image
-docker build \
-    -t ${IMAGE_NAME}:${IMAGE_TAG} \
-    -f - . <<EOF
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f - ../../ <<EOF
+
 FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 COPY rubber_duck /rubber_duck
@@ -35,3 +32,4 @@ docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
 
 # Optionally, also tag as "latest" for easier reference
 docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REPO}:latest
+docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_REPO}:latest-latest

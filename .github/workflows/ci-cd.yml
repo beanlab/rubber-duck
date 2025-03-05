@@ -44,7 +44,7 @@ jobs:
       - name: Push Docker image to ECR
         run: docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
 
-  deploy_to_fargate:
+  deploy_to_cloudformation:
     needs: [build_and_push]
     runs-on: ubuntu-latest
 
