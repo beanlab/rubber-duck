@@ -1,0 +1,99 @@
+name: Build, Push, and Deploy to AWS Infrastructure
+
+on:
+  push:
+    branches:
+      - master  # Production
+      - 62-aws-s3-and-fargate-deployment    # Test
+  workflow_dispatch:
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Set environment variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=test" >> $GITHUB_ENV
+            echo "IMAGE_TAG=test-latest" >> $GITHUB_ENV
+          fi
+
+      - name: Run Docker build script
+        run: bash .github/workflows/build_docker.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Push Docker image to ECR
+        run: docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
+
+  deploy_to_fargate:
+    needs: [build_and_push]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy ECS Infrastructure with CloudFormation
+        run: |
+          aws cloudformation deploy \
+            --stack-name rubber-duck-${{ env.ENVIRONMENT }} \
+            --template-file infra/ecs-infra.yml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              ClusterName=DuckCluster-${{ env.ENVIRONMENT }} \
+              TaskDefinitionFamily=rubber-duck-${{ env.ENVIRONMENT }} \
+              ContainerName=duck-container-${{ env.ENVIRONMENT }} \
+              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}
+
+      - name: Register ECS Task Definition and Deploy
+        run: |
+          bash .github/workflows/esc_setup.sh \
+            "DuckCluster-${{ env.ENVIRONMENT }}" \
+            "DuckService-${{ env.ENVIRONMENT }}" \
+            "rubber-duck-${{ env.ENVIRONMENT }}" \
+            "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ env.IMAGE_TAG }}" \
+            "${{ secrets.AWS_REGION }}" \
+            "${{ secrets.EXECUTION_ROLE }}" \
+            "${{ secrets.ENV_FILE_S3_PATH }}"
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster DuckCluster-${{ env.ENVIRONMENT }} \
+            --service DuckService-${{ env.ENVIRONMENT }} \
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Check ECS Service Status
+        run: |
+          aws ecs describe-services \
+            --cluster DuckCluster-${{ env.ENVIRONMENT }} \
+            --services DuckService-${{ env.ENVIRONMENT }} \
+            --region ${{ secrets.AWS_REGION }}

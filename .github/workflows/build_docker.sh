@@ -6,7 +6,7 @@
 IMAGE_NAME="rubber-duck"
 IMAGE_TAG="latest"
 ECR_REPO="844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck"
-
+set -e
 docker build \
     -t ${IMAGE_NAME}:${IMAGE_TAG} \
     -f - . <<EOF
