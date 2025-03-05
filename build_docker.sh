@@ -40,9 +40,3 @@ else
     echo "Tagging as test-latest"
 fi
 
-# Push both tags to ECR
-docker push ${ECR_REPO}:${IMAGE_TAG}
-docker push ${ECR_REPO}:test-latest
-docker push ${ECR_REPO}:production-latest
-
-echo "Push complete!"
