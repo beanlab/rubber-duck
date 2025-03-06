@@ -58,7 +58,6 @@
       }
     ],
     "defaults": {
-      "name": "default-duck",
       "engine": "gpt-4o",
       "timeout": 600
     }
@@ -78,7 +77,7 @@
     "748656649287368704": "CS 260",
     "1128355484039123065": "CS 312"
   },
-  "open_ai_retry_protocol": {
+  "ai_completion_retry_protocol": {
     "max_retries": 2,
     "delay": 2,
     "backoff": 2

@@ -107,14 +107,14 @@ class MyClient(discord.Client):
         super().__init__(intents=intents)
 
         self.admin_settings = config['admin_settings']
-        open_ai_retry_protocol = config['open_ai_retry_protocol']
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
         self._duck_config = config['rubber_duck']
-        self._duck_channels = set(conf.get('channel_name') or conf.get('id') for conf in self._duck_config['channels'])
+        self._duck_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._duck_config['channels'])
 
         # SQLMetricsHandler initialization
         db_url = config["sql"]["db_url"]
@@ -151,6 +151,7 @@ class MyClient(discord.Client):
         ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
         )
+        wrap_steps(ai_client, ['get_completion'])
 
         have_conversation = HaveStandardGptConversation(
             ai_client,
@@ -159,7 +160,7 @@ class MyClient(discord.Client):
             self.send_message,
             self.report_error,
             self.typing,
-            open_ai_retry_protocol,
+            ai_completion_retry_protocol,
         )
 
         duck_workflow = RubberDuck(

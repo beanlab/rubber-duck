@@ -10,6 +10,9 @@ from quest import step, queue
 from protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
+class RetryableException(Exception):
+    pass
+
 class RetryConfig(TypedDict):
     max_retries: int
     delay: int
@@ -61,6 +64,29 @@ class HaveStandardGptConversation:
         self._typing = typing
         self._retry_config = retry_config
 
+    async def _get_completion_with_retry(self, thread_id: int, engine: str, message_history: list[GPTMessage]):
+        max_retries = self._retry_config['max_retries']
+        delay = self._retry_config['delay']
+        backoff = self._retry_config['backoff']
+        retries = -1
+        while retries < max_retries:
+            try:
+                async with self._typing(thread_id):
+                    return await self._ai_client.get_completion(engine, message_history)
+            except (
+                    openai.APITimeoutError, openai.InternalServerError,
+                    openai.UnprocessableEntityError) as ex:
+                if retries == -1:
+                    await self._send_message(thread_id, 'Trying to contact servers...')
+                retries += 1
+                if retries >= max_retries:
+                    raise RetryableException(ex) from ex
+
+                logging.warning(
+                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
+                await asyncio.sleep(delay)
+                delay *= backoff
+
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
         async with queue('messages', None) as messages:
             while True:
@@ -91,28 +117,9 @@ class HaveStandardGptConversation:
                     await self._record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
-                    max_retries = self._retry_config['max_retries']
-                    delay = self._retry_config['delay']
-                    backoff = self._retry_config['backoff']
-                    retries = -1
-                    while retries < max_retries:
-                        try:
-                            async with self._typing(thread_id):
-                                choices, usage = await self._ai_client.get_completion(engine, message_history)
-                            break
-                        except (
-                                openai.APITimeoutError, openai.InternalServerError,
-                                openai.UnprocessableEntityError) as ex:
-                            if retries == -1:
-                                await self._send_message(thread_id, 'Trying to contact servers...')
-                            retries += 1
-                            if retries >= max_retries:
-                                raise
 
-                            logging.warning(
-                                f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                            await asyncio.sleep(delay)
-                            delay *= backoff
+                    choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
+
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 

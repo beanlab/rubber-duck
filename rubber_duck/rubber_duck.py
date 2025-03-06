@@ -1,20 +1,22 @@
 import random
 from pathlib import Path
-from typing import TypedDict, Protocol, List
+from typing import TypedDict, Protocol
 
 from quest import step, alias
 
+from conversation import GPTMessage
 from feedback import GetConvoFeedback
 from protocols import Message
-from conversation import GPTMessage
+
 
 class DuckChannelConfig(TypedDict):
-    name: str | None
+    name: str
     prompt: str | None
     prompt_file: str | None
     engine: str | None
     timeout: int | None
     weight: int | None
+
 
 class ChannelConfig(TypedDict):
     channel_name: str | None
@@ -32,12 +34,13 @@ class SetupThread(Protocol):
 
     """Returns the thread ID"""
 
+
 class SetupConversation(Protocol):
     async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]: ...
 
 
 class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int =600): ...
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
 class RubberDuck:
@@ -49,7 +52,11 @@ class RubberDuck:
                  get_feedback: GetConvoFeedback,
                  ):
 
-        self._channel_configs = {config['channel_name']: config for config in duck_config['channels']}
+        self._channel_configs = {config['channel_name']: config for config in duck_config['channels'] if
+                                 'channel_name' in config}
+        self._channel_configs = self._channel_configs | {config['channel_id']: config for config in
+                                                         duck_config['channels'] if 'channel_id' in config}
+
         self._default_config = duck_config['defaults']
         self._setup_thread = step(setup_thread)
         self._setup_conversation = step(setup_conversation)
@@ -66,7 +73,6 @@ class RubberDuck:
             config_weights.append(duck.get('weight', 1))
 
         channel_config = random.choices(config_options, weights=config_weights)[0]
-
 
         prompt = channel_config.get('prompt', None)
         if prompt is None:
