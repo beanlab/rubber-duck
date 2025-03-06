@@ -5,12 +5,13 @@ import uuid
 from typing import TypedDict, Protocol
 
 import openai
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
 from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
 
+
+class RetryableException(Exception):
+    pass
 
 class RetryConfig(TypedDict):
     max_retries: int
@@ -32,31 +33,62 @@ class RecordUsage(Protocol):
                        output_tokens: int): ...
 
 
+class GenAIClient(Protocol):
+    async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
+
+
+class BasicSetupConversation:
+    def __init__(self, record_message):
+        self._record_message = step(record_message)
+
+    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]:
+        message_history = [GPTMessage(role='system', content=prompt)]
+        user_id = initial_message['author_id']
+        guild_id = initial_message['guild_id']
+
+        await self._record_message(
+            guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
+        return message_history
+
+
 class HaveStandardGptConversation:
-    def __init__(self, openai_api_key: str,
-                 retry_config: RetryConfig,
+    def __init__(self, ai_client: GenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping):
-        self._retry_config = retry_config
+                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
+                 retry_config: RetryConfig):
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
+        self._ai_client = ai_client
         self._typing = typing
-        self._client = AsyncOpenAI(api_key=openai_api_key)
+        self._retry_config = retry_config
 
-    async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
+    async def _get_completion_with_retry(self, thread_id: int, engine: str, message_history: list[GPTMessage]):
+        max_retries = self._retry_config['max_retries']
+        delay = self._retry_config['delay']
+        backoff = self._retry_config['backoff']
+        retries = -1
+        while retries < max_retries:
+            try:
+                async with self._typing(thread_id):
+                    return await self._ai_client.get_completion(engine, message_history)
+            except (
+                    openai.APITimeoutError, openai.InternalServerError,
+                    openai.UnprocessableEntityError) as ex:
+                if retries == -1:
+                    await self._send_message(thread_id, 'Trying to contact servers...')
+                retries += 1
+                if retries >= max_retries:
+                    raise RetryableException(ex) from ex
+
+                logging.warning(
+                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
+                await asyncio.sleep(delay)
+                delay *= backoff
+
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
         async with queue('messages', None) as messages:
-            message_history = [
-                GPTMessage(role='system', content=prompt)
-            ]
-
-            user_id = initial_message['author_id']
-            guild_id = initial_message['guild_id']
-
-            # Record the prompt
-            await self._record_message(
-                guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
                 #  prompt them to start a new conversation (and close this one)
@@ -87,6 +119,7 @@ class HaveStandardGptConversation:
                     )
 
                     choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
+
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
 
@@ -135,40 +168,6 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-
-    @step
-    async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
-        async with self._typing(thread_id):
-            completion: ChatCompletion = await self._client.chat.completions.create(
-                model=engine,
-                messages=message_history
-            )
-            logging.debug(f"Completion: {completion}")
-            completion_dict = completion.dict()
-            choices = completion_dict['choices']
-            usage = completion_dict['usage']
-            return choices, usage
-
-    @step
-    async def _get_completion_with_retry(self, thread_id, engine, message_history):
-        max_retries = self._retry_config['max_retries']
-        delay = self._retry_config['delay']
-        backoff = self._retry_config['backoff']
-        retries = -1
-        while retries < max_retries:
-            try:
-                return await self._get_completion(thread_id, engine, message_history)
-            except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
-                if retries == -1:
-                    await self._send_message(thread_id, 'Trying to contact servers...')
-                retries += 1
-                if retries >= max_retries:
-                    raise
-
-                logging.warning(
-                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                await asyncio.sleep(delay)
-                delay *= backoff
 
     @staticmethod
     def _generate_error_message(guild_id, thread_id, ex):
