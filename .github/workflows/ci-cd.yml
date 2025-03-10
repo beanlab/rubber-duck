@@ -34,10 +34,15 @@ jobs:
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
-      - name: Push Docker image to ECR
+      - name: Push Docker images to ECR
         run: |
-          docker tag rubber-duck:latest 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
           docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
+          else
+            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
+          fi
 
       - name: Complete Docker push
         run: echo "Docker images pushed to ECR successfully!"
