@@ -93,7 +93,7 @@ class StatusCommand(Command):
 
 class ReportCommand(Command):
     name = "!report"
-    help_msg = "!report - weqiqwuqwe\n"
+    help_msg = "!report - get the report\n"
 
     def __init__(self, send_message, reporter):
         self.send_message = send_message
@@ -171,5 +171,5 @@ class LogCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         await self.send_message(channel_id, 'The log command has been temporarily disabled.')
-        #await self._execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
+        #await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
         #await self._send_message(channel_id, 'log zip', file='log.zip')

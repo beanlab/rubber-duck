@@ -10,10 +10,14 @@ class BotCommands:
         return await self.handle_command(message)
 
     async def get_help(self, channel_id):
-        help_string = ""
-        for key, command in self.commands:
+        help_string = "!help - print out this message\n"
+
+        for command in self.commands.values():
             help_string += command.help_msg
-        self.send_message(channel_id, help_string)
+
+        wrap_help_string = f"```\n{help_string}\n```"
+
+        await self.send_message(channel_id, wrap_help_string)
 
     async def handle_command(self, message: Message):
         # Extract the command from the content
