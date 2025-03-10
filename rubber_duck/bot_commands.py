@@ -15,9 +15,9 @@ class BotCommands:
         for command in self.commands.values():
             help_string += command.help_msg
 
-        wrap_help_string = f"```\n{help_string}\n```"
+        help_string = f"```\n{help_string}\n```"
 
-        await self.send_message(channel_id, wrap_help_string)
+        await self.send_message(channel_id, help_string)
 
     async def handle_command(self, message: Message):
         # Extract the command from the content
