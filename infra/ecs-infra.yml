@@ -17,91 +17,23 @@ Parameters:
   Memory:
     Type: String
     Default: "2048"
-#844825014198
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where the ECS tasks will run
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of subnet IDs where the ECS tasks will run
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group ID for the ECS tasks
+  ExecutionRoleArn:
+    Type: String
+    Description: ARN of the existing ECS task execution role
+  TaskRoleArn:
+    Type: String
+    Description: ARN of the existing ECS task role
+
 Resources:
-  # VPC Resources
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-VPC
-
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs ""]
-      CidrBlock: 10.0.1.0/24
-      MapPublicIpOnLaunch: true
-
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs ""]
-      CidrBlock: 10.0.2.0/24
-      MapPublicIpOnLaunch: true
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-IGW
-
-  AttachGateway:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
-
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Public-RT
-
-  DefaultPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: AttachGateway
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
-  PublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref PublicRouteTable
-
-  PublicSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref PublicRouteTable
-
-  # Security Group
-  ContainerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for ECS containers
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-Container-SG
-
   # ECS Resources
   ECSCluster:
     Type: AWS::ECS::Cluster
@@ -114,38 +46,12 @@ Resources:
       LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
       RetentionInDays: 30
 
-  TaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      Path: "/"
-
-  TaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      Path: "/"
-
   FargateTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Ref TaskDefinitionFamily
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
       RequiresCompatibilities:
         - FARGATE
       Cpu: !Ref Cpu
@@ -183,7 +89,6 @@ Resources:
 
   ECSService:
     Type: AWS::ECS::Service
-    DependsOn: DefaultPublicRoute
     Properties:
       ServiceName: !Sub ${AWS::StackName}-Service
       Cluster: !Ref ECSCluster
@@ -192,11 +97,9 @@ Resources:
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
+          Subnets: !Ref SubnetIds
           SecurityGroups:
-            - !Ref ContainerSecurityGroup
+            - !Ref SecurityGroupId
           AssignPublicIp: ENABLED
 
 Outputs:

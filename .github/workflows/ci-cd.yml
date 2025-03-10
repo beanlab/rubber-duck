@@ -66,7 +66,12 @@ jobs:
               ClusterName=DuckCluster-${{ github.sha }} \
               TaskDefinitionFamily=rubber-duck-production \
               ContainerName=duck-container-production \
-              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
+              VpcId=${{ secrets.VPC_ID }} \
+              SubnetIds=${{ secrets.SUBNET_IDS }} \
+              SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }} \
+              ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }} \
+              TaskRoleArn=${{ secrets.TASK_ROLE }}
 
       - name: Register ECS Task Definition and Deploy
         run: |
