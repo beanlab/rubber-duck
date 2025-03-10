@@ -6,13 +6,12 @@ from pathlib import Path
 from typing import TypedDict
 
 import discord
-from openai.resources.beta.threads import Messages
 from quest import wrap_steps
 
 from SQLquest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
-    ReportCommand, BashExecuteCommand, StateCommand, LogCommand, Command
+    ReportCommand, BashExecuteCommand, LogCommand, Command
 from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
 from protocols import Attachment, Message
@@ -105,14 +104,17 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
     messages = MessagesMetricsCommand(send_message, metrics_handler)
     usage = UsageMetricsCommand(send_message, metrics_handler)
     feedback = FeedbackMetricsCommand(send_message, metrics_handler)
-    metrics = MetricsCommand(messages, usage, feedback)
-    status = StatusCommand(send_message)
-    report = ReportCommand(send_message, reporter)
-    state = StateCommand(send_message, bash_execute_command)
-    log = LogCommand(send_message, bash_execute_command)
 
     # Create and return the list of commands
-    return [messages, usage, feedback, metrics, status, report, state, log]
+    return [
+        messages,
+        usage,
+        feedback,
+        MetricsCommand(messages, usage, feedback),
+        StatusCommand(send_message),
+        ReportCommand(send_message, reporter),
+        LogCommand(send_message, bash_execute_command)
+    ]
 
 
 class MyClient(discord.Client):
