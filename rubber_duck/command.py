@@ -1,5 +1,5 @@
 import discord
-import reporter
+import zip_utils
 import subprocess
 
 from pathlib import Path
@@ -26,7 +26,7 @@ class MessagesMetricsCommand(Command):
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        messages_zip = reporter.zip_data_file(self.metrics_handler.get_messages())
+        messages_zip = zip_utils.zip_data_file(self.metrics_handler.get_messages())
         discord_messages_file = discord.File(messages_zip, filename="messages.zip")
         await self.send_message(channel_id, "", file=discord_messages_file)
 
@@ -42,7 +42,7 @@ class UsageMetricsCommand(Command):
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        usage_zip = reporter.zip_data_file(self.metrics_handler.get_usage())
+        usage_zip = zip_utils.zip_data_file(self.metrics_handler.get_usage())
         discord_usage_file = discord.File(usage_zip, filename="usage.zip")
         await self.send_message(channel_id, "", file=discord_usage_file)
 
@@ -58,7 +58,7 @@ class FeedbackMetricsCommand(Command):
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        feedback_zip = reporter.zip_data_file(self.metrics_handler.get_feedback())
+        feedback_zip = zip_utils.zip_data_file(self.metrics_handler.get_feedback())
         discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
         await self.send_message(channel_id, "", file=discord_feedback_file)
 
