@@ -7,6 +7,7 @@ from typing import TypedDict, Protocol
 from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
+import openai
 
 
 class RetryableException(Exception):
@@ -132,7 +133,7 @@ class HaveStandardGptConversation:
 
                     await self._send_message(thread_id, response)
 
-                except RetryableException as ex:
+                except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble connecting to the OpenAI servers, '
@@ -140,7 +141,9 @@ class HaveStandardGptConversation:
                     await self._report_error(error_message)
                     break
 
-                except RetryableException as ex:
+                except (openai.APIConnectionError, openai.BadRequestError,
+                        openai.AuthenticationError, openai.ConflictError, openai.NotFoundError,
+                        openai.RateLimitError) as ex:
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
