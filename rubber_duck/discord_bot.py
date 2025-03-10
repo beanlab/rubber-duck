@@ -10,6 +10,8 @@ from quest import wrap_steps
 
 from SQLquest import create_sql_manager
 from bot_commands import BotCommands
+from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
+    ReportCommand, BashExecuteCommand, LogCommand, Command
 from conversation import HaveStandardGptConversation
 from feedback import GetTAFeedback, GetConvoFeedback
 from protocols import Attachment, Message
@@ -96,7 +98,19 @@ class RubberDuckConfig(TypedDict):
     channels: list[ChannelConfig]
 
 
-# noinspection PyBroadException
+def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
+    # Create and return the list of commands
+    return [
+        messages := MessagesMetricsCommand(send_message, metrics_handler),
+        usage := UsageMetricsCommand(send_message, metrics_handler),
+        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
+        MetricsCommand(messages, usage, feedback),
+        StatusCommand(send_message),
+        ReportCommand(send_message, reporter),
+        LogCommand(send_message, BashExecuteCommand(send_message))
+    ]
+
+
 class MyClient(discord.Client):
     def __init__(self, config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
@@ -121,7 +135,8 @@ class MyClient(discord.Client):
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
         reporter = Reporter(self.metrics_handler, config['reporting'])
-        commands_workflow = BotCommands(self.send_message, self.metrics_handler, reporter)
+        commands = create_commands(self.send_message, self.metrics_handler, reporter)
+        commands_workflow = BotCommands(commands, self.send_message)
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
