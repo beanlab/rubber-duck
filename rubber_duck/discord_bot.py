@@ -266,6 +266,10 @@ class MyClient(discord.Client):
 
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
+        if channel is None:
+            await self.report_error(f'Tried to send message on {channel_id}, but no channel found.')
+            raise Exception(f'No channel id {channel_id}')
+
         curr_message = None
 
         for block in parse_blocks(message):
