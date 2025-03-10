@@ -57,6 +57,13 @@ jobs:
 
       - name: Deploy ECS Infrastructure with CloudFormation
         run: |
+          echo "Checking parameter values..."
+          echo "ExecutionRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
+          echo "TaskRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
+          echo "VpcId is set: ${{ secrets.VPC_ID != '' }}"
+          echo "SubnetIds is set: ${{ secrets.SUBNET_IDS != '' }}"
+          echo "SecurityGroupId is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
+
           aws cloudformation deploy \
             --stack-name rubber-duck-${{ github.sha }} \
             --template-file infra/ecs-infra.yml \
@@ -70,8 +77,8 @@ jobs:
               VpcId=${{ secrets.VPC_ID }} \
               SubnetIds=${{ secrets.SUBNET_IDS }} \
               SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }} \
-              ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }} \
-              TaskRoleArn=${{ secrets.EXECUTION_ROLE }} \
+              ExecutionRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole \
+              TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole \
               Cpu=1024 \
               Memory=2048
 
