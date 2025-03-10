@@ -46,6 +46,22 @@ Resources:
       LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
       RetentionInDays: 30
 
+  # IAM Policy for CloudWatch Logs
+  CloudWatchLogsPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-CloudWatchLogsPolicy
+      Roles:
+        - !Ref ExecutionRoleArn
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub ${CloudWatchLogGroup.Arn}:*
+
   FargateTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
