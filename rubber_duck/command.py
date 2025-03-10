@@ -144,22 +144,6 @@ class BashExecuteCommand():
             await self.send_message(channel_id, f'```{output}```')
 
 
-class StateCommand(Command):
-    name = "!state"
-    help_msg = "!state - get a zip of the state folder\n"
-
-    def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
-        self.send_message = send_message
-        self.bash_execute_command = bash_execute_command
-
-    @step
-    async def execute(self, message: Message):
-        channel_id = message['channel_id']
-        await self.send_message(channel_id, "Getting state zip")
-        await self.bash_execute_command.execute_command(channel_id, 'zip -q -r state.zip state')
-        await self.send_message(channel_id, 'state zip', file='state.zip')
-
-
 class LogCommand(Command):
     name = "!log"
     help_msg = "!log - get the log file\n"
