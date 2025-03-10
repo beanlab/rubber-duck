@@ -14,3 +14,4 @@ state/
 /aubry.json
 *.db
 settings.txt
+github_secrets.txt

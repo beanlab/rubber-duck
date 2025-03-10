@@ -3,7 +3,7 @@ from typing import TypedDict
 
 from sqlalchemy.sql import text
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -22,7 +22,7 @@ def _create_sql_session(db_type: str, username: str, password: str, host: str, p
     with engine.connect() as conn:
         try:
             conn.execute(text(f"CREATE DATABASE {database}"))
-        except OperationalError:
+        except ProgrammingError:
             pass  # Database likely already exists
 
     # Now connect to the newly created database
