@@ -17,7 +17,7 @@ class Command():
 
 class MessagesMetricsCommand(Command):
     name = "!messages"
-    help_msg = "!messages - get a zip of the messages data\n"
+    help_msg = "get a zip of the messages data\n"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -33,7 +33,7 @@ class MessagesMetricsCommand(Command):
 
 class UsageMetricsCommand(Command):
     name = "!usage"
-    help_msg = "!usage - get a zip of the usage data\n"
+    help_msg = "get a zip of the usage data\n"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -49,7 +49,7 @@ class UsageMetricsCommand(Command):
 
 class FeedbackMetricsCommand(Command):
     name = "!feedback"
-    help_msg = "!feedback - get a zip of the feedback data\n"
+    help_msg = "get a zip of the feedback data\n"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -65,7 +65,7 @@ class FeedbackMetricsCommand(Command):
 
 class MetricsCommand(Command):
     name = "!metrics"
-    help_msg = "!metrics - get the zips of the data tables\n"
+    help_msg = "get the zips of the data tables\n"
 
     def __init__(self, messages_metrics: MessagesMetricsCommand, usage_metrics: UsageMetricsCommand, feedback_metrics: FeedbackMetricsCommand):
         self.messages_metrics = messages_metrics
@@ -81,7 +81,7 @@ class MetricsCommand(Command):
 
 class StatusCommand(Command):
     name = "!status"
-    help_msg = "!status - print a status message\n"
+    help_msg = "print a status message\n"
 
     def __init__(self, send_message):
         self.send_message = send_message
@@ -93,7 +93,7 @@ class StatusCommand(Command):
 
 class ReportCommand(Command):
     name = "!report"
-    help_msg = "!report - get the report\n"
+    help_msg = "get the report\n"
 
     def __init__(self, send_message, reporter):
         self.send_message = send_message
@@ -146,7 +146,7 @@ class BashExecuteCommand():
 
 class LogCommand(Command):
     name = "!log"
-    help_msg = "!log - get the log file\n"
+    help_msg = "get the log file\n"
 
     def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
         self.send_message = send_message
