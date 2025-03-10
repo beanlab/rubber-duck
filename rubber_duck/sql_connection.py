@@ -26,7 +26,7 @@ def _create_sql_session(db_type: str, username: str, password: str, host: str, p
             pass  # Database likely already exists
 
     # Now connect to the newly created database
-    engine = create_engine(db_url)
+    engine = create_engine(db_url, pool_pre_ping=True)
     return sessionmaker(bind=engine)()
 
 
