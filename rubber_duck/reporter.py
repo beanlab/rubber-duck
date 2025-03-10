@@ -1,6 +1,8 @@
+import csv
 import io
 import json
 import sys
+import zipfile
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
