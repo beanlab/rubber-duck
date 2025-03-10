@@ -4,7 +4,6 @@ import traceback as tb
 import uuid
 from typing import TypedDict, Protocol
 
-import openai
 from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
@@ -73,9 +72,7 @@ class HaveStandardGptConversation:
             try:
                 async with self._typing(thread_id):
                     return await self._ai_client.get_completion(engine, message_history)
-            except (
-                    openai.APITimeoutError, openai.InternalServerError,
-                    openai.UnprocessableEntityError) as ex:
+            except RetryableException as ex:
                 if retries == -1:
                     await self._send_message(thread_id, 'Trying to contact servers...')
                 retries += 1
@@ -135,7 +132,7 @@ class HaveStandardGptConversation:
 
                     await self._send_message(thread_id, response)
 
-                except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
+                except RetryableException as ex:
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble connecting to the OpenAI servers, '
@@ -143,9 +140,7 @@ class HaveStandardGptConversation:
                     await self._report_error(error_message)
                     break
 
-                except (openai.APIConnectionError, openai.BadRequestError,
-                        openai.AuthenticationError, openai.ConflictError, openai.NotFoundError,
-                        openai.RateLimitError) as ex:
+                except RetryableException as ex:
                     openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
