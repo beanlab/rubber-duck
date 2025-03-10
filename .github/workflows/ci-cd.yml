@@ -71,7 +71,7 @@ jobs:
               SubnetIds=${{ secrets.SUBNET_IDS }} \
               SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }} \
               ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }} \
-              TaskRoleArn=${{ secrets.TASK_ROLE }}
+              TaskRoleArn=${{ secrets.EXECUTION_ROLE }}
 
       - name: Register ECS Task Definition and Deploy
         run: |
