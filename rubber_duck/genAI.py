@@ -1,6 +1,7 @@
 import logging
 
-from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError
+from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 
 
@@ -23,3 +24,8 @@ class OpenAI():
             APITimeoutError, InternalServerError,
             UnprocessableEntityError) as ex:
             raise ex
+        except (APIConnectionError, BadRequestError,
+                        AuthenticationError, ConflictError, NotFoundError,
+                        RateLimitError) as ex:
+            raise ex
+

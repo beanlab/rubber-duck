@@ -7,10 +7,12 @@ from typing import TypedDict, Protocol
 from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
-import openai
 
 
 class RetryableException(Exception):
+    pass
+
+class GenAIException(Exception):
     pass
 
 class RetryConfig(TypedDict):
@@ -133,7 +135,7 @@ class HaveStandardGptConversation:
 
                     await self._send_message(thread_id, response)
 
-                except (openai.APITimeoutError, openai.InternalServerError, openai.UnprocessableEntityError) as ex:
+                except RetryableException as ex:
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble connecting to the OpenAI servers, '
@@ -141,17 +143,15 @@ class HaveStandardGptConversation:
                     await self._report_error(error_message)
                     break
 
-                except (openai.APIConnectionError, openai.BadRequestError,
-                        openai.AuthenticationError, openai.ConflictError, openai.NotFoundError,
-                        openai.RateLimitError) as ex:
-                    openai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
+                except GenAIException as ex:
+                    genai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
                                          "for more details on how to resolve this error"
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble processing your request, '
                                              'I have notified your professor to look into the problem!')
-                    openai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{openai_error_message}\n{openai_web_mention}")
+                    genai_error_message = f"*** {type(ex).__name__} ***"
+                    await self._report_error(f"{genai_error_message}\n{genai_web_mention}")
                     await self._report_error(error_message, True)
                     break
 
