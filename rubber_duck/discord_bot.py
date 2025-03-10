@@ -99,9 +99,6 @@ class RubberDuckConfig(TypedDict):
 
 
 def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
-    #Create all commands
-    bash_execute_command = BashExecuteCommand(send_message)
-
     # Create and return the list of commands
     return [
         messages := MessagesMetricsCommand(send_message, metrics_handler),
@@ -110,7 +107,7 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message, bash_execute_command)
+        LogCommand(send_message, BashExecuteCommand(send_message))
     ]
 
 
