@@ -2,9 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
   Environment:
     Type: String
-    AllowedValues:
-      - production
-      - test
+    Default: "production"
   ClusterName:
     Type: String
   TaskDefinitionFamily:
@@ -15,10 +13,10 @@ Parameters:
     Type: String
   Cpu:
     Type: String
-    Default: "256"
+    Default: "1024"
   Memory:
     Type: String
-    Default: "512"
+    Default: "2048"
 #844825014198
 Resources:
   # VPC Resources
@@ -157,14 +155,31 @@ Resources:
         - Name: !Ref ContainerName
           Image: !Ref ImageURI
           Essential: true
-          PortMappings:
-            - ContainerPort: 80
+          Cpu: 0
+          Memory: 2048
+          PortMappings: []
+          Environment: []
+          EnvironmentFiles:
+            - Value: !Sub arn:aws:s3:::rubber-duck-config/wiley-secrets.env
+              Type: s3
+          MountPoints: []
+          VolumesFrom: []
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref CloudWatchLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
+              mode: non-blocking
+              awslogs-create-group: "true"
+              max-buffer-size: "25m"
+          SystemControls: []
+      Volumes: []
+      EphemeralStorage:
+        SizeInGiB: 21
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
 
   ECSService:
     Type: AWS::ECS::Service

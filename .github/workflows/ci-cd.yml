@@ -3,8 +3,8 @@ name: Build, Push, and Deploy to AWS Infrastructure
 on:
   push:
     branches:
-      - master # Production
-      - 62-aws-s3-and-fargate-deployment # Test
+      - master
+      - 62-aws-s3-and-fargate-deployment
   workflow_dispatch:
 
 jobs:
@@ -37,15 +37,6 @@ jobs:
       - name: Push Docker images to ECR
         run: |
           docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
-          else
-            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:test-latest
-          fi
-
-      - name: Complete Docker push
-        run: echo "Docker images pushed to ECR successfully!"
 
   deploy_to_cloudformation:
     needs: [build_and_push]
@@ -71,18 +62,18 @@ jobs:
             --template-file infra/ecs-infra.yml \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
+              Environment=production \
               ClusterName=DuckCluster-${{ github.sha }} \
-              TaskDefinitionFamily=rubber-duck-${{ env.ENVIRONMENT }} \
-              ContainerName=duck-container-${{ env.ENVIRONMENT }} \
+              TaskDefinitionFamily=rubber-duck-production \
+              ContainerName=duck-container-production \
               ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
 
       - name: Register ECS Task Definition and Deploy
         run: |
           bash .github/workflows/esc_setup.sh \
             "DuckCluster-${{ github.sha }}" \
-            "DuckService-${{ env.ENVIRONMENT }}" \
-            "rubber-duck-${{ env.ENVIRONMENT }}" \
+            "DuckService-production" \
+            "rubber-duck-production" \
             "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
             "${{ secrets.AWS_REGION }}" \
             "${{ secrets.EXECUTION_ROLE }}" \
@@ -92,7 +83,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster DuckCluster-${{ github.sha }} \
-            --service DuckService-${{ env.ENVIRONMENT }} \
+            --service DuckService-production \
             --force-new-deployment \
             --region ${{ secrets.AWS_REGION }}
 
@@ -100,5 +91,5 @@ jobs:
         run: |
           aws ecs describe-services \
             --cluster DuckCluster-${{ github.sha }} \
-            --services DuckService-${{ env.ENVIRONMENT }} \
+            --services DuckService-production \
             --region ${{ secrets.AWS_REGION }}
