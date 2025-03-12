@@ -10,7 +10,7 @@ scratch/suites/.DS_Store
 poetry.lock
 /wiley_config.json
 /bryce_config.json
-/wiley_config_v2.json
+/wiley-config.json
 state/
 /aubry.json
 *.db
