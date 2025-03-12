@@ -334,7 +334,7 @@ def fetch_config_from_s3():
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
     if not s3_path:
-        raise ValueError("S3 path not set in environment variable 'CONFIG_FILE_S3_PATH'")
+        return None
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
