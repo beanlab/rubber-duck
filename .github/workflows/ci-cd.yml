@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 62-aws-s3-and-fargate-deployment
   workflow_dispatch:
 
 jobs:
