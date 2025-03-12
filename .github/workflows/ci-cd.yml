@@ -1,0 +1,119 @@
+name: Build, Push, and Deploy to AWS Infrastructure
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Set IMAGE_TAG to Commit SHA
+        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Get branch name
+        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+
+      - name: Run Docker build script
+        run: bash ./build_docker.sh
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Tag and Push Docker images to ECR
+        run: |
+          IMAGE_REPO="844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck"
+          
+          SAFE_BRANCH_NAME=$(echo "${BRANCH_NAME}" | tr '/' '-' | tr -cd '[:alnum:]-')
+
+          docker tag $IMAGE_REPO:${IMAGE_TAG} $IMAGE_REPO:$SAFE_BRANCH_NAME
+
+          # Push all tags
+          docker push $IMAGE_REPO:${IMAGE_TAG}
+          docker push $IMAGE_REPO:$SAFE_BRANCH_NAME
+
+#  deploy_to_cloudformation:
+#    needs: [build_and_push]
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#
+#      - name: Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v2
+#        with:
+#          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          aws-region: ${{ secrets.AWS_REGION }}
+#
+#      - name: Set ENVIRONMENT Variable
+#        run: echo "ENVIRONMENT=production" >> $GITHUB_ENV
+#
+#      - name: Deploy ECS Infrastructure with CloudFormation
+#        run: |
+#          echo "Checking parameter values..."
+#          echo "ExecutionRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
+#          echo "TaskRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
+#          echo "VpcId is set: ${{ secrets.VPC_ID != '' }}"
+#          echo "SubnetIds is set: ${{ secrets.SUBNET_IDS != '' }}"
+#          echo "SecurityGroupId is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
+#
+#          aws cloudformation deploy \
+#            --stack-name rubber-duck-${{ github.sha }} \
+#            --template-file infra/ecs-infra.yml \
+#            --capabilities CAPABILITY_NAMED_IAM \
+#            --parameter-overrides \
+#              Environment=production \
+#              ClusterName=DuckCluster-${{ github.sha }} \
+#              TaskDefinitionFamily=rubber-duck-production \
+#              ContainerName=duck-container-production \
+#              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
+#              VpcId=${{ secrets.VPC_ID }} \
+#              SubnetIds=${{ secrets.SUBNET_IDS }} \
+#              SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }} \
+#              ExecutionRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole \
+#              TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole \
+#              Cpu=1024 \
+#              Memory=2048
+#
+#      - name: Register ECS Task Definition and Deploy
+#        run: |
+#          bash .github/workflows/esc_setup.sh \
+#            "DuckCluster-${{ github.sha }}" \
+#            "DuckService-production" \
+#            "rubber-duck-production" \
+#            "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
+#            "${{ secrets.AWS_REGION }}" \
+#            "${{ secrets.EXECUTION_ROLE }}" \
+#            "${{ secrets.ENV_FILE_S3_PATH }}"
+#
+#      - name: Update ECS service
+#        run: |
+#          aws ecs update-service \
+#            --cluster DuckCluster-${{ github.sha }} \
+#            --service DuckService-production \
+#            --force-new-deployment \
+#            --region ${{ secrets.AWS_REGION }}
+#
+#      - name: Check ECS Service Status
+#        run: |
+#          aws ecs describe-services \
+#            --cluster DuckCluster-${{ github.sha }} \
+#            --services DuckService-production \
+#            --region ${{ secrets.AWS_REGION }}
