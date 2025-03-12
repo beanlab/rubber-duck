@@ -52,7 +52,7 @@ Resources:
     Properties:
       PolicyName: !Sub ${AWS::StackName}-CloudWatchLogsPolicy
       Roles:
-        - !Ref ExecutionRoleArn
+        - !Select [1, !Split ["/", !Ref ExecutionRoleArn]]
       PolicyDocument:
         Version: "2012-10-17"
         Statement:

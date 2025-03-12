@@ -73,6 +73,7 @@ jobs:
           echo "Using resource suffix: ${RESOURCE_SUFFIX}"
 
       - name: Deploy ECS Infrastructure with CloudFormation
+        id: deploy
         run: |
           echo "Checking parameter values..."
           echo "ExecutionRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
@@ -100,6 +101,8 @@ jobs:
             --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
             --template-file infra/ecs-infra.yml \
             --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --rollback-configuration "{\"RollbackTriggers\": [{\"Type\": \"AWS::CloudWatch::Alarm\", \"Arn\": \"*\"}]}" \
             --parameter-overrides \
               Environment=production \
               ClusterName=DuckCluster-${{ env.RESOURCE_SUFFIX }} \
@@ -113,6 +116,21 @@ jobs:
               TaskRoleArn="${TASK_ROLE}" \
               Cpu=1024 \
               Memory=2048
+
+      - name: Cleanup on Failure
+        if: failure()
+        run: |
+          echo "Deployment failed. Cleaning up resources..."
+          aws cloudformation delete-stack \
+            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
+            --region ${{ secrets.AWS_REGION }}
+
+          echo "Waiting for stack deletion to complete..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
+            --region ${{ secrets.AWS_REGION }}
+
+          echo "Cleanup completed."
 
       - name: Register ECS Task Definition and Deploy
         run: |
