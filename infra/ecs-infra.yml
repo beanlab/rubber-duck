@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  Environment:
+    Type: String
+    Default: "production"
+  ClusterName:
+    Type: String
+  TaskDefinitionFamily:
+    Type: String
+  ContainerName:
+    Type: String
+  ImageURI:
+    Type: String
+  Cpu:
+    Type: String
+    Default: "1024"
+  Memory:
+    Type: String
+    Default: "2048"
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where the ECS tasks will run
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of subnet IDs where the ECS tasks will run
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group ID for the ECS tasks
+  ExecutionRoleArn:
+    Type: String
+    Description: ARN of the existing ECS task execution role
+  TaskRoleArn:
+    Type: String
+    Description: ARN of the existing ECS task role
+
+Resources:
+  # ECS Resources
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
+      RetentionInDays: 30
+
+  # IAM Policy for CloudWatch Logs
+  CloudWatchLogsPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-CloudWatchLogsPolicy
+      Roles:
+        - !Ref ExecutionRoleArn
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub ${CloudWatchLogGroup.Arn}:*
+
+  FargateTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref TaskDefinitionFamily
+      ExecutionRoleArn: !Ref ExecutionRoleArn
+      TaskRoleArn: !Ref TaskRoleArn
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref Cpu
+      Memory: !Ref Memory
+      NetworkMode: awsvpc
+      ContainerDefinitions:
+        - Name: !Ref ContainerName
+          Image: !Ref ImageURI
+          Essential: true
+          Cpu: 0
+          Memory: 2048
+          PortMappings: []
+          Environment: []
+          EnvironmentFiles:
+            - Value: !Sub arn:aws:s3:::rubber-duck-config/wiley-secrets.env
+              Type: s3
+          MountPoints: []
+          VolumesFrom: []
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudWatchLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+              mode: non-blocking
+              awslogs-create-group: "true"
+              max-buffer-size: "25m"
+          SystemControls: []
+      Volumes: []
+      EphemeralStorage:
+        SizeInGiB: 21
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}-Service
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref FargateTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Ref SubnetIds
+          SecurityGroups:
+            - !Ref SecurityGroupId
+          AssignPublicIp: ENABLED
+
+Outputs:
+  ClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${AWS::StackName}-ClusterName
+
+  ServiceName:
+    Description: The name of the ECS service
+    Value: !Ref ECSService
+    Export:
+      Name: !Sub ${AWS::StackName}-ServiceName

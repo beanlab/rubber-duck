@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, BigInteger
 from sqlalchemy.orm import declarative_base, Session
 
 MetricsBase = declarative_base()
@@ -24,12 +24,12 @@ class MessagesModel(MetricsBase):
     __tablename__ = 'messages'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(String)
-    guild_id = Column(Integer)
-    thread_id = Column(Integer)
-    user_id = Column(Integer)
-    role = Column(String)
-    message = Column(String)
+    timestamp = Column(String(255))
+    guild_id = Column(BigInteger)
+    thread_id = Column(BigInteger)
+    user_id = Column(BigInteger)
+    role = Column(String(255))
+    message = Column(String(4096))
 
 
 @add_iter
@@ -37,13 +37,13 @@ class UsageModel(MetricsBase):
     __tablename__ = 'usage'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(String)
-    guild_id = Column(Integer)
-    thread_id = Column(Integer)
-    user_id = Column(Integer)
-    engine = Column(String)
-    input_tokens = Column(String)
-    output_tokens = Column(String)
+    timestamp = Column(String(255))
+    guild_id = Column(BigInteger)
+    thread_id = Column(BigInteger)
+    user_id = Column(BigInteger)
+    engine = Column(String(255))
+    input_tokens = Column(String(255))
+    output_tokens = Column(String(255))
 
 
 @add_iter
@@ -51,13 +51,13 @@ class FeedbackModel(MetricsBase):
     __tablename__ = 'feedback'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(String)
-    workflow_type = Column(String)
-    guild_id = Column(Integer)
-    thread_id = Column(Integer)
-    user_id = Column(Integer)
-    reviewer_role_id = Column(Integer)
-    feedback_score = Column(Integer)
+    timestamp = Column(String(255))
+    workflow_type = Column(String(255))
+    guild_id = Column(BigInteger)
+    thread_id = Column(BigInteger)
+    user_id = Column(BigInteger)
+    reviewer_role_id = Column(BigInteger)
+    feedback_score = Column(BigInteger)
 
 
 class SQLMetricsHandler:
