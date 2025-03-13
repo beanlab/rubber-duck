@@ -46,13 +46,12 @@ Resources:
       LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
       RetentionInDays: 30
 
-  # IAM Policy for CloudWatch Logs
   CloudWatchLogsPolicy:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub ${AWS::StackName}-CloudWatchLogsPolicy
       Roles:
-        - !Select [1, !Split ["role/", !Ref ExecutionRoleArn]]
+        - !Sub arn:aws:iam::${AWS::AccountId}:role/${ExecutionRoleName}
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
