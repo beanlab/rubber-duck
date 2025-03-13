@@ -77,18 +77,18 @@ jobs:
         run: |
           echo "Checking parameter values..."
           echo "ExecutionRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
-          echo "TaskRoleArn is set: ${{ secrets.TASK_ROLE != '' }}"
+          echo "TaskRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
           echo "VpcId is set: ${{ secrets.VPC_ID != '' }}"
           echo "SubnetIds is set: ${{ secrets.SUBNET_IDS != '' }}"
           echo "SecurityGroupId is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
-          
+
           # Set variables for clarity
           EXECUTION_ROLE="${{ secrets.EXECUTION_ROLE }}"
-          TASK_ROLE="${{ secrets.TASK_ROLE }}"
+          TASK_ROLE="${{ secrets.EXECUTION_ROLE }}"
           VPC_ID="${{ secrets.VPC_ID }}"
           SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
           SECURITY_GROUP_ID="${{ secrets.SECURITY_GROUP_ID }}"
-          
+
           # Debug output (without exposing actual values)
           echo "Parameter lengths:"
           echo "ExecutionRoleArn length: ${#EXECUTION_ROLE}"
@@ -96,26 +96,25 @@ jobs:
           echo "VpcId length: ${#VPC_ID}"
           echo "SubnetIds length: ${#SUBNET_IDS}"
           echo "SecurityGroupId length: ${#SECURITY_GROUP_ID}"
-          
+
           aws cloudformation deploy \
-          --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
-          --template-file infra/ecs-infra.yml \
-          --capabilities CAPABILITY_NAMED_IAM \
-          --no-fail-on-empty-changeset \
-          --rollback-configuration "{\"RollbackTriggers\": [{\"Type\": \"AWS::CloudWatch::Alarm\", \"Arn\": \"*\"}]}" \
-          --parameter-overrides \
-           Environment=production \
-           ClusterName=DuckCluster-${{ env.RESOURCE_SUFFIX }} \
-           TaskDefinitionFamily=rubber-duck-production \
-           ContainerName=duck-container-production \
-           ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
-           VpcId="${VPC_ID}" \
-           SubnetIds="${SUBNET_IDS}" \
-           SecurityGroupId="${SECURITY_GROUP_ID}" \
-           ExecutionRoleArn="${EXECUTION_ROLE}" \
-           TaskRoleArn="${TASK_ROLE}" \
-           Cpu=1024 \
-           Memory=2048
+            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
+            --template-file infra/ecs-infra.yml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment=production \
+              ClusterName=DuckCluster-${{ env.RESOURCE_SUFFIX }} \
+              TaskDefinitionFamily=rubber-duck-production \
+              ContainerName=duck-container-production \
+              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
+              VpcId="${VPC_ID}" \
+              SubnetIds="${SUBNET_IDS}" \
+              SecurityGroupId="${SECURITY_GROUP_ID}" \
+              ExecutionRoleArn="${EXECUTION_ROLE}" \
+              TaskRoleArn="${TASK_ROLE}" \
+              Cpu=1024 \
+              Memory=2048
 
       - name: Cleanup on Failure
         if: failure()
