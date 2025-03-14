@@ -53,6 +53,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Check if secrets are set
+        run: |
+          echo "Checking if secrets are set..."
+          echo "VPC_ID is set: ${{ secrets.VPC_ID != '' }}"
+          echo "SUBNET_IDS is set: ${{ secrets.SUBNET_IDS != '' }}"
+          echo "SECURITY_GROUP_ID is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
+          echo "EXECUTION_ROLE is set: ${{ secrets.EXECUTION_ROLE != '' }}"
+          echo "ENV_FILE_S3_PATH is set: ${{ secrets.ENV_FILE_S3_PATH != '' }}"
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
