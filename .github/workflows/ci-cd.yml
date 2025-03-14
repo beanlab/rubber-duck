@@ -64,22 +64,58 @@ jobs:
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
+          # More detailed debugging
+          echo "Checking actual values (partial to avoid exposing secrets):"
+          EXECUTION_ROLE="${{ secrets.EXECUTION_ROLE }}"
+          TASK_ROLE="${{ secrets.EXECUTION_ROLE }}"  # Using same value as execution role
+          ENV_FILE="${{ secrets.ENV_FILE_S3_PATH }}"
+
+          # Check if values are actually non-empty strings
+          echo "EXECUTION_ROLE length: ${#EXECUTION_ROLE}"
+          echo "TASK_ROLE length: ${#TASK_ROLE}"
+          echo "ENV_FILE length: ${#ENV_FILE}"
+
+          # Show partial values (first and last few characters)
+          if [ ${#EXECUTION_ROLE} -gt 10 ]; then
+            echo "EXECUTION_ROLE starts with: ${EXECUTION_ROLE:0:10}...ends with: ...${EXECUTION_ROLE: -10}"
+          fi
+
+          if [ ${#TASK_ROLE} -gt 10 ]; then
+            echo "TASK_ROLE starts with: ${TASK_ROLE:0:10}...ends with: ...${TASK_ROLE: -10}"
+          fi
+
+          if [ ${#ENV_FILE} -gt 10 ]; then
+            echo "ENV_FILE starts with: ${ENV_FILE:0:10}...ends with: ...${ENV_FILE: -10}"
+          fi
+
+          # Set fallbacks if empty
+          if [ -z "$TASK_ROLE" ]; then
+            echo "WARNING: TaskRoleArn is empty! Setting default value."
+            TASK_ROLE="arn:aws:iam::844825014198:role/ecsTaskExecutionRole"
+          fi
+
+          if [ -z "$ENV_FILE" ]; then
+            echo "WARNING: EnvFileS3Path is empty! Setting default value."
+            ENV_FILE="arn:aws:s3:::rubber-duck-config/wiley-secrets.env"
+          fi
+
+          # Run with quoted values to prevent issues
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
             --template-file infra/ecs-infra.yml \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              Environment=production \
-              ClusterName=DuckCluster-rubber-duck-production \
-              TaskDefinitionFamily=rubber-duck-production \
-              ContainerName=duck-container-production \
-              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
-              VpcId=${{ secrets.VPC_ID }} \
-              SubnetIds=${{ secrets.SUBNET_IDS }} \
-              SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }} \
-              ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }} \
-              TaskRoleArn=${{ secrets.EXECUTION_ROLE }} \
-              Cpu=1024 \
-              Memory=2048 \
-              EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}
+            Environment=production \
+            ClusterName=DuckCluster-rubber-duck-production \
+            TaskDefinitionFamily=rubber-duck-production \
+            ContainerName=duck-container-production \
+            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
+            "VpcId=${{ secrets.VPC_ID }}" \
+            "SubnetIds=${{ secrets.SUBNET_IDS }}" \
+            "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
+            "ExecutionRoleArn=${EXECUTION_ROLE}" \
+            "TaskRoleArn=${TASK_ROLE}" \
+            "Cpu=1024" \
+            "Memory=2048" \
+            "EnvFileS3Path=${ENV_FILE}"
