@@ -10,15 +10,16 @@ on:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      IMAGE_REPO: 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
+      IMAGE_TAG: ${{ github.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Set IMAGE_TAG to Commit SHA
-        run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Run Docker build script
         run: bash ./build_docker.sh
@@ -28,16 +29,16 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ env.IMAGE_REPO }}
 
       - name: Push Docker image to ECR
         run: |
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+          docker push ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
 
       - name: Complete Docker push
         run: echo "Docker image pushed to ECR successfully!"
@@ -45,6 +46,15 @@ jobs:
   deploy_to_cloudformation:
     needs: [build_and_push]
     runs-on: ubuntu-latest
+    env:
+      EXECUTION_ROLE: ${{ secrets.EXECUTION_ROLE }}
+      TASK_ROLE: ${{ secrets.EXECUTION_ROLE }}
+      VPC_ID: ${{ secrets.VPC_ID }}
+      SUBNET_IDS: ${{ secrets.SUBNET_IDS }}
+      SECURITY_GROUP_ID: ${{ secrets.SECURITY_GROUP_ID }}
+      CPU: "1024"
+      MEMORY: "2048"
+      ENV_FILE_S3_PATH: ${{ secrets.ENV_FILE_S3_PATH }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -54,25 +64,11 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
-          echo "Checking parameter values..."
-          echo "ExecutionRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
-          echo "TaskRoleArn is set: ${{ secrets.EXECUTION_ROLE != '' }}"
-          echo "VpcId is set: ${{ secrets.VPC_ID != '' }}"
-          echo "SubnetIds is set: ${{ secrets.SUBNET_IDS != '' }}"
-          echo "SecurityGroupId is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
-
-          # Set variables for clarity
-          EXECUTION_ROLE="${{ secrets.EXECUTION_ROLE }}"
-          TASK_ROLE="${{ secrets.EXECUTION_ROLE }}"
-          VPC_ID="${{ secrets.VPC_ID }}"
-          SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
-          SECURITY_GROUP_ID="${{ secrets.SECURITY_GROUP_ID }}"
-
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
             --template-file infra/ecs-infra.yml \
@@ -83,37 +79,12 @@ jobs:
               ClusterName=DuckCluster-rubber-duck-production \
               TaskDefinitionFamily=rubber-duck-production \
               ContainerName=duck-container-production \
-              ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
+              ImageURI=${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }} \
               VpcId="${VPC_ID}" \
               SubnetIds="${SUBNET_IDS}" \
               SecurityGroupId="${SECURITY_GROUP_ID}" \
               ExecutionRoleArn="${EXECUTION_ROLE}" \
               TaskRoleArn="${TASK_ROLE}" \
-              Cpu=1024 \
-              Memory=2048
-
-      - name: Register ECS Task Definition and Deploy
-        run: |
-          bash .github/workflows/esc_setup.sh \
-            "DuckCluster-rubber-duck-production" \
-            "DuckService-rubber-duck-production" \
-            "rubber-duck-production" \
-            "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
-            "${{ secrets.AWS_REGION }}" \
-            "${{ secrets.EXECUTION_ROLE }}" \
-            "${{ secrets.ENV_FILE_S3_PATH }}"
-
-      - name: Update ECS service
-        run: |
-          aws ecs update-service \
-            --cluster DuckCluster-rubber-duck-production \
-            --service DuckService-rubber-duck-production \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
-
-      - name: Check ECS Service Status
-        run: |
-          aws ecs describe-services \
-            --cluster DuckCluster-rubber-duck-production \
-            --services DuckService-rubber-duck-production \
-            --region ${{ secrets.AWS_REGION }}
+              Cpu="${CPU}" \
+              Memory="${MEMORY}" \
+              EnvFileS3Path="${ENV_FILE_S3_PATH}"
