@@ -36,7 +36,7 @@ Parameters:
     Type: String
     Description: S3 path for the environment file
     Default: arn:aws:s3:::rubber-duck-config/wiley-secrets.env
-
+#
 Resources:
   # ECS Resources
   ECSCluster:
