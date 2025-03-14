@@ -116,20 +116,6 @@ jobs:
               Cpu=1024 \
               Memory=2048
 
-      - name: Cleanup on Failure
-        if: failure()
-        run: |
-          echo "Deployment failed. Cleaning up resources..."
-          aws cloudformation delete-stack \
-            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
-            --region ${{ secrets.AWS_REGION }}
-
-          echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete \
-            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
-            --region ${{ secrets.AWS_REGION }}
-
-          echo "Cleanup completed."
 
       - name: Register ECS Task Definition and Deploy
         run: |
