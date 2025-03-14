@@ -20,14 +20,6 @@ jobs:
       - name: Set IMAGE_TAG to Commit SHA
         run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
-      - name: Get commit message and SHA
-        run: |
-          # Get the first line of commit message, remove special chars, convert to lowercase
-          COMMIT_MSG=$(git log -1 --pretty=%B | head -n1 | tr -cd '[:alnum:]-' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          # Create a short, readable suffix with commit message and first 6 chars of SHA
-          echo "RESOURCE_SUFFIX=${COMMIT_MSG}-${GITHUB_SHA::6}" >> $GITHUB_ENV
-          echo "Using resource suffix: ${RESOURCE_SUFFIX}"
-
       - name: Run Docker build script
         run: bash ./build_docker.sh
 
@@ -64,14 +56,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Get commit message and SHA
-        run: |
-          # Get the first line of commit message, remove special chars, convert to lowercase
-          COMMIT_MSG=$(git log -1 --pretty=%B | head -n1 | tr -cd '[:alnum:]-' | tr '[:upper:]' '[:lower:]' | cut -c1-20)
-          # Create a short, readable suffix with commit message and first 6 chars of SHA
-          echo "RESOURCE_SUFFIX=${COMMIT_MSG}-${GITHUB_SHA::6}" >> $GITHUB_ENV
-          echo "Using resource suffix: ${RESOURCE_SUFFIX}"
-
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
@@ -89,22 +73,14 @@ jobs:
           SUBNET_IDS="${{ secrets.SUBNET_IDS }}"
           SECURITY_GROUP_ID="${{ secrets.SECURITY_GROUP_ID }}"
 
-          # Debug output (without exposing actual values)
-          echo "Parameter lengths:"
-          echo "ExecutionRoleArn length: ${#EXECUTION_ROLE}"
-          echo "TaskRoleArn length: ${#TASK_ROLE}"
-          echo "VpcId length: ${#VPC_ID}"
-          echo "SubnetIds length: ${#SUBNET_IDS}"
-          echo "SecurityGroupId length: ${#SECURITY_GROUP_ID}"
-
           aws cloudformation deploy \
-            --stack-name rubber-duck-${{ env.RESOURCE_SUFFIX }} \
+            --stack-name rubber-duck-production \
             --template-file infra/ecs-infra.yml \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
               Environment=production \
-              ClusterName=DuckCluster-${{ env.RESOURCE_SUFFIX }} \
+              ClusterName=DuckCluster-rubber-duck-production \
               TaskDefinitionFamily=rubber-duck-production \
               ContainerName=duck-container-production \
               ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }} \
@@ -116,12 +92,11 @@ jobs:
               Cpu=1024 \
               Memory=2048
 
-
       - name: Register ECS Task Definition and Deploy
         run: |
           bash .github/workflows/esc_setup.sh \
-            "DuckCluster-${{ env.RESOURCE_SUFFIX }}" \
-            "DuckService-${{ env.RESOURCE_SUFFIX }}" \
+            "DuckCluster-rubber-duck-production" \
+            "DuckService-rubber-duck-production" \
             "rubber-duck-production" \
             "844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
             "${{ secrets.AWS_REGION }}" \
@@ -131,14 +106,14 @@ jobs:
       - name: Update ECS service
         run: |
           aws ecs update-service \
-            --cluster DuckCluster-${{ env.RESOURCE_SUFFIX }} \
-            --service DuckService-${{ env.RESOURCE_SUFFIX }} \
+            --cluster DuckCluster-rubber-duck-production \
+            --service DuckService-rubber-duck-production \
             --force-new-deployment \
             --region ${{ secrets.AWS_REGION }}
 
       - name: Check ECS Service Status
         run: |
           aws ecs describe-services \
-            --cluster DuckCluster-${{ env.RESOURCE_SUFFIX }} \
-            --services DuckService-${{ env.RESOURCE_SUFFIX }} \
+            --cluster DuckCluster-rubber-duck-production \
+            --services DuckService-rubber-duck-production \
             --region ${{ secrets.AWS_REGION }}
