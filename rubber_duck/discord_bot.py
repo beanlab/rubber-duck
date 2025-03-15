@@ -372,12 +372,12 @@ if __name__ == '__main__':
     # Set up logging based on user preference
     if args.log_console:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
     else:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.WARNING,
             filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
