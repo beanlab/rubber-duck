@@ -13,7 +13,7 @@ COPY poetry.lock* /app/poetry.lock
 # Install dependencies
 RUN pip install --no-cache-dir poetry && \
     poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi --no-dev
+    poetry install --no-interaction --no-ansi --without dev
 
 # Set Python path to include the application
 ENV PYTHONPATH=/app
