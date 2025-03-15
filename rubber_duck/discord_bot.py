@@ -9,7 +9,7 @@ import boto3
 import discord
 from quest import wrap_steps
 
-from sql_quest import create_sql_manager
+from rubber_duck.sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command
