@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - sql-fixes
   workflow_dispatch:
 
 jobs:
