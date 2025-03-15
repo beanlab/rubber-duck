@@ -86,6 +86,19 @@ jobs:
           TASK_ROLE="${{ secrets.EXECUTION_ROLE }}"  # Using same value as execution role
           ENV_FILE="${{ secrets.ENV_FILE_S3_PATH }}"
 
+          # Get branch name from GitHub context
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+
+          # Sanitize branch name for Docker tag
+          SAFE_BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '/' '-' | tr -cd '[:alnum:]-')
+
+          # Create combined tag with branch name and abbreviated SHA
+          COMBINED_TAG="${SAFE_BRANCH_NAME}-${GITHUB_SHA:0:7}"
+
+          # Set image URI with combined tag
+          IMAGE_URI="844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${COMBINED_TAG}"
+          echo "Using image: ${IMAGE_URI}"
+
           # Check if values are actually non-empty strings
           echo "EXECUTION_ROLE length: ${#EXECUTION_ROLE}"
           echo "TASK_ROLE length: ${#TASK_ROLE}"
@@ -126,7 +139,7 @@ jobs:
             ClusterName=DuckCluster-rubber-duck-production \
             TaskDefinitionFamily=rubber-duck-production \
             ContainerName=duck-container-production \
-            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
+            "ImageURI=${IMAGE_URI}" \
             "VpcId=${{ secrets.VPC_ID }}" \
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
