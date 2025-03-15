@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - Quick-fixes
   workflow_dispatch:
 
 jobs:
@@ -33,7 +34,23 @@ jobs:
 
       - name: Push Docker image to ECR
         run: |
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+          # Get branch name from GitHub context
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+
+          # Sanitize branch name for Docker tag (remove slashes, etc.)
+          SAFE_BRANCH_NAME=$(echo "$BRANCH_NAME" | tr '/' '-' | tr -cd '[:alnum:]-')
+
+          # Create combined tag with branch name and abbreviated SHA
+          COMBINED_TAG="${SAFE_BRANCH_NAME}-${GITHUB_SHA:0:7}"
+
+          echo "Pushing Docker image with combined tag: ${COMBINED_TAG}"
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${COMBINED_TAG}
+
+          # Only push production-latest tag for master branch
+          if [[ "$BRANCH_NAME" == "master" ]]; then
+            docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:production-latest
+            echo "Also pushed as production-latest"
+          fi
 
       - name: Complete Docker push
         run: echo "Docker image pushed to ECR successfully!"
