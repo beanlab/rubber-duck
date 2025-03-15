@@ -14,6 +14,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Extract branch name
+        run: echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_ENV
+
+      - name: Extract short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::5}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -34,10 +40,17 @@ jobs:
 
       - name: Push Docker image to ECR
         run: |
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          echo "Tagging image as: $IMAGE_TAG"
+          
+          docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
+            844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
+
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
 
       - name: Complete Docker push
-        run: echo "Docker image pushed to ECR successfully!"
+        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${SHORT_SHA}!"
+
 
   deploy_to_cloudformation:
     needs: [build_and_push]
