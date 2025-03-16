@@ -8,12 +8,17 @@ from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
 
-
 class RetryableException(Exception):
-    pass
+    def __init__(self, exception, message):
+        self.exception = exception
+        self.message = message
+        super().__init__(self.exception.__str__())
 
 class GenAIException(Exception):
-    pass
+    def __init__(self, exception, web_mention):
+        self.exception = exception
+        self.web_mention = web_mention
+        super().__init__(self.exception.__str__())
 
 class RetryConfig(TypedDict):
     max_retries: int
@@ -70,17 +75,17 @@ class HaveStandardGptConversation:
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
-        retries = -1
-        while retries < max_retries:
+        retries = 0
+        while True:
             try:
                 async with self._typing(thread_id):
                     return await self._ai_client.get_completion(engine, message_history)
             except RetryableException as ex:
-                if retries == -1:
+                if retries == 0:
                     await self._send_message(thread_id, 'Trying to contact servers...')
                 retries += 1
                 if retries >= max_retries:
-                    raise RetryableException(ex) from ex
+                    raise ex
 
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
@@ -137,21 +142,18 @@ class HaveStandardGptConversation:
 
                 except RetryableException as ex:
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id,
-                                             'I\'m having trouble connecting to the OpenAI servers, '
-                                             'please open up a separate conversation and try again')
+                    await self._send_message(thread_id, ex.message)
                     await self._report_error(error_message)
                     break
 
                 except GenAIException as ex:
-                    genai_web_mention = "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
-                                         "for more details on how to resolve this error"
+                    web_mention = ex.web_mention
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble processing your request, '
                                              'I have notified your professor to look into the problem!')
                     genai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{genai_error_message}\n{genai_web_mention}")
+                    await self._report_error(f"{genai_error_message}\n{web_mention}")
                     await self._report_error(error_message, True)
                     break
 
