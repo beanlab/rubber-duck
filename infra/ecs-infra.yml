@@ -32,6 +32,9 @@ Parameters:
   TaskRoleArn:
     Type: String
     Description: ARN of the existing ECS task role
+  EnvFileS3Path:
+    Type: String
+    Description: S3 path for the environment file
 
 Resources:
   # ECS Resources
@@ -45,22 +48,6 @@ Resources:
     Properties:
       LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
       RetentionInDays: 30
-
-  # IAM Policy for CloudWatch Logs
-  CloudWatchLogsPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${AWS::StackName}-CloudWatchLogsPolicy
-      Roles:
-        - !Ref ExecutionRoleArn
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Resource: !Sub ${CloudWatchLogGroup.Arn}:*
 
   FargateTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -82,7 +69,7 @@ Resources:
           PortMappings: []
           Environment: []
           EnvironmentFiles:
-            - Value: !Sub arn:aws:s3:::rubber-duck-config/wiley-secrets.env
+            - Value: !Ref EnvFileS3Path
               Type: s3
           MountPoints: []
           VolumesFrom: []
