@@ -25,10 +25,10 @@ class OpenAI():
             APITimeoutError, InternalServerError,
             UnprocessableEntityError) as ex:
             raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                             'please open up a separate conversation and try again')
+                                             'please open up a separate conversation and try again') from ex
         except (APIConnectionError, BadRequestError,
                         AuthenticationError, ConflictError, NotFoundError,
                         RateLimitError) as ex:
-            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors " \
-                                         "for more details on how to resolve this error")
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                         "for more details on how to resolve this error") from ex
 

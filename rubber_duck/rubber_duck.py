@@ -86,7 +86,7 @@ class RubberDuck:
 
         timeout = channel_config.get('timeout', self._default_config['timeout'])
 
-        duck_name = channel_config.get('name', self._default_config['name'])
+        duck_name = channel_config.get('name', 'default')
 
         return prompt, engine, timeout, duck_name
 

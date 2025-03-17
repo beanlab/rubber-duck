@@ -88,7 +88,7 @@ class HaveStandardGptConversation:
                     error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id, ex.message)
                     await self._report_error(error_message)
-                    return None, None
+                    raise GenAIException(ex, error_message)
 
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
@@ -127,7 +127,6 @@ class HaveStandardGptConversation:
                     )
 
                     choices, usage = await self._get_completion_with_retry(guild_id, thread_id, engine, message_history)
-                    if choices is None: break
 
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
