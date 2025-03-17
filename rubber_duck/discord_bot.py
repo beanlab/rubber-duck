@@ -13,8 +13,9 @@ from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command
-from conversation import HaveStandardGptConversation
+from conversation import HaveStandardGptConversation, BasicSetupConversation
 from feedback import GetTAFeedback, GetConvoFeedback
+from genAI import OpenAI
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
@@ -120,14 +121,14 @@ class MyClient(discord.Client):
         super().__init__(intents=intents)
 
         self.admin_settings = config['admin_settings']
-        open_ai_retry_protocol = config['open_ai_retry_protocol']
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
         self._duck_config = config['rubber_duck']
-        self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
+        self._duck_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._duck_config['channels'])
 
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
@@ -157,19 +158,29 @@ class MyClient(discord.Client):
             self.send_message
         )
 
-        have_conversation = HaveStandardGptConversation(
+        setup_conversation = BasicSetupConversation(
+            self.metrics_handler.record_message,
+        )
+
+        ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
-            open_ai_retry_protocol,
+        )
+        wrap_steps(ai_client, ['get_completion'])
+
+        have_conversation = HaveStandardGptConversation(
+            ai_client,
             self.metrics_handler.record_message,
             self.metrics_handler.record_usage,
             self.send_message,
             self.report_error,
-            self.typing
+            self.typing,
+            ai_completion_retry_protocol,
         )
 
         duck_workflow = RubberDuck(
             self._duck_config,
             setup_thread,
+            setup_conversation,
             have_conversation,
             get_feedback,
         )
