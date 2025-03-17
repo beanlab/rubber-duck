@@ -71,7 +71,7 @@ class HaveStandardGptConversation:
         self._typing = typing
         self._retry_config = retry_config
 
-    async def _get_completion_with_retry(self, thread_id: int, engine: str, message_history: list[GPTMessage]):
+    async def _get_completion_with_retry(self, guild_id, thread_id: int, engine: str, message_history: list[GPTMessage]):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
@@ -84,8 +84,11 @@ class HaveStandardGptConversation:
                 if retries == 0:
                     await self._send_message(thread_id, 'Trying to contact servers...')
                 retries += 1
-                if retries >= max_retries:
-                    raise ex
+                if retries > max_retries:
+                    error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
+                    await self._send_message(thread_id, ex.message)
+                    await self._report_error(error_message)
+                    return None, None
 
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
@@ -123,7 +126,8 @@ class HaveStandardGptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage = await self._get_completion_with_retry(thread_id, engine, message_history)
+                    choices, usage = await self._get_completion_with_retry(guild_id, thread_id, engine, message_history)
+                    if choices is None: break
 
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
@@ -139,12 +143,6 @@ class HaveStandardGptConversation:
                     message_history.append(GPTMessage(role='assistant', content=response))
 
                     await self._send_message(thread_id, response)
-
-                except RetryableException as ex:
-                    error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id, ex.message)
-                    await self._report_error(error_message)
-                    break
 
                 except GenAIException as ex:
                     web_mention = ex.web_mention
