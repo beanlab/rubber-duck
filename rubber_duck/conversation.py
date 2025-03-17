@@ -4,13 +4,16 @@ import traceback as tb
 import uuid
 from typing import TypedDict, Protocol
 
+import chromadb
 import openai
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from quest import step, queue
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
+from rag import Rag
 
+global x
 
 class RetryConfig(TypedDict):
     max_retries: int
@@ -44,6 +47,7 @@ class HaveStandardGptConversation:
         self._report_error = step(report_error)
         self._typing = typing
         self._client = AsyncOpenAI(api_key=openai_api_key)
+        self._rag_client = Rag(openai_api_key, "./chroma_db", "lecture_notes", "/Users/nicholaslewis/CS_Classes/CS-301R/mybot/rubber-duck/rubber_duck/pdfs/lecture_notes.txt")
 
     async def __call__(self, thread_id: int, engine: str, prompt: str, initial_message: Message, timeout=600):
         async with queue('messages', None) as messages:
@@ -54,6 +58,7 @@ class HaveStandardGptConversation:
             user_id = initial_message['author_id']
             guild_id = initial_message['guild_id']
 
+            await self._rag_client.store_embeddings(120)
             # Record the prompt
             await self._record_message(
                 guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
@@ -76,8 +81,8 @@ class HaveStandardGptConversation:
                             "Please resend your message with the relevant parts of your file included in the message."
                         )
                         continue
-
-                    message_history.append(GPTMessage(role='user', content=message['content']))
+                    matches = await self._rag_client.search_relevant_docs(message['content'])
+                    message_history.append(GPTMessage(role='user', content=message['content'] + '\n' + matches))
 
                     user_id = message['author_id']
                     guild_id = message['guild_id']
@@ -135,6 +140,7 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
+
 
     @step
     async def _get_completion(self, thread_id, engine, message_history) -> tuple[list, dict]:
