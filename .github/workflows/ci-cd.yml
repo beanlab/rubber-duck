@@ -4,21 +4,34 @@ on:
   push:
     branches:
       - master
-      - 62-aws-s3-and-fargate-deployment
   workflow_dispatch:
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.extract_sha.outputs.short_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Extract branch name
+        run: echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_ENV
+
+      - name: Extract short SHA
+        id: extract_sha
+        run: |
+          echo "GITHUB_SHA=${GITHUB_SHA}"  # Debugging
+          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
+          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+          echo "::set-output name=short_sha::${SHORT_SHA}"
+          echo "Extracted SHORT_SHA: ${SHORT_SHA}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
       - name: Run Docker build script
-        run: bash ./build_docker.sh
+        run: bash ./infra/build_docker.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -32,12 +45,18 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
 
-      - name: Push Docker image to ECR
+      - name: Tag and Push Docker Image
         run: |
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          echo "Tagging image as: $IMAGE_TAG"
+
+          docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
+            844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
+
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
 
       - name: Complete Docker push
-        run: echo "Docker image pushed to ECR successfully!"
+        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${SHORT_SHA}!"
 
   deploy_to_cloudformation:
     needs: [build_and_push]
@@ -53,53 +72,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Check if secrets are set
-        run: |
-          echo "Checking if secrets are set..."
-          echo "VPC_ID is set: ${{ secrets.VPC_ID != '' }}"
-          echo "SUBNET_IDS is set: ${{ secrets.SUBNET_IDS != '' }}"
-          echo "SECURITY_GROUP_ID is set: ${{ secrets.SECURITY_GROUP_ID != '' }}"
-          echo "EXECUTION_ROLE is set: ${{ secrets.EXECUTION_ROLE != '' }}"
-          echo "ENV_FILE_S3_PATH is set: ${{ secrets.ENV_FILE_S3_PATH != '' }}"
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
-          # More detailed debugging
-          echo "Checking actual values (partial to avoid exposing secrets):"
-          EXECUTION_ROLE="${{ secrets.EXECUTION_ROLE }}"
-          TASK_ROLE="${{ secrets.EXECUTION_ROLE }}"  # Using same value as execution role
-          ENV_FILE="${{ secrets.ENV_FILE_S3_PATH }}"
+          IMAGE_TAG="${{ github.ref_name }}-${{ needs.build_and_push.outputs.short_sha }}"
+          echo "Deploying ECS with image tag: ${IMAGE_TAG}"
 
-          # Check if values are actually non-empty strings
-          echo "EXECUTION_ROLE length: ${#EXECUTION_ROLE}"
-          echo "TASK_ROLE length: ${#TASK_ROLE}"
-          echo "ENV_FILE length: ${#ENV_FILE}"
-
-          # Show partial values (first and last few characters)
-          if [ ${#EXECUTION_ROLE} -gt 10 ]; then
-            echo "EXECUTION_ROLE starts with: ${EXECUTION_ROLE:0:10}...ends with: ...${EXECUTION_ROLE: -10}"
-          fi
-
-          if [ ${#TASK_ROLE} -gt 10 ]; then
-            echo "TASK_ROLE starts with: ${TASK_ROLE:0:10}...ends with: ...${TASK_ROLE: -10}"
-          fi
-
-          if [ ${#ENV_FILE} -gt 10 ]; then
-            echo "ENV_FILE starts with: ${ENV_FILE:0:10}...ends with: ...${ENV_FILE: -10}"
-          fi
-
-          # Set fallbacks if empty
-          if [ -z "$TASK_ROLE" ]; then
-            echo "WARNING: TaskRoleArn is empty! Setting default value."
-            TASK_ROLE="arn:aws:iam::844825014198:role/ecsTaskExecutionRole"
-          fi
-
-          if [ -z "$ENV_FILE" ]; then
-            echo "WARNING: EnvFileS3Path is empty! Setting default value."
-            ENV_FILE="arn:aws:s3:::rubber-duck-config/wiley-secrets.env"
-          fi
-
-          # Run with quoted values to prevent issues
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
             --template-file infra/ecs-infra.yml \
@@ -110,12 +88,12 @@ jobs:
             ClusterName=DuckCluster-rubber-duck-production \
             TaskDefinitionFamily=rubber-duck-production \
             ContainerName=duck-container-production \
-            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${{ github.sha }}" \
+            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${IMAGE_TAG}" \
             "VpcId=${{ secrets.VPC_ID }}" \
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
-            "ExecutionRoleArn=${EXECUTION_ROLE}" \
-            "TaskRoleArn=${TASK_ROLE}" \
+            "ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }}" \
+            "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${ENV_FILE}"
+            "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}"
