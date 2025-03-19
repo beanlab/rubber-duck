@@ -1,4 +1,3 @@
-import logging
 import os
 from typing import TypedDict
 
@@ -7,11 +6,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 
-logging.basicConfig(
-    level=logging.INFO,  # Adjust log level to control verbosity
-    format='%(asctime)s %(levelname)s: %(message)s',
-    handlers=[logging.StreamHandler()]  # Logs to console (can change to FileHandler for file logging)
-)
 
 def _create_sqlite_session(db_name: str) -> Session:
     db_url = f"sqlite:///{db_name}"
@@ -52,16 +46,9 @@ def resolve_env_vars(config):
         for key, value in config.items()
     }
 
-
 def create_sql_session(config: SqlConfig) -> Session:
-    # Check the environment variable to determine if it's a local setup
-    environment = os.getenv('ENVIRONMENT', 'production')
-
-    # If the environment is 'local', use SQLite, otherwise use RDS
-    if environment == 'local':
-        logging.info("Running locally. Using SQLite.")
+    config = resolve_env_vars(config)
+    if config['db_type'] == 'sqlite':
         return _create_sqlite_session(config['database'])
     else:
-        logging.info(f"Running in {environment}. Connecting to RDS.")
-        config = resolve_env_vars(config)
         return _create_sql_session(**config)
