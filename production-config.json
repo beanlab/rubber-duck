@@ -17,6 +17,12 @@
             "name": "standard-rubber-duck",
             "weight": 1,
             "prompt_file": "prompts/standard-rubber-duck.txt"
+          },
+          {
+            "name": "o3-mini-duck",
+            "weight": 1,
+            "prompt_file": "prompts/standard-rubber-duck.txt",
+            "engine": "o3-mini"
           }
         ]
       },
