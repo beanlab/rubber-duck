@@ -46,7 +46,6 @@ def resolve_env_vars(config):
         for key, value in config.items()
     }
 
-
 def create_sql_session(config: SqlConfig) -> Session:
     config = resolve_env_vars(config)
     if config['db_type'] == 'sqlite':
