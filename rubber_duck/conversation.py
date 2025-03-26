@@ -43,6 +43,21 @@ class RecordUsage(Protocol):
 class GenAIClient(Protocol):
     async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
 
+class RetryableGenAIClient(Protocol):
+    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> tuple[list, dict]: ...
+
+def generate_error_message(guild_id, thread_id, ex):
+    error_code = str(uuid.uuid4()).split('-')[0].upper()
+    logging.exception('Error getting completion: ' + error_code)
+    logging.exception('Error getting completion: ' + error_code)
+    error_message = (
+        f'😵 **Error code {error_code}** 😵'
+        f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
+        f'\n{ex}\n'
+        '\n'.join(tb.format_exception(ex))
+    )
+    return error_message, error_code
+
 
 class BasicSetupConversation:
     def __init__(self, record_message):
@@ -59,7 +74,7 @@ class BasicSetupConversation:
 
 
 class HaveStandardGptConversation:
-    def __init__(self, ai_client: GenAIClient,
+    def __init__(self, ai_client: RetryableGenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
                  send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
                  retry_config: RetryConfig):
@@ -70,30 +85,6 @@ class HaveStandardGptConversation:
         self._ai_client = ai_client
         self._typing = typing
         self._retry_config = retry_config
-
-    async def _get_completion_with_retry(self, guild_id, thread_id: int, engine: str, message_history: list[GPTMessage]):
-        max_retries = self._retry_config['max_retries']
-        delay = self._retry_config['delay']
-        backoff = self._retry_config['backoff']
-        retries = 0
-        while True:
-            try:
-                async with self._typing(thread_id):
-                    return await self._ai_client.get_completion(engine, message_history)
-            except RetryableException as ex:
-                if retries == 0:
-                    await self._send_message(thread_id, 'Trying to contact servers...')
-                retries += 1
-                if retries > max_retries:
-                    error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id, ex.message)
-                    await self._report_error(error_message)
-                    raise GenAIException(ex, error_message)
-
-                logging.warning(
-                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                await asyncio.sleep(delay)
-                delay *= backoff
 
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
         async with queue('messages', None) as messages:
@@ -126,7 +117,7 @@ class HaveStandardGptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage = await self._get_completion_with_retry(guild_id, thread_id, engine, message_history)
+                    choices, usage = await self._ai_client.get_completion(guild_id, thread_id, engine, message_history)
 
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
@@ -145,7 +136,7 @@ class HaveStandardGptConversation:
 
                 except GenAIException as ex:
                     web_mention = ex.web_mention
-                    error_message, _ = self._generate_error_message(guild_id, thread_id, ex)
+                    error_message, _ = generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              'I\'m having trouble processing your request, '
                                              'I have notified your professor to look into the problem!')
@@ -155,7 +146,7 @@ class HaveStandardGptConversation:
                     break
 
                 except Exception as ex:
-                    error_message, error_code = self._generate_error_message(guild_id, thread_id, ex)
+                    error_message, error_code = generate_error_message(guild_id, thread_id, ex)
                     await self._send_message(thread_id,
                                              f'😵 **Error code {error_code}** 😵'
                                              f'\nAn unexpected error occurred. Please contact support.'
@@ -165,16 +156,3 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-
-    @staticmethod
-    def _generate_error_message(guild_id, thread_id, ex):
-        error_code = str(uuid.uuid4()).split('-')[0].upper()
-        logging.exception('Error getting completion: ' + error_code)
-        logging.exception('Error getting completion: ' + error_code)
-        error_message = (
-            f'😵 **Error code {error_code}** 😵'
-            f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
-            f'\n{ex}\n'
-            '\n'.join(tb.format_exception(ex))
-        )
-        return error_message, error_code

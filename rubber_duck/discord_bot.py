@@ -13,9 +13,9 @@ from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from conversation import HaveStandardGptConversation, BasicSetupConversation
+from conversation import HaveStandardGptConversation, BasicSetupConversation, RetryableGenAIClient
 from feedback import GetTAFeedback, GetConvoFeedback
-from genAI import OpenAI
+from genAI import OpenAI, RetryableGenAI
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
@@ -164,10 +164,19 @@ class MyClient(discord.Client):
         ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
         )
+
+        retryable_ai_client = RetryableGenAI(
+            ai_client,
+            self.send_message,
+            self.report_error,
+            self.typing,
+            ai_completion_retry_protocol
+        )
+
         wrap_steps(ai_client, ['get_completion'])
 
         have_conversation = HaveStandardGptConversation(
-            ai_client,
+            retryable_ai_client,
             self.metrics_handler.record_message,
             self.metrics_handler.record_usage,
             self.send_message,
@@ -232,7 +241,7 @@ class MyClient(discord.Client):
         # Command channel
         if message.channel.id == self._command_channel:
             workflow_id = f'command-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'command', workflow_id, as_message(message))
             return
 
@@ -245,7 +254,7 @@ class MyClient(discord.Client):
 
         if channel_name is not None:
             workflow_id = f'duck-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'duck', workflow_id, channel_name, as_message(message)
             )
 
