@@ -183,22 +183,22 @@ class MyClient(discord.Client):
             have_conversation,
             get_feedback,
         )
-        # how can I get the get_workflow_manager function
-        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics())
-        commands_workflow = BotCommands(commands, self.send_message)
+        workflows = {
+            'duck': duck_workflow
+        }
 
         def create_workflow(wtype: str):
-            match wtype:
-                case 'command':
-                    return commands_workflow
-
-                case 'duck':
-                    return duck_workflow
+            if wtype in workflows:
+                return workflows[wtype]
 
             raise NotImplementedError(f'No workflow of type {wtype}')
 
         namespace = 'rubber-duck'  # TODO - move to config
         self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
+
+        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics())
+        commands_workflow = BotCommands(commands, self.send_message)
+        workflows['command'] = commands_workflow
 
     async def on_ready(self):
         # print out information when the bot wakes up
