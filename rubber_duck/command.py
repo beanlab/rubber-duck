@@ -181,7 +181,7 @@ class ActiveWorkflowsCommand(Command):
             msg += (
                 f"**Workflow ID:** {metric['workflow_id']}\n"
                 f"**Workflow Type:** {metric['workflow_type']}\n"
-                f"**Start Time:** {metric['start_time']}\n"
+                f"**Start Time:** {metric['start_time']}\n\n"
             )
 
         await self.send_message(channel_id, msg)

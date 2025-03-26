@@ -183,7 +183,7 @@ class MyClient(discord.Client):
             have_conversation,
             get_feedback,
         )
-
+        # how can I get the get_workflow_manager function
         commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics())
         commands_workflow = BotCommands(commands, self.send_message)
 
