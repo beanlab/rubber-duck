@@ -239,7 +239,7 @@ class MyClient(discord.Client):
         # Command channel
         if message.channel.id == self._command_channel:
             workflow_id = f'command-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'command', workflow_id, as_message(message))
             return
 
@@ -252,7 +252,7 @@ class MyClient(discord.Client):
 
         if channel_name is not None:
             workflow_id = f'duck-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'duck', workflow_id, channel_name, as_message(message)
             )
 
