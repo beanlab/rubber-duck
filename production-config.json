@@ -1,12 +1,11 @@
 {
-
   "sql": {
     "db_type": "mysql+pymysql",
     "username": "env:DB_USER",
-    "password":"env:DB_PASSWORD",
-    "host":"env:DB_HOST",
-    "port":"env:DB_PORT",
-    "database":"env:DB_NAME"
+    "password": "env:DB_PASSWORD",
+    "host": "env:DB_HOST",
+    "port": "env:DB_PORT",
+    "database": "env:DB_NAME"
   },
   "rubber_duck": {
     "channels": [
@@ -72,6 +71,19 @@
     "927616651409649675": {
       "channel_id": 1296158078017736725,
       "name": "cs110"
+    },
+    "747510855536738336": {
+      "channel_id": 1327385245036838912,
+      "name": "cs235"
+    },
+    "1235303213796691998": {
+      "channel_id": 1329934513333338244,
+      "name": "cs111"
+    },
+    "1338616224858374287": {
+      "channel_id": 1338619665789751337,
+      "name": "Duck Demo",
+      "allow_self_feedback": true
     }
   },
   "reporting": {
