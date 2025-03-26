@@ -157,3 +157,36 @@ class LogCommand(Command):
         await self.send_message(channel_id, 'The log command has been temporarily disabled.')
         #await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
         #await self._send_message(channel_id, 'log zip', file='log.zip')
+
+
+class ActiveWorkflowsCommand(Command):
+    name = "!active-workflows" # maybe just !active
+    help_msg = "get the active workflows for this bot\n"
+
+    def __init__(self, send_message, get_workflow_metrics):
+        self.send_message = send_message
+        self.get_workflow_metrics = get_workflow_metrics
+
+    @step
+    async def execute(self, message: Message):
+        channel_id = message['channel_id']
+        active_workflows = self.get_workflow_metrics()
+
+        if not active_workflows:
+            await self.send_message(channel_id, "No active workflows.")
+            return
+
+        msg = "**Active Workflows:**\n\n"
+        for metric in active_workflows:
+            msg += (
+                f"**Workflow ID:** {metric['workflow_id']}\n"
+                f"**Workflow Type:** {metric['workflow_type']}\n"
+                f"**Start Time:** {metric['start_time']}\n"
+            )
+
+        await self.send_message(channel_id, msg)
+
+
+
+
+

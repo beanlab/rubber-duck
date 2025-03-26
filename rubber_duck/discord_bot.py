@@ -12,7 +12,7 @@ from quest import wrap_steps
 from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
-    ReportCommand, BashExecuteCommand, LogCommand, Command
+    ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
 from conversation import HaveStandardGptConversation, BasicSetupConversation
 from feedback import GetTAFeedback, GetConvoFeedback
 from genAI import OpenAI
@@ -100,7 +100,7 @@ class RubberDuckConfig(TypedDict):
     channels: list[ChannelConfig]
 
 
-def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
+def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
     # Create and return the list of commands
     return [
         messages := MessagesMetricsCommand(send_message, metrics_handler),
@@ -109,7 +109,8 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message))
+        LogCommand(send_message, BashExecuteCommand(send_message)),
+        ActiveWorkflowsCommand(send_message, active_workflow_function)
     ]
 
 
@@ -136,8 +137,6 @@ class MyClient(discord.Client):
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
         reporter = Reporter(self.metrics_handler, config['reporting'])
-        commands = create_commands(self.send_message, self.metrics_handler, reporter)
-        commands_workflow = BotCommands(commands, self.send_message)
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -184,6 +183,9 @@ class MyClient(discord.Client):
             have_conversation,
             get_feedback,
         )
+
+        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics())
+        commands_workflow = BotCommands(commands, self.send_message)
 
         def create_workflow(wtype: str):
             match wtype:
