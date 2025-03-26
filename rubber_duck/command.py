@@ -160,8 +160,8 @@ class LogCommand(Command):
 
 
 class ActiveWorkflowsCommand(Command):
-    name = "!active-workflows" # maybe just !active
-    help_msg = "get the active workflows for this bot\n"
+    name = "!active-"
+    help_msg = "get the active workflow metrics\n"
 
     def __init__(self, send_message, get_workflow_metrics):
         self.send_message = send_message
