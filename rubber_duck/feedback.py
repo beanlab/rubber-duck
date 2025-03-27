@@ -86,7 +86,7 @@ class GetTAFeedback:
                 await self._add_reaction(reviewer_channel_id, review_message_id, '✅')
 
             except asyncio.TimeoutError:
-                await self._add_reaction('❌')
+                await self._add_reaction(reviewer_channel_id, review_message_id, '❌')
                 feedback_score = 'nan'
                 reviewer_id = 'nan'
 
