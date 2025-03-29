@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       local_config:
-        description: "Path to local config file to upload (e.g., wiley-config.json)"
+        description: "Path to local config file to upload (e.g., infra/config.json)"
         required: false
         default: "infra/config.json"
         type: string
