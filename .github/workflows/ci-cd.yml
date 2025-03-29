@@ -158,8 +158,8 @@ jobs:
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
             "ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }}" \
-            "TaskRoleArn=${{ secrets.TASK_ROLE }}" \
+            "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" \
-            "ConfigFileS3Path=${{ needs.send_config.outputs.config_s3_path }}"
+            "EnvFileS3Path=s3://rubber-duck-config/secrets.env" \
+            "ConfigFileS3Path=s3://rubber-duck-config/config.json"
