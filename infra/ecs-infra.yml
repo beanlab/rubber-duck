@@ -35,6 +35,9 @@ Parameters:
   EnvFileS3Path:
     Type: String
     Description: S3 path for the environment file
+  ConfigFileS3Path:
+    Type: String
+    Description: S3 path for the config file
 
 Resources:
   # ECS Resources
@@ -64,8 +67,8 @@ Resources:
         - Name: !Ref ContainerName
           Image: !Ref ImageURI
           Essential: true
-          Cpu: 0
-          Memory: 2048
+          Cpu: !Ref Cpu
+          Memory: !Ref Memory
           PortMappings: []
           EnvironmentFiles:
             - Value: !Ref EnvFileS3Path

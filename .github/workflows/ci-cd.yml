@@ -16,6 +16,9 @@ on:
 jobs:
   send_config:
     runs-on: ubuntu-latest
+    outputs:
+      config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
+      secrets_s3_path: ${{ steps.set_outputs.outputs.secrets_s3_path }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -32,8 +35,6 @@ jobs:
           cat > secrets.env << EOL
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          CANVAS_TOKEN=${{ secrets.CANVAS_TOKEN }}
-          COURSE_ID=${{ secrets.COURSE_ID }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION=${{ secrets.AWS_REGION }}
@@ -42,50 +43,32 @@ jobs:
           DB_PORT=${{ secrets.DB_PORT }}
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          ENVIRONMENT="production"
+          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/config.json
+          ENV_FILE_S3_PATH=s3://rubber-duck-config/secrets.env
+          ENVIRONMENT=production
           EOL
 
-      - name: Validate config file
-        run: |
-          # Debug current directory and file existence
-          echo "Current directory: $(pwd)"
-          echo "Looking for config file: ${{ inputs.local_config || 'infra/config.json' }}"
-          ls -la infra/
-
-          # Check if file exists
-          if [ ! -f "${{ inputs.local_config || 'infra/config.json' }}" ]; then
-            echo "Error: Config file '${{ inputs.local_config || 'infra/config.json' }}' not found"
-            echo "Available files in infra directory:"
-            ls -la infra/
-            exit 1
-          fi
-          echo "Config file validated successfully"
-
       - name: Upload config and secrets to S3
+        id: set_outputs
         run: |
-          # Get branch name and SHA for unique naming
-          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')
-          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-
-          # Create unique names for the files
-          CONFIG_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.json"
-          SECRETS_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.env"
+          # Use fixed paths
+          CONFIG_S3_PATH="s3://rubber-duck-config/config.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/secrets.env"
 
           # Debug file paths
           echo "Config file path: ${{ inputs.local_config || 'infra/config.json' }}"
-          echo "Target S3 path: s3://rubber-duck-config/${CONFIG_NAME}"
+          echo "Target S3 path: $CONFIG_S3_PATH"
 
           # Upload files
-          aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "s3://rubber-duck-config/${CONFIG_NAME}"
-          aws s3 cp secrets.env "s3://rubber-duck-config/${SECRETS_NAME}"
+          aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "$CONFIG_S3_PATH"
+          aws s3 cp secrets.env "$SECRETS_S3_PATH"
 
           # Set outputs for use in other jobs
-          echo "CONFIG_S3_PATH=s3://rubber-duck-config/${CONFIG_NAME}" >> $GITHUB_ENV
-          echo "SECRETS_S3_PATH=s3://rubber-duck-config/${SECRETS_NAME}" >> $GITHUB_ENV
+          echo "config_s3_path=$CONFIG_S3_PATH" >> $GITHUB_OUTPUT
+          echo "secrets_s3_path=$SECRETS_S3_PATH" >> $GITHUB_OUTPUT
 
-          echo "Uploaded config to: s3://rubber-duck-config/${CONFIG_NAME}"
-          echo "Uploaded secrets to: s3://rubber-duck-config/${SECRETS_NAME}"
+          echo "Uploaded config to: $CONFIG_S3_PATH"
+          echo "Uploaded secrets to: $SECRETS_S3_PATH"
 
   build_and_push:
     runs-on: ubuntu-latest
@@ -157,6 +140,8 @@ jobs:
         run: |
           IMAGE_TAG="${{ github.ref_name }}-${{ needs.build_and_push.outputs.short_sha }}"
           echo "Deploying ECS with image tag: ${IMAGE_TAG}"
+          echo "Using config path: ${{ needs.send_config.outputs.config_s3_path }}"
+          echo "Using secrets path: ${{ needs.send_config.outputs.secrets_s3_path }}"
 
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
@@ -173,8 +158,8 @@ jobs:
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
             "ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }}" \
-            "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
+            "TaskRoleArn=${{ secrets.TASK_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.SECRETS_S3_PATH }}" \
-            "ConfigFileS3Path=${{ needs.send_config.outputs.CONFIG_S3_PATH }}"
+            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" \
+            "ConfigFileS3Path=${{ needs.send_config.outputs.config_s3_path }}"
