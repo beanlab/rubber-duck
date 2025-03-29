@@ -35,9 +35,6 @@ Parameters:
   EnvFileS3Path:
     Type: String
     Description: S3 path for the environment file
-  ConfigFileS3Path:
-    Type: String
-    Description: S3 path for the config file
 
 Resources:
   # ECS Resources
@@ -67,15 +64,13 @@ Resources:
         - Name: !Ref ContainerName
           Image: !Ref ImageURI
           Essential: true
-          Cpu: !Ref Cpu
-          Memory: !Ref Memory
+          Cpu: 0
+          Memory: 2048
           PortMappings: []
+          Environment: []
           EnvironmentFiles:
-            - Value: s3://rubber-duck-config/wiley-secrets.env
+            - Value: !Ref EnvFileS3Path
               Type: s3
-          Environment:
-            - Name: CONFIG_FILE_S3_PATH
-              Value: s3://rubber-duck-config/wiley-config.json
           MountPoints: []
           VolumesFrom: []
           LogConfiguration:

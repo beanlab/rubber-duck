@@ -160,4 +160,3 @@ jobs:
             "Cpu=1024" \
             "Memory=2048" \
             "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}" \
-            "ConfigFileS3Path=${{ secrets.CONFIG_FILE_S3_PATH }}"
