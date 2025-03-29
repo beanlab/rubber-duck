@@ -16,3 +16,4 @@ poetry.lock
 settings.txt
 github_secrets.txt
 requirements.txt
+config.json

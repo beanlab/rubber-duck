@@ -67,7 +67,6 @@ Resources:
           Cpu: 0
           Memory: 2048
           PortMappings: []
-          Environment: []
           EnvironmentFiles:
             - Value: !Ref EnvFileS3Path
               Type: s3

@@ -4,9 +4,77 @@ on:
   push:
     branches:
       - master
+      - 110-fargate-update
   workflow_dispatch:
+    inputs:
+      local_config:
+        description: "Path to local config file to upload (e.g., wiley-config.json)"
+        required: false
+        default: "infra/config.json"
+        type: string
 
 jobs:
+  send_config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Create secrets file
+        run: |
+          cat > secrets.env << EOL
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          CANVAS_TOKEN=${{ secrets.CANVAS_TOKEN }}
+          COURSE_ID=${{ secrets.COURSE_ID }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVIRONMENT="production"
+          EOL
+
+      - name: Validate config file
+        run: |
+          if [ ! -f "${{ inputs.local_config || 'infra/config.json' }}" ]; then
+            echo "Error: Config file '${{ inputs.local_config || 'infra/config.json' }}' not found"
+            exit 1
+          fi
+          echo "Config file validated successfully"
+
+      - name: Upload config and secrets to S3
+        run: |
+          # Get branch name and SHA for unique naming
+          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')
+          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+          # Create unique names for the files
+          CONFIG_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.json"
+          SECRETS_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.env"
+
+          # Upload files
+          aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "s3://rubber-duck-config/${CONFIG_NAME}"
+          aws s3 cp secrets.env "s3://rubber-duck-config/${SECRETS_NAME}"
+
+          # Set outputs for use in other jobs
+          echo "CONFIG_S3_PATH=s3://rubber-duck-config/${CONFIG_NAME}" >> $GITHUB_ENV
+          echo "SECRETS_S3_PATH=s3://rubber-duck-config/${SECRETS_NAME}" >> $GITHUB_ENV
+
+          echo "Uploaded config to: s3://rubber-duck-config/${CONFIG_NAME}"
+          echo "Uploaded secrets to: s3://rubber-duck-config/${SECRETS_NAME}"
+
   build_and_push:
     runs-on: ubuntu-latest
     outputs:
@@ -59,7 +127,7 @@ jobs:
         run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${SHORT_SHA}!"
 
   deploy_to_cloudformation:
-    needs: [build_and_push]
+    needs: [build_and_push, send_config]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -96,4 +164,5 @@ jobs:
             "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}"
+            "EnvFileS3Path=${{ needs.send_config.outputs.SECRETS_S3_PATH }}" \
+            "ConfigFileS3Path=${{ needs.send_config.outputs.CONFIG_S3_PATH }}"
