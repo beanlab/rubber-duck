@@ -173,7 +173,7 @@ jobs:
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
             "ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }}" \
-            "TaskRoleArn=${{ secrets.TASK_ROLE }}" \
+            "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
             "EnvFileS3Path=${{ needs.send_config.outputs.SECRETS_S3_PATH }}" \
