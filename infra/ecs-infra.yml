@@ -71,8 +71,11 @@ Resources:
           Memory: !Ref Memory
           PortMappings: []
           EnvironmentFiles:
-            - Value: !Ref EnvFileS3Path
+            - Value: s3://rubber-duck-config/wiley-secrets.env
               Type: s3
+          Environment:
+            - Name: CONFIG_FILE_S3_PATH
+              Value: s3://rubber-duck-config/wiley-config.json
           MountPoints: []
           VolumesFrom: []
           LogConfiguration:

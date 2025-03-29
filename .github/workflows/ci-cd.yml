@@ -16,9 +16,7 @@ on:
 jobs:
   send_config:
     runs-on: ubuntu-latest
-    outputs:
-      config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
-      secrets_s3_path: ${{ steps.set_outputs.outputs.secrets_s3_path }}
+    environment: wiley-environment.
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -72,6 +70,7 @@ jobs:
 
   build_and_push:
     runs-on: ubuntu-latest
+    environment: wiley-environment.
     outputs:
       short_sha: ${{ steps.extract_sha.outputs.short_sha }}
     steps:
@@ -124,6 +123,7 @@ jobs:
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
     runs-on: ubuntu-latest
+    environment: wiley-environment.
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -140,8 +140,6 @@ jobs:
         run: |
           IMAGE_TAG="${{ github.ref_name }}-${{ needs.build_and_push.outputs.short_sha }}"
           echo "Deploying ECS with image tag: ${IMAGE_TAG}"
-          echo "Using config path: ${{ needs.send_config.outputs.config_s3_path }}"
-          echo "Using secrets path: ${{ needs.send_config.outputs.secrets_s3_path }}"
 
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
@@ -161,5 +159,5 @@ jobs:
             "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=s3://rubber-duck-config/secrets.env" \
-            "ConfigFileS3Path=s3://rubber-duck-config/config.json"
+            "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}" \
+            "ConfigFileS3Path=${{ secrets.CONFIG_FILE_S3_PATH }}"
