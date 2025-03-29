@@ -47,8 +47,16 @@ jobs:
 
       - name: Validate config file
         run: |
+          # Debug current directory and file existence
+          echo "Current directory: $(pwd)"
+          echo "Looking for config file: ${{ inputs.local_config || 'infra/config.json' }}"
+          ls -la infra/
+
+          # Check if file exists
           if [ ! -f "${{ inputs.local_config || 'infra/config.json' }}" ]; then
             echo "Error: Config file '${{ inputs.local_config || 'infra/config.json' }}' not found"
+            echo "Available files in infra directory:"
+            ls -la infra/
             exit 1
           fi
           echo "Config file validated successfully"
@@ -63,6 +71,10 @@ jobs:
           # Create unique names for the files
           CONFIG_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.json"
           SECRETS_NAME="${BRANCH_NAME}-${SHORT_SHA}-${TIMESTAMP}.env"
+
+          # Debug file paths
+          echo "Config file path: ${{ inputs.local_config || 'infra/config.json' }}"
+          echo "Target S3 path: s3://rubber-duck-config/${CONFIG_NAME}"
 
           # Upload files
           aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "s3://rubber-duck-config/${CONFIG_NAME}"
