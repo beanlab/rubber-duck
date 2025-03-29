@@ -231,6 +231,10 @@ class MyClient(discord.Client):
         # ignore messages from the bot itself
         if message.author.id == self.user.id:
             return
+        #
+        # # ignore messages from other bots
+        # if message.author.bot:
+        #     return
 
         # ignore messages that start with //
         if message.content.startswith('//'):
@@ -239,7 +243,7 @@ class MyClient(discord.Client):
         # Command channel
         if message.channel.id == self._command_channel:
             workflow_id = f'command-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'command', workflow_id, as_message(message))
             return
 
@@ -252,7 +256,7 @@ class MyClient(discord.Client):
 
         if channel_name is not None:
             workflow_id = f'duck-{message.id}'
-            self._workflow_manager.start_workflow_background(
+            self._workflow_manager.start_workflow(
                 'duck', workflow_id, channel_name, as_message(message)
             )
 
@@ -352,6 +356,9 @@ def fetch_config_from_s3():
 
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
+
+    if os.environ.get('ENVIRONMENT') == 'local':
+        return None
 
     if not s3_path:
         return None
