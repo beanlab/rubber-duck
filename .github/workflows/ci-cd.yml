@@ -155,8 +155,8 @@ jobs:
             "VpcId=${{ secrets.VPC_ID }}" \
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
-            "ExecutionRoleArn=${{ secrets.EXECUTION_ROLE }}" \
-            "TaskRoleArn=${{ secrets.EXECUTION_ROLE }}" \
+            "ExecutionRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
+            "TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
             "Cpu=1024" \
             "Memory=2048" \
             "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}" \
