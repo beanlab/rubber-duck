@@ -205,8 +205,9 @@ class MyClient(discord.Client):
         namespace = 'rubber-duck'  # TODO - move to config
         self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
-        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics())
+        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics)
         commands_workflow = BotCommands(commands, self.send_message)
+
         workflows['command'] = commands_workflow
 
     async def on_ready(self):

@@ -160,7 +160,7 @@ class LogCommand(Command):
 
 
 class ActiveWorkflowsCommand(Command):
-    name = "!active-"
+    name = "!active"
     help_msg = "get the active workflow metrics\n"
 
     def __init__(self, send_message, get_workflow_metrics):
@@ -177,12 +177,17 @@ class ActiveWorkflowsCommand(Command):
             return
 
         msg = "**Active Workflows:**\n\n"
+        count = 0
         for metric in active_workflows:
+            count += 1
             msg += (
-                f"**Workflow ID:** {metric['workflow_id']}\n"
-                f"**Workflow Type:** {metric['workflow_type']}\n"
+                f"Workflow {count}\n"
+                f"**ID:** {metric['workflow_id']}\n"
+                f"**Type:** {metric['workflow_type']}\n"
                 f"**Start Time:** {metric['start_time']}\n\n"
             )
+
+        msg += f"**Total Count:** {count}"
 
         await self.send_message(channel_id, msg)
 
