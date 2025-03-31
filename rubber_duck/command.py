@@ -201,8 +201,3 @@ class ActiveWorkflowsCommand(Command):
             )
 
         await self.send_message(channel_id, f"```{msg}```")
-
-
-
-
-
