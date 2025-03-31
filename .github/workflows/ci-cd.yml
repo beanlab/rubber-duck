@@ -128,23 +128,22 @@ jobs:
           docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
 
       - name: Tag and Push Docker Image
-        id: set_outputs
+        id: set_outputs  # Add this line
         run: |
-          # Sanitize branch name to remove invalid characters
-          SANITIZED_BRANCH_NAME=$(echo "${{ needs.extract_sha.outputs.branch_name }}" | tr -cd '[:alnum:]_-')
-          IMAGE_TAG="${SANITIZED_BRANCH_NAME}-${{ needs.extract_sha.outputs.short_sha }}"
+          IMAGE_TAG="${{ needs.extract_sha.outputs.branch_name }}${{ needs.extract_sha.outputs.short_sha }}"
           echo "Tagging image as: $IMAGE_TAG"
-      
+
           docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
             844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-      
+
           docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-      
+
           # ✅ Set the output for use in other jobs
           echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Complete Docker push
-        run: echo "Docker image pushed to ECR with tag ${SANITIZED_BRANCH_NAME}-${{ needs.extract_sha.outputs.short_sha }}!"
+        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${{ needs.extract_sha.outputs.short_sha }}!"
+
 
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
