@@ -14,9 +14,40 @@ on:
         type: string
 
 jobs:
+  extract_sha:
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.extract_sha.outputs.short_sha }}
+      extract_branch: ${{ steps.extract_branch.outputs.branch_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Extract branch name
+        id: extract_branch  # ✅ Add an ID
+        run: |
+          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT  # ✅ Make it an output
+
+
+
+      - name: Extract short SHA
+        id: extract_sha  # ✅ Add this ID so outputs work
+        run: |
+          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
+          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT  # ✅ Correct output format
+
+
+
   send_config:
     runs-on: ubuntu-latest
     environment: wiley-environment.
+    needs: extract_sha
+    outputs:
+        config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
+        secrets_s3_path: ${{ steps.set_outputs.outputs.secrets_s3_path }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -50,8 +81,8 @@ jobs:
         id: set_outputs
         run: |
           # Use fixed paths
-          CONFIG_S3_PATH="s3://rubber-duck-config/config.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/secrets.env"
+          CONFIG_S3_PATH="s3://rubber-duck-config/production/${{ needs.extract_sha.outputs.short_sha }}config.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/production/${{ needs.extract_sha.outputs.short_sha }}secrets.env"
 
           # Debug file paths
           echo "Config file path: ${{ inputs.local_config || 'infra/config.json' }}"
@@ -59,7 +90,7 @@ jobs:
 
           # Upload files
           aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "$CONFIG_S3_PATH"
-          aws s3 cp secrets.env "$SECRETS_S3_PATH"
+          aws s3 cp secrets.env "$SECRETS_S3_PATH" --no-progress
 
           # Set outputs for use in other jobs
           echo "config_s3_path=$CONFIG_S3_PATH" >> $GITHUB_OUTPUT
@@ -70,24 +101,13 @@ jobs:
 
   build_and_push:
     runs-on: ubuntu-latest
-    environment: wiley-environment.
+    environment: wiley-environment
+    needs: extract_sha
     outputs:
-      short_sha: ${{ steps.extract_sha.outputs.short_sha }}
+      docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Extract branch name
-        run: echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_ENV
-
-      - name: Extract short SHA
-        id: extract_sha
-        run: |
-          echo "GITHUB_SHA=${GITHUB_SHA}"  # Debugging
-          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
-          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
-          echo "::set-output name=short_sha::${SHORT_SHA}"
-          echo "Extracted SHORT_SHA: ${SHORT_SHA}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -108,8 +128,9 @@ jobs:
           docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
 
       - name: Tag and Push Docker Image
+        id: set_outputs  # Add this line
         run: |
-          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          IMAGE_TAG="${{ needs.extract_sha.outputs.branch_name }}-${{ needs.extract_sha.outputs.short_sha }}"
           echo "Tagging image as: $IMAGE_TAG"
 
           docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
@@ -117,8 +138,12 @@ jobs:
 
           docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
 
+          # ✅ Set the output for use in other jobs
+          echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
       - name: Complete Docker push
-        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${SHORT_SHA}!"
+        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${{ needs.extract_sha.outputs.short_sha }}!"
+
 
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
@@ -138,7 +163,7 @@ jobs:
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
-          IMAGE_TAG="${{ github.ref_name }}-${{ needs.build_and_push.outputs.short_sha }}"
+          IMAGE_TAG="${{needs.build_and_push.outputs.docker_image_tag}}"  # This is the docker image tag from build and push
           echo "Deploying ECS with image tag: ${IMAGE_TAG}"
 
           aws cloudformation deploy \
@@ -159,4 +184,4 @@ jobs:
             "TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ secrets.ENV_FILE_S3_PATH }}" \
+            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" \
