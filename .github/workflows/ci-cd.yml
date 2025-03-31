@@ -81,8 +81,8 @@ jobs:
         id: set_outputs
         run: |
           # Use fixed paths
-          CONFIG_S3_PATH="s3://rubber-duck-config/production/${{ needs.extract_sha.outputs.short_sha }}config.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/production/${{ needs.extract_sha.outputs.short_sha }}secrets.env"
+          CONFIG_S3_PATH="s3://rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
 
           # Debug file paths
           echo "Config file path: ${{ inputs.local_config || 'infra/config.json' }}"
