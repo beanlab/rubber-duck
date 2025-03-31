@@ -13,7 +13,7 @@ class BotCommands:
         help_string = "!help - print out this message\n"
 
         for command in self.commands.values():
-            help_string += f"{command.name} - {command.help_msg}"
+            help_string += f"{command.name} - {command.help_msg}\n"
 
         help_string = f"```\n{help_string}\n```"
 
