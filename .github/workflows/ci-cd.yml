@@ -24,16 +24,18 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Extract branch name
-        id: extract_branch
+        id: extract_branch # ✅ Add an ID
         run: |
           BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')
-          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT  # ✅ Make it an output
 
       - name: Extract short SHA
-        id: extract_sha
+        id: extract_sha # ✅ Add this ID so outputs work
         run: |
           SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT  # ✅ Correct output format
 
   send_config:
     runs-on: ubuntu-latest
@@ -42,6 +44,7 @@ jobs:
     outputs:
       config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
       secrets_s3_path: ${{ steps.set_outputs.outputs.secrets_s3_path }}
+      arn_env: ${{ steps.set_outputs.outputs.arn_env }} # Consolidated ARN output
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -74,20 +77,33 @@ jobs:
       - name: Upload config and secrets to S3
         id: set_outputs
         run: |
-          SHORT_SHA="${{ needs.extract_sha.outputs.short_sha }}"
-          CONFIG_S3_PATH="s3://rubber-duck-config/production/config-${SHORT_SHA}.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/production/secrets-${SHORT_SHA}.env"
+          CONFIG_S3_PATH="s3://rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
 
-          # Upload files to S3
+          # Debugging outputs
+          echo "Config file path: $CONFIG_S3_PATH"
+          echo "Secrets file path: $SECRETS_S3_PATH"
+
+          # Upload files
           aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "$CONFIG_S3_PATH"
           aws s3 cp secrets.env "$SECRETS_S3_PATH" --no-progress
 
-          # Set outputs
+          # Set outputs for use in other jobs
           echo "config_s3_path=$CONFIG_S3_PATH" >> $GITHUB_OUTPUT
           echo "secrets_s3_path=$SECRETS_S3_PATH" >> $GITHUB_OUTPUT
+          echo "arn_env=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
 
           echo "Uploaded config to: $CONFIG_S3_PATH"
           echo "Uploaded secrets to: $SECRETS_S3_PATH"
+
+      - name: Upload Arn
+        id: arn_env
+        run: |
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          echo "secrets_s3_path=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
 
   build_and_push:
     runs-on: ubuntu-latest
@@ -115,24 +131,29 @@ jobs:
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
+          docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
 
       - name: Tag and Push Docker Image
-        id: set_outputs
+        id: set_outputs # Add this line
         run: |
           IMAGE_TAG="${{ needs.extract_sha.outputs.branch_name }}${{ needs.extract_sha.outputs.short_sha }}"
+          echo "Tagging image as: $IMAGE_TAG"
+
+          docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
+            844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
+
+          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
+
+          # ✅ Set the output for use in other jobs
           echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-          docker tag ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
-            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
+      - name: Complete Docker push
+        run: echo "Docker image pushed to ECR with tag ${BRANCH_NAME}-${{ needs.extract_sha.outputs.short_sha }}!"
 
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
     runs-on: ubuntu-latest
-    environment: wiley-environment
+    environment: wiley-environment.
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -147,7 +168,8 @@ jobs:
       - name: Deploy ECS Infrastructure with CloudFormation
         id: deploy
         run: |
-          IMAGE_TAG="${{ needs.build_and_push.outputs.docker_image_tag }}"
+          IMAGE_TAG="${{needs.build_and_push.outputs.docker_image_tag}}"  # This is the docker image tag from build and push
+          echo "Deploying ECS with image tag: ${IMAGE_TAG}"
 
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
@@ -157,6 +179,14 @@ jobs:
             --parameter-overrides \
             Environment=production \
             ClusterName=DuckCluster-rubber-duck-production \
+            TaskDefinitionFamily=rubber-duck-production \
             ContainerName=duck-container-production \
-            "ImageURI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${IMAGE_TAG}" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" 
+            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${IMAGE_TAG}" \
+            "VpcId=${{ secrets.VPC_ID }}" \
+            "SubnetIds=${{ secrets.SUBNET_IDS }}" \
+            "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
+            "ExecutionRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
+            "TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
+            "Cpu=1024" \
+            "Memory=2048" \
+            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" \
