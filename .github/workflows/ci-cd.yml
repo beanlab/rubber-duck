@@ -189,4 +189,4 @@ jobs:
             "TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.secrets_s3_path }}" \
+            "EnvFileS3Path=${{ needs.send_config.outputs.arn_env }}" \
