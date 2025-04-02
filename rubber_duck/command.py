@@ -1,13 +1,12 @@
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import discord
 import pytz
+from quest import step
 
 import zip_utils
-import subprocess
-
-from pathlib import Path
-from quest import step
 from protocols import Message
 
 
@@ -71,7 +70,8 @@ class MetricsCommand(Command):
     name = "!metrics"
     help_msg = "get the zips of the data tables"
 
-    def __init__(self, messages_metrics: MessagesMetricsCommand, usage_metrics: UsageMetricsCommand, feedback_metrics: FeedbackMetricsCommand):
+    def __init__(self, messages_metrics: MessagesMetricsCommand, usage_metrics: UsageMetricsCommand,
+                 feedback_metrics: FeedbackMetricsCommand):
         self.messages_metrics = messages_metrics
         self.usage_metrics = usage_metrics
         self.feedback_metrics = feedback_metrics
@@ -159,8 +159,8 @@ class LogCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         await self.send_message(channel_id, 'The log command has been temporarily disabled.')
-        #await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
-        #await self._send_message(channel_id, 'log zip', file='log.zip')
+        # await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
+        # await self._send_message(channel_id, 'log zip', file='log.zip')
 
 
 class ActiveWorkflowsCommand(Command):
@@ -171,8 +171,20 @@ class ActiveWorkflowsCommand(Command):
         self.send_message = send_message
         self.get_workflow_metrics = get_workflow_metrics
 
-    @step
-    async def execute(self, message: Message):
+    async def _execute_summary(self, message: Message):
+        channel_id = message['channel_id']
+        active_workflows = self.get_workflow_metrics()
+
+        counts = {}
+        for metric in active_workflows:
+            wtype = metric['type']
+            counts[wtype] = counts.get(wtype, 0) + 1
+
+        msg = '\n'.join(f'Type: {wtype}\nCount: {count}\n' for wtype, count in counts.items())
+
+        await self.send_message(channel_id, f"```\nActive Workflows:\n{msg}```")
+
+    async def _execute_full(self, message: Message):
         channel_id = message['channel_id']
         active_workflows = self.get_workflow_metrics()
 
@@ -200,4 +212,11 @@ class ActiveWorkflowsCommand(Command):
                 f"Start Time ({time_zone_str}): {formatted_time}\n\n"
             )
 
-        await self.send_message(channel_id, f"```{msg}```")
+        await self.send_message(channel_id, f"```\n{msg}```")
+
+    @step
+    async def execute(self, message: Message):
+        if 'full' in message:
+            await self._execute_full(message)
+        else:
+            await self._execute_summary(message)
