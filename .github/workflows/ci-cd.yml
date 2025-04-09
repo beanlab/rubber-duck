@@ -71,7 +71,7 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           CONFIG_FILE_S3_PATH=s3://rubber-duck-config/config.json
           ENV_FILE_S3_PATH=s3://rubber-duck-config/secrets.env
-          ENVIRONMENT=production
+          ENVIRONMENT=wiley-environment.
           EOL
 
       - name: Verify Secrets File
