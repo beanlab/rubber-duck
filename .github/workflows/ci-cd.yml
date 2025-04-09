@@ -39,7 +39,7 @@ jobs:
 
   send_config:
     runs-on: ubuntu-latest
-    environment: wiley-environment
+    environment: wiley-environment.
     needs: extract_sha
     outputs:
       config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
