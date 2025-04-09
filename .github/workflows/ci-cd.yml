@@ -74,6 +74,76 @@ jobs:
           ENVIRONMENT=production
           EOL
 
+      - name: Verify Secrets File
+        run: |
+          # Debug: List all available secrets (without values)
+          echo "Available GitHub secrets:"
+          for secret in $(env | grep '^GITHUB_' | cut -d= -f1); do
+            echo "- $secret"
+          done
+
+          # Check if required secrets are set in GitHub
+          required_secrets=(
+            "OPENAI_API_KEY"
+            "DISCORD_TOKEN"
+            "AWS_ACCESS_KEY_ID"
+            "AWS_SECRET_ACCESS_KEY"
+            "AWS_REGION"
+            "DB_NAME"
+            "DB_HOST"
+            "DB_PORT"
+            "DB_USER"
+            "DB_PASSWORD"
+            "VPC_ID"
+            "SUBNET_IDS"
+            "SECURITY_GROUP_ID"
+          )
+
+          missing_secrets=()
+          for secret in "${required_secrets[@]}"; do
+            if [ -z "$(eval echo \$$secret)" ]; then
+              missing_secrets+=("$secret")
+            fi
+          done
+
+          if [ ${#missing_secrets[@]} -ne 0 ]; then
+            echo "❌ Missing required secrets in GitHub:"
+            printf '%s\n' "${missing_secrets[@]}"
+            echo "Please ensure these secrets are set in the wiley-environment"
+            exit 1
+          else
+            echo "✅ All required secrets are set in GitHub"
+          fi
+
+          # Verify secrets file was created
+          if [ ! -f "secrets.env" ]; then
+            echo "❌ secrets.env file was not created"
+            exit 1
+          fi
+
+          # Debug: Show the contents of secrets.env (without values)
+          echo "Contents of secrets.env (variables only):"
+          grep -v '^#' secrets.env | cut -d= -f1
+
+          # Check if secrets file contains all required variables
+          missing_vars=()
+          for secret in "${required_secrets[@]}"; do
+            if ! grep -q "^${secret}=" secrets.env; then
+              missing_vars+=("$secret")
+            fi
+          done
+
+          if [ ${#missing_vars[@]} -ne 0 ]; then
+            echo "❌ Missing variables in secrets.env:"
+            printf '%s\n' "${missing_vars[@]}"
+            echo "Please check the Create secrets file step"
+            exit 1
+          else
+            echo "✅ All required variables are present in secrets.env"
+          fi
+
+          echo "✅ Secrets verification completed successfully"
+
       - name: Upload config and secrets to S3
         id: set_outputs
         run: |
@@ -171,6 +241,14 @@ jobs:
           IMAGE_TAG="${{needs.build_and_push.outputs.docker_image_tag}}"  # This is the docker image tag from build and push
           echo "Deploying ECS with image tag: ${IMAGE_TAG}"
 
+          # First, force update the ECS service to ensure it can be updated
+          aws ecs update-service \
+            --cluster DuckCluster-rubber-duck-production \
+            --service rubber-duck-production-Service \
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }} || true
+
+          # Then deploy the CloudFormation stack
           aws cloudformation deploy \
             --stack-name rubber-duck-production \
             --template-file infra/ecs-infra.yml \
@@ -185,8 +263,15 @@ jobs:
             "VpcId=${{ secrets.VPC_ID }}" \
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
             "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
-            "ExecutionRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
-            "TaskRoleArn=arn:aws:iam::844825014198:role/ecsTaskExecutionRole" \
+            "ExecutionRoleArn=${{secrets.EXECUTION_ROLE}}" \
+            "TaskRoleArn=${{secrets.EXECUTION_ROLE}}" \
             "Cpu=1024" \
             "Memory=2048" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.arn_env }}" \
+            "EnvFileS3Path=${{ needs.send_config.outputs.arn_env }}"
+
+          # Wait for the ECS service to stabilize
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster DuckCluster-rubber-duck-production \
+            --services rubber-duck-production-Service \
+            --region ${{ secrets.AWS_REGION }}
