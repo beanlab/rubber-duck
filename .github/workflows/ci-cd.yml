@@ -39,7 +39,7 @@ jobs:
 
   send_config:
     runs-on: ubuntu-latest
-    environment: wiley-environment.
+    environment: production
     needs: extract_sha
     outputs:
       config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
@@ -71,7 +71,7 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           CONFIG_FILE_S3_PATH=s3://rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json
           ENV_FILE_S3_PATH=s3://rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env
-          ENVIRONMENT=wiley-environment.
+          ENVIRONMENT=production
           EOL
 
       - name: Upload config and secrets to S3
@@ -107,7 +107,7 @@ jobs:
 
   build_and_push:
     runs-on: ubuntu-latest
-    environment: wiley-environment.
+    environment: production
     needs: extract_sha
     outputs:
       docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
@@ -153,7 +153,7 @@ jobs:
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
     runs-on: ubuntu-latest
-    environment: wiley-environment.
+    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
