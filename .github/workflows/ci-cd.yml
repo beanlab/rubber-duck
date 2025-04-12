@@ -87,7 +87,7 @@ jobs:
           echo "Secrets file path: $SECRETS_S3_PATH"
 
           # Upload files
-          aws s3 cp "${{ inputs.local_config || 'infra/config.json' }}" "$CONFIG_S3_PATH"
+          aws s3 cp "${{ inputs.local_config || 'infra/production-config.json' }}" "$CONFIG_S3_PATH"
           aws s3 cp secrets.env "$SECRETS_S3_PATH" --no-progress
 
           # Set outputs for use in other jobs
