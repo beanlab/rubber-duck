@@ -1,9 +1,12 @@
-import discord
-import zip_utils
 import subprocess
-
+from datetime import datetime
 from pathlib import Path
+
+import discord
+import pytz
 from quest import step
+
+import zip_utils
 from protocols import Message
 
 
@@ -17,7 +20,7 @@ class Command():
 
 class MessagesMetricsCommand(Command):
     name = "!messages"
-    help_msg = "get a zip of the messages data\n"
+    help_msg = "get a zip of the messages data"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -33,7 +36,7 @@ class MessagesMetricsCommand(Command):
 
 class UsageMetricsCommand(Command):
     name = "!usage"
-    help_msg = "get a zip of the usage data\n"
+    help_msg = "get a zip of the usage data"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -49,7 +52,7 @@ class UsageMetricsCommand(Command):
 
 class FeedbackMetricsCommand(Command):
     name = "!feedback"
-    help_msg = "get a zip of the feedback data\n"
+    help_msg = "get a zip of the feedback data"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -65,9 +68,10 @@ class FeedbackMetricsCommand(Command):
 
 class MetricsCommand(Command):
     name = "!metrics"
-    help_msg = "get the zips of the data tables\n"
+    help_msg = "get the zips of the data tables"
 
-    def __init__(self, messages_metrics: MessagesMetricsCommand, usage_metrics: UsageMetricsCommand, feedback_metrics: FeedbackMetricsCommand):
+    def __init__(self, messages_metrics: MessagesMetricsCommand, usage_metrics: UsageMetricsCommand,
+                 feedback_metrics: FeedbackMetricsCommand):
         self.messages_metrics = messages_metrics
         self.usage_metrics = usage_metrics
         self.feedback_metrics = feedback_metrics
@@ -81,7 +85,7 @@ class MetricsCommand(Command):
 
 class StatusCommand(Command):
     name = "!status"
-    help_msg = "print a status message\n"
+    help_msg = "print a status message"
 
     def __init__(self, send_message):
         self.send_message = send_message
@@ -93,7 +97,7 @@ class StatusCommand(Command):
 
 class ReportCommand(Command):
     name = "!report"
-    help_msg = "get the report\n"
+    help_msg = "get the report"
 
     def __init__(self, send_message, reporter):
         self.send_message = send_message
@@ -146,7 +150,7 @@ class BashExecuteCommand():
 
 class LogCommand(Command):
     name = "!log"
-    help_msg = "get the log file\n"
+    help_msg = "get the log file"
 
     def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
         self.send_message = send_message
@@ -155,5 +159,64 @@ class LogCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         await self.send_message(channel_id, 'The log command has been temporarily disabled.')
-        #await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
-        #await self._send_message(channel_id, 'log zip', file='log.zip')
+        # await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
+        # await self._send_message(channel_id, 'log zip', file='log.zip')
+
+
+class ActiveWorkflowsCommand(Command):
+    name = "!active"
+    help_msg = "get the active workflow metrics"
+
+    def __init__(self, send_message, get_workflow_metrics):
+        self.send_message = send_message
+        self.get_workflow_metrics = get_workflow_metrics
+
+    async def _execute_summary(self, message: Message):
+        channel_id = message['channel_id']
+        active_workflows = self.get_workflow_metrics()
+
+        counts = {}
+        for metric in active_workflows:
+            wtype = metric['type']
+            counts[wtype] = counts.get(wtype, 0) + 1
+
+        msg = '\n'.join(f'Type: {wtype}\nCount: {count}\n' for wtype, count in counts.items())
+
+        await self.send_message(channel_id, f"```\nActive Workflows:\n{msg}```")
+
+    async def _execute_full(self, message: Message):
+        channel_id = message['channel_id']
+        active_workflows = self.get_workflow_metrics()
+
+        msg = ""
+        count = 0
+        for metric in active_workflows:
+            count += 1
+            start_time = metric['start_time']
+            # Convert to datetime object (UTC)
+            dt_utc = datetime.fromisoformat(start_time).replace(tzinfo=pytz.utc)
+
+            # Convert to Mountain Time
+            mountain_time_zone = pytz.timezone("America/Denver")
+            dt_mountain = dt_utc.astimezone(mountain_time_zone)
+
+            # Get the time zone string
+            time_zone_str = dt_mountain.strftime("%Z")
+
+            # Reformat string to be more readable
+            formatted_time = dt_mountain.strftime("%m-%d-%Y %I:%M:%S %p")
+            msg += (
+                f"Workflow {count}\n"
+                f"ID: {metric['workflow_id']}\n"
+                f"Type: {metric['workflow_type']}\n"
+                f"Start Time ({time_zone_str}): {formatted_time}\n\n"
+            )
+
+        await self.send_message(channel_id, f"```\n{msg}```")
+
+    @step
+    async def execute(self, message: Message):
+        if 'full' in message:
+            await self._execute_full(message)
+        else:
+            await self._execute_summary(message)
