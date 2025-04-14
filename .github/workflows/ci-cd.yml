@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       local_config:
-        description: "Path to local config file to upload (e.g., infra/config.json)"
+        description: "Path to local config file to upload (e.g., infra/production-config.json)"
         required: false
         default: "infra/production-config.json"
         type: string
@@ -35,6 +35,13 @@ jobs:
           SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Upload poetry.lock
+        uses: actions/upload-artifact@v3
+        with:
+          name: poetry-lock
+          path: poetry.lock
+          retention-days: 1
 
   send_config:
     runs-on: ubuntu-latest
@@ -113,6 +120,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Download poetry.lock
+        uses: actions/download-artifact@v3
+        with:
+          name: poetry-lock
+          path: .
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
