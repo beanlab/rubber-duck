@@ -216,7 +216,7 @@ class ActiveWorkflowsCommand(Command):
 
     @step
     async def execute(self, message: Message):
-        if 'full' in message:
+        if 'full' in message['content']:
             await self._execute_full(message)
         else:
             await self._execute_summary(message)
