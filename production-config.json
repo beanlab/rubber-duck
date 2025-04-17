@@ -67,6 +67,25 @@
       "timeout": 600
     }
   },
+  "agentic": {
+    "channels": [
+      {
+        "channel_name": "agentic-workflow",
+        "agents": [
+          {
+            "name": "agentic-assistant",
+            "weight": 1,
+            "prompt_file": "prompts/agentic-workflow.txt",
+            "engine": "gpt-4o"
+          }
+        ]
+      }
+    ],
+    "defaults": {
+      "engine": "gpt-4o",
+      "timeout": 600
+    }
+  },
   "feedback": {
     "927616651409649675": {
       "channel_id": 1296158078017736725,
@@ -105,4 +124,3 @@
     "admin_role_id": 933123843038535741
   }
 }
-

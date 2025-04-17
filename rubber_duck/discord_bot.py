@@ -131,6 +131,10 @@ class MyClient(discord.Client):
         self._duck_config = config['rubber_duck']
         self._duck_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._duck_config['channels'])
 
+        # Agentic workflow feature
+        self._agentic_config = config['agentic']
+        self._agentic_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._agentic_config['channels'])
+
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
         self.metrics_handler = SQLMetricsHandler(sql_session)
@@ -192,8 +196,18 @@ class MyClient(discord.Client):
             have_conversation,
             get_feedback,
         )
+
+        agentic_workflow = AgenticWorkflow(
+            self._agentic_config,
+            setup_thread,
+            setup_conversation,
+            have_conversation,
+            get_feedback,
+        )
+
         workflows = {
-            'duck': duck_workflow
+            'duck': duck_workflow,
+            'agentic': agentic_workflow
         }
 
         def create_workflow(wtype: str):
@@ -258,6 +272,20 @@ class MyClient(discord.Client):
             self._workflow_manager.start_workflow(
                 'duck', workflow_id, channel_name, as_message(message)
             )
+            return
+
+        # Agentic channel
+        if message.channel.id in self._agentic_channels:
+            channel_name = message.channel.id
+        elif message.channel.name in self._agentic_channels:
+            channel_name = message.channel.name
+
+        if channel_name is not None:
+            workflow_id = f'agentic-{message.id}'
+            self._workflow_manager.start_workflow(
+                'agentic', workflow_id, channel_name, as_message(message)
+            )
+            return
 
         # Belongs to an existing conversation
         str_id = str(message.channel.id)
