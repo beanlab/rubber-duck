@@ -49,22 +49,6 @@ Resources:
       LogGroupName: !Sub /ecs/${TaskDefinitionFamily}
       RetentionInDays: 30
 
-  TaskExecutionRolePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: !Sub ${TaskDefinitionFamily}-TaskExecutionRolePolicy
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action:
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-              - logs:DescribeLogStreams
-            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/${TaskDefinitionFamily}:*
-      Roles:
-        - !Ref ExecutionRoleArn
-
   FargateTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
