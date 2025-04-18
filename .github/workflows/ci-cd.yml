@@ -21,7 +21,7 @@ jobs:
       extract_branch: ${{ steps.extract_branch.outputs.branch_name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Extract branch name
         id: extract_branch
