@@ -38,7 +38,7 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Upload poetry.lock
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: poetry-lock
           path: poetry.lock
@@ -54,7 +54,7 @@ jobs:
       arn_env: ${{ steps.set_outputs.outputs.arn_env }} # Consolidated ARN output
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -120,10 +120,10 @@ jobs:
       docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download poetry.lock
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: poetry-lock
           path: .
@@ -169,7 +169,7 @@ jobs:
     environment: pre-production
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
