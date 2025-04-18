@@ -12,7 +12,9 @@ poetry.lock
 /wiley-config.json
 /bryce_config.json
 /aubry.json
+scratch/secrets.env
 *.db
 settings.txt
 github_secrets.txt
 requirements.txt
+pre-production.env

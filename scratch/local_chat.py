@@ -54,8 +54,11 @@ def main(starter_history_file: str | None):
             model=ENGINE,
             messages=history
         )
-        print('Assistant:', completion.choices[0]['message'].content)
-        history.append(completion.choices[0]['message'])
+        print('Assistant:', completion.choices[0].message.content)
+        history.append({
+            "role": completion.choices[0].message.role,
+            "content": completion.choices[0].message.content
+        })
 
 
 if __name__ == '__main__':
