@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - master
+      - 110-fargate-update
   workflow_dispatch:
     inputs:
       local_config:
-        description: "Path to local config file to upload (e.g., infra/production-config.json)"
+        description: "Path to local config file to upload (e.g., infra/pre-production-config.json)"
         required: false
-        default: "infra/production-config.json"
+        default: "infra/pre-production-config.json"
         type: string
 
 jobs:
@@ -45,7 +46,7 @@ jobs:
 
   send_config:
     runs-on: ubuntu-latest
-    environment: production
+    environment: pre-production
     needs: extract_sha
     outputs:
       config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
@@ -75,25 +76,25 @@ jobs:
           DB_PORT=${{ secrets.DB_PORT }}
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json
-          ENV_FILE_S3_PATH=s3://rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env
-          ENVIRONMENT=production
+          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json
+          ENV_FILE_S3_PATH=s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env
+          ENVIRONMENT=pre-production
           EOL
 
       - name: Upload config and secrets to S3
         id: set_outputs
         run: |
-          CONFIG_S3_PATH="s3://rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_PATH="s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
 
           # Debugging outputs
           echo "Config file path: $CONFIG_S3_PATH"
           echo "Secrets file path: $SECRETS_S3_PATH"
 
           # Upload files
-          aws s3 cp "${{ inputs.local_config || 'infra/production-config.json' }}" "$CONFIG_S3_PATH"
+          aws s3 cp "${{ inputs.local_config || 'infra/pre-production-config.json' }}" "$CONFIG_S3_PATH"
           aws s3 cp secrets.env "$SECRETS_S3_PATH" --no-progress
 
           # Set outputs for use in other jobs
@@ -107,13 +108,13 @@ jobs:
       - name: Upload Arn
         id: arn_env
         run: |
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
           echo "secrets_s3_path=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
 
   build_and_push:
     runs-on: ubuntu-latest
-    environment: production
+    environment: pre-production
     needs: extract_sha
     outputs:
       docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
@@ -165,7 +166,7 @@ jobs:
   deploy_to_cloudformation:
     needs: [build_and_push, send_config]
     runs-on: ubuntu-latest
-    environment: production
+    environment: pre-production
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -197,10 +198,10 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-            Environment=production \
-            ClusterName=DuckCluster-rubber-duck-production \
-            TaskDefinitionFamily=rubber-duck-production \
-            ContainerName=duck-container-production \
+            Environment=pre-production \
+            ClusterName=DuckCluster-rubber-duck-pre-production \
+            TaskDefinitionFamily=rubber-duck-pre-production \
+            ContainerName=duck-container-pre-production \
             "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${IMAGE_TAG}" \
             "VpcId=${{ secrets.VPC_ID }}" \
             "SubnetIds=${{ secrets.SUBNET_IDS }}" \
@@ -214,6 +215,6 @@ jobs:
           # Wait for the ECS service to stabilize
           echo "Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
-            --cluster DuckCluster-rubber-duck-production \
-            --services rubber-duck-production-Service \
+            --cluster DuckCluster-rubber-duck-pre-production \
+            --services rubber-duck-pre-production-Service \
             --region ${{ secrets.AWS_REGION }}

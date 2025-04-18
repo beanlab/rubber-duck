@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
   Environment:
     Type: String
-    Default: "production"
+    Default: "pre-production"
   ClusterName:
     Type: String
   TaskDefinitionFamily:
@@ -96,7 +96,7 @@ Resources:
       ServiceName: !Sub ${AWS::StackName}-Service
       Cluster: !Ref ECSCluster
       TaskDefinition: !Ref FargateTaskDefinition
-      DesiredCount: 1
+      DesiredCount: 1 # We can maybe increase this for more results.
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
