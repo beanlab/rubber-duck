@@ -171,16 +171,8 @@ jobs:
           IMAGE_TAG="${{needs.build_and_push.outputs.docker_image_tag}}"  # This is the docker image tag from build and push
           echo "Deploying ECS with image tag: ${IMAGE_TAG}"
 
-          # First, force update the ECS service to ensure it can be updated
-          aws ecs update-service \
-            --cluster DuckCluster-rubber-duck-production \
-            --service rubber-duck-production-Service \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }} || true
-
-          # Then deploy the CloudFormation stack
           aws cloudformation deploy \
-            --stack-name rubber-duck-production \
+            --stack-name rubber-duck-pre-production \
             --template-file infra/ecs-infra.yml \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
