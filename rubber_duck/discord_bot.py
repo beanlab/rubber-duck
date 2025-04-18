@@ -9,6 +9,7 @@ import boto3
 import discord
 from quest import wrap_steps
 
+from agentic_workflow import AgenticWorkflow
 from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
@@ -381,6 +382,9 @@ def fetch_config_from_s3():
     # Initialize S3 client
     s3 = boto3.client('s3')
 
+    environment = os.environ.get('ENVIRONMENT')
+    if environment == 'local':
+        return None
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
