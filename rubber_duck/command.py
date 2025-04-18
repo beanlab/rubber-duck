@@ -177,7 +177,7 @@ class ActiveWorkflowsCommand(Command):
 
         counts = {}
         for metric in active_workflows:
-            wtype = metric['type']
+            wtype = metric['workflow_type']
             counts[wtype] = counts.get(wtype, 0) + 1
 
         msg = '\n'.join(f'Type: {wtype}\nCount: {count}\n' for wtype, count in counts.items())
@@ -216,7 +216,7 @@ class ActiveWorkflowsCommand(Command):
 
     @step
     async def execute(self, message: Message):
-        if 'full' in message:
+        if 'full' in message['content']:
             await self._execute_full(message)
         else:
             await self._execute_summary(message)
