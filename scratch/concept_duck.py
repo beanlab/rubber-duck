@@ -2,7 +2,7 @@ import asyncio
 import os
 
 from pydantic import BaseModel
-
+from dotenv import load_dotenv
 from agents import (
     Agent,
     HandoffOutputItem,
@@ -15,8 +15,6 @@ from agents import (
 )
 
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-
-OPENAI_API_KEY = ""
 
 teaching_agent = Agent(
     name="Teaching Agent",
@@ -98,16 +96,21 @@ question_agent = Agent(
     handoffs=[concept_agent]
 )
 
-async def main():
 
+async def main():
     agent = question_agent
     input_items: list[TResponseInputItem] = []
 
     with trace("Understand Concept"):
-        input_items.append({"content": "Introduce yourself and what you can do to the user", "role": "user"})
+        input_items.append({
+            "content": "Hello! I'm here to help you learn. Please describe the problem you're working on.",
+            "role": "assistant"
+        })
 
         while True:
+            print(f"\n🤖 {agent.name} is active")
 
+            # Run current agent
             if len(input_items) > 0:
                 result = await Runner.run(agent, input_items)
 
@@ -118,12 +121,18 @@ async def main():
                 input_items = result.to_input_list()
                 agent = result.last_agent
 
-            user_input = input("Enter your message: ")
+                # If the next agent is not QuestionAgent or TeachingAgent, continue automatically
+                if agent.name != "Question Agent" and agent.name != "Teaching Agent":
+                    continue
+
+            # Wait for user input if agent expects user input
+            user_input = input("👤 You: ")
             input_items.append({"content": user_input, "role": "user"})
 
 
 
 
+
 if __name__ == "__main__":
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+    load_dotenv('scratch/secrets.env')
     asyncio.run(main())
