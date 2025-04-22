@@ -354,7 +354,12 @@ class MyClient(discord.Client):
 def fetch_config_from_s3():
     # Initialize S3 client
     s3 = boto3.client('s3')
-
+    
+    # Add a section to your env file to allow for local and production environment
+    environment = os.environ.get('ENVIRONMENT')
+    if not environment or environment == 'LOCAL':
+        return None
+    
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
