@@ -354,8 +354,8 @@ def fetch_config_from_s3():
     s3 = boto3.client('s3')
     
     # Add a section to your env file to allow for local and production environment
-    environment = os.environment.get('ENVIRONMENT')
-    if (environment == 'LOCAL'):
+    environment = os.environ.get('ENVIRONMENT')
+    if not environment or environment == 'LOCAL':
         return None
     
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
