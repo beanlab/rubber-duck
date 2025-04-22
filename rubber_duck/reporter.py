@@ -15,11 +15,11 @@ from matplotlib.ticker import PercentFormatter
 from sql_metrics import SQLMetricsHandler
 
 
-def fancy_preproccesing(df, guilds):
-    df['guild_name'] = df['guild_id'].map(guilds)
-    df = df.drop(columns=['guild_id'])
+def fancy_preproccesing(df, channels):
+    df['channel_name'] = df['channel_id'].map(channels)
+    df = df.drop(columns=['channel_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
-            .groupby('guild_name')
+            .groupby('channel_name')
             .resample('W')
             .agg(
         avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
@@ -29,14 +29,14 @@ def fancy_preproccesing(df, guilds):
             )
 
 
-def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
+def feed_fancy_graph(channels, df_feedback, arg_string, show_fig):
     specific_str = arg_string.split()[2]
-    df = fancy_preproccesing(df_feedback, guilds)
+    df = fancy_preproccesing(df_feedback, channels)
 
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
     if specific_str == 'percent':
-        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='guild_name')
+        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='channel_name')
         plt.gca().yaxis.set_major_formatter(PercentFormatter())
 
     else:
@@ -83,9 +83,9 @@ class Reporter:
         # 'all': (None, 'All of the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
-        'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
+        'f1': ('!report -df feedback -iv feedback_score -p year -ev channel_id -per',
                "What percent of threads are scored by class over the past year?"),
-        'f2': ('!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
+        'f2': ('!report -df feedback -iv feedback_score -p year -ev channel_id -avg',
                "What is the average feedback score by class over the past year?"),
         'u1': ('!report -df usage -iv thread_id -ev hour_of_day -p year -c',
                "What time are threads being opened over the past year?"),
@@ -93,16 +93,16 @@ class Reporter:
                "How expensive is the average thread based on the time of day over the past year?"),
         'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg',
                "What does the distribution of thread cost look like over the past year?"),
-        'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg',
+        'u4': ('!report -df usage -iv cost -p year -ev channel_id -avg',
                "How expensive is the average thread based on the class over the past year?"),
-        'u5': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
+        'u5': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 channel_id -p year -c',
                "How many threads being opened per class during what time over the past year?")
     }
 
     def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
         self.show_fig = show_fig
-        self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
+        self._channels = {int(channel_id): name for channel_id, name in report_config.items()}
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
@@ -137,13 +137,13 @@ class Reporter:
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
-        if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            df['guild_name'] = df['guild_id'].map(self._guilds)
-            df = df.drop(columns=['guild_id'])
-            if args.exp_var == 'guild_id':
-                args.exp_var = 'guild_name'
+        if args.exp_var == 'channel_id' or args.exp_var_2 == 'channel_id':
+            df['channel_name'] = df['channel_id'].map(self._channels)
+            df = df.drop(columns=['channel_id'])
+            if args.exp_var == 'channel_id':
+                args.exp_var = 'channel_name'
             else:
-                args.exp_var_2 = 'guild_name'
+                args.exp_var_2 = 'channel_name'
 
         return df
 
@@ -291,7 +291,7 @@ class Reporter:
             return self.help_menu(), None
 
         if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+            return feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
 
         args = self.parse_args(arg_string)
 
