@@ -138,7 +138,8 @@ class MyClient(discord.Client):
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
         config_adapter = ConfigAdapter(config)
-        reporter = Reporter(self.metrics_handler, config_adapter.adapt_metric_config(config['reporting']))
+        # reporting = config_adapter.adapt_metric_config()
+        reporter = Reporter(self.metrics_handler, config_adapter.adapt_metric_config())
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -147,10 +148,8 @@ class MyClient(discord.Client):
             self.metrics_handler.record_feedback,
         )
 
-        feedback_configs = config['feedback']
-
         get_feedback = GetConvoFeedback(
-            feedback_configs,
+            config['course_channels'],
             get_ta_feedback
         )
 
@@ -362,10 +361,6 @@ def fetch_config_from_s3():
     
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-    environment = os.environ.get('ENVIRONMENT')
-    if environment == 'local':
-        return None
 
     if not s3_path:
         return None
