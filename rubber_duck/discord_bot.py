@@ -137,9 +137,14 @@ class MyClient(discord.Client):
         self.metrics_handler = SQLMetricsHandler(sql_session)
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
-        config_adapter = ConfigAdapter(config)
-        # reporting = config_adapter.adapt_metric_config()
-        reporter = Reporter(self.metrics_handler, config_adapter.adapt_metric_config())
+        if not config.get('reporting') and config.get('course_channels'):
+            config_adapter = ConfigAdapter(config)
+            reporter = Reporter(self.metrics_handler, config_adapter.adapt_metric_config())
+            feedback_configs = config['course_channels']
+        else:
+            # This makes the old config backwards compatible
+            reporter = Reporter(self.metrics_handler, config['reporting'])
+            feedback_configs = config['feedback']
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -149,7 +154,7 @@ class MyClient(discord.Client):
         )
 
         get_feedback = GetConvoFeedback(
-            config['course_channels'],
+            feedback_configs,
             get_ta_feedback
         )
 
