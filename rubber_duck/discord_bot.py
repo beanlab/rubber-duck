@@ -140,11 +140,11 @@ class MyClient(discord.Client):
         if not config.get('reporting') and config.get('course_channels'):
             config_adapter = ConfigAdapter(config)
             reporter = Reporter(self.metrics_handler, config_adapter.adapt_metric_config())
-            feedback_configs = config['course_channels']
+            feedback_config = config_adapter.adapt_feedback_config()
         else:
             # This makes the old config backwards compatible
             reporter = Reporter(self.metrics_handler, config['reporting'])
-            feedback_configs = config['feedback']
+            feedback_config = config['feedback']
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -154,7 +154,7 @@ class MyClient(discord.Client):
         )
 
         get_feedback = GetConvoFeedback(
-            feedback_configs,
+            feedback_config,
             get_ta_feedback
         )
 

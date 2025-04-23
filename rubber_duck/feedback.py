@@ -17,11 +17,9 @@ class RecordFeedback(Protocol):
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
                        feedback_score: int): ...
 
-
 class GetFeedback(Protocol):
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int,
                        feedback_config: FeedbackConfig): ...
-
 
 class GetConvoFeedback:
     def __init__(self, feedback_configs: dict[str, FeedbackConfig], get_feedback: GetFeedback):
@@ -72,7 +70,7 @@ class GetTAFeedback:
                 await self._add_reaction(thread_id, feedback_message_id, reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
-            reviewer_channel_id = feedback_config['channel_id']
+            reviewer_channel_id = feedback_config['ta_review_channel_id']
             review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
             try:
