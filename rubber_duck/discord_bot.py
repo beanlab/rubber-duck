@@ -15,7 +15,7 @@ from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetrics
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
 from conversation import HaveStandardGptConversation, BasicSetupConversation, RetryableGenAIClient
 from feedback import GetTAFeedback, GetConvoFeedback
-from genAI import OpenAI, RetryableGenAI
+from genAI import OpenAI, RetryableGenAI, AgentSDKAI
 from protocols import Attachment, Message
 from reporter import Reporter
 from rubber_duck import RubberDuck
@@ -162,6 +162,10 @@ class MyClient(discord.Client):
         )
 
         ai_client = OpenAI(
+            os.environ['OPENAI_API_KEY'],
+        )
+
+        ai_client2 = AgentSDKAI(
             os.environ['OPENAI_API_KEY'],
         )
 

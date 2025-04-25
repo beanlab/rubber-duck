@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
@@ -9,6 +10,11 @@ from quest import step
 from conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig, generate_error_message
 from protocols import IndicateTyping, ReportError, SendMessage
+from agents import (
+    Agent,
+    Runner,
+    set_default_openai_key
+)
 
 
 class OpenAI():
@@ -27,15 +33,60 @@ class OpenAI():
             usage = completion_dict['usage']
             return choices, usage
         except (
-            APITimeoutError, InternalServerError,
-            UnprocessableEntityError) as ex:
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
             raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                             'please open up a separate conversation and try again') from ex
+                                         'please open up a separate conversation and try again') from ex
         except (APIConnectionError, BadRequestError,
-                        AuthenticationError, ConflictError, NotFoundError,
-                        RateLimitError) as ex:
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
             raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                         "for more details on how to resolve this error") from ex
+                                     "for more details on how to resolve this error") from ex
+
+
+
+class AgentSDKAI():
+    def __init__(self, openai_api_key: str):
+        set_default_openai_key(openai_api_key)
+
+    async def get_completion(self, engine, message_history) -> tuple[list, dict]:
+        try:
+            DEEP_QUESTION_PROMPT = Path("prompts/agent1.txt").read_text()
+
+            agent = Agent(
+                name="Teaching Assistant Agent",
+                instructions=DEEP_QUESTION_PROMPT,
+                model=engine,
+            )
+            run_result = await Runner.run(agent, message_history, max_turns=1)
+            assistant_text = run_result.final_output
+            choices = [{
+                "message": {
+                    "role": "assistant",
+                    "content": assistant_text
+                }
+            }]
+            usage_totals = {}
+            total_input = 0
+            total_output = 0
+            for resp in run_result.raw_responses:
+                u = resp.usage
+                total_input += u.input_tokens
+                total_output += u.output_tokens
+            usage_totals['prompt_tokens'] = total_input
+            usage_totals['completion_tokens'] = total_output
+            return choices, usage_totals
+        except (
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
+            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
+                                         'please open up a separate conversation and try again') from ex
+        except (APIConnectionError, BadRequestError,
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                     "for more details on how to resolve this error") from ex
+
 
 class RetryableGenAI:
     def __init__(self, genai: GenAIClient,
@@ -70,4 +121,3 @@ class RetryableGenAI:
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
-
