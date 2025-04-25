@@ -27,15 +27,44 @@ class OpenAI():
             usage = completion_dict['usage']
             return choices, usage
         except (
-            APITimeoutError, InternalServerError,
-            UnprocessableEntityError) as ex:
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
             raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                             'please open up a separate conversation and try again') from ex
+                                         'please open up a separate conversation and try again') from ex
         except (APIConnectionError, BadRequestError,
-                        AuthenticationError, ConflictError, NotFoundError,
-                        RateLimitError) as ex:
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
             raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                         "for more details on how to resolve this error") from ex
+                                     "for more details on how to resolve this error") from ex
+
+    async def check_completion(self, engine, message) -> tuple[list, dict]:
+        try:
+            completion: ChatCompletion = await self._client.chat.completions.create(
+                model=engine,
+                messages=[
+                    {"role": "system",
+                     "content": "You are an AI assistant that ensure messages from another AI are completely free of specific answers, leading questions, or any form of examples. Your are to change inputted text so that it is a short question that allows them to lead the conversation. If the response already fulfills these requirements do NOT change it, if not, make the necessary changes so that it meets this criteria."},
+                    {"role": "user", "content": [
+                        {"type": "text",
+                         "text": message},
+                    ]}]
+            )
+            logging.debug(f"Checked Completion: {completion}")
+            completion_dict = completion.dict()
+            choices = completion_dict['choices']
+            usage = completion_dict['usage']
+            return choices, usage
+        except (
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
+            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
+                                         'please open up a separate conversation and try again') from ex
+        except (APIConnectionError, BadRequestError,
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                     "for more details on how to resolve this error") from ex
+
 
 class RetryableGenAI:
     def __init__(self, genai: GenAIClient,
@@ -71,3 +100,5 @@ class RetryableGenAI:
                 await asyncio.sleep(delay)
                 delay *= backoff
 
+    async def check_completion(self, engine, message) -> tuple[list, dict]:
+        return await self._genai.check_completion(engine, message)
