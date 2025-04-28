@@ -1,0 +1,42 @@
+name: Validate PR Description
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  validate-pr-description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Validate PR description
+        run: |
+          # Get the PR number from the event payload
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          # Use GitHub's REST API to fetch PR details (using the built-in GITHUB context, no token needed)
+          PR_BODY=$(curl -s https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER} | jq -r .body)
+
+          # Check if the PR body has at least 3 sentences and contains '## Summary' and '## Changes'
+          SUMMARY_PRESENT=$(echo "$PR_BODY" | grep -q "## Summary" && echo "true" || echo "false")
+          CHANGES_PRESENT=$(echo "$PR_BODY" | grep -q "## Changes" && echo "true" || echo "false")
+          SENTENCE_COUNT=$(echo "$PR_BODY" | grep -o '\.' | wc -l)
+
+          if [ "$SUMMARY_PRESENT" != "true" ]; then
+            echo "Error: PR description must include '## Summary' section."
+            exit 1
+          fi
+
+          if [ "$CHANGES_PRESENT" != "true" ]; then
+            echo "Error: PR description must include '## Changes' section."
+            exit 1
+          fi
+
+          if [ "$SENTENCE_COUNT" -lt 3 ]; then
+            echo "Error: PR description must contain at least 3 sentences."
+            exit 1
+          fi
+
+          echo "PR description is valid!"
