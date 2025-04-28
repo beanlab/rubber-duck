@@ -156,11 +156,13 @@ class MyClient(discord.Client):
         )
 
         feedback_configs = {
-            channel["channel_id"]: channel["feedback"]
-            for server in config["servers"].values()
+            str(server_id): {
+                str(channel["channel_id"]): channel["feedback"]
+                for channel in server["channels"]
+                if isinstance(channel, dict) and "feedback" in channel
+            }
+            for server_id, server in config["servers"].items()
             if isinstance(server, dict) and "channels" in server
-            for channel in server["channels"]
-            if isinstance(channel, dict) and "feedback" in channel
         }
 
         get_feedback = GetConvoFeedback(
