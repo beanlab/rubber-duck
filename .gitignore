@@ -18,3 +18,4 @@ settings.txt
 github_secrets.txt
 requirements.txt
 pre-production.env
+v2-production.config.json

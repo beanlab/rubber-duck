@@ -67,7 +67,7 @@ class RubberDuck:
         }
 
         # Get defaults from the config
-        self._default_config = duck_config.get('defaults', default_config)
+        self._default_config = duck_config.get('default_duck_settings', default_config)
 
         # Make a rubber duck per channel
         self._setup_thread = step(setup_thread)

@@ -165,7 +165,7 @@ class MyClient(discord.Client):
             if isinstance(server, dict) and "channels" in server
         }
 
-        get_feedback = GetConvoFeedback(
+        get_feedback = GetConvoFeedback( # TODO Let's revisit how we are doing feedback - separate PR
             feedback_configs,
             get_ta_feedback
         )
@@ -213,7 +213,7 @@ class MyClient(discord.Client):
         )
 
         workflows = {
-            'duck': duck_workflow
+            'duck': duck_workflow # TODO New PR - make "duck" configurable to allow for multiple workflows
         }
 
         def create_workflow(wtype: str):
