@@ -266,7 +266,7 @@ class MyClient(discord.Client):
 
         # Duck channel
         if message.channel.id in self._duck_channels:
-            workflow_id = f'duck-{message.channel.id}'  # Use channel ID as workflow ID
+            workflow_id = f'duck-{message.channel.id}-{message.id}'  # Include message ID to allow multiple conversations
             self._workflow_manager.start_workflow(
                 'duck',
                 workflow_id,
