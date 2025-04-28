@@ -28,6 +28,10 @@ class DuckConfig(TypedDict):
     defaults: DuckChannelConfig
     channels: list[ChannelConfig]
 
+class DefaultConfig(TypedDict):
+    engine: str | None
+    timeout: int | None
+
 
 class SetupThread(Protocol):
     async def __call__(self, initial_message: Message) -> int: ...
@@ -46,25 +50,34 @@ class HaveConversation(Protocol):
 class RubberDuck:
     def __init__(self,
                  duck_config: DuckConfig,
+                 default_config: DefaultConfig,
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,
                  have_conversation: HaveConversation,
                  get_feedback: GetConvoFeedback,
                  ):
 
-        self._channel_configs = {config['channel_name']: config for config in duck_config['channels'] if
-                                 'channel_name' in config}
-        self._channel_configs = self._channel_configs | {config['channel_id']: config for config in
-                                                         duck_config['channels'] if 'channel_id' in config}
+        # Use comprehension to extract channel configurations by channel_id
+        self._channel_configs = {
+            config['channel_id']: config
+            for server_config in duck_config.values()
+            if isinstance(server_config, dict) and 'channels' in server_config
+            for config in server_config['channels']
+            if 'channel_id' in config
+        }
 
-        self._default_config = duck_config['defaults']
+        # Get defaults from the config
+        self._default_config = duck_config.get('defaults', default_config)
+
+        # Make a rubber duck per channel
         self._setup_thread = step(setup_thread)
         self._setup_conversation = step(setup_conversation)
         self._have_conversation = step(have_conversation)
         self._get_feedback = step(get_feedback)
 
-    def _get_channel_settings(self, channel_name: str, initial_message: Message):
-        channel_config = self._channel_configs[channel_name]
+    def _get_channel_settings(self, channel_id: int, initial_message: Message):
+        # Retrieve the channel configuration using the channel_id
+        channel_config = self._channel_configs[channel_id]
 
         config_options = []
         config_weights = []
@@ -82,16 +95,18 @@ class RubberDuck:
             else:
                 prompt = Path(prompt_file).read_text()
 
+        # Access the engine from channel_config, defaulting to self._default_config['engine'] if it's not set
         engine = channel_config.get('engine', self._default_config['engine'])
 
+        # Access the timeout from channel_config, defaulting to self._default_config['timeout'] if it's not set
         timeout = channel_config.get('timeout', self._default_config['timeout'])
 
         duck_name = channel_config.get('name')
 
         return prompt, engine, timeout, duck_name
 
-    async def __call__(self, channel_name: str, initial_message: Message, timeout=600):
-        prompt, engine, timeout, duck_name = self._get_channel_settings(channel_name, initial_message)
+    async def __call__(self, channel_id: int, initial_message: Message, timeout=600):
+        prompt, engine, timeout, duck_name = self._get_channel_settings(channel_id, initial_message)
 
         thread_id = await self._setup_thread(initial_message)
 

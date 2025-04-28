@@ -16,7 +16,7 @@ from sql_metrics import SQLMetricsHandler
 
 
 def fancy_preproccesing(df, guilds):
-    df['guild_name'] = df['guild_id'].map(guilds)
+    df['guild_name'] = df['guild_id'].map(guilds) # TODO: Lets use channel ids instead of guild ids.
     df = df.drop(columns=['guild_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
             .groupby('guild_name')

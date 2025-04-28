@@ -128,15 +128,25 @@ class MyClient(discord.Client):
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
-        self._duck_config = config['rubber_duck']
-        self._duck_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._duck_config['channels'])
+        self._duck_config = config['servers']
+        self._default_config = config['defaults']
+
+
+        # Collect all duck channel names or IDs across all servers
+        self._duck_channels = {
+            channel['channel_id']
+            for server in self._duck_config.values()
+            if isinstance(server, dict) and 'channels' in server
+            for channel in server['channels']
+            if 'channel_id' in channel
+        }
 
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
         self.metrics_handler = SQLMetricsHandler(sql_session)
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
-        reporter = Reporter(self.metrics_handler, config['reporting'])
+        reporter = Reporter(self.metrics_handler, config['reporting']) #TODO get the config to work with this
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -145,7 +155,13 @@ class MyClient(discord.Client):
             self.metrics_handler.record_feedback,
         )
 
-        feedback_configs = config['feedback']
+        feedback_configs = {
+            channel["channel_id"]: channel["feedback"]
+            for server in config["servers"].values()
+            if isinstance(server, dict) and "channels" in server
+            for channel in server["channels"]
+            if isinstance(channel, dict) and "feedback" in channel
+        }
 
         get_feedback = GetConvoFeedback(
             feedback_configs,
@@ -187,11 +203,13 @@ class MyClient(discord.Client):
 
         duck_workflow = RubberDuck(
             self._duck_config,
+            self._default_config,
             setup_thread,
             setup_conversation,
             have_conversation,
             get_feedback,
         )
+
         workflows = {
             'duck': duck_workflow
         }
@@ -247,16 +265,13 @@ class MyClient(discord.Client):
             return
 
         # Duck channel
-        channel_name = None
         if message.channel.id in self._duck_channels:
-            channel_name = message.channel.id
-        elif message.channel.name in self._duck_channels:
-            channel_name = message.channel.name
-
-        if channel_name is not None:
-            workflow_id = f'duck-{message.id}'
+            workflow_id = f'duck-{message.channel.id}'  # Use channel ID as workflow ID
             self._workflow_manager.start_workflow(
-                'duck', workflow_id, channel_name, as_message(message)
+                'duck',
+                workflow_id,
+                message.channel.id,
+                as_message(message)
             )
 
         # Belongs to an existing conversation
