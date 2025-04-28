@@ -8,25 +8,31 @@ from conversation import GPTMessage
 from feedback import GetConvoFeedback
 from protocols import Message
 
+class FeedbackConfig(TypedDict):
+    ta_review_channel_id: int
+    reviewer_role_id: int | None
 
-class DuckChannelConfig(TypedDict):
-    name: str
-    prompt: str | None
-    prompt_file: str | None
-    engine: str | None
-    timeout: int | None
-    weight: int | None
-
-
-class ChannelConfig(TypedDict):
-    channel_name: str | None
-    channel_id: int | None
-    ducks: list[DuckChannelConfig]
-
+class DuckSettings(TypedDict):
+    prompt_file: str
+    engine: str
+    weight: int
+    timeout: int
 
 class DuckConfig(TypedDict):
-    defaults: DuckChannelConfig
-    channels: list[ChannelConfig]
+    name: str
+    workflow_type: str
+    duck_settings_config: DuckSettings
+
+class ChannelsConfig:
+    channel_id: int
+    channel_name: str
+    feedback_config: FeedbackConfig
+    duck_config: DuckConfig
+
+class ServerConfig(TypedDict):
+    server_name: str
+    channels_config: ChannelsConfig
+
 
 class DefaultConfig(TypedDict):
     engine: str | None
@@ -49,7 +55,7 @@ class HaveConversation(Protocol):
 
 class RubberDuck:
     def __init__(self,
-                 duck_config: DuckConfig,
+                 server_config: ServerConfig,
                  default_config: DefaultConfig,
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,
@@ -60,14 +66,14 @@ class RubberDuck:
         # Use comprehension to extract channel configurations by channel_id
         self._channel_configs = {
             config['channel_id']: config
-            for server_config in duck_config.values()
+            for server_config in server_config.values()
             if isinstance(server_config, dict) and 'channels' in server_config
             for config in server_config['channels']
             if 'channel_id' in config
         }
 
         # Get defaults from the config
-        self._default_config = duck_config.get('default_duck_settings', default_config)
+        self._default_config = server_config.get('default_duck_settings', default_config)
 
         # Make a rubber duck per channel
         self._setup_thread = step(setup_thread)

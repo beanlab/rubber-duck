@@ -128,15 +128,15 @@ class MyClient(discord.Client):
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
-        self._duck_config = config['servers']
-        self._default_config = config['defaults']
+        self._server_config = config['servers']
+        self._default_config = config['default_duck_settings']
 
 
-        # Collect all duck channel names or IDs across all servers
+        # Collect all duck channel IDs across all servers
         self._duck_channels = {
             channel['channel_id']
-            for server in self._duck_config.values()
-            if isinstance(server, dict) and 'channels' in server
+            for server in self._server_config.values()
+            # if isinstance(server, dict) and 'channels' in server
             for channel in server['channels']
             if 'channel_id' in channel
         }
@@ -204,7 +204,7 @@ class MyClient(discord.Client):
         )
 
         duck_workflow = RubberDuck(
-            self._duck_config,
+            self._server_config,
             self._default_config,
             setup_thread,
             setup_conversation,
