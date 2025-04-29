@@ -6,14 +6,6 @@ from quest import queue, step, alias
 from protocols import AddReaction, SendMessage
 from config_types import FeedbackConfig
 
-# This could be trouble we have two different classes named feedback config
-class FeedbackConfig(TypedDict):
-    channel_id: int
-    reviewer_role_id: int
-    allow_self_feedback: bool
-    feedback_timeout: int
-
-
 class RecordFeedback(Protocol):
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
                        feedback_score: int): ...

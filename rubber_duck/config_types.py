@@ -4,6 +4,8 @@ from typing import TypedDict
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None
+    allow_self_feedback: bool | None
+    feedback_timeout: int | None
 
 
 class DuckSettings(TypedDict):
