@@ -52,6 +52,7 @@ class RubberDuck:
             if channel.channel_id == channel_id
         )
         duck_config = channel_config.duck_config
+        duck_workflow = duck_config["workflow_type"]
         duck_settings = duck_config["duck_settings_config"]
 
         prompt_file = duck_settings["prompt_file"]
@@ -63,12 +64,11 @@ class RubberDuck:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = duck_settings["engine"] or self._default_bot_config["engine"]
         timeout = duck_settings["timeout"] or self._default_bot_config["timeout"]
-        duck_name = duck_config["name"]
 
-        return prompt, engine, timeout, duck_name
+        return prompt, engine, timeout, duck_workflow
 
     async def __call__(self, channel_id: int, initial_message: Message, timeout=600):
-        prompt, engine, timeout, duck_name = self._get_channel_settings(channel_id, initial_message)
+        prompt, engine, timeout, duck_workflow = self._get_channel_settings(channel_id, initial_message)
 
         thread_id = await self._setup_thread(initial_message)
 
@@ -79,4 +79,4 @@ class RubberDuck:
 
         guild_id = initial_message['guild_id']
         user_id = initial_message['author_id']
-        await self._get_feedback("duck", guild_id, thread_id, user_id, channel_id)
+        await self._get_feedback(duck_workflow, guild_id, thread_id, user_id, channel_id)
