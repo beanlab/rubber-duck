@@ -3,7 +3,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import TypedDict
 
 import boto3
 import discord
@@ -22,9 +21,17 @@ from rubber_duck import RubberDuck
 from sql_metrics import SQLMetricsHandler
 from sql_connection import create_sql_session
 from threads import SetupPrivateThread
+from config_types import (
+    FeedbackConfig,
+    ServerConfig,
+    Config,
+    SQLConfig,
+    RetryProtocol,
+    AdminSettings
+)
 
 logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
+LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
 
 
 def parse_blocks(text: str, limit=1990):
@@ -76,29 +83,12 @@ def as_message(message: discord.Message) -> Message:
         file=[as_attachment(attachment) for attachment in message.attachments]
     )
 
-
 def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
         filename=attachment.filename
     )
-
-
-class ChannelConfig(TypedDict):
-    name: str | None
-    id: int | None
-    prompt: str | None
-    prompt_file: str | None
-    engine: str | None
-    timeout: int | None
-
-
-class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
-
 
 def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
     # Create and return the list of commands
@@ -115,7 +105,7 @@ def create_commands(send_message, metrics_handler, reporter, active_workflow_fun
 
 
 class MyClient(discord.Client):
-    def __init__(self, config):
+    def __init__(self, config: Config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
@@ -127,16 +117,16 @@ class MyClient(discord.Client):
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
-        # Rubber duck feature
-        self._duck_config = config['rubber_duck']
-        self._duck_channels = set(conf.get('channel_name') or conf.get('channel_id') for conf in self._duck_config['channels'])
+        # Convert config to typed dictionaries
+        self._server_config = config['servers']
+        self._default_duck_workflow_config = config['default_duck_settings']
 
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
         self.metrics_handler = SQLMetricsHandler(sql_session)
         wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
 
-        reporter = Reporter(self.metrics_handler, config['reporting'])
+        reporter = Reporter(self.metrics_handler, config['reporting']) #TODO get the config to work with this
 
         # Feedback
         get_ta_feedback = GetTAFeedback(
@@ -145,13 +135,17 @@ class MyClient(discord.Client):
             self.metrics_handler.record_feedback,
         )
 
-        feedback_configs = config['feedback']
+        feedback_config: dict[int, FeedbackConfig] = {
+            channel["channel_id"]: channel["feedback"]
+            for server in self._server_config.values()
+            for channel in server["channels"]
+        }
 
         get_feedback = GetConvoFeedback(
-            feedback_configs,
+            feedback_config,
             get_ta_feedback
         )
-
+        # TODO: remove weights from config
         setup_thread = SetupPrivateThread(
             self.create_thread,
             self.send_message
@@ -186,12 +180,14 @@ class MyClient(discord.Client):
         )
 
         duck_workflow = RubberDuck(
-            self._duck_config,
+            self._server_config,
+            self._default_duck_workflow_config,
             setup_thread,
             setup_conversation,
             have_conversation,
             get_feedback,
         )
+
         workflows = {
             'duck': duck_workflow
         }
@@ -202,13 +198,20 @@ class MyClient(discord.Client):
 
             raise NotImplementedError(f'No workflow of type {wtype}')
 
-        namespace = 'rubber-duck'  # TODO - move to config
+        namespace = 'rubber-duck'  # TODO - move to config. What is this really asking about Dr. Bean?
         self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
         commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics)
         commands_workflow = BotCommands(commands, self.send_message)
 
         workflows['command'] = commands_workflow
+
+        # Collect all duck channel IDs across all servers
+        self._duck_channels = {
+            channel["channel_id"]
+            for server in self._server_config.values()
+            for channel in server["channels"]
+        }
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -247,16 +250,13 @@ class MyClient(discord.Client):
             return
 
         # Duck channel
-        channel_name = None
         if message.channel.id in self._duck_channels:
-            channel_name = message.channel.id
-        elif message.channel.name in self._duck_channels:
-            channel_name = message.channel.name
-
-        if channel_name is not None:
-            workflow_id = f'duck-{message.id}'
+            workflow_id = f'duck-{message.channel.id}-{message.id}'
             self._workflow_manager.start_workflow(
-                'duck', workflow_id, channel_name, as_message(message)
+                'duck',
+                workflow_id,
+                message.channel.id,
+                as_message(message)
             )
 
         # Belongs to an existing conversation
@@ -301,7 +301,7 @@ class MyClient(discord.Client):
         if file is not None:
             if isinstance(file, list):
                 curr_message = await channel.send("",
-                                                  files=file)  # TODO: check that all instances are discord.File objects
+                                                  files=file)  # TODO: check that all instances are discord.File objects.
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -327,7 +327,6 @@ class MyClient(discord.Client):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            # TODO make this assume one id
             user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg
@@ -349,7 +348,7 @@ class MyClient(discord.Client):
         return thread.id
 
 
-def fetch_config_from_s3():
+def fetch_config_from_s3()-> Config | None:
     # Initialize S3 client
     s3 = boto3.client('s3')
     

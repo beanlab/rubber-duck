@@ -4,14 +4,7 @@ from typing import TypedDict, Protocol
 from quest import queue, step, alias
 
 from protocols import AddReaction, SendMessage
-
-
-class FeedbackConfig(TypedDict):
-    channel_id: int
-    reviewer_role_id: int
-    allow_self_feedback: bool
-    feedback_timeout: int
-
+from config_types import FeedbackConfig
 
 class RecordFeedback(Protocol):
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
@@ -24,12 +17,12 @@ class GetFeedback(Protocol):
 
 
 class GetConvoFeedback:
-    def __init__(self, feedback_configs: dict[str, FeedbackConfig], get_feedback: GetFeedback):
+    def __init__(self, feedback_configs: dict[int, FeedbackConfig], get_feedback: GetFeedback):
         self._feedback_configs = feedback_configs
         self._get_feedback = get_feedback
 
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int):
-        if (config := self._feedback_configs.get(str(guild_id))) is not None:
+    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, channel_id: int):
+        if (config := self._feedback_configs.get(channel_id)) is not None:
             await self._get_feedback(workflow_type, guild_id, thread_id, user_id, config)
 
 
@@ -72,7 +65,7 @@ class GetTAFeedback:
                 await self._add_reaction(thread_id, feedback_message_id, reaction)
                 await asyncio.sleep(0.5)  # per discord policy, we wait
 
-            reviewer_channel_id = feedback_config['channel_id']
+            reviewer_channel_id = feedback_config['ta_review_channel_id']
             review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
             try:

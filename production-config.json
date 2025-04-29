@@ -7,72 +7,6 @@
     "port": "env:DB_PORT",
     "database": "env:DB_NAME"
   },
-  "rubber_duck": {
-    "channels": [
-      {
-        "channel_name": "duck-pond",
-        "ducks": [
-          {
-            "name": "standard-rubber-duck",
-            "weight": 1,
-            "prompt_file": "prompts/standard-rubber-duck.txt"
-          }
-        ]
-      },
-      {
-        "channel_name": "gpt4",
-        "ducks": [
-          {
-            "name": "gpt-4.1",
-            "weight": 1,
-            "engine": "gpt-4.1"
-          }
-        ]
-      },
-      {
-        "channel_name": "fast",
-        "ducks": [
-          {
-            "name": "gpt-4.1-mini",
-            "weight": 1,
-            "engine": "gpt-4.1-mini",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "defaults": {
-      "engine": "gpt-4.1",
-      "timeout": 600
-    }
-  },
-  "feedback": {
-    "927616651409649675": {
-      "channel_id": 1296158078017736725,
-      "name": "cs110"
-    },
-    "747510855536738336": {
-      "channel_id": 1327385245036838912,
-      "name": "cs235"
-    },
-    "1235303213796691998": {
-      "channel_id": 1329934513333338244,
-      "name": "cs111"
-    },
-    "1354902457368576401": {
-      "channel_id": 1359587940027596841,
-      "name": "phys230"
-    },
-    "1354902266246598928": {
-      "channel_id": 1359587525605458030,
-      "name": "phys430"
-    },
-    "1338616224858374287": {
-      "channel_id": 1338619665789751337,
-      "name": "Duck Demo",
-      "allow_self_feedback": true
-    }
-  },
   "reporting": {
     "1058490579799003187": "BeanLab",
     "927616651409649675": "CS 110",
@@ -84,14 +18,161 @@
     "1354902457368576401": "Phys 230",
     "1354902266246598928": "Phys 430"
   },
+  "servers": {
+    "927616651409649675": {
+      "server_name": "CS 110",
+      "channels": [
+        {
+          "channel_id": 1296158078017736725,
+          "channel_name": "general-cs110",
+          "feedback": {
+            "ta_review_channel_id": 1296158078017736725
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "747510855536738336": {
+      "server_name": "CS 235",
+      "channels": [
+        {
+          "channel_id": 1327385245036838912,
+          "channel_name": "student-text-channels-cs235",
+          "feedback": {
+            "ta_review_channel_id": 1327385245036838912
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "1235303213796691998": {
+      "server_name": "CS 111",
+      "channels": [
+        {
+          "channel_id": 1329934513333338244,
+          "channel_name": "cs111",
+          "feedback": {
+            "ta_review_channel_id": 1329934513333338244
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "1354902266246598928": {
+      "server_name": "Physics",
+      "channels": [
+        {
+          "channel_id": 1363949528201564170,
+          "channel_name": "physics-230-phys230",
+          "feedback": {
+            "ta_review_channel_id": 1359587713749094700
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        },
+        {
+          "channel_id": 1359587525605458030,
+          "channel_name": "physics-430-phys430",
+          "feedback": {
+            "ta_review_channel_id": 1359587713749094700
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "1338616224858374287": {
+      "server_name": "Duck Demo",
+      "channels": [
+        {
+          "channel_id": 1338619665789751337,
+          "channel_name": "text-channels-duck-pond",
+          "allow_self_feedback": true,
+          "feedback": {
+            "ta_review_channel_id": 1338619665789751337
+          },
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "duck",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "admin_settings": {
+    "admin_channel_id": 1192895746672951340,
+    "admin_role_id": 933123843038535741
+  },
   "ai_completion_retry_protocol": {
     "max_retries": 2,
     "delay": 2,
     "backoff": 2
   },
-  "admin_settings": {
-    "admin_channel_id": 1192895746672951340,
-    "admin_role_id": 933123843038535741
+  "default_duck_settings": {
+    "duck": {
+      "engine": "gpt-4.1",
+      "timeout": 600
+    }
   }
 }
-
