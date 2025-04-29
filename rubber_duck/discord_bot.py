@@ -189,7 +189,7 @@ class MyClient(discord.Client):
         )
 
         workflows = {
-            'duck': duck_workflow # TODO New PR - make "duck" configurable to allow for multiple workflows
+            'duck': duck_workflow
         }
 
         def create_workflow(wtype: str):
