@@ -32,10 +32,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -56,10 +56,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -80,10 +80,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -104,10 +104,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -123,10 +123,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -148,10 +148,10 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
+              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
-                "weight": 1,
                 "timeout": 600
               }
             }
@@ -169,39 +169,10 @@
     "delay": 2,
     "backoff": 2
   },
-  "rubber_duck_channels": {
-    "duck-pond": {
-      "ducks": [
-        {
-          "name": "standard-rubber-duck",
-          "weight": 1,
-          "prompt_file": "prompts/standard-rubber-duck.txt"
-        }
-      ]
-    },
-    "gpt4": {
-      "ducks": [
-        {
-          "name": "gpt-4.1",
-          "weight": 1,
-          "engine": "gpt-4.1"
-        }
-      ]
-    },
-    "fast": {
-      "ducks": [
-        {
-          "name": "gpt-4.1-mini",
-          "weight": 1,
-          "engine": "gpt-4.1-mini",
-          "timeout": 10
-        }
-      ]
-    }
-  },
   "default_duck_settings": {
-    "weight": 1,
-    "engine": "gpt-4.1",
-    "timeout": 600
+    "duck": {
+      "engine": "gpt-4.1",
+      "timeout": 600
+    }
   }
 }
