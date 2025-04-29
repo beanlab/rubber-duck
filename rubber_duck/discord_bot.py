@@ -146,7 +146,7 @@ class MyClient(discord.Client):
             feedback_config,
             get_ta_feedback
         )
-
+        # TODO: remove weights from config
         setup_thread = SetupPrivateThread(
             self.create_thread,
             self.send_message

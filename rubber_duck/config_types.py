@@ -16,7 +16,7 @@ class DuckWorkflowSettings(TypedDict):
 
 class DuckConfig(TypedDict):
     name: str
-    "The name will not affect the code and is only used to distinguish between different rubber ducks."
+    "The channel name is not used in the code. It provides a description of the duck."
     workflow_type: str
     weight: int
     settings: dict
@@ -25,14 +25,14 @@ class DuckConfig(TypedDict):
 class ChannelConfig:
     channel_id: int
     channel_name: str
-    "The channel name will not affect the code and is only used to know what the name of the Discord channel we are using is."
+    "The channel name is not used in the code. It is used to indicate the name of Discord channel."
     feedback_config: FeedbackConfig
     duck_config: DuckConfig
 
 
 class ServerConfig(TypedDict):
     server_name: str
-    "The server name will not affect the code and is only used to distinguish between different servers."
+    "The channel name is not used in the code. It is used to indicate the name of the server."
     channels: list[ChannelConfig]
 
 
