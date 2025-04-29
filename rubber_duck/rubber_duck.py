@@ -7,36 +7,7 @@ from quest import step, alias
 from conversation import GPTMessage
 from feedback import GetConvoFeedback
 from protocols import Message
-
-class FeedbackConfig(TypedDict):
-    ta_review_channel_id: int
-    reviewer_role_id: int | None
-
-class DuckSettings(TypedDict):
-    prompt_file: str
-    engine: str
-    weight: int
-    timeout: int
-
-class DuckConfig(TypedDict):
-    name: str
-    workflow_type: str
-    duck_settings_config: DuckSettings
-
-class ChannelsConfig:
-    channel_id: int
-    channel_name: str
-    feedback_config: FeedbackConfig
-    duck_config: DuckConfig
-
-class ServerConfig(TypedDict):
-    server_name: str
-    channels_config: ChannelsConfig
-
-
-class DefaultConfig(TypedDict):
-    engine: str | None
-    timeout: int | None
+from config_types import ServerConfig, DefaultConfig, MultiServerConfig
 
 
 class SetupThread(Protocol):
@@ -55,7 +26,7 @@ class HaveConversation(Protocol):
 
 class RubberDuck:
     def __init__(self,
-                 server_config: ServerConfig,
+                 server_config: MultiServerConfig,
                  default_config: DefaultConfig,
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,
@@ -63,17 +34,8 @@ class RubberDuck:
                  get_feedback: GetConvoFeedback,
                  ):
 
-        # Use comprehension to extract channel configurations by channel_id
-        self._channel_configs = {
-            config['channel_id']: config
-            for server_config in server_config.values()
-            if isinstance(server_config, dict) and 'channels' in server_config
-            for config in server_config['channels']
-            if 'channel_id' in config
-        }
-
-        # Get defaults from the config
-        self._default_config = server_config.get('default_duck_settings', default_config)
+        self._server_config = server_config
+        self._default_bot_config = default_config
 
         # Make a rubber duck per channel
         self._setup_thread = step(setup_thread)
@@ -82,32 +44,26 @@ class RubberDuck:
         self._get_feedback = step(get_feedback)
 
     def _get_channel_settings(self, channel_id: int, initial_message: Message):
-        # Retrieve the channel configuration using the channel_id
-        channel_config = self._channel_configs[channel_id]
+        # Find the channel configuration using the channel_id
+        channel_config = next(
+            channel 
+            for server in self._server_config["servers"]
+            for channel in server["channels_config"]
+            if channel.channel_id == channel_id
+        )
+        duck_config = channel_config.duck_config
+        duck_settings = duck_config["duck_settings_config"]
 
-        config_options = []
-        config_weights = []
-        for duck in channel_config['ducks']:
-            config_options.append(duck)
-            config_weights.append(duck.get('weight', 1))
+        prompt_file = duck_settings["prompt_file"]
+        if prompt_file:
+            prompt = Path(prompt_file).read_text()
+        else:
+            prompt = initial_message['content']
 
-        channel_config = random.choices(config_options, weights=config_weights)[0]
-
-        prompt = channel_config.get('prompt', None)
-        if prompt is None:
-            prompt_file = channel_config.get('prompt_file', None)
-            if prompt_file is None:
-                prompt = initial_message['content']
-            else:
-                prompt = Path(prompt_file).read_text()
-
-        # Access the engine from channel_config, defaulting to self._default_config['engine'] if it's not set
-        engine = channel_config.get('engine', self._default_config['engine'])
-
-        # Access the timeout from channel_config, defaulting to self._default_config['timeout'] if it's not set
-        timeout = channel_config.get('timeout', self._default_config['timeout'])
-
-        duck_name = channel_config.get('name')
+        # Get engine and timeout from duck settings, falling back to defaults if not set
+        engine = duck_settings["engine"] or self._default_bot_config["engine"]
+        timeout = duck_settings["timeout"] or self._default_bot_config["timeout"]
+        duck_name = duck_config["name"]
 
         return prompt, engine, timeout, duck_name
 

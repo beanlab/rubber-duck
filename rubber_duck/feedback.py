@@ -4,6 +4,7 @@ from typing import TypedDict, Protocol
 from quest import queue, step, alias
 
 from protocols import AddReaction, SendMessage
+from config_types import FeedbackConfig
 
 
 class FeedbackConfig(TypedDict):
@@ -24,17 +25,13 @@ class GetFeedback(Protocol):
 
 
 class GetConvoFeedback:
-    def __init__(self, feedback_configs: dict[str, dict[str, FeedbackConfig]], get_feedback: GetFeedback):
+    def __init__(self, feedback_configs: dict[str, FeedbackConfig], get_feedback: GetFeedback):
         self._feedback_configs = feedback_configs
         self._get_feedback = get_feedback
 
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int):
-        server_configs = self._feedback_configs.get(str(guild_id), {})
-        if server_configs:
-            # Get the first channel's feedback config for now
-            # TODO: Consider how to handle multiple channels in the same server
-            channel_config = next(iter(server_configs.values()))
-            await self._get_feedback(workflow_type, guild_id, thread_id, user_id, channel_config)
+        if (config := self._feedback_configs.get(thread_id)) is not None:
+            await self._get_feedback(workflow_type, guild_id, thread_id, user_id, config)
 
 
 class GetTAFeedback:

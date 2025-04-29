@@ -22,6 +22,7 @@ from rubber_duck import RubberDuck
 from sql_metrics import SQLMetricsHandler
 from sql_connection import create_sql_session
 from threads import SetupPrivateThread
+from config_types import FeedbackConfig, DuckSettings, DuckConfig, ChannelsConfig, ServerConfig, DefaultConfig, MultiServerConfig
 
 logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
@@ -76,29 +77,12 @@ def as_message(message: discord.Message) -> Message:
         file=[as_attachment(attachment) for attachment in message.attachments]
     )
 
-
 def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
         filename=attachment.filename
     )
-
-
-class ChannelConfig(TypedDict):
-    name: str | None
-    id: int | None
-    prompt: str | None
-    prompt_file: str | None
-    engine: str | None
-    timeout: int | None
-
-
-class RubberDuckConfig(TypedDict):
-    command_channels: list[int]
-    defaults: ChannelConfig
-    channels: list[ChannelConfig]
-
 
 def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
     # Create and return the list of commands
@@ -127,20 +111,16 @@ class MyClient(discord.Client):
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
-        # Rubber duck feature
-        self._server_config = config['servers']
-        self._default_config = config['default_duck_settings']
-
+        # Convert config to typed dictionaries
+        self._server_config, self._default_config = create_typed_config(config)
 
         # Collect all duck channel IDs across all servers
         self._duck_channels = {
-            channel['channel_id']
-            for server in self._server_config.values()
-            # if isinstance(server, dict) and 'channels' in server
-            for channel in server['channels']
-            if 'channel_id' in channel
+            channel.channel_id
+            for server in self._server_config["servers"]
+            for channel in server["channels_config"]
         }
-
+    
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
         self.metrics_handler = SQLMetricsHandler(sql_session)
@@ -155,18 +135,14 @@ class MyClient(discord.Client):
             self.metrics_handler.record_feedback,
         )
 
-        feedback_configs = {
-            str(server_id): {
-                str(channel["channel_id"]): channel["feedback"]
-                for channel in server["channels"]
-                if isinstance(channel, dict) and "feedback" in channel
-            }
-            for server_id, server in config["servers"].items()
-            if isinstance(server, dict) and "channels" in server
+        feedback_config: dict[int, FeedbackConfig] = {
+            channel.channel_id: channel.feedback_config
+            for server in self._server_config["servers"]
+            for channel in server["channels_config"]
         }
 
-        get_feedback = GetConvoFeedback( # TODO Let's revisit how we are doing feedback - separate PR
-            feedback_configs,
+        get_feedback = GetConvoFeedback(
+            feedback_config,
             get_ta_feedback
         )
 
@@ -401,6 +377,71 @@ def fetch_config_from_s3():
 # Function to load the configuration from a local file (if needed)
 def load_local_config(file_path: Path):
     return json.loads(file_path.read_text())
+
+
+def create_typed_config(config: dict) -> tuple[MultiServerConfig, DefaultConfig]:
+    """Convert the raw JSON config into properly typed dictionaries.
+    
+    Args:
+        config: The raw JSON configuration
+        
+    Returns:
+        A tuple containing:
+        - A MultiServerConfig object containing all server configurations
+        - A DefaultConfig object with default settings
+    """
+    servers = []
+    
+    for server_id, server in config["servers"].items():
+        channels_config = []
+        for channel in server["channels"]:
+            # Create DuckSettings for each duck
+            duck_settings = DuckSettings(
+                prompt_file=channel["ducks"][0]["settings"]["prompt_file"],
+                engine=channel["ducks"][0]["settings"]["engine"],
+                weight=channel["ducks"][0]["settings"].get("weight", 1),
+                timeout=channel["ducks"][0]["settings"].get("timeout", 10)
+            )
+            
+            # Create DuckConfig
+            duck_config = DuckConfig(
+                name=channel["ducks"][0]["name"],
+                workflow_type=channel["ducks"][0]["workflow_type"],
+                duck_settings_config=duck_settings
+            )
+            
+            # Create FeedbackConfig
+            feedback_config = FeedbackConfig(
+                ta_review_channel_id=channel["feedback"]["ta_review_channel_id"],
+                reviewer_role_id=channel["feedback"].get("reviewer_role_id")
+            )
+            
+            # Create ChannelsConfig
+            channel_config = ChannelsConfig()
+            channel_config.channel_id = channel["channel_id"]
+            channel_config.channel_name = channel["channel_name"]
+            channel_config.feedback_config = feedback_config
+            channel_config.duck_config = duck_config
+            
+            channels_config.append(channel_config)
+        
+        # Create ServerConfig
+        server_config = ServerConfig(
+            server_name=server["server_name"],
+            channels_config=channels_config
+        )
+        servers.append(server_config)
+    
+    # Create MultiServerConfig
+    multi_server_config = MultiServerConfig({"servers": servers})
+    
+    # Create DefaultConfig
+    default_config = DefaultConfig(
+        engine=config["default_duck_settings"]["engine"],
+        timeout=config["default_duck_settings"]["timeout"]
+    )
+    
+    return multi_server_config, default_config
 
 
 def main(config):
