@@ -111,16 +111,15 @@ class MyClient(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self.admin_settings: AdminSettings = config['admin_settings']
-        ai_completion_retry_protocol: RetryProtocol = config['ai_completion_retry_protocol']
+        self.admin_settings = config['admin_settings']
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
         # Command channel feature
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Convert config to typed dictionaries
-        self._server_config = config['servers']  # This is already a dict[str, ServerConfig]
-        self._default_duck_workflow_config: dict[str, dict] = config['default_duck_settings']
-
+        self._server_config = config['servers']
+        self._default_duck_workflow_config = config['default_duck_settings']
 
         # SQLMetricsHandler initialization
         sql_session = create_sql_session(config['sql'])
@@ -252,7 +251,7 @@ class MyClient(discord.Client):
 
         # Duck channel
         if message.channel.id in self._duck_channels:
-            workflow_id = f'duck-{message.channel.id}-{message.id}'  # Include message ID to allow multiple conversations
+            workflow_id = f'duck-{message.channel.id}-{message.id}'
             self._workflow_manager.start_workflow(
                 'duck',
                 workflow_id,
