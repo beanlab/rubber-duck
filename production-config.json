@@ -24,7 +24,7 @@
       "channels": [
         {
           "channel_id": 1296158078017736725,
-          "channel_name": "cs110",
+          "channel_name": "general-cs110",
           "feedback": {
             "ta_review_channel_id": 1296158078017736725
           },
@@ -32,11 +32,11 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
@@ -48,7 +48,7 @@
       "channels": [
         {
           "channel_id": 1327385245036838912,
-          "channel_name": "cs235",
+          "channel_name": "student-text-channels-cs235",
           "feedback": {
             "ta_review_channel_id": 1327385245036838912
           },
@@ -56,11 +56,11 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
@@ -80,11 +80,11 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
@@ -96,7 +96,7 @@
       "channels": [
         {
           "channel_id": 1363949528201564170,
-          "channel_name": "phys230",
+          "channel_name": "physics-230-phys230",
           "feedback": {
             "ta_review_channel_id": 1359587713749094700
           },
@@ -104,18 +104,18 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
         },
         {
           "channel_id": 1359587525605458030,
-          "channel_name": "phys430",
+          "channel_name": "physics-430-phys430",
           "feedback": {
             "ta_review_channel_id": 1359587713749094700
           },
@@ -123,11 +123,11 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
@@ -139,7 +139,7 @@
       "channels": [
         {
           "channel_id": 1338619665789751337,
-          "channel_name": "Duck Demo",
+          "channel_name": "text-channels-duck-pond",
           "allow_self_feedback": true,
           "feedback": {
             "ta_review_channel_id": 1338619665789751337
@@ -148,11 +148,11 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
-              "timeout": 600,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
-                "engine": "gpt-4.1"
+                "engine": "gpt-4.1",
+                "weight": 1,
+                "timeout": 600
               }
             }
           ]
