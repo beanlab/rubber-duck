@@ -6,7 +6,7 @@ from quest import queue, step, alias
 from protocols import AddReaction, SendMessage
 from config_types import FeedbackConfig
 
-
+# This could be trouble we have two different classes named feedback config
 class FeedbackConfig(TypedDict):
     channel_id: int
     reviewer_role_id: int
