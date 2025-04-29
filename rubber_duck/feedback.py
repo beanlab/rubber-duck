@@ -25,12 +25,12 @@ class GetFeedback(Protocol):
 
 
 class GetConvoFeedback:
-    def __init__(self, feedback_configs: dict[str, FeedbackConfig], get_feedback: GetFeedback):
+    def __init__(self, feedback_configs: dict[int, FeedbackConfig], get_feedback: GetFeedback):
         self._feedback_configs = feedback_configs
         self._get_feedback = get_feedback
 
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int):
-        if (config := self._feedback_configs.get(thread_id)) is not None:
+    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, channel_id: int):
+        if (config := self._feedback_configs.get(channel_id)) is not None:
             await self._get_feedback(workflow_type, guild_id, thread_id, user_id, config)
 
 
