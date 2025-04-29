@@ -25,7 +25,7 @@ from threads import SetupPrivateThread
 from config_types import FeedbackConfig, DuckSettings, DuckConfig, ChannelsConfig, ServerConfig, DefaultConfig, MultiServerConfig
 
 logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this
+LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
 
 
 def parse_blocks(text: str, limit=1990):
@@ -198,7 +198,7 @@ class MyClient(discord.Client):
 
             raise NotImplementedError(f'No workflow of type {wtype}')
 
-        namespace = 'rubber-duck'  # TODO - move to config
+        namespace = 'rubber-duck'  # TODO - move to config. What is this really asking about Dr. Bean?
         self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
         commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics)
@@ -294,7 +294,7 @@ class MyClient(discord.Client):
         if file is not None:
             if isinstance(file, list):
                 curr_message = await channel.send("",
-                                                  files=file)  # TODO: check that all instances are discord.File objects
+                                                  files=file)  # TODO: check that all instances are discord.File objects. Dr.Bean what is this?
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -320,7 +320,6 @@ class MyClient(discord.Client):
 
     async def report_error(self, msg: str, notify_admins: bool = False):
         if notify_admins:
-            # TODO make this assume one id
             user_ids_to_mention = [self.admin_settings["admin_role_id"]]
             mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
             msg = mentions + '\n' + msg
