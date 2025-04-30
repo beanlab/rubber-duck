@@ -26,7 +26,7 @@ class HaveConversation(Protocol):
 
 class BasicPromptWorkflow:
     def __init__(self,
-                 server_config: ServerConfig,
+                 server_config: dict[str, ServerConfig],
                  default_config: dict,
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,

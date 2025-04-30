@@ -44,6 +44,42 @@ def create_commands(send_message, metrics_handler, reporter, active_workflow_fun
     ]
 
 
+def _parse_blocks(text: str, limit=1990):
+    tick = '`'
+    fence = tick * 3
+    block = ""
+    current_fence = ""
+    for line in text.splitlines():
+        if len(block) + len(line) > limit:
+            if block:
+                if current_fence:
+                    block += fence
+                    yield block
+                    block = current_fence
+                else:
+                    yield block
+                    block = ""
+            else:
+                # REALLY long line
+                while len(line) > limit:
+                    yield line[:limit]
+                    line = line[limit:]
+
+        if line.strip().startswith(fence):
+            if current_fence:
+                current_fence = ""
+            else:
+                if block:
+                    yield block
+                current_fence = line
+                block = ""
+
+        block += ('\n' + line) if block else line
+
+    if block:
+        yield block
+
+
 class DiscordBot(discord.Client):
     def __init__(self):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
@@ -69,7 +105,6 @@ class DiscordBot(discord.Client):
         logging.info(self.user.name)
         logging.info(self.user.id)
         logging.info('Starting workflow manager')
-        self._workflow_manager = await self._workflow_manager.__aenter__()
 
         try:
             await self.send_message(self._command_channel, 'Duck online')
@@ -80,10 +115,12 @@ class DiscordBot(discord.Client):
 
     async def close(self):
         logging.warning("-- Suspending --")
-        await self._workflow_manager.__aexit__(None, None, None)
         await super().close()
 
     async def on_message(self, message: discord.Message):
+        if self._rubber_duck is None:
+            return
+
         # ignore messages from the bot itself
         if message.author.id == self.user.id:
             return
@@ -96,46 +133,14 @@ class DiscordBot(discord.Client):
         if message.content.startswith('//'):
             return
 
-        # Command channel
-        if message.channel.id == self._command_channel:
-            workflow_id = f'command-{message.id}'
-            self._workflow_manager.start_workflow(
-                'command', workflow_id, as_message(message))
-            return
-
-        # Duck channel
-        if message.channel.id in self._duck_channels:
-            workflow_id = f'duck-{message.channel.id}-{message.id}'
-            self._workflow_manager.start_workflow(
-                'duck',
-                workflow_id,
-                message.channel.id,
-                as_message(message)
-            )
-
-        # Belongs to an existing conversation
-        str_id = str(message.channel.id)
-        if self._workflow_manager.has_workflow(str_id):
-            await self._workflow_manager.send_event(
-                str_id, 'messages', None, 'put',
-                as_message(message)
-            )
-
-        # If it didn't match anything above, we can ignore it.
+        await self._rubber_duck.route_message(as_message(message))
 
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
-        # Ignore messages from the bot
-        if user.id == self.user.id:
+        # Ignore messages from the bot or other bots
+        if user.id == self.user.id or user.bot:
             return
 
-        workflow_alias = str(reaction.message.id)
-        emoji = reaction.emoji
-
-        if self._workflow_manager.has_workflow(workflow_alias):
-            await self._workflow_manager.send_event(
-                workflow_alias, 'feedback', None, 'put',
-                (emoji, user.id)
-            )
+        await self._rubber_duck.route_reaction(reaction.emoji, reaction.message.id, user.id)
 
     #
     # Methods for message-handling protocols
@@ -154,8 +159,8 @@ class DiscordBot(discord.Client):
 
         if file is not None:
             if isinstance(file, list):
-                curr_message = await channel.send("",
-                                                  files=file)  # TODO: check that all instances are discord.File objects.
+                curr_message = await channel.send("", files=file)
+                # TODO: check that all instances are discord.File objects.
             elif not isinstance(file, discord.File):
                 file = discord.File(file)
                 curr_message = await channel.send("", file=file)
@@ -178,16 +183,6 @@ class DiscordBot(discord.Client):
     async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
-
-    async def report_error(self, msg: str, notify_admins: bool = False):
-        if notify_admins:
-            user_ids_to_mention = [self.admin_settings["admin_role_id"]]
-            mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
-            msg = mentions + '\n' + msg
-            try:
-                await self.send_message(self._command_channel, msg)
-            except:
-                logging.exception(f'Unable to message channel {self._command_channel}')
 
     def typing(self, channel_id: int):
         return self.get_channel(channel_id).typing()

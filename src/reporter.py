@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import PercentFormatter
+from quest import wrap_steps
 
 from sql_metrics import SQLMetricsHandler
 
@@ -101,6 +102,8 @@ class Reporter:
 
     def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
+        wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
+
         self.show_fig = show_fig
         self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
 

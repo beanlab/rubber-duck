@@ -4,7 +4,7 @@ import traceback as tb
 import uuid
 from typing import TypedDict, Protocol
 
-from quest import step, queue
+from quest import step, queue, wrap_steps
 
 from protocols import Message, SendMessage, ReportError, IndicateTyping
 
