@@ -1,25 +1,12 @@
 import logging
-import os
 import discord
-from quest import wrap_steps
-
-from sql_quest import create_sql_manager
-from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from conversation import HaveStandardGptConversation, BasicSetupConversation
-from feedback import GetTAFeedback, GetConvoFeedback
-from genAI import OpenAI, RetryableGenAI
 from protocols import Attachment, Message
-from reporter import Reporter
-from rubber_duck import RubberDuck
-from sql_metrics import SQLMetricsHandler
-from sql_connection import create_sql_session
-from threads import SetupPrivateThread
 from config_types import (
-    FeedbackConfig,
     Config,
 )
+
 
 def as_message(message: discord.Message) -> Message:
     return Message(
@@ -34,12 +21,14 @@ def as_message(message: discord.Message) -> Message:
         file=[as_attachment(attachment) for attachment in message.attachments]
     )
 
+
 def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
         filename=attachment.filename
     )
+
 
 def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
     # Create and return the list of commands
@@ -56,113 +45,23 @@ def create_commands(send_message, metrics_handler, reporter, active_workflow_fun
 
 
 class DiscordBot(discord.Client):
-    def __init__(self, config: Config):
+    def __init__(self):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
+        self._rubber_duck = None
+        self._command_channel = None  # Will be set when rubber duck app is set
 
-        self.admin_settings = config['admin_settings']
-        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+    def set_duck_app(self, rubber_duck):
+        self._rubber_duck = rubber_duck
+        self._command_channel = rubber_duck._command_channel
 
-        # Command channel feature
-        self._command_channel = self.admin_settings['admin_channel_id']
+    async def __aenter__(self):
+        return self
 
-        # Convert config to typed dictionaries
-        self._server_config = config['servers']
-        self._default_duck_workflow_config = config['default_duck_settings']
-
-        # SQLMetricsHandler initialization
-        sql_session = create_sql_session(config['sql'])
-        self.metrics_handler = SQLMetricsHandler(sql_session)
-        wrap_steps(self.metrics_handler, ["record_message", "record_usage", "record_feedback"])
-
-        reporter = Reporter(self.metrics_handler, config['reporting']) #TODO get the config to work with this
-
-        # Feedback
-        get_ta_feedback = GetTAFeedback(
-            self.send_message,
-            self.add_reaction,
-            self.metrics_handler.record_feedback,
-        )
-
-        feedback_config: dict[int, FeedbackConfig] = {
-            channel["channel_id"]: channel["feedback"]
-            for server in self._server_config.values()
-            for channel in server["channels"]
-        }
-
-        get_feedback = GetConvoFeedback(
-            feedback_config,
-            get_ta_feedback
-        )
-        # TODO: remove weights from config
-        setup_thread = SetupPrivateThread(
-            self.create_thread,
-            self.send_message
-        )
-
-        setup_conversation = BasicSetupConversation(
-            self.metrics_handler.record_message,
-        )
-
-        ai_client = OpenAI(
-            os.environ['OPENAI_API_KEY'],
-        )
-
-        retryable_ai_client = RetryableGenAI(
-            ai_client,
-            self.send_message,
-            self.report_error,
-            self.typing,
-            ai_completion_retry_protocol
-        )
-
-        wrap_steps(ai_client, ['get_completion'])
-
-        have_conversation = HaveStandardGptConversation(
-            retryable_ai_client,
-            self.metrics_handler.record_message,
-            self.metrics_handler.record_usage,
-            self.send_message,
-            self.report_error,
-            self.typing,
-            ai_completion_retry_protocol,
-        )
-
-        duck_workflow = RubberDuck(
-            self._server_config,
-            self._default_duck_workflow_config,
-            setup_thread,
-            setup_conversation,
-            have_conversation,
-            get_feedback,
-        )
-
-        workflows = {
-            'duck': duck_workflow
-        }
-
-        def create_workflow(wtype: str):
-            if wtype in workflows:
-                return workflows[wtype]
-
-            raise NotImplementedError(f'No workflow of type {wtype}')
-
-        namespace = 'rubber-duck'  # TODO - move to config. What is this really asking about Dr. Bean?
-        self._workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
-
-        commands = create_commands(self.send_message, self.metrics_handler, reporter, self._workflow_manager.get_workflow_metrics)
-        commands_workflow = BotCommands(commands, self.send_message)
-
-        workflows['command'] = commands_workflow
-
-        # Collect all duck channel IDs across all servers
-        self._duck_channels = {
-            channel["channel_id"]
-            for server in self._server_config.values()
-            for channel in server["channels"]
-        }
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     async def on_ready(self):
         # print out information when the bot wakes up
@@ -187,6 +86,10 @@ class DiscordBot(discord.Client):
     async def on_message(self, message: discord.Message):
         # ignore messages from the bot itself
         if message.author.id == self.user.id:
+            return
+
+        # ignore messages from other bots
+        if message.author.bot:
             return
 
         # ignore messages that start with //
@@ -234,40 +137,6 @@ class DiscordBot(discord.Client):
                 (emoji, user.id)
             )
 
-    def _parse_blocks(text: str, limit=1990):
-        tick = '`'
-        fence = tick * 3
-        block = ""
-        current_fence = ""
-        for line in text.splitlines():
-            if len(block) + len(line) > limit:
-                if block:
-                    if current_fence:
-                        block += fence
-                        yield block
-                        block = current_fence
-                    else:
-                        yield block
-                        block = ""
-                else:
-                    # REALLY long line
-                    while len(line) > limit:
-                        yield line[:limit]
-                        line = line[limit:]
-
-            if line.strip().startswith(fence):
-                if current_fence:
-                    current_fence = ""
-                else:
-                    if block:
-                        yield block
-                    current_fence = line
-                    block = ""
-
-            block += ('\n' + line) if block else line
-
-        if block:
-            yield block
     #
     # Methods for message-handling protocols
     #
@@ -280,7 +149,7 @@ class DiscordBot(discord.Client):
 
         curr_message = None
 
-        for block in self._parse_blocks(message):
+        for block in _parse_blocks(message):
             curr_message = await channel.send(block)
 
         if file is not None:

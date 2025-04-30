@@ -83,6 +83,7 @@ class HaveStandardGptConversation:
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._ai_client = ai_client
+        wrap_steps(self._ai_client, ['get_completion'])
         self._typing = typing
         self._retry_config = retry_config
 

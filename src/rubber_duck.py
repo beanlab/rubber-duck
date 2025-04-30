@@ -24,7 +24,7 @@ class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
-class RubberDuck:
+class BasicPromptWorkflow:
     def __init__(self,
                  server_config: ServerConfig,
                  default_config: dict,
