@@ -1,10 +1,5 @@
-import argparse
-import json
 import logging
 import os
-from pathlib import Path
-
-import boto3
 import discord
 from quest import wrap_steps
 
@@ -12,7 +7,7 @@ from sql_quest import create_sql_manager
 from bot_commands import BotCommands
 from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from conversation import HaveStandardGptConversation, BasicSetupConversation, RetryableGenAIClient
+from conversation import HaveStandardGptConversation, BasicSetupConversation
 from feedback import GetTAFeedback, GetConvoFeedback
 from genAI import OpenAI, RetryableGenAI
 from protocols import Attachment, Message
@@ -23,52 +18,8 @@ from sql_connection import create_sql_session
 from threads import SetupPrivateThread
 from config_types import (
     FeedbackConfig,
-    ServerConfig,
     Config,
-    SQLConfig,
-    RetryProtocol,
-    AdminSettings
 )
-
-logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
-
-
-def parse_blocks(text: str, limit=1990):
-    tick = '`'
-    fence = tick * 3
-    block = ""
-    current_fence = ""
-    for line in text.splitlines():
-        if len(block) + len(line) > limit:
-            if block:
-                if current_fence:
-                    block += fence
-                    yield block
-                    block = current_fence
-                else:
-                    yield block
-                    block = ""
-            else:
-                # REALLY long line
-                while len(line) > limit:
-                    yield line[:limit]
-                    line = line[limit:]
-
-        if line.strip().startswith(fence):
-            if current_fence:
-                current_fence = ""
-            else:
-                if block:
-                    yield block
-                current_fence = line
-                block = ""
-
-        block += ('\n' + line) if block else line
-
-    if block:
-        yield block
-
 
 def as_message(message: discord.Message) -> Message:
     return Message(
@@ -104,7 +55,7 @@ def create_commands(send_message, metrics_handler, reporter, active_workflow_fun
     ]
 
 
-class MyClient(discord.Client):
+class DiscordBot(discord.Client):
     def __init__(self, config: Config):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
@@ -283,6 +234,40 @@ class MyClient(discord.Client):
                 (emoji, user.id)
             )
 
+    def _parse_blocks(text: str, limit=1990):
+        tick = '`'
+        fence = tick * 3
+        block = ""
+        current_fence = ""
+        for line in text.splitlines():
+            if len(block) + len(line) > limit:
+                if block:
+                    if current_fence:
+                        block += fence
+                        yield block
+                        block = current_fence
+                    else:
+                        yield block
+                        block = ""
+                else:
+                    # REALLY long line
+                    while len(line) > limit:
+                        yield line[:limit]
+                        line = line[limit:]
+
+            if line.strip().startswith(fence):
+                if current_fence:
+                    current_fence = ""
+                else:
+                    if block:
+                        yield block
+                    current_fence = line
+                    block = ""
+
+            block += ('\n' + line) if block else line
+
+        if block:
+            yield block
     #
     # Methods for message-handling protocols
     #
@@ -295,7 +280,7 @@ class MyClient(discord.Client):
 
         curr_message = None
 
-        for block in parse_blocks(message):
+        for block in self._parse_blocks(message):
             curr_message = await channel.send(block)
 
         if file is not None:
@@ -346,73 +331,3 @@ class MyClient(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
-
-
-def fetch_config_from_s3()-> Config | None:
-    # Initialize S3 client
-    s3 = boto3.client('s3')
-    
-    # Add a section to your env file to allow for local and production environment
-    environment = os.environ.get('ENVIRONMENT')
-    if not environment or environment == 'LOCAL':
-        return None
-    
-    # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-    s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-    if not s3_path:
-        return None
-
-    # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-    bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    logging.info(bucket_name)
-    logging.info(key)
-    try:
-        # Download file from S3
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-
-        # Read the content of the file and parse it as JSON
-        config = json.loads(response['Body'].read().decode('utf-8'))
-        return config
-
-    except Exception as e:
-        print(f"Failed to fetch config from S3: {e}")
-        return None
-
-
-# Function to load the configuration from a local file (if needed)
-def load_local_config(file_path: Path):
-    return json.loads(file_path.read_text())
-
-
-def main(config):
-    client = MyClient(config)
-    client.run(os.environ['DISCORD_TOKEN'])
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--log-console', action='store_true')
-    args = parser.parse_args()
-
-    # Set up logging based on user preference
-    if args.log_console:
-        logging.basicConfig(
-            level=logging.WARNING,
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
-    else:
-        logging.basicConfig(
-            level=logging.WARNING,
-            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
-
-    # Try fetching the config from S3 first
-    config = fetch_config_from_s3()
-
-    if config is None:
-        # If fetching from S3 failed, load from local file
-        config = load_local_config(args.config)
-    main(config)
