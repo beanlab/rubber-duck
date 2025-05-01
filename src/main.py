@@ -83,6 +83,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     get_ta_feedback = GetTAFeedback(
         bot.send_message,
         bot.add_reaction,
+        bot.clear_reaction,
         metrics_handler.record_feedback,
     )
 
