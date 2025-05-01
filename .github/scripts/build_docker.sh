@@ -20,7 +20,7 @@ ADD pyproject.toml /app/pyproject.toml
 WORKDIR /app
 RUN pip install --no-cache-dir poetry
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi
+    poetry install --no-interaction --no-ansi --no-root
 CMD ["python", "/app/src/main.py", "--config", "/config.json", "--log-console"]
 EOF
 
