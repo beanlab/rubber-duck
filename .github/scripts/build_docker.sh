@@ -18,10 +18,9 @@ COPY src /app/src
 COPY prompts /app/prompts
 ADD pyproject.toml /app/pyproject.toml
 WORKDIR /app
-RUN pip install poetry
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
-EXPOSE 8080
+RUN pip install --no-cache-dir poetry
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi
 CMD ["python", "/app/src/main.py", "--config", "/config.json", "--log-console"]
 EOF
 
