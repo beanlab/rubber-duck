@@ -1,10 +1,10 @@
 import asyncio
-from typing import TypedDict, Protocol
+from typing import Protocol
 
 from quest import queue, step, alias
 
-from protocols import AddReaction, SendMessage
-from config_types import FeedbackConfig
+from utils.protocols import AddReaction, SendMessage
+from utils.config_types import FeedbackConfig
 
 class RecordFeedback(Protocol):
     async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,

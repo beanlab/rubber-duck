@@ -6,9 +6,9 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
-from conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
+from src.conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig, generate_error_message
-from protocols import IndicateTyping, ReportError, SendMessage
+from src.utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
 class OpenAI():

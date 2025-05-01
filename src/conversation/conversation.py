@@ -6,7 +6,7 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from protocols import Message, SendMessage, ReportError, IndicateTyping
+from utils.protocols import Message, SendMessage, ReportError, IndicateTyping
 
 class RetryableException(Exception):
     def __init__(self, exception, message):

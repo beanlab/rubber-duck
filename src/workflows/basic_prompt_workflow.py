@@ -4,10 +4,10 @@ from typing import TypedDict, Protocol
 
 from quest import step, alias
 
-from conversation import GPTMessage
-from feedback import GetConvoFeedback
-from protocols import Message
-from config_types import ServerConfig
+from conversation.conversation import GPTMessage
+from metrics.feedback import GetConvoFeedback
+from utils.protocols import Message
+from utils.config_types import ServerConfig
 
 
 class SetupThread(Protocol):

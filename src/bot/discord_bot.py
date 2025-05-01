@@ -1,9 +1,9 @@
 import logging
 import discord
-from command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
+from commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from protocols import Attachment, Message
-from config_types import (
+from utils.protocols import Attachment, Message
+from utils.config_types import (
     Config,
 )
 

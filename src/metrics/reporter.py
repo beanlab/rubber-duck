@@ -13,7 +13,7 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
-from sql_metrics import SQLMetricsHandler
+from storage.sql_metrics import SQLMetricsHandler
 
 
 def fancy_preproccesing(df, guilds):

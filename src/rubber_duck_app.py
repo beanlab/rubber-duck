@@ -1,5 +1,5 @@
-from protocols import Message
-from config_types import ServerConfig
+from utils.protocols import Message
+from utils.config_types import ServerConfig
 
 
 class RubberDuckApp:
