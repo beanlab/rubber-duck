@@ -1,5 +1,4 @@
 import sqlite3
-
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -12,12 +11,15 @@ MetricsBase = declarative_base()
 def get_timestamp():
     return datetime.now(ZoneInfo('US/Mountain')).isoformat()
 
+
 def add_iter(cls):
     def __iter__(self):
         for key in self.__table__.columns.keys():
             yield key, getattr(self, key)
+
     cls.__iter__ = __iter__
     return cls
+
 
 @add_iter
 class MessagesModel(MetricsBase):
@@ -84,7 +86,8 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int, feedback_score: int):
+    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
+                              feedback_score: int):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,

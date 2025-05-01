@@ -1,8 +1,6 @@
-import csv
 import io
 import json
 import sys
-import zipfile
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -11,12 +9,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.ticker import PercentFormatter
+from quest import wrap_steps
 
-from sql_metrics import SQLMetricsHandler
+from ..storage.sql_metrics import SQLMetricsHandler
 
 
 def fancy_preproccesing(df, guilds):
-    df['guild_name'] = df['guild_id'].map(guilds) # TODO: Lets use channel ids instead of guild ids.
+    df['guild_name'] = df['guild_id'].map(guilds)  # TODO: Lets use channel ids instead of guild ids.
     df = df.drop(columns=['guild_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
             .groupby('guild_name')
@@ -101,6 +100,8 @@ class Reporter:
 
     def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
+        wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
+
         self.show_fig = show_fig
         self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
 

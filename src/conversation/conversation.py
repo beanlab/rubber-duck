@@ -4,9 +4,10 @@ import traceback as tb
 import uuid
 from typing import TypedDict, Protocol
 
-from quest import step, queue
+from quest import step, queue, wrap_steps
 
-from protocols import Message, SendMessage, ReportError, IndicateTyping
+from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
+
 
 class RetryableException(Exception):
     def __init__(self, exception, message):
@@ -14,11 +15,13 @@ class RetryableException(Exception):
         self.message = message
         super().__init__(self.exception.__str__())
 
+
 class GenAIException(Exception):
     def __init__(self, exception, web_mention):
         self.exception = exception
         self.web_mention = web_mention
         super().__init__(self.exception.__str__())
+
 
 class RetryConfig(TypedDict):
     max_retries: int
@@ -43,8 +46,11 @@ class RecordUsage(Protocol):
 class GenAIClient(Protocol):
     async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
 
+
 class RetryableGenAIClient(Protocol):
-    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> tuple[list, dict]: ...
+    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
+    tuple[list, dict]: ...
+
 
 def generate_error_message(guild_id, thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
@@ -83,6 +89,7 @@ class HaveStandardGptConversation:
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._ai_client = ai_client
+        wrap_steps(self._ai_client, ['get_completion'])
         self._typing = typing
         self._retry_config = retry_config
 

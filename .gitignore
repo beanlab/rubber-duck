@@ -20,3 +20,4 @@ requirements.txt
 pre-production.env
 v2-production-config.json
 rubberduckdb
+/.vscode/

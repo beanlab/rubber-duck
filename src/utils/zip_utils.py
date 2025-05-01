@@ -2,6 +2,7 @@ import csv
 import io
 import zipfile
 
+
 def zip_data_file(table_data):
     try:
         csv_buffer = io.StringIO()

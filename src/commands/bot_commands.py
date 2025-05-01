@@ -1,5 +1,6 @@
-from command import Command
-from rubber_duck import Message
+from ..commands.command import Command
+from ..utils.protocols import Message
+
 
 class BotCommands:
     def __init__(self, commands: list[Command], send_message):

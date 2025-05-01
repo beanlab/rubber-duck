@@ -1,4 +1,4 @@
-from protocols import Message, CreateThread, SendMessage
+from ..utils.protocols import Message, CreateThread, SendMessage
 
 
 class SetupPrivateThread:

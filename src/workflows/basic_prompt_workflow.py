@@ -1,13 +1,12 @@
-import random
 from pathlib import Path
-from typing import TypedDict, Protocol
+from typing import Protocol
 
 from quest import step, alias
 
-from conversation import GPTMessage
-from feedback import GetConvoFeedback
-from protocols import Message
-from config_types import ServerConfig
+from ..conversation.conversation import GPTMessage
+from ..metrics.feedback import GetConvoFeedback
+from ..utils.config_types import ServerConfig
+from ..utils.protocols import Message
 
 
 class SetupThread(Protocol):
@@ -24,9 +23,9 @@ class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
-class RubberDuck:
+class BasicPromptWorkflow:
     def __init__(self,
-                 server_config: ServerConfig,
+                 server_config: dict[str, ServerConfig],
                  default_config: dict,
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,
@@ -46,7 +45,7 @@ class RubberDuck:
     def _get_channel_settings(self, channel_id: int, initial_message: Message):
         # Find the channel configuration using the channel_id
         channel_config = next(
-            channel 
+            channel
             for server in self._server_config.values()
             for channel in server["channels"]
             if channel["channel_id"] == channel_id
