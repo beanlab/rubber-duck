@@ -4,7 +4,7 @@ from typing import Protocol
 from quest import queue, step, alias
 
 from ..utils.config_types import FeedbackConfig
-from ..utils.protocols import AddReaction, SendMessage
+from ..utils.protocols import AddReaction, ClearReaction, SendMessage
 
 
 class RecordFeedback(Protocol):
@@ -31,10 +31,12 @@ class GetTAFeedback:
     def __init__(self,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
+                 clear_reaction: ClearReaction,
                  record_feedback: RecordFeedback
                  ):
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
+        self._clear_reaction = step(clear_reaction)
         self._record_feedback = record_feedback
 
         self._reactions = {
@@ -97,4 +99,5 @@ class GetTAFeedback:
             # Verify that the feedback came from someone other than the student
             if allow_self_feedback or reviewer_id != user_id:
                 return feedback_emoji, reviewer_id
-            # If it's from the same user and self-feedback is not allowed, just ignore it and continue waiting
+            else:
+                await self._clear_reaction(thread_id, feedback_message_id, feedback_emoji)

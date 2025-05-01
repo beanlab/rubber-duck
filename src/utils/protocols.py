@@ -32,6 +32,10 @@ class AddReaction(Protocol):
     async def __call__(self, channel_id: int, message_id: int, reaction: str): ...
 
 
+class ClearReaction(Protocol):
+    async def __call__(self, channel_id: int, message_id: int, reaction: str): ...
+
+
 class ReportError(Protocol):
     async def __call__(self, msg: str, notify_admin: bool = False): ...
 
