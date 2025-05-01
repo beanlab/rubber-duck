@@ -21,7 +21,11 @@ WORKDIR /app
 RUN pip install --no-cache-dir poetry
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --no-root
-CMD ["python", "/app/src/main.py", "--config", "/config.json", "--log-console"]
+
+# Set up Python path
+ENV PYTHONPATH=/app/src
+
+CMD ["python", "-m", "src.main", "--config", "/config.json", "--log-console"]
 EOF
 
 # Tag the image for ECR with both latest and commit SHA
