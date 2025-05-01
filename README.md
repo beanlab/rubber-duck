@@ -36,6 +36,7 @@ It is designed to be a fun and interactive way to learn challenging concepts whi
 - Open an issue on GitHub
 - Join our [Discord Server](https://discord.gg/46vCrvJ3Rk)
 - Need to record your hours for class? Check out the [Time Tracker](https://docs.google.com/spreadsheets/d/1gs5WWLLAhcTz75jDKWuaFtNe4sZsAFfBaWtZ9LL5VuY/edit?usp=sharing)
+- Need to know what is currently being worked on? Check out the [Project Dashboard](https://github.com/orgs/beanlab/projects/5)
 
 ## License
 
