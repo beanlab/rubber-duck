@@ -14,16 +14,15 @@ set -e
 docker build -t ${IMAGE_NAME}:latest -f - . <<EOF
 FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
-COPY rubber_duck /rubber_duck
-COPY prompts /prompts
-ADD pyproject.toml /rubber_duck/pyproject.toml
-WORKDIR /rubber_duck
+COPY src /app/src
+COPY prompts /app/prompts
+ADD pyproject.toml /app/pyproject.toml
+WORKDIR /app
 RUN pip install poetry
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
 EXPOSE 8080
-WORKDIR /
-CMD ["python", "/rubber_duck/discord_bot.py", "--config", "/config.json", "--log-console"]
+CMD ["python", "/app/src/main.py", "--config", "/config.json", "--log-console"]
 EOF
 
 # Tag the image for ECR with both latest and commit SHA
