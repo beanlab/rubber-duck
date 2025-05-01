@@ -1,11 +1,11 @@
 import logging
+
 import discord
-from commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, StatusCommand, \
+
+from ..commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, \
+    StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from utils.protocols import Attachment, Message
-from utils.config_types import (
-    Config,
-)
+from ..utils.protocols import Attachment, Message
 
 
 def as_message(message: discord.Message) -> Message:

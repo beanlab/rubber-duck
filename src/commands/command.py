@@ -6,11 +6,11 @@ import discord
 import pytz
 from quest import step
 
-from src.utils.zip_utils import *
-from src.utils.protocols import Message
+from ..utils.protocols import Message
+from ..utils.zip_utils import zip_data_file
 
 
-class Command():
+class Command:
     name = ""
     help_msg = ""
 

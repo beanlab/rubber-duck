@@ -69,7 +69,6 @@ def create_sql_manager(
         sql_session: Session,
         serializer: StepSerializer = NoopSerializer()
 ) -> WorkflowManager:
-
     QuestRecordBase.metadata.create_all(sql_session.connection())
 
     workflow_manager_storage = SqlBlobStorage(workflow_manager_sql_namespace, sql_session)
@@ -78,4 +77,5 @@ def create_sql_manager(
         history_storage = SqlBlobStorage(wid, sql_session)
         return PersistentHistory(wid, history_storage)
 
-    return WorkflowManager(workflow_manager_sql_namespace, workflow_manager_storage, create_history, factory, serializer=serializer)
+    return WorkflowManager(workflow_manager_sql_namespace, workflow_manager_storage, create_history, factory,
+                           serializer=serializer)

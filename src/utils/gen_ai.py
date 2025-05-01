@@ -6,9 +6,9 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
-from src.conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
+from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig, generate_error_message
-from src.utils.protocols import IndicateTyping, ReportError, SendMessage
+from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
 class OpenAI():
@@ -27,15 +27,16 @@ class OpenAI():
             usage = completion_dict['usage']
             return choices, usage
         except (
-            APITimeoutError, InternalServerError,
-            UnprocessableEntityError) as ex:
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
             raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                             'please open up a separate conversation and try again') from ex
+                                         'please open up a separate conversation and try again') from ex
         except (APIConnectionError, BadRequestError,
-                        AuthenticationError, ConflictError, NotFoundError,
-                        RateLimitError) as ex:
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
             raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                         "for more details on how to resolve this error") from ex
+                                     "for more details on how to resolve this error") from ex
+
 
 class RetryableGenAI:
     def __init__(self, genai: GenAIClient,
@@ -70,4 +71,3 @@ class RetryableGenAI:
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
-

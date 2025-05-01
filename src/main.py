@@ -4,21 +4,21 @@ import logging
 import os
 from pathlib import Path
 import boto3
-from utils.config_types import (
+from .utils.config_types import (
     Config, FeedbackConfig,
 )
-from metrics.reporter import Reporter
-from rubber_duck_app import RubberDuckApp
-from storage.sql_connection import create_sql_session
-from storage.sql_metrics import SQLMetricsHandler
-from metrics.feedback import GetTAFeedback, GetConvoFeedback
-from bot.discord_bot import DiscordBot, create_commands
-from commands.bot_commands import BotCommands
-from conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
-from utils.gen_ai import OpenAI, RetryableGenAI
-from workflows.basic_prompt_workflow import BasicPromptWorkflow
-from storage.sql_quest import create_sql_manager
-from conversation.threads import SetupPrivateThread
+from .metrics.reporter import Reporter
+from .rubber_duck_app import RubberDuckApp
+from .storage.sql_connection import create_sql_session
+from .storage.sql_metrics import SQLMetricsHandler
+from .metrics.feedback import GetTAFeedback, GetConvoFeedback
+from .bot.discord_bot import DiscordBot, create_commands
+from .commands.bot_commands import BotCommands
+from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
+from .utils.gen_ai import OpenAI, RetryableGenAI
+from .workflows.basic_prompt_workflow import BasicPromptWorkflow
+from .storage.sql_quest import create_sql_manager
+from .conversation.threads import SetupPrivateThread
 
 logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?

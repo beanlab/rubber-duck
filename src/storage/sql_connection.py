@@ -1,10 +1,10 @@
 import os
 from typing import TypedDict
 
-from sqlalchemy.sql import text
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql import text
 
 
 def _create_sqlite_session(db_name: str) -> Session:
@@ -30,7 +30,6 @@ def _create_sql_session(db_type: str, username: str, password: str, host: str, p
     return sessionmaker(bind=engine)()
 
 
-
 class SqlConfig(TypedDict):
     db_type: str
     username: str
@@ -45,6 +44,7 @@ def resolve_env_vars(config):
         key: os.getenv(value[len('env:'):]) if value.startswith('env:') else value
         for key, value in config.items()
     }
+
 
 def create_sql_session(config: SqlConfig) -> Session:
     config = resolve_env_vars(config)
