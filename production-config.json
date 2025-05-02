@@ -91,6 +91,31 @@
         }
       ]
     },
+    "1058490579799003187": {
+        "server_name": "BeanLab",
+        "channels": [
+            {
+            "channel_id": 1282751976982970496,
+            "channel_name": "Ducks-Duck-Pond",
+            "feedback": {
+                "ta_review_channel_id": 1284224818698260490,
+                "allow_self_feedback": true
+            },
+            "ducks": [
+                {
+                "name": "standard-rubber-duck",
+                "workflow_type": "duck",
+                "weight": 1,
+                "settings": {
+                    "prompt_file": "prompts/standard-rubber-duck.txt",
+                    "engine": "gpt-4.1",
+                    "timeout": 600
+                }
+                }
+            ]
+            }
+        ]
+    },
     "1354902266246598928": {
       "server_name": "Physics",
       "channels": [
@@ -140,9 +165,9 @@
         {
           "channel_id": 1338619665789751337,
           "channel_name": "text-channels-duck-pond",
-          "allow_self_feedback": true,
           "feedback": {
-            "ta_review_channel_id": 1338619665789751337
+            "ta_review_channel_id": 1338619665789751337,
+            "allow_self_feedback": true
           },
           "ducks": [
             {
