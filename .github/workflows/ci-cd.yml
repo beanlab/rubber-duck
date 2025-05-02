@@ -76,18 +76,18 @@ jobs:
           DB_PORT=${{ secrets.DB_PORT }}
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json
-          ENV_FILE_S3_PATH=s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env
+          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json
+          ENV_FILE_S3_PATH=s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env
           ENVIRONMENT=pre-production
           EOL
 
       - name: Upload config and secrets to S3
         id: set_outputs
         run: |
-          CONFIG_S3_PATH="s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_PATH="s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
+          SECRETS_S3_PATH="s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
 
           # Debugging outputs
           echo "Config file path: $CONFIG_S3_PATH"
@@ -108,8 +108,8 @@ jobs:
       - name: Upload Arn
         id: arn_env
         run: |
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.short_sha }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.short_sha }}.env"
+          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
+          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
           echo "secrets_s3_path=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
 
   build_and_push:
