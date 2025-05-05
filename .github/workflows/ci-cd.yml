@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - 137-rubber-duck-admin-webhook-with-new-sha
   workflow_dispatch:
     inputs:
       local_config:
