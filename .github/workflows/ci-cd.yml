@@ -217,6 +217,9 @@ jobs:
           COMBINED="${{ needs.extract_sha.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
   
-          MESSAGE="Deployment completed successfully! \nDocker Tag: $COMBINED"
+          MESSAGE=
+          "```md
+          Deployment completed successfully! \nDocker Tag: $COMBINED
+          ```"
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
