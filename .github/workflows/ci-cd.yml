@@ -26,7 +26,7 @@ jobs:
       - name: Extract branch name
         id: extract_branch
         run: |
-          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')
+          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' | tr -cd '[:alnum:]-')
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
           echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
