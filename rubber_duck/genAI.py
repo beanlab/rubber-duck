@@ -46,18 +46,17 @@ class OpenAI():
 
 
 class AgentSDKAI():
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, prompt_file: Path):
         set_default_openai_key(openai_api_key)
-
+        self.prompt = Path(prompt_file).read_text()
     async def get_completion(self, engine, message_history) -> tuple[list, dict]:
         try:
-            DEEP_QUESTION_PROMPT = Path("prompts/agent1.txt").read_text()
-
             agent = Agent(
                 name="Teaching Assistant Agent",
-                instructions=DEEP_QUESTION_PROMPT,
+                instructions=self.prompt,
                 model=engine,
             )
+
             run_result = await Runner.run(agent, message_history, max_turns=1)
             assistant_text = run_result.final_output
             choices = [{

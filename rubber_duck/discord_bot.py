@@ -167,17 +167,18 @@ class MyClient(discord.Client):
 
         ai_client2 = AgentSDKAI(
             os.environ['OPENAI_API_KEY'],
+            config["rubber_duck"]["channels"][0]["ducks"][0]["agent_prompts"][0]["agent1_prompt"]
         )
 
         retryable_ai_client = RetryableGenAI(
-            ai_client,
+            ai_client2,
             self.send_message,
             self.report_error,
             self.typing,
             ai_completion_retry_protocol
         )
 
-        wrap_steps(ai_client, ['get_completion'])
+        wrap_steps(ai_client2, ['get_completion'])
 
         have_conversation = HaveStandardGptConversation(
             retryable_ai_client,
