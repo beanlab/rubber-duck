@@ -1,3 +1,4 @@
+from duck_orchestrator import DuckOrchestrator
 from .utils.protocols import Message
 from .utils.config_types import ServerConfig
 
@@ -6,6 +7,7 @@ class RubberDuckApp:
     def __init__(self, server_configs: dict[str, ServerConfig], command_channel: int, workflow_manager):
         self._command_channel = command_channel
         self._workflow_manager = workflow_manager
+        self._orchestrator = DuckOrchestrator(server_configs, workflow_manager)
 
         # Collect all duck channel IDs across all servers
         self._duck_channels = {
@@ -18,19 +20,16 @@ class RubberDuckApp:
         # Command channel
         if message['channel_id'] == self._command_channel:
             workflow_id = f'command-{message["message_id"]}'
+            # TODO make a workflow for commands?
             self._workflow_manager.start_workflow(
                 'command', workflow_id, message)
             return
 
         # Duck channel
         if message['channel_id'] in self._duck_channels:
+            # Call DuckOrchestrator
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
-            self._workflow_manager.start_workflow(
-                'duck',
-                workflow_id,
-                message["channel_id"],
-                message
-            )
+            await self._orchestrator(message["channel_id"], message)
 
         # Belongs to an existing conversation
         str_id = str(message["channel_id"])
