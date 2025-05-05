@@ -55,7 +55,7 @@ class BasicPromptWorkflow:
 
         prompt_file = duck_settings["prompt_file"]
         if prompt_file:
-            prompt = Path(prompt_file).read_text()
+            prompt = Path(prompt_file).read_text(encoding="utf-8")
         else:
             prompt = initial_message['content']
 
