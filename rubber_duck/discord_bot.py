@@ -174,7 +174,7 @@ class MyClient(discord.Client):
         )
 
         wrap_steps(ai_client, ['get_completion'])
-
+#
         have_conversation = HaveStandardGptConversation(
             retryable_ai_client,
             self.metrics_handler.record_message,

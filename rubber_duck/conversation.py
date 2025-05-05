@@ -41,14 +41,12 @@ class RecordUsage(Protocol):
 
 
 class GenAIClient(Protocol):
-    async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
+    async def get_completion(self, engine, message_history, check_response: bool) -> tuple[list, dict]: ...
 
-    async def check_completion(self, engine, message) -> tuple[list, dict]: ...
 
 class RetryableGenAIClient(Protocol):
     async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> tuple[list, dict]: ...
 
-    async def check_completion(self, engine, message) -> tuple[list, dict]: ...
 
 def generate_error_message(guild_id, thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
@@ -161,90 +159,4 @@ class HaveStandardGptConversation:
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
 
-
-class HaveCheckedGptConversation:
-    def __init__(self, ai_client: RetryableGenAIClient,
-                 record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
-                 retry_config: RetryConfig):
-        self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
-        self._send_message = step(send_message)
-        self._report_error = step(report_error)
-        self._ai_client = ai_client
-        self._typing = typing
-        self._retry_config = retry_config
-
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
-        async with queue('messages', None) as messages:
-            while True:
-                try:  # catch all errors
-                    try:
-                        # Waiting for a response from the user
-                        message: Message = await asyncio.wait_for(messages.get(), timeout)
-
-                    except asyncio.TimeoutError:  # Close the thread if the conversation has closed
-                        break
-
-                    if len(message['file']) > 0:
-                        await self._send_message(
-                            thread_id,
-                            "I'm sorry, I can't read file attachments. "
-                            "Please resend your message with the relevant parts of your file included in the message."
-                        )
-                        continue
-
-                    message_history.append(GPTMessage(role='user', content=message['content']))
-
-                    user_id = message['author_id']
-                    guild_id = message['guild_id']
-
-                    await self._record_message(
-                        guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
-                    )
-
-                    choices, usage = await self._ai_client.get_completion(guild_id, thread_id, engine, message_history)
-
-                    response_message = choices[0]['message']
-                    response = response_message['content'].strip()
-
-                    await self._record_usage(guild_id, thread_id, user_id,
-                                             engine,
-                                             usage['prompt_tokens'],
-                                             usage['completion_tokens'])
-
-                    checked_choices, checked_usage = await self._ai_client.check_completion(engine, response)
-
-                    checked_response_message = checked_choices[0]['message']
-                    checked_response = checked_response_message['content'].strip()
-
-                    await self._record_message(
-                        guild_id, thread_id, user_id, checked_response_message['role'], checked_response_message['content'])
-
-                    message_history.append(GPTMessage(role='assistant', content=checked_response))
-
-                    await self._send_message(thread_id, checked_response)
-
-                except GenAIException as ex:
-                    web_mention = ex.web_mention
-                    error_message, _ = generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id,
-                                             'I\'m having trouble processing your request, '
-                                             'I have notified your professor to look into the problem!')
-                    genai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{genai_error_message}\n{web_mention}")
-                    await self._report_error(error_message, True)
-                    break
-
-                except Exception as ex:
-                    error_message, error_code = generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵'
-                                             f'\nAn unexpected error occurred. Please contact support.'
-                                             f'\nError code for reference: {error_code}')
-                    await self._report_error(error_message)
-                    break
-
-            # After while loop
-            await self._send_message(thread_id, '*This conversation has been closed.*')
 
