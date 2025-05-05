@@ -204,3 +204,21 @@ jobs:
             --cluster DuckCluster-rubber-duck-pre-production \
             --services rubber-duck-pre-production-Service \
             --region ${{ secrets.AWS_REGION }}
+
+  send_sha_via_discord_webhook:
+    runs-on: ubuntu-latest
+    needs: deploy_to_cloudformation
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send SHA to Discord Webhook
+        run: |
+          SHORT_SHA="${{ needs.extract_sha.outputs.short_sha }}"
+          BRANCH_NAME="${{ needs.extract_sha.outputs.extract_branch }}"
+          COMBINED="${{ needs.extract_sha.outputs.combined }}"
+          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+          curl -X POST -H "Content-Type: application/json" -d '{
+            "content": "Deployment completed successfully! \nBranch: '"$BRANCH_NAME"' \nShort SHA: '"$SHORT_SHA"' \nCombined: '"$COMBINED"'"
+          }' "$DISCORD_WEBHOOK_URL"
