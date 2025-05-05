@@ -53,7 +53,8 @@ class BasicPromptWorkflow:
         duck_config = channel_config["ducks"][0]
         duck_settings = duck_config["settings"]
 
-        prompt_file = duck_settings["prompt_file"]
+        prompt_file = duck_settings["initial_prompt_file"]
+
         if prompt_file:
             prompt = Path(prompt_file).read_text()
         else:

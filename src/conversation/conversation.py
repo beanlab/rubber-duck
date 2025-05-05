@@ -79,6 +79,7 @@ class BasicSetupConversation:
         return message_history
 
 
+
 class HaveStandardGptConversation:
     def __init__(self, ai_client: RetryableGenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,

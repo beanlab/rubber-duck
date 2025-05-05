@@ -15,7 +15,7 @@ from .metrics.feedback import GetTAFeedback, GetConvoFeedback
 from .bot.discord_bot import DiscordBot, create_commands
 from .commands.bot_commands import BotCommands
 from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
-from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.gen_ai import OpenAI, RetryableGenAI, AgentSDKAI
 from .workflows.basic_prompt_workflow import BasicPromptWorkflow
 from .storage.sql_quest import create_sql_manager
 from .conversation.threads import SetupPrivateThread
@@ -109,6 +109,10 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     ai_client = OpenAI(
         os.environ['OPENAI_API_KEY'],
     )
+    # ai_client2 = AgentSDKAI(
+    #     os.environ['OPENAI_API_KEY'],
+    #     config['servers'][]
+    # )
 
     async def report_error(msg: str, notify_admins: bool = False):
         if notify_admins:
@@ -121,7 +125,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
                 logging.exception(f'Unable to message channel {command_channel}')
 
     retryable_ai_client = RetryableGenAI(
-        ai_client,
+        ai_client2,
         bot.send_message,
         report_error,
         bot.typing,

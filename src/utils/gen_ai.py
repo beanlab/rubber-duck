@@ -1,14 +1,23 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from agents import (
+    Agent,
+    Runner,
+    set_default_openai_key
+)
+
+
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig, generate_error_message
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
+
 
 
 class OpenAI():
@@ -26,6 +35,47 @@ class OpenAI():
             choices = completion_dict['choices']
             usage = completion_dict['usage']
             return choices, usage
+        except (
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
+            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
+                                         'please open up a separate conversation and try again') from ex
+        except (APIConnectionError, BadRequestError,
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                     "for more details on how to resolve this error") from ex
+
+class AgentSDKAI():
+    def __init__(self, openai_api_key: str, prompt_file: dict[str, str]):
+        set_default_openai_key(openai_api_key)
+        self.prompt1 = Path(prompt_file["teaching_assistant"]).read_text()
+    async def get_completion(self, engine, message_history) -> tuple[list, dict]:
+        try:
+            agent = Agent(
+                name="Teaching Assistant Agent",
+                instructions=self.prompt1,
+                model=engine,
+            )
+
+            run_result = await Runner.run(agent, message_history, max_turns=1)
+            assistant_text = run_result.final_output
+            choices = [{
+                "message": {
+                    "role": "assistant",
+                    "content": assistant_text
+                }
+            }]
+            usage_totals = {}
+            total_input = 0
+            total_output = 0
+            for resp in run_result.raw_responses:
+                u = resp.usage
+                total_input += u.input_tokens
+                total_output += u.output_tokens
+            usage_totals['prompt_tokens'] = total_input
+            usage_totals['completion_tokens'] = total_output
+            return choices, usage_totals
         except (
                 APITimeoutError, InternalServerError,
                 UnprocessableEntityError) as ex:
