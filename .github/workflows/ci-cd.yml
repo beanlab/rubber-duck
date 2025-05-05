@@ -145,12 +145,12 @@ jobs:
         run: |
           IMAGE_TAG="${{ needs.extract_sha.outputs.combined }}"
           echo "Tagging image as: $IMAGE_TAG"
-          
+
           docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
             844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-          
+
           docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-          
+
           # ✅ Set the output for use in other jobs
           echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -216,10 +216,8 @@ jobs:
         run: |
           COMBINED="${{ needs.extract_sha.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-  
-          MESSAGE=
-          "```md
-          Deployment completed successfully! \nDocker Tag: $COMBINED
-          ```"
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
+          MESSAGE="**Deployment completed successfully!**\n\n\`\`\`md\nDocker Tag: $COMBINED\n\`\`\`"
+          # Escape double quotes for JSON
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
