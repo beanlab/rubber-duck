@@ -170,7 +170,7 @@ jobs:
           COMBINED="${{ needs.extract_sha.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
 
-          MESSAGE="**Deployment completed successfully!**\n\n\`\`\`md\n$COMBINED\n\`\`\`"
+          MESSAGE="**Deployment completed successfully!**\n\n\`\`\`md\nCombined SHA and Branch:\n$COMBINED\n\`\`\`\n\nDocker image successfully pushed to ECR."
           # Escape double quotes for JSON
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
