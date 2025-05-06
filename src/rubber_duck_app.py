@@ -7,7 +7,6 @@ class RubberDuckApp:
     def __init__(self, server_configs: dict[str, ServerConfig], command_channel: int, workflow_manager):
         self._command_channel = command_channel
         self._workflow_manager = workflow_manager
-        self._orchestrator = DuckOrchestrator(server_configs, workflow_manager)
 
         # Collect all duck channel IDs across all servers
         self._duck_channels = {

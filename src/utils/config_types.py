@@ -27,7 +27,7 @@ class ChannelConfig:
     channel_name: str
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
     feedback_config: FeedbackConfig
-    duck_config: DuckConfig
+    duck_config: list[DuckConfig]
 
 
 class ServerConfig(TypedDict):
