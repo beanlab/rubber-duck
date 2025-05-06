@@ -23,8 +23,8 @@
       "server_name": "CS 110",
       "channels": [
         {
-          "channel_id": 1296158078017736725,
-          "channel_name": "general-cs110",
+          "channel_id": 1234556460453597276,
+          "channel_name": "general/duck-pond",
           "feedback": {
             "ta_review_channel_id": 1296158078017736725
           },
@@ -47,8 +47,8 @@
       "server_name": "CS 235",
       "channels": [
         {
-          "channel_id": 1327385245036838912,
-          "channel_name": "student-text-channels-cs235",
+          "channel_id": 1195490291134779502,
+          "channel_name": "student-text-channels/duck-pond",
           "feedback": {
             "ta_review_channel_id": 1327385245036838912
           },
@@ -71,8 +71,8 @@
       "server_name": "CS 111",
       "channels": [
         {
-          "channel_id": 1329934513333338244,
-          "channel_name": "cs111",
+          "channel_id": 1365456542287269919,
+          "channel_name": "Student Text Channels/duck-pond",
           "feedback": {
             "ta_review_channel_id": 1329934513333338244
           },
