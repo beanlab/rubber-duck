@@ -184,6 +184,10 @@ class DiscordBot(discord.Client):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    async def clear_reaction(self, channel_id: int, message_id: int, reaction: str):
+        message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.clear_reaction(reaction)
+
     def typing(self, channel_id: int):
         return self.get_channel(channel_id).typing()
 

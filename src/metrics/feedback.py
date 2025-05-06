@@ -71,7 +71,7 @@ class GetTAFeedback:
 
             try:
                 feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
-                    user_id, feedback_queue,
+                    user_id, feedback_queue, feedback_message_id, thread_id,
                     feedback_config.get('allow_self_feedback', False),
                     feedback_config.get('feedback_timeout', 604800)
                 )
@@ -85,13 +85,9 @@ class GetTAFeedback:
                 reviewer_id = 'nan'
 
             # Record score
-
             await self._record_feedback(workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score)
 
-            # Done
-
-    @staticmethod
-    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
+    async def _get_reviewer_feedback(self, user_id, feedback_queue, feedback_message_id, thread_id, allow_self_feedback, feedback_timeout):
         while True:
             # Wait for feedback to be given
             feedback_emoji, reviewer_id = await asyncio.wait_for(
