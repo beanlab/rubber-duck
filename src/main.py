@@ -140,15 +140,6 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         ai_completion_retry_protocol,
     )
 
-    duck_workflow = BasicPromptWorkflow(
-        server_config,
-        default_duck_workflow_config,
-        setup_thread,
-        setup_conversation,
-        have_conversation,
-        get_feedback,
-    )
-
     duck_orchestra = DuckOrchestrator(
         server_config,
         setup_thread,
@@ -157,7 +148,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     )
 
     workflows = {
-        'duck-orchestra': duck_workflow
+        'duck-orchestra': duck_orchestra,
     }
 
     def create_workflow(wtype: str):

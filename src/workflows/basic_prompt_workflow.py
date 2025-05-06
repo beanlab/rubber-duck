@@ -76,6 +76,4 @@ class BasicPromptWorkflow:
         async with alias(str(thread_id)):
             await self._have_conversation(thread_id, engine, message_history, timeout)
 
-        guild_id = initial_message['guild_id']
-        user_id = initial_message['author_id']
-        await self._get_feedback(duck_name, guild_id, thread_id, user_id, channel_id)
+
