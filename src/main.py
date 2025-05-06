@@ -4,6 +4,8 @@ import logging
 import os
 from pathlib import Path
 import boto3
+
+from duck_orchestrator import DuckOrchestrator
 from .utils.config_types import (
     Config, FeedbackConfig,
 )
@@ -147,8 +149,15 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         get_feedback,
     )
 
+    duck_orchestra = DuckOrchestrator(
+        server_config,
+        setup_thread,
+        setup_conversation,
+        get_feedback,
+    )
+
     workflows = {
-        'duck': duck_workflow
+        'duck-orchestra': duck_workflow
     }
 
     def create_workflow(wtype: str):

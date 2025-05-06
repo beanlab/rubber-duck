@@ -29,7 +29,12 @@ class RubberDuckApp:
         if message['channel_id'] in self._duck_channels:
             # Call DuckOrchestrator
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
-            await self._orchestrator(message["channel_id"], message)
+            self._workflow_manager.start_workflow(
+                'duck-orchestra',
+                workflow_id,
+                message['channel_id'],
+                message
+            )
 
         # Belongs to an existing conversation
         str_id = str(message["channel_id"])
