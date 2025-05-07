@@ -6,7 +6,7 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
+from utils.protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
 class RetryableException(Exception):
@@ -51,6 +51,9 @@ class RetryableGenAIClient(Protocol):
     async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
     tuple[list, dict]: ...
 
+class HaveConversation(Protocol):
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
+
 
 def generate_error_message(guild_id, thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
@@ -63,6 +66,7 @@ def generate_error_message(guild_id, thread_id, ex):
         '\n'.join(tb.format_exception(ex))
     )
     return error_message, error_code
+
 
 
 class BasicSetupConversation:

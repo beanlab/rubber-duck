@@ -89,7 +89,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     )
 
     feedback_config: dict[int, FeedbackConfig] = {
-        channel["channel_id"]: channel["feedback"]
+        channel["channel_id"]: channel["feedback_config"]
         for server in server_config.values()
         for channel in server["channels"]
     }
@@ -140,11 +140,26 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         ai_completion_retry_protocol,
     )
 
+    # have_agentic_conversation = HaveAgenticConversation(
+    #     retryable_ai_client,
+    #     metrics_handler.record_message,
+    #     metrics_handler.record_usage,
+    #     bot.send_message,
+    #     report_error,
+    #     bot.typing,
+    #     ai_completion_retry_protocol,
+    # )
+
+    conversation_types = {
+        'standard_conversation': have_conversation,
+    }
+
     duck_orchestra = DuckOrchestrator(
         server_config,
         setup_thread,
         setup_conversation,
         get_feedback,
+        conversation_types
     )
 
     workflows = {
