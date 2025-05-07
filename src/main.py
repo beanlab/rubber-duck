@@ -4,6 +4,10 @@ import logging
 import os
 from pathlib import Path
 import boto3
+from quest import queue
+
+from conversation.conversation import HaveTAGradingConversation
+from workflows.grading_workflow import GradingWorkflow
 from .utils.config_types import (
     Config, FeedbackConfig,
 )
@@ -87,7 +91,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     )
 
     feedback_config: dict[int, FeedbackConfig] = {
-        channel["channel_id"]: channel["feedback"]
+        channel["channel_id"]: channel["feedback_config"]
         for server in server_config.values()
         for channel in server["channels"]
     }
@@ -138,6 +142,22 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         ai_completion_retry_protocol,
     )
 
+
+
+    have_ta_conversation = HaveTAGradingConversation(
+        metrics_handler.record_message,
+        bot.send_message,
+        report_error,
+        bot.typing,
+        get_feedback,
+        get_from_queue=lambda x: x,
+    )
+
+    grading_workflow = GradingWorkflow(
+        setup_thread,
+        have_ta_conversation,
+    )
+
     duck_workflow = BasicPromptWorkflow(
         server_config,
         default_duck_workflow_config,
@@ -147,14 +167,18 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         get_feedback,
     )
 
+    async def queue_initializer(queue_name: str, identity: str):
+        async with queue(queue_name, identity):
+            await asyncio.Event().wait()
+
     workflows = {
-        'duck': duck_workflow
+        'duck': duck_workflow,
+        'grading': grading_workflow,
     }
 
     def create_workflow(wtype: str):
         if wtype in workflows:
             return workflows[wtype]
-
         raise NotImplementedError(f'No workflow of type {wtype}')
 
     namespace = 'rubber-duck'  # TODO - move to config.

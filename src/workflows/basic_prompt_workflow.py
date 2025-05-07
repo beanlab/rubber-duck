@@ -3,10 +3,11 @@ from typing import Protocol
 
 from quest import step, alias
 
-from ..conversation.conversation import GPTMessage
-from ..metrics.feedback import GetConvoFeedback
-from ..utils.config_types import ServerConfig
-from ..utils.protocols import Message
+from utils.protocols import PutToQueue
+from conversation.conversation import GPTMessage
+
+from utils.config_types import ServerConfig
+from utils.protocols import Message
 
 
 class SetupThread(Protocol):
@@ -22,6 +23,8 @@ class SetupConversation(Protocol):
 class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
+class HaveTAConversation(Protocol):
+    async def __call__(self, thread_id: int, message_history: list[GPTMessage], timeout: int = 600): ...
 
 class BasicPromptWorkflow:
     def __init__(self,
@@ -30,7 +33,7 @@ class BasicPromptWorkflow:
                  setup_thread: SetupThread,
                  setup_conversation: SetupConversation,
                  have_conversation: HaveConversation,
-                 get_feedback: GetConvoFeedback,
+                 put_to_queue: PutToQueue
                  ):
 
         self._server_config = server_config
@@ -40,7 +43,7 @@ class BasicPromptWorkflow:
         self._setup_thread = step(setup_thread)
         self._setup_conversation = step(setup_conversation)
         self._have_conversation = step(have_conversation)
-        self._get_feedback = step(get_feedback)
+        self._put_to_queue = step(put_to_queue)
 
     def _get_channel_settings(self, channel_id: int, initial_message: Message):
         # Find the channel configuration using the channel_id
@@ -78,4 +81,4 @@ class BasicPromptWorkflow:
 
         guild_id = initial_message['guild_id']
         user_id = initial_message['author_id']
-        await self._get_feedback(duck_name, guild_id, thread_id, user_id, channel_id)
+        await self._put_to_queue()

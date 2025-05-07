@@ -14,6 +14,14 @@ class RubberDuckApp:
             for channel in server["channels"]
         }
 
+        self._grading_channels = {
+            channel["feedback_config"]["ta_review_channel_id"]
+            for server in server_configs.values()
+            for channel in server["channels"]
+            if channel.get("feedback_config") and "ta_review_channel_id" in channel["feedback_config"]
+        }
+
+
     async def route_message(self, message: Message):
         # Command channel
         if message['channel_id'] == self._command_channel:
@@ -27,6 +35,16 @@ class RubberDuckApp:
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
             self._workflow_manager.start_workflow(
                 'duck',
+                workflow_id,
+                message["channel_id"],
+                message
+            )
+
+        # Grading channel
+        if message['channel_id'] in self._grading_channels:
+            workflow_id = f'grading-{message["channel_id"]}-{message["message_id"]}'
+            self._workflow_manager.start_workflow(
+                'grading',
                 workflow_id,
                 message["channel_id"],
                 message
