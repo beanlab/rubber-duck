@@ -138,7 +138,7 @@
       "server_name": "Duck Demo",
       "channels": [
         {
-          "channel_id": 1338619665789751337,
+          "channel_id": 1338616283671040000,
           "channel_name": "text-channels-duck-pond",
           "allow_self_feedback": true,
           "feedback": {
