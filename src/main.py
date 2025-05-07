@@ -3,22 +3,24 @@ import json
 import logging
 import os
 from pathlib import Path
+
 import boto3
-from .utils.config_types import (
-    Config, FeedbackConfig,
-)
+
+from .bot.discord_bot import DiscordBot, create_commands
+from .commands.bot_commands import BotCommands
+from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
+from .conversation.threads import SetupPrivateThread
+from .metrics.feedback import GetTAFeedback, GetConvoFeedback
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
-from .metrics.feedback import GetTAFeedback, GetConvoFeedback
-from .bot.discord_bot import DiscordBot, create_commands
-from .commands.bot_commands import BotCommands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
+from .storage.sql_quest import create_sql_manager
+from .utils.config_types import (
+    Config, FeedbackConfig,
+)
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .workflows.basic_prompt_workflow import BasicPromptWorkflow
-from .storage.sql_quest import create_sql_manager
-from .conversation.threads import SetupPrivateThread
 
 logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
@@ -80,7 +82,12 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     reporter = Reporter(metrics_handler, config['reporting'])  # TODO get the config to work with this
 
     # Feedback
+    async def cache_message(channel_id, message_id):
+        message = await (await bot.fetch_channel(channel_id)).fetch_message(message_id)
+        await message.edit(content=message.content)
+
     get_ta_feedback = GetTAFeedback(
+        cache_message,
         bot.send_message,
         bot.add_reaction,
         metrics_handler.record_feedback,
@@ -181,17 +188,22 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
+
+    import quest
+
+    quest.utils.quest_logger.level = logging.DEBUG
 
     # Set up logging based on user preference
     if args.log_console:
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.DEBUG if args.debug else logging.WARNING,
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
     else:
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.DEBUG if args.debug else logging.WARNING,
             filename='logfile.log',  # Replace LOG_FILE with the actual log file path
             format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
         )
@@ -202,6 +214,7 @@ if __name__ == '__main__':
     if config is None:
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
-    
+
     import asyncio
+
     asyncio.run(main(config))

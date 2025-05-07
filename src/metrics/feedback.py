@@ -29,10 +29,12 @@ class GetConvoFeedback:
 
 class GetTAFeedback:
     def __init__(self,
+                 cache_message,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
                  record_feedback: RecordFeedback
                  ):
+        self._cache_message = cache_message
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
         self._record_feedback = record_feedback
@@ -47,36 +49,40 @@ class GetTAFeedback:
 
     # Implements GetFeedback Protocol
     async def __call__(self, workflow_type, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
+        # Alert reviewers
         review_message_content = (
             f"How effective was this conversation: "
             f"https://discord.com/channels/{guild_id}/{thread_id}/{user_id}"
-        )
-        feedback_message_content = (
-            f"On a scale of 1 to 5, "
-            f"how effective was this conversation: "
         )
 
         if 'reviewer_role_id' in feedback_config:
             review_message_content = f"<@{feedback_config['reviewer_role_id']}> {review_message_content}"
 
-        feedback_message_id = await self._send_message(thread_id, feedback_message_content)
+        reviewer_channel_id = feedback_config['ta_review_channel_id']
+        review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
 
-        async with alias(str(feedback_message_id)), queue("feedback", None) as feedback_queue:
-            for reaction in self._reactions:
-                await self._add_reaction(thread_id, feedback_message_id, reaction)
-                await asyncio.sleep(0.5)  # per discord policy, we wait
+        # Add emojis to reviewer message
+        for reaction in self._reactions:
+            await self._add_reaction(reviewer_channel_id, review_message_id, reaction)
+            await asyncio.sleep(0.5)  # per discord policy, we wait
 
-            reviewer_channel_id = feedback_config['ta_review_channel_id']
-            review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
+        # Add link to reviewer message in thread
+        link_to_review_message = (
+            f"Go back to review channel: "
+            f"https://discord.com/channels/{guild_id}/{reviewer_channel_id}/{review_message_id}"
+        )
+        await self._send_message(thread_id, link_to_review_message)
 
+        # Wait for feedback
+        async with alias(str(review_message_id)), queue("feedback", None) as feedback_queue:
             try:
                 feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
+                    reviewer_channel_id, review_message_id,
                     user_id, feedback_queue,
                     feedback_config.get('allow_self_feedback', False),
                     feedback_config.get('feedback_timeout', 604800)
                 )
                 feedback_score = self._reactions[feedback_emoji]
-                await self._add_reaction(thread_id, feedback_message_id, '✅')
                 await self._add_reaction(reviewer_channel_id, review_message_id, '✅')
 
             except asyncio.TimeoutError:
@@ -90,8 +96,9 @@ class GetTAFeedback:
 
             # Done
 
-    @staticmethod
-    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
+    async def _get_reviewer_feedback(self, channel_id, message_id, user_id, feedback_queue, allow_self_feedback,
+                                     feedback_timeout):
+        await self._cache_message(channel_id, message_id)
         while True:
             # Wait for feedback to be given
             feedback_emoji, reviewer_id = await asyncio.wait_for(
