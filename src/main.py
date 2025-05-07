@@ -138,32 +138,24 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         report_error,
         bot.typing,
         ai_completion_retry_protocol,
+        setup_conversation
     )
 
-    # have_agentic_conversation = HaveAgenticConversation(
-    #     retryable_ai_client,
-    #     metrics_handler.record_message,
-    #     metrics_handler.record_usage,
-    #     bot.send_message,
-    #     report_error,
-    #     bot.typing,
-    #     ai_completion_retry_protocol,
-    # )
-
-    conversation_types = {
+    ducks = {
         'standard_conversation': have_conversation,
     }
+    
+    remember_conversation = BasicPromptWorkflo
 
-    duck_orchestra = DuckOrchestrator(
-        server_config,
+    duck_orchestrator = DuckOrchestrator(
         setup_thread,
-        setup_conversation,
-        get_feedback,
-        conversation_types
+        ducks,
+        remember_conversation
+        
     )
 
     workflows = {
-        'duck-orchestra': duck_orchestra,
+        'duck-orchestra': duck_orchestrator,
     }
 
     def create_workflow(wtype: str):

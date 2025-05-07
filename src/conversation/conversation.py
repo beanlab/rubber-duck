@@ -2,6 +2,7 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
+from pathlib import Path
 from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
@@ -87,7 +88,9 @@ class HaveStandardGptConversation:
     def __init__(self, ai_client: RetryableGenAIClient,
                  record_message: RecordMessage, record_usage: RecordUsage,
                  send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
-                 retry_config: RetryConfig):
+                 retry_config: RetryConfig,
+                 setup_conversation: BasicSetupConversation
+                 ):
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._send_message = step(send_message)
@@ -96,8 +99,23 @@ class HaveStandardGptConversation:
         wrap_steps(self._ai_client, ['get_completion'])
         self._typing = typing
         self._retry_config = retry_config
+        self._setup_conversation = step(setup_conversation)
 
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+
+        prompt_file = settings["prompt_file"]
+        if prompt_file:
+            prompt = Path(prompt_file).read_text(encoding="utf-8")
+        else:
+            prompt = initial_message['content']
+
+        # Get engine and timeout from duck settings, falling back to defaults if not set
+        engine = settings["engine"]
+        timeout = settings["timeout"]
+
+        message_history = await self._setup_conversation(thread_id, prompt, initial_message)
+
+
         async with queue('messages', None) as messages:
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
