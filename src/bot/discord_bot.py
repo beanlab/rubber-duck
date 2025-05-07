@@ -1,11 +1,13 @@
-import logging
 
 import discord
 
+from utils.logger import DuckLogger
 from ..commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, \
     StatusCommand, \
     ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
 from ..utils.protocols import Attachment, Message
+
+logger = DuckLogger("Discord Bot", use_colors=True)
 
 
 def as_message(message: discord.Message) -> Message:
@@ -101,20 +103,20 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         # print out information when the bot wakes up
-        logging.info('Logged in as')
-        logging.info(self.user.name)
-        logging.info(self.user.id)
-        logging.info('Starting workflow manager')
+        logger.info('Logged in as')
+        logger.info(f'{self.user.name}')
+        logger.info(f'{self.user.id}')
+        logger.info('Starting workflow manager')
 
         try:
             await self.send_message(self._command_channel, 'Duck online')
         except:
-            logging.exception(f'Unable to message channel {self._command_channel}')
+            logger.error(f'Unable to message channel {self._command_channel}')
 
-        logging.info('------')
+        logger.info('------')
 
     async def close(self):
-        logging.warning("-- Suspending --")
+        logger.warning("-- Suspending --")
         await super().close()
 
     async def on_message(self, message: discord.Message):
@@ -149,7 +151,7 @@ class DiscordBot(discord.Client):
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
         if channel is None:
-            await self.report_error(f'Tried to send message on {channel_id}, but no channel found.')
+            logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
         curr_message = None
@@ -178,7 +180,7 @@ class DiscordBot(discord.Client):
             msg = await channel.fetch_message(message_id)
             await msg.edit(content=new_content)
         except Exception as e:
-            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+            logger.error(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
     async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)

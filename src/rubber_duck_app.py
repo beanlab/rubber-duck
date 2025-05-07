@@ -1,6 +1,9 @@
+from utils.logger import DuckLogger
 from .utils.protocols import Message
 from .utils.config_types import ServerConfig
 
+# Initialize logger without explicit level to respect DEBUG environment variable
+logger = DuckLogger("app", use_colors=True)
 
 class RubberDuckApp:
     def __init__(self, server_configs: dict[str, ServerConfig], command_channel: int, workflow_manager):
@@ -13,10 +16,13 @@ class RubberDuckApp:
             for server in server_configs.values()
             for channel in server["channels"]
         }
+        logger.info("Starting Rubber Duck App")
+        logger.debug(f"Initialized with channels: {self._duck_channels}")
 
     async def route_message(self, message: Message):
         # Command channel
         if message['channel_id'] == self._command_channel:
+            logger.debug(f"Command channel message: {message}")
             workflow_id = f'command-{message["message_id"]}'
             self._workflow_manager.start_workflow(
                 'command', workflow_id, message)
@@ -24,6 +30,7 @@ class RubberDuckApp:
 
         # Duck channel
         if message['channel_id'] in self._duck_channels:
+            logger.debug(f"Duck channel message: {message}")
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
             self._workflow_manager.start_workflow(
                 'duck',
@@ -35,6 +42,7 @@ class RubberDuckApp:
         # Belongs to an existing conversation
         str_id = str(message["channel_id"])
         if self._workflow_manager.has_workflow(str_id):
+            logger.debug(f"Existing conversation message: {message}")
             await self._workflow_manager.send_event(
                 str_id, 'messages', None, 'put',
                 message
@@ -44,6 +52,7 @@ class RubberDuckApp:
 
     async def route_reaction(self, emoji, message_id, user_id):
         workflow_alias = str(message_id)
+        logger.debug(f"Processing reaction: {emoji} from user {user_id} on message {message_id}")
 
         if self._workflow_manager.has_workflow(workflow_alias):
             await self._workflow_manager.send_event(

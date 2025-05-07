@@ -1,9 +1,11 @@
 import argparse
 import json
-import logging
 import os
 from pathlib import Path
 import boto3
+import asyncio
+
+from utils.logger import DuckLogger
 from .utils.config_types import (
     Config, FeedbackConfig,
 )
@@ -20,9 +22,12 @@ from .workflows.basic_prompt_workflow import BasicPromptWorkflow
 from .storage.sql_quest import create_sql_manager
 from .conversation.threads import SetupPrivateThread
 
-logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
+# Create logs directory if it doesn't exist
+LOGS_DIR = Path('logs')
+LOGS_DIR.mkdir(exist_ok=True)
+LOG_FILE = LOGS_DIR / 'duck.log'
 
+logger = DuckLogger("main", log_file=str(LOG_FILE))
 
 def fetch_config_from_s3() -> Config | None:
     # Initialize S3 client
@@ -31,33 +36,38 @@ def fetch_config_from_s3() -> Config | None:
     # Add a section to your env file to allow for local and production environment
     environment = os.environ.get('ENVIRONMENT')
     if not environment or environment == 'LOCAL':
+        logger.info("Using local environment")
         return None
 
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
     if not s3_path:
+        logger.warning("No S3 path configured")
         return None
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    logging.info(bucket_name)
-    logging.info(key)
+    logger.info(f"Fetching config from bucket: {bucket_name}")
+    logger.info(f"Config key: {key}")
+    
     try:
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
         # Read the content of the file and parse it as JSON
         config = json.loads(response['Body'].read().decode('utf-8'))
+        logger.info("Successfully loaded config from S3")
         return config
 
     except Exception as e:
-        print(f"Failed to fetch config from S3: {e}")
+        logger.error(f"Failed to fetch config from S3: {e}")
         return None
 
 
 # Function to load the configuration from a local file (if needed)
 def load_local_config(file_path: Path) -> Config:
+    logger.info(f"Loading local config from {file_path}")
     return json.loads(file_path.read_text())
 
 
@@ -118,7 +128,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
             try:
                 await bot.send_message(command_channel, msg)
             except:
-                logging.exception(f'Unable to message channel {command_channel}')
+                logger.exception(f'Unable to message channel {command_channel}')
 
     retryable_ai_client = RetryableGenAI(
         ai_client,
@@ -181,20 +191,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
+
+    # Set debug environment variable if debug flag is set
+    if args.debug:
+        os.environ['DEBUG'] = '1'
 
     # Set up logging based on user preference
     if args.log_console:
-        logging.basicConfig(
-            level=logging.WARNING,
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
+        logger = DuckLogger('main', use_colors=True)  # Console-only logging with colors
     else:
-        logging.basicConfig(
-            level=logging.WARNING,
-            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
+        logger = DuckLogger('main', log_file='/tmp/duck.log')  # File logging
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
@@ -203,5 +211,4 @@ if __name__ == '__main__':
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
     
-    import asyncio
     asyncio.run(main(config))
