@@ -1,38 +1,21 @@
-from duck_orchestrator import DuckOrchestrator
+from utils.config_types import ChannelConfig
 from .utils.protocols import Message
-from .utils.config_types import ServerConfig
 
 
 class RubberDuckApp:
-    def __init__(self, server_configs: dict[str, ServerConfig], command_channel: int, workflow_manager):
-        self._command_channel = command_channel
+    def __init__(self, channel_configs: dict[int, ChannelConfig], workflow_manager):
         self._workflow_manager = workflow_manager
-        self._orchestrator = DuckOrchestrator(server_configs, workflow_manager)
-
-        # Collect all duck channel IDs across all servers
-        self._duck_channels = {
-            channel["channel_id"]
-            for server in server_configs.values()
-            for channel in server["channels"]
-        }
+        self._channel_configs = channel_configs
 
     async def route_message(self, message: Message):
-        # Command channel
-        if message['channel_id'] == self._command_channel:
-            workflow_id = f'command-{message["message_id"]}'
-            # TODO make a workflow for commands?
-            self._workflow_manager.start_workflow(
-                'command', workflow_id, message)
-            return
-
         # Duck channel
-        if message['channel_id'] in self._duck_channels:
+        if message['channel_id'] in self._channel_configs:
             # Call DuckOrchestrator
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
             self._workflow_manager.start_workflow(
-                'duck-orchestra',
+                'duck-orchestrator',
                 workflow_id,
-                message['channel_id'],
+                self._channel_configs[message['channel_id']],
                 message
             )
 
@@ -54,4 +37,3 @@ class RubberDuckApp:
                 workflow_alias, 'feedback', None, 'put',
                 (emoji, user_id)
             )
-

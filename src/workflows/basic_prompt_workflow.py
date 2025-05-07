@@ -19,10 +19,6 @@ class SetupConversation(Protocol):
     async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]: ...
 
 
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
-
-
 class BasicPromptWorkflow:
     def __init__(self,
                  server_config: dict[str, ServerConfig],

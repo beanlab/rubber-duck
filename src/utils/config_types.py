@@ -22,12 +22,11 @@ class DuckConfig(TypedDict):
     settings: dict
 
 
-class ChannelConfig:
+class ChannelConfig(TypedDict):
     channel_id: int
     channel_name: str
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
-    feedback_config: FeedbackConfig
-    duck_config: DuckConfig
+    ducks: list[DuckConfig]
 
 
 class ServerConfig(TypedDict):
