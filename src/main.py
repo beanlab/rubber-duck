@@ -145,13 +145,12 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         'standard_conversation': have_conversation,
     }
     
-    remember_conversation = BasicPromptWorkflo
+    remember_conversation = `
 
     duck_orchestrator = DuckOrchestrator(
         setup_thread,
         ducks,
         remember_conversation
-        
     )
 
     workflows = {
@@ -165,6 +164,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         raise NotImplementedError(f'No workflow of type {wtype}')
 
     namespace = 'rubber-duck'  # TODO - move to config.
+
     workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
 
     commands = create_commands(bot.send_message, metrics_handler, reporter,
