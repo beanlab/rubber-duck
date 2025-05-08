@@ -102,8 +102,8 @@ class DiscordBot(discord.Client):
     async def on_ready(self):
         # print out information when the bot wakes up
         duck_logger.info('Logged in as')
-        duck_logger.info(f'{self.user.name}')
-        duck_logger.info(f'{self.user.id}')
+        duck_logger.info(self.user.name)
+        duck_logger.info(self.user.id)
         duck_logger.info('Starting workflow manager')
 
         try:
