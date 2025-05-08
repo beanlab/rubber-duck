@@ -15,6 +15,12 @@ from .conversation.conversation import BasicSetupConversation, HaveStandardGptCo
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
+import asyncio
+
+from utils.logger import duck_logger
+from .utils.config_types import (
+    Config, FeedbackConfig,
+)
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
@@ -25,10 +31,6 @@ from .utils.config_types import (
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.persistent_queue import PersistentQueue
 
-logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
-
-
 def fetch_config_from_s3() -> Config | None:
     # Initialize S3 client
     s3 = boto3.client('s3')
@@ -36,33 +38,38 @@ def fetch_config_from_s3() -> Config | None:
     # Add a section to your env file to allow for local and production environment
     environment = os.environ.get('ENVIRONMENT')
     if not environment or environment == 'LOCAL':
+        duck_logger.info("Using local environment")
         return None
 
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
     if not s3_path:
+        duck_logger.warning("No S3 path configured")
         return None
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    logging.info(bucket_name)
-    logging.info(key)
+    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.info(f"Config key: {key}")
+
     try:
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
         # Read the content of the file and parse it as JSON
         config = json.loads(response['Body'].read().decode('utf-8'))
+        duck_logger.info("Successfully loaded config from S3")
         return config
 
     except Exception as e:
-        print(f"Failed to fetch config from S3: {e}")
+        duck_logger.error(f"Failed to fetch config from S3: {e}")
         return None
 
 
 # Function to load the configuration from a local file (if needed)
 def load_local_config(file_path: Path) -> Config:
+    duck_logger.info(f"Loading local config from {file_path}")
     return json.loads(file_path.read_text())
 
 
@@ -114,7 +121,7 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
             try:
                 await bot.send_message(command_channel, msg)
             except:
-                logging.exception(f'Unable to message channel {command_channel}')
+                duck_logger.exception(f'Unable to message channel {command_channel}')
 
     retryable_ai_client = RetryableGenAI(
         ai_client,
@@ -195,23 +202,16 @@ async def main(config: Config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--log-console', action='store_true')
-    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
 
-    # Set up logging based on user preference
-    if args.log_console:
-        logging.basicConfig(
-            level=logging.WARNING,
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
+    # Set debug environment variable if debug flag is set
+    if args.debug:
+        duck_logger.setLevel(logging.DEBUG)
+        from quest.utils import quest_logger
+        quest_logger.setLevel(logging.DEBUG)
     else:
-        logging.basicConfig(
-            level=logging.WARNING,
-            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
-
+        duck_logger.setLevel(logging.INFO)
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
 
@@ -220,5 +220,6 @@ if __name__ == '__main__':
         config = load_local_config(args.config)
 
     import asyncio
+
 
     asyncio.run(main(config))

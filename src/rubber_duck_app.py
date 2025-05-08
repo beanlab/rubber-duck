@@ -1,6 +1,6 @@
 from .utils.config_types import ChannelConfig
+from utils.logger import duck_logger
 from .utils.protocols import Message
-
 
 class RubberDuckApp:
     def __init__(self, channel_configs: dict[int, ChannelConfig], workflow_manager):
@@ -22,6 +22,7 @@ class RubberDuckApp:
         # Belongs to an existing conversation
         str_id = str(message["channel_id"])
         if self._workflow_manager.has_workflow(str_id):
+            duck_logger.debug(f"Existing conversation message: {message}")
             await self._workflow_manager.send_event(
                 str_id, 'messages', None, 'put',
                 message
@@ -31,6 +32,7 @@ class RubberDuckApp:
 
     async def route_reaction(self, emoji, message_id, user_id):
         workflow_alias = str(message_id)
+        duck_logger.debug(f"Processing reaction: {emoji} from user {user_id} on message {message_id}")
 
         if self._workflow_manager.has_workflow(workflow_alias):
             await self._workflow_manager.send_event(
