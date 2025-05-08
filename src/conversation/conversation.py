@@ -212,7 +212,7 @@ class HaveTAGradingConversation:
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
 
 
-        channels_to_review = settings["channels_to_review"]
+        channel_to_review = settings["channel_to_review"]
         timeout = settings["timeout"]
         message_history = []
 
@@ -234,7 +234,7 @@ class HaveTAGradingConversation:
                             continue
 
                         elif user_input == '/next':
-                            conversation_link = self._feedback_manager.get_conversation()
+                            conversation_link = await self._feedback_manager.get_conversation(channel_to_review)
                             if not conversation_link:
                                 await self._send_message(thread_id, "No more conversations to review.")
                                 continue

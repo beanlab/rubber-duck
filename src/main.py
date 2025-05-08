@@ -6,6 +6,8 @@ from pathlib import Path
 import boto3
 
 from duck_orchestrator import DuckOrchestrator
+from metrics.feedback_manager import FeedbackManager
+from utils.persistent_queue import PersistentQueue
 from .utils.config_types import (
     Config, FeedbackConfig,
 )
@@ -16,9 +18,8 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .metrics.feedback import GetTAFeedback, GetConvoFeedback
 from .bot.discord_bot import DiscordBot, create_commands
 from .commands.bot_commands import BotCommands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
+from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation, HaveTAGradingConversation
 from .utils.gen_ai import OpenAI, RetryableGenAI
-from .workflows.basic_prompt_workflow import BasicPromptWorkflow
 from .storage.sql_quest import create_sql_manager
 from .conversation.threads import SetupPrivateThread
 
@@ -141,16 +142,35 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         setup_conversation
     )
 
+    persistent_queues = dict[int, PersistentQueue] = {}
+    for server in server_config.values():
+        for channel in server["channels"]:
+            channel_id = channel["channel_id"]
+            persistent_queues[channel_id] = PersistentQueue(channel_id, sql_session)
+
+
+    feedback_manager = FeedbackManager(
+        persistent_queues
+    )
+
+    have_ta_conversation = HaveTAGradingConversation(
+        metrics_handler.record_message,
+        bot.send_message,
+        report_error,
+        bot.typing,
+        get_feedback,
+        feedback_manager
+    )
+
     ducks = {
         'standard_conversation': have_conversation,
     }
     
-    remember_conversation = `
 
     duck_orchestrator = DuckOrchestrator(
         setup_thread,
         ducks,
-        remember_conversation
+        feedback_manager.remember_conversation
     )
 
     workflows = {
@@ -166,6 +186,8 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     namespace = 'rubber-duck'  # TODO - move to config.
 
     workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
+
+
 
     commands = create_commands(bot.send_message, metrics_handler, reporter,
                                workflow_manager.get_workflow_metrics)

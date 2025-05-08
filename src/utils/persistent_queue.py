@@ -5,11 +5,12 @@ from quest.extras.sql import SqlBlobStorage
 
 
 class PersistentQueue:
-    def __init__(self, name: str, session):
+    def __init__(self, channel_id: int, session):
         # Use the provided SQL session
-        self._storage = SqlBlobStorage(name, session)
-        self._history = PersistentHistory(namespace=f"queue-{name}", storage=self._storage)
+        self._storage = SqlBlobStorage(f'{channel_id}', session)
+        self._history = PersistentHistory(namespace=f"queue-{channel_id}", storage=self._storage)
         self._queue = asyncio.Queue()
+        self.channel_id = channel_id
 
         # Restore queue state from history
         if self._history:
@@ -17,6 +18,9 @@ class PersistentQueue:
             if last_state['type'] == 'queue_state':
                 for item in last_state['state']:
                     self._queue.put_nowait(item)
+
+    def get_channel_id(self):
+        return self.channel_id
 
     async def put(self, item):
         await self._queue.put(item)

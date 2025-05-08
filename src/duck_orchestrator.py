@@ -19,7 +19,7 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  ducks: dict[str, HaveConversation],
-                 remember_conversation: Callable[[ChannelConfig, int], None]
+                 remember_conversation: Callable[[int, ChannelConfig, int], None]
                  ):
 
         self._setup_thread = step(setup_thread)
@@ -90,4 +90,4 @@ class DuckOrchestrator:
             await duck(thread_id, settings, initial_message)
 
         # Remember conversation
-        self._remember_conversation(channel_config, thread_id)
+        self._remember_conversation(initial_message['guild_id'], channel_config, thread_id)
