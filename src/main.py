@@ -3,25 +3,27 @@ import json
 import logging
 import os
 from pathlib import Path
-import boto3
 
-from duck_orchestrator import DuckOrchestrator
-from metrics.feedback_manager import FeedbackManager
-from utils.persistent_queue import PersistentQueue
-from .utils.config_types import (
-    Config, FeedbackConfig,
-)
+import boto3
+from quest import these
+from quest.extras.sql import SqlBlobStorage
+
+from .bot.discord_bot import DiscordBot
+from .commands.bot_commands import BotCommands
+from .commands.command import create_commands
+from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation, HaveTAGradingConversation
+from .conversation.threads import SetupPrivateThread
+from .duck_orchestrator import DuckOrchestrator
+from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
-from .metrics.feedback import GetTAFeedback, GetConvoFeedback
-from .bot.discord_bot import DiscordBot, create_commands
-from .commands.bot_commands import BotCommands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation, HaveTAGradingConversation
-from .utils.gen_ai import OpenAI, RetryableGenAI
 from .storage.sql_quest import create_sql_manager
-from .conversation.threads import SetupPrivateThread
+from .utils.config_types import (
+    Config, )
+from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.persistent_queue import PersistentQueue
 
 logging.basicConfig(level=logging.INFO)
 LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
@@ -64,7 +66,25 @@ def load_local_config(file_path: Path) -> Config:
     return json.loads(file_path.read_text())
 
 
-def setup_workflow_manager(config: Config, bot: DiscordBot):
+def setup_workflow_manager(duck_orchestrator, sql_session):
+    workflows = {
+        'duck-orchestrator': duck_orchestrator,
+    }
+
+    def create_workflow(wtype: str):
+        if wtype in workflows:
+            return workflows[wtype]
+
+        raise NotImplementedError(f'No workflow of type {wtype}')
+
+    namespace = 'rubber-duck'  # TODO - move to config.
+
+    workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
+
+    return workflow_manager
+
+
+def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
     # admin settings
     admin_settings = config['admin_settings']
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
@@ -72,38 +92,11 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
     # Command channel feature
     command_channel = admin_settings['admin_channel_id']
 
-    # Convert config to typed dictionaries
-    server_config = config['servers']
-    default_duck_workflow_config = config['default_duck_settings']
-
     # SQLMetricsHandler initialization
-    sql_session = create_sql_session(config['sql'])
     metrics_handler = SQLMetricsHandler(sql_session)
 
+    # TODO - use this
     reporter = Reporter(metrics_handler, config['reporting'])  # TODO get the config to work with this
-
-    # Feedback
-    get_ta_feedback = GetTAFeedback(
-        bot.send_message,
-        bot.add_reaction,
-        metrics_handler.record_feedback,
-    )
-
-    feedback_config: dict[int, FeedbackConfig] = {
-        channel["channel_id"]: channel["feedback_config"]
-        for server in server_config.values()
-        for channel in server["channels"]
-    }
-
-    get_feedback = GetConvoFeedback(
-        feedback_config,
-        get_ta_feedback
-    )
-    # TODO: remove weights from config
-    setup_thread = SetupPrivateThread(
-        bot.create_thread,
-        bot.send_message
-    )
 
     setup_conversation = BasicSetupConversation(
         metrics_handler.record_message,
@@ -142,74 +135,68 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         setup_conversation
     )
 
-    persistent_queues = dict[int, PersistentQueue] = {}
-    for server in server_config.values():
-        for channel in server["channels"]:
-            channel_id = channel["channel_id"]
-            persistent_queues[channel_id] = PersistentQueue(channel_id, sql_session)
-
-
-    feedback_manager = FeedbackManager(
-        persistent_queues
-    )
-
     have_ta_conversation = HaveTAGradingConversation(
         metrics_handler.record_message,
         bot.send_message,
         report_error,
         bot.typing,
-        get_feedback,
         feedback_manager
     )
 
-    ducks = {
-        'standard_conversation': have_conversation,
-    }
-    
-
-    duck_orchestrator = DuckOrchestrator(
-        setup_thread,
-        ducks,
-        feedback_manager.remember_conversation
-    )
-
-    workflows = {
-        'duck-orchestra': duck_orchestrator,
-    }
-
-    def create_workflow(wtype: str):
-        if wtype in workflows:
-            return workflows[wtype]
-
-        raise NotImplementedError(f'No workflow of type {wtype}')
-
-    namespace = 'rubber-duck'  # TODO - move to config.
-
-    workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
-
-
-
-    commands = create_commands(bot.send_message, metrics_handler, reporter,
-                               workflow_manager.get_workflow_metrics)
+    commands = create_commands(bot.send_message, metrics_handler, reporter)
     commands_workflow = BotCommands(commands, bot.send_message)
 
-    workflows['command'] = commands_workflow
+    return {
+        'standard_conversation': have_conversation,
+        'ta_grading_conversation': have_ta_conversation,
+        'command': commands_workflow
+    }
 
-    return workflow_manager
 
+async def main(config: Config):
+    sql_session = create_sql_session(config['sql'])
 
-async def main(config):
-    async with DiscordBot() as bot, \
-            setup_workflow_manager(config, bot) as workflow_manager:
-        rubber_duck = RubberDuckApp(config['servers'], config['admin_settings']['admin_channel_id'], workflow_manager)
-        bot.set_duck_app(rubber_duck)
-        await bot.start(os.environ['DISCORD_TOKEN'])
+    async with DiscordBot() as bot:
+        setup_thread = SetupPrivateThread(
+            bot.create_thread,
+            bot.send_message
+        )
+
+        queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
+
+        with these({
+            channel_config['channel_id']: PersistentQueue(str(channel_config['channel_id']), queue_blob_storage)
+            for server_config in config['servers'].values()
+            for channel_config in server_config['channels']
+            if 'feedback' in channel_config
+        }) as persistent_queues:
+
+            feedback_manager = FeedbackManager(persistent_queues)
+            ducks = setup_ducks(config, bot, sql_session, feedback_manager)
+
+            duck_orchestrator = DuckOrchestrator(
+                setup_thread,
+                ducks,
+                feedback_manager.remember_conversation
+            )
+
+            channel_configs = {
+                channel_config['channel_id']: channel_config
+                for server_config in config['servers'].values()
+                for channel_config in server_config['channels']
+            }
+
+            async with setup_workflow_manager(duck_orchestrator, sql_session) as workflow_manager:
+                rubber_duck = RubberDuckApp(channel_configs, workflow_manager)
+                bot.set_duck_app(rubber_duck, config['admin_settings']['admin_channel_id'])
+                await bot.start(os.environ['DISCORD_TOKEN'])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
     parser.add_argument('--log-console', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
     # Set up logging based on user preference
@@ -231,6 +218,7 @@ if __name__ == '__main__':
     if config is None:
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
-    
+
     import asyncio
+
     asyncio.run(main(config))

@@ -30,20 +30,6 @@ def as_attachment(attachment):
     )
 
 
-def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
-    # Create and return the list of commands
-    return [
-        messages := MessagesMetricsCommand(send_message, metrics_handler),
-        usage := UsageMetricsCommand(send_message, metrics_handler),
-        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
-        MetricsCommand(messages, usage, feedback),
-        StatusCommand(send_message),
-        ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message)),
-        ActiveWorkflowsCommand(send_message, active_workflow_function)
-    ]
-
-
 def _parse_blocks(text: str, limit=1990):
     tick = '`'
     fence = tick * 3
@@ -87,11 +73,11 @@ class DiscordBot(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
         self._rubber_duck = None
-        self._command_channel = None  # Will be set when rubber duck app is set
+        self._admin_channel = None  # Will be set when rubber duck app is set
 
-    def set_duck_app(self, rubber_duck):
+    def set_duck_app(self, rubber_duck, admin_channel_id: int):
         self._rubber_duck = rubber_duck
-        self._command_channel = rubber_duck._command_channel
+        self._admin_channel = admin_channel_id
 
     async def __aenter__(self):
         return self
@@ -107,9 +93,9 @@ class DiscordBot(discord.Client):
         logging.info('Starting workflow manager')
 
         try:
-            await self.send_message(self._command_channel, 'Duck online')
+            await self.send_message(self._admin_channel, 'Duck online')
         except:
-            logging.exception(f'Unable to message channel {self._command_channel}')
+            logging.exception(f'Unable to message channel {self._admin_channel}')
 
         logging.info('------')
 

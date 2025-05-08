@@ -1,4 +1,4 @@
-from utils.config_types import ChannelConfig
+from .utils.config_types import ChannelConfig
 from .utils.protocols import Message
 
 

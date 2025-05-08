@@ -7,9 +7,8 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from metrics.feedback import GetConvoFeedback
-from metrics.feedback_manager import FeedbackManager
-from utils.protocols import Message, SendMessage, ReportError, IndicateTyping
+from ..metrics.feedback_manager import FeedbackManager
+from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
 class RetryableException(Exception):
@@ -52,7 +51,8 @@ class GenAIClient(Protocol):
 
 class RetryableGenAIClient(Protocol):
     async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
-    tuple[list, dict]: ...
+            tuple[list, dict]: ...
+
 
 class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
@@ -69,7 +69,6 @@ def generate_error_message(guild_id, thread_id, ex):
         '\n'.join(tb.format_exception(ex))
     )
     return error_message, error_code
-
 
 
 class BasicSetupConversation:
@@ -120,7 +119,6 @@ class HaveStandardGptConversation:
         timeout = settings["timeout"]
 
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
-
 
         async with queue('messages', None) as messages:
             while True:
@@ -209,7 +207,6 @@ class HaveTAGradingConversation:
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
 
-
         channel_to_review = settings["channel_to_review"]
         timeout = settings["timeout"]
         message_history = []
@@ -232,15 +229,15 @@ class HaveTAGradingConversation:
                             continue
 
                         elif user_input == '/next':
-                            conversation_link = await self._feedback_manager.get_conversation(channel_to_review)
-                            if not conversation_link:
+                            conversation_thread_id = await self._feedback_manager.get_conversation(channel_to_review)
+                            if not conversation_thread_id:
                                 await self._send_message(thread_id, "No more conversations to review.")
                                 continue
 
-                            await self._send_message(thread_id, conversation_link)
+                            await self._send_message(thread_id, conversation_thread_id)
 
                             message_history.append(GPTMessage(role='user', content=user_input))
-                            message_history.append(GPTMessage(role='assistant', content=conversation_link))
+                            message_history.append(GPTMessage(role='assistant', content=f'<#{conversation_thread_id}>'))
 
                             await self._record_message(
                                 message['guild_id'],
@@ -255,21 +252,21 @@ class HaveTAGradingConversation:
                                 thread_id,
                                 message['author_id'],
                                 'assistant',
-                                conversation_link
+                                conversation_thread_id
                             )
                             continue
 
                         else:
                             await self._send_message(thread_id,
-                                "Not a valid command. Please use /help or /next.\n")
+                                                     "Not a valid command. Please use /help or /next.\n")
                             continue
 
                     else:
                         await self._send_message(thread_id,
-                            "Please only use the valid commands listed below.\n"
-                            "/help (To get more information on how this channel works)\n"
-                            "/next (To get the next conversation link that requires feedback)"
-                        )
+                                                 "Please only use the valid commands listed below.\n"
+                                                 "/help (To get more information on how this channel works)\n"
+                                                 "/next (To get the next conversation link that requires feedback)"
+                                                 )
 
                 except asyncio.TimeoutError:
                     await self._send_message(thread_id, "*This conversation has timed out.*")
@@ -278,8 +275,8 @@ class HaveTAGradingConversation:
                 except Exception as ex:
                     error_message, error_code = generate_error_message(message.get('guild_id', 0), thread_id, ex)
                     await self._send_message(thread_id,
-                        f'😵 **Error code {error_code}** 😵\n'
-                        f'An unexpected error occurred. Please contact support.\n'
-                        f'Error code for reference: {error_code}')
+                                             f'😵 **Error code {error_code}** 😵\n'
+                                             f'An unexpected error occurred. Please contact support.\n'
+                                             f'Error code for reference: {error_code}')
                     await self._report_error(error_message)
                     break

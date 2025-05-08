@@ -26,46 +26,6 @@ class DuckOrchestrator:
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
-    # def _get_config_info(self, channel_id: int, initial_message: Message):
-    #     # Find the channel configuration using the channel_id
-    #     channel_config = next(
-    #         channel
-    #         for server in self._channel_configs.values()
-    #         for channel in server["channels"]
-    #         if channel["channel_id"] == channel_id
-    #     )
-    #
-    #     # Check if feedback exists and store the result
-    #     if channel_config.feedback_config is not None:
-    #         feedback_config_exists = True
-    #     else:
-    #         feedback_config_exists = False
-    #
-    #     duck_config = channel_config["ducks"][0]
-    #     duck_settings = duck_config["settings"]
-    #
-    #     prompt_file = duck_settings["prompt_file"]
-    #     if prompt_file:
-    #         prompt = Path(prompt_file).read_text(encoding="utf-8")
-    #     else:
-    #         prompt = initial_message['content']
-    #
-    #     # Get engine and timeout from duck settings, falling back to defaults if not set
-    #     engine = duck_settings["engine"] or self._default_bot_config["engine"]
-    #     timeout = duck_settings["timeout"] or self._default_bot_config["timeout"]
-    #     duck_name = duck_config["name"]
-    #
-    #     # Get a random duck type based on the weights
-    #     ducks = channel_config["duck"].list()
-    #     items = []
-    #     weights = []
-    #     for duck in ducks:
-    #         items.append(duck["workflow_type"])
-    #         weights.append(duck["weight"])
-    #     duck_type = random.choices(items, weights=weights, k=1)[0]
-    #
-    #     return prompt, engine, timeout, duck_name, duck_type, feedback_config_exists
-
     def _get_duck(self, channel_config: ChannelConfig) -> tuple[HaveConversation, dict]:
         possible_ducks = channel_config['ducks']
 
