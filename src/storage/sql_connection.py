@@ -24,7 +24,7 @@ def _create_sql_session(db_type: str, username: str, password: str, host: str, p
             duck_logger.info(f"Creating a local database: {database}")
             conn.execute(text(f"CREATE DATABASE {database}"))
         except ProgrammingError:
-            duck_logger.debug(f"Database: {database} already exists")
+            duck_logger.info(f"Database: {database} already exists")
             pass  # Database likely already exists
 
     # Now connect to the newly created database
