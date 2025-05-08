@@ -193,7 +193,7 @@ if __name__ == '__main__':
         from quest.utils import quest_logger
         quest_logger.setLevel(logging.DEBUG)
     else:
-        duck_logger.setLevel(logging.WARNING)
+        duck_logger.setLevel(logging.INFO)
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
 
