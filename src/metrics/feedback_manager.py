@@ -1,4 +1,5 @@
 from utils.config_types import ChannelConfig
+from utils.persistent_queue import PersistentQueue
 
 
 class FeedbackManager():
@@ -12,8 +13,8 @@ class FeedbackManager():
             link = f"https://discord.com/channels/{self._server_id}/{channel_id}/{thread_id}"
             self._queue.put(link)
 
-    def get_conversation(self) -> str | None:
+    async def get_conversation(self) -> str | None:
         # Get the conversation link from the queue
-        if not self._queue.empty():
-            return self._queue.get()
+        if not self._queue.is_empty():
+            return await self._queue.get()
         return None
