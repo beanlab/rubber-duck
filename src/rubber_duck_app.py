@@ -1,6 +1,7 @@
+from .utils.logger import duck_logger
 from .utils.config_types import ChannelConfig
-from utils.logger import duck_logger
 from .utils.protocols import Message
+
 
 class RubberDuckApp:
     def __init__(self, channel_configs: dict[int, ChannelConfig], workflow_manager):

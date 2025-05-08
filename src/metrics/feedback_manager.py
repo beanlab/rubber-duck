@@ -1,4 +1,3 @@
-from ..utils.config_types import ChannelConfig
 from ..utils.persistent_queue import PersistentQueue
 
 CHANNEL_ID = int

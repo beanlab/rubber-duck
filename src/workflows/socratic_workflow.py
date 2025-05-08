@@ -1,7 +1,6 @@
-from quest import step
-
-from conversation.conversation import HaveConversation
 from conversation.conversation import GPTMessage
+from conversation.conversation import HaveConversation
+from quest import step
 
 
 class SocraticWorkflow:

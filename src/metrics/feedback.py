@@ -2,7 +2,6 @@ import asyncio
 from typing import Protocol
 
 from quest import queue, step, alias
-
 from utils.config_types import FeedbackConfig
 from utils.protocols import AddReaction, SendMessage
 

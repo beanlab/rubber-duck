@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -8,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from .utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -15,12 +17,6 @@ from .conversation.conversation import BasicSetupConversation, HaveStandardGptCo
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
-import asyncio
-
-from utils.logger import duck_logger
-from .utils.config_types import (
-    Config, FeedbackConfig,
-)
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
@@ -30,6 +26,7 @@ from .utils.config_types import (
     Config, )
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.persistent_queue import PersistentQueue
+
 
 def fetch_config_from_s3() -> Config | None:
     # Initialize S3 client
@@ -218,8 +215,5 @@ if __name__ == '__main__':
     if config is None:
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
-
-    import asyncio
-
 
     asyncio.run(main(config))

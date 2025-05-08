@@ -5,7 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql import text
-from utils.logger import duck_logger
+from ..utils.logger import duck_logger
+
 
 def _create_sqlite_session(db_name: str) -> Session:
     db_url = f"sqlite:///{db_name}"
