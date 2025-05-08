@@ -1,11 +1,12 @@
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 import boto3
 import asyncio
 
-from utils.logger import DuckLogger
+from utils.logger import duck_logger
 from .utils.config_types import (
     Config, FeedbackConfig,
 )
@@ -22,13 +23,6 @@ from .workflows.basic_prompt_workflow import BasicPromptWorkflow
 from .storage.sql_quest import create_sql_manager
 from .conversation.threads import SetupPrivateThread
 
-# Create logs directory if it doesn't exist
-LOGS_DIR = Path('logs')
-LOGS_DIR.mkdir(exist_ok=True)
-LOG_FILE = LOGS_DIR / 'duck.log'
-
-logger = DuckLogger("main", log_file=str(LOG_FILE))
-
 def fetch_config_from_s3() -> Config | None:
     # Initialize S3 client
     s3 = boto3.client('s3')
@@ -36,20 +30,20 @@ def fetch_config_from_s3() -> Config | None:
     # Add a section to your env file to allow for local and production environment
     environment = os.environ.get('ENVIRONMENT')
     if not environment or environment == 'LOCAL':
-        logger.info("Using local environment")
+        duck_logger.info("Using local environment")
         return None
 
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
     if not s3_path:
-        logger.warning("No S3 path configured")
+        duck_logger.warning("No S3 path configured")
         return None
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    logger.info(f"Fetching config from bucket: {bucket_name}")
-    logger.info(f"Config key: {key}")
+    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.info(f"Config key: {key}")
     
     try:
         # Download file from S3
@@ -57,17 +51,17 @@ def fetch_config_from_s3() -> Config | None:
 
         # Read the content of the file and parse it as JSON
         config = json.loads(response['Body'].read().decode('utf-8'))
-        logger.info("Successfully loaded config from S3")
+        duck_logger.info("Successfully loaded config from S3")
         return config
 
     except Exception as e:
-        logger.error(f"Failed to fetch config from S3: {e}")
+        duck_logger.error(f"Failed to fetch config from S3: {e}")
         return None
 
 
 # Function to load the configuration from a local file (if needed)
 def load_local_config(file_path: Path) -> Config:
-    logger.info(f"Loading local config from {file_path}")
+    duck_logger.info(f"Loading local config from {file_path}")
     return json.loads(file_path.read_text())
 
 
@@ -128,7 +122,7 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
             try:
                 await bot.send_message(command_channel, msg)
             except:
-                logger.exception(f'Unable to message channel {command_channel}')
+                duck_logger.exception(f'Unable to message channel {command_channel}')
 
     retryable_ai_client = RetryableGenAI(
         ai_client,
@@ -190,20 +184,16 @@ async def main(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--log-console', action='store_true')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
 
     # Set debug environment variable if debug flag is set
     if args.debug:
-        os.environ['DEBUG'] = '1'
-
-    # Set up logging based on user preference
-    if args.log_console:
-        logger = DuckLogger('main', use_colors=True)  # Console-only logging with colors
+        duck_logger.setLevel(logging.DEBUG)
+        from quest.utils import quest_logger
+        quest_logger.setLevel(logging.DEBUG)
     else:
-        logger = DuckLogger('main', log_file='/tmp/duck.log')  # File logging
-
+        duck_logger.setLevel(logging.WARNING)
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
 
