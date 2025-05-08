@@ -199,14 +199,12 @@ class HaveTAGradingConversation:
                  send_message: SendMessage,
                  report_error: ReportError,
                  typing: IndicateTyping,
-                 get_feedback: GetConvoFeedback,
                  feedback_manager: FeedbackManager
                  ):
         self._record_message = step(record_message)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._typing = typing
-        self._get_feedback = step(get_feedback)
         self._feedback_manager = feedback_manager
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
@@ -240,7 +238,6 @@ class HaveTAGradingConversation:
                                 continue
 
                             await self._send_message(thread_id, conversation_link)
-                            #await self._get_feedback(duck_name, guild_id, thread_id, user_id, channel_id)
 
                             message_history.append(GPTMessage(role='user', content=user_input))
                             message_history.append(GPTMessage(role='assistant', content=conversation_link))
