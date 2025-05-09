@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+  
 jobs:
   update_the_production_config:
     runs-on: ubuntu-latest
