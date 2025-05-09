@@ -3,6 +3,7 @@ name = "rubber_duck"
 version = "0.2.4"
 description = ""
 authors = ["Gordon Bean <gbean@cs.byu.edu>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -19,8 +20,8 @@ requests = "^2.32.3"
 pymysql = "^1.1.1"
 
 [tool.poetry.dev-dependencies]
+pytest = "^8.3.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-

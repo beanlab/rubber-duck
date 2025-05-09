@@ -21,3 +21,4 @@ pre-production.env
 v2-production-config.json
 rubberduckdb
 /.vscode/
+/.bashrc
