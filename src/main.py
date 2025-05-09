@@ -9,12 +9,11 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from .metrics.feedback import GetTAFeedback
-from .utils.logger import duck_logger
+from src.metrics.feedback import HaveTAGradingConversation
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation, HaveTAGradingConversation
+from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
@@ -26,6 +25,7 @@ from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
 from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
 
 
@@ -140,33 +140,22 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         setup_conversation
     )
 
-    get_ta_feedback = GetTAFeedback(
+    have_ta_conversation = HaveTAGradingConversation(
+        feedback_manager,
+        metrics_handler.record_feedback,
         bot.send_message,
         bot.add_reaction,
-        metrics_handler.record_feedback,
+        report_error
     )
-    thread_to_duck: dict[int, str] = {}
-
-    have_ta_conversation = HaveTAGradingConversation(
-        metrics_handler.record_message,
-        bot.send_message,
-        report_error,
-        bot.typing,
-        feedback_manager,
-        get_ta_feedback,
-        bot.fetch_channel,
-        thread_to_duck
-    )
-
 
     commands = create_commands(bot.send_message, metrics_handler, reporter)
     commands_workflow = BotCommands(commands, bot.send_message)
 
     return {
-        'standard_conversation': have_conversation,
-        'ta_grading_conversation': have_ta_conversation,
+        'basic_prompt_conversation': have_conversation,
+        'conversation_review': have_ta_conversation,
         'command': commands_workflow
-    }, thread_to_duck
+    }
 
 
 async def main(config: Config):
@@ -186,15 +175,13 @@ async def main(config: Config):
             for channel_config in server_config['channels']
             if 'feedback' in channel_config
         }) as persistent_queues:
-
             feedback_manager = FeedbackManager(persistent_queues)
-            ducks, thread_to_duck = setup_ducks(config, bot, sql_session, feedback_manager)
+            ducks = setup_ducks(config, bot, sql_session, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 ducks,
-                feedback_manager.remember_conversation,
-                thread_to_duck
+                feedback_manager.remember_conversation
             )
 
             channel_configs = {
@@ -219,9 +206,11 @@ if __name__ == '__main__':
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
         from quest.utils import quest_logger
+
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
+
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
 

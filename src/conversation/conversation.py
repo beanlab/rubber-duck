@@ -2,16 +2,11 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
-from collections.abc import Callable
 from pathlib import Path
-from typing import TypedDict, Protocol, Coroutine, Any
+from typing import TypedDict, Protocol
 
-from discord.abc import GuildChannel
 from quest import step, queue, wrap_steps
 
-from ..metrics.feedback import GetTAFeedback
-from ..metrics.feedback_manager import FeedbackManager
-from ..utils.config_types import ServerConfig
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
@@ -193,111 +188,3 @@ class HaveStandardGptConversation:
 
             # After while loop
             await self._send_message(thread_id, '*This conversation has been closed.*')
-
-
-class HaveTAGradingConversation:
-    def __init__(self,
-                 record_message: RecordMessage,
-                 send_message: SendMessage,
-                 report_error: ReportError,
-                 typing: IndicateTyping,
-                 feedback_manager: FeedbackManager,
-                 get_feedback: GetTAFeedback,
-                 fetch_channel: Callable[[int], Coroutine[Any, Any, GuildChannel]],
-                 thread_to_duck: dict[int, str]
-                 ):
-        self._record_message = step(record_message)
-        self._send_message = step(send_message)
-        self._report_error = step(report_error)
-        self._typing = typing
-        self._feedback_manager = feedback_manager
-        self._get_feedback = step(get_feedback)
-        self._fetch_channel = step(fetch_channel)
-        self._thread_to_duck = thread_to_duck
-
-    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
-
-        channel_to_review = settings["channel_to_review"]
-        timeout = settings["timeout"]
-        message_history = []
-
-        async with queue('messages', None) as messages:
-            await self._send_message(
-                thread_id,
-                "Please only use the valid commands listed below.\n"
-                "/help (To get more information on how this channel works)\n"
-                "/next (To get the next conversation link that requires feedback)\n"
-            )
-            while True:
-                try:
-                    message: Message = await asyncio.wait_for(messages.get(), timeout)
-                    user_input = message['content'].strip()
-
-                    if user_input.startswith('/'):
-                        if user_input == '/help':
-                            await self._send_message(thread_id, 'Help message')
-                            continue
-
-                        elif user_input == '/next':
-                            conversation_thread_id = await self._feedback_manager.get_conversation(channel_to_review)
-                            if not conversation_thread_id:
-                                await self._send_message(thread_id, "No more conversations to review.")
-                                continue
-                            student_convo_link = f"<#{conversation_thread_id}>"
-
-                            ta_convo_link = f"<#{thread_id}>"
-                            await self._send_message(thread_id, "Student Conversation: " + student_convo_link)
-
-                            await self._send_message(conversation_thread_id, "Back to Grading: " + ta_convo_link)
-                            student_thread_object = await self._fetch_channel(conversation_thread_id)
-                            members = await student_thread_object.fetch_members()
-
-                            guild_id = student_thread_object.guild_id  # ID of the guild
-                            user_id = next((member for member in members if not member.bot), None)
-                            # channel_id = student_thread_object.parent_id  # Redundant if you already have it
-                            await self._get_feedback(self._thread_to_duck[conversation_thread_id], guild_id, conversation_thread_id, user_id, settings)
-
-                            message_history.append(GPTMessage(role='user', content=user_input))
-                            message_history.append(GPTMessage(role='assistant', content=student_convo_link))
-
-                            await self._record_message(
-                                message['guild_id'],
-                                thread_id,
-                                message['author_id'],
-                                'user',
-                                user_input
-                            )
-
-                            await self._record_message(
-                                message['guild_id'],
-                                thread_id,
-                                message['author_id'],
-                                'assistant',
-                                conversation_thread_id
-                            )
-                            continue
-
-                        else:
-                            await self._send_message(thread_id,
-                                                     "Not a valid command. Please use /help or /next.\n")
-                            continue
-
-                    else:
-                        await self._send_message(thread_id,
-                                                 "Please only use the valid commands listed below.\n"
-                                                 "/help (To get more information on how this channel works)\n"
-                                                 "/next (To get the next conversation link that requires feedback)"
-                                                 )
-
-                except asyncio.TimeoutError:
-                    await self._send_message(thread_id, "*This conversation has timed out.*")
-                    break
-
-                except Exception as ex:
-                    error_message, error_code = generate_error_message(message.get('guild_id', 0), thread_id, ex)
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵\n'
-                                             f'An unexpected error occurred. Please contact support.\n'
-                                             f'Error code for reference: {error_code}')
-                    await self._report_error(error_message)
-                    break

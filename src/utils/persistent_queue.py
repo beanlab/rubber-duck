@@ -1,9 +1,13 @@
+from typing import TypeVar, Generic
+
 from quest.persistence import BlobStorage
 
 from ..utils.logger import duck_logger
 
+T = TypeVar('T')
 
-class PersistentQueue:
+
+class PersistentQueue(Generic[T]):
     def __init__(self, storage_key: str, blob_storage: BlobStorage):
         # Use the provided SQL session
         self._storage = blob_storage
@@ -21,13 +25,11 @@ class PersistentQueue:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         self._stash()
 
-    def put(self, item):
+    def put(self, item: T):
         self._queue.append(item)
 
-    def pop(self):
+    def pop(self) -> T:
         return self._queue.pop(0)
 
     def __bool__(self) -> bool:
-        # Check if the queue is empty
-        duck_logger.debug(f"Queue {self._storage_key} is empty" if not self._queue else f"Queue {self._storage_key} is not empty")
         return bool(self._queue)

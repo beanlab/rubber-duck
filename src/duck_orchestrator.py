@@ -3,8 +3,7 @@ from typing import Protocol, Callable
 
 from quest import step, alias
 
-
-# How is this import supposed to be setup, becuase it surrently
+from .metrics.feedback_manager import FeedbackData
 from .utils.config_types import ChannelConfig
 from .utils.protocols import Message
 
@@ -21,14 +20,12 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  ducks: dict[str, HaveConversation],
-                 remember_conversation: Callable[[int, int], None],
-                 thread_to_duck_type: dict[int, str]
+                 remember_conversation: Callable[[FeedbackData], None]
                  ):
 
         self._setup_thread = step(setup_thread)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
-        self._thread_to_duck_type = thread_to_duck_type
 
     def _get_duck(self, channel_config: ChannelConfig) -> tuple[HaveConversation, dict, str]:
         possible_ducks = channel_config['ducks']
@@ -51,10 +48,14 @@ class DuckOrchestrator:
         # Run the duck
         duck, settings, duck_type = self._get_duck(channel_config)
 
-        self._thread_to_duck_type[thread_id] = duck_type
-
         async with alias(str(thread_id)):
             await duck(thread_id, settings, initial_message)
 
         # Remember conversation
-        self._remember_conversation(channel_config['channel_id'], thread_id)
+        self._remember_conversation(FeedbackData(
+            duck_type=duck_type,
+            guild_id=initial_message['guild_id'],
+            parent_channel_id=channel_config['channel_id'],
+            user_id=initial_message['author_id'],
+            conversation_thread_id=thread_id
+        ))
