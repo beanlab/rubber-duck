@@ -5,6 +5,7 @@ from pathlib import Path
 import discord
 import pytz
 from quest import step
+from quest.manager import find_workflow_manager
 
 from ..utils.protocols import Message
 from ..utils.zip_utils import zip_data_file
@@ -220,3 +221,20 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_full(message)
         else:
             await self._execute_summary(message)
+
+
+def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
+    # Create and return the list of commands
+    def get_workflow_metrics():
+        return find_workflow_manager().get_workflow_metrics()
+
+    return [
+        messages := MessagesMetricsCommand(send_message, metrics_handler),
+        usage := UsageMetricsCommand(send_message, metrics_handler),
+        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
+        MetricsCommand(messages, usage, feedback),
+        StatusCommand(send_message),
+        ReportCommand(send_message, reporter),
+        LogCommand(send_message, BashExecuteCommand(send_message)),
+        ActiveWorkflowsCommand(send_message, get_workflow_metrics)
+    ]

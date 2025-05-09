@@ -56,6 +56,7 @@ class FeedbackModel(MetricsBase):
     timestamp = Column(String(255))
     workflow_type = Column(String(255))
     guild_id = Column(BigInteger)
+    parent_channel_id = Column(BigInteger)
     thread_id = Column(BigInteger)
     user_id = Column(BigInteger)
     reviewer_role_id = Column(BigInteger)
@@ -86,12 +87,13 @@ class SQLMetricsHandler:
         except sqlite3.Error as e:
             print(f"An error occured: {e}")
 
-    async def record_feedback(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
+    async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, reviewer_id: int,
                               feedback_score: int):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
-                                             guild_id=guild_id, thread_id=thread_id,
+                                             guild_id=guild_id, parent_channel_id=parent_channel_id,
+                                             thread_id=thread_id,
                                              user_id=user_id, reviewer_role_id=reviewer_id,
                                              feedback_score=feedback_score)
             self.session.add(new_feedback_row)
