@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - webhook-config
   workflow_dispatch:
 
 jobs:
@@ -30,8 +31,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+
       - name: Send notification to Discord
         run: |
+          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           MESSAGE="✅ The production config has been successfully updated."
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
