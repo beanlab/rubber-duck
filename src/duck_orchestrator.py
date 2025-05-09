@@ -3,6 +3,8 @@ from typing import Protocol, Callable
 
 from quest import step, alias
 
+
+# How is this import supposed to be setup, becuase it surrently
 from .utils.config_types import ChannelConfig
 from .utils.protocols import Message
 
@@ -19,7 +21,7 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  ducks: dict[str, HaveConversation],
-                 remember_conversation: Callable[[int, ChannelConfig, int], None]
+                 remember_conversation: Callable[[int, int], None]
                  ):
 
         self._setup_thread = step(setup_thread)
@@ -50,4 +52,4 @@ class DuckOrchestrator:
             await duck(thread_id, settings, initial_message)
 
         # Remember conversation
-        self._remember_conversation(initial_message['guild_id'], channel_config, thread_id)
+        self._remember_conversation(channel_config['channel_id'], thread_id)
