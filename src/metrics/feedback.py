@@ -98,7 +98,7 @@ class HaveTAGradingConversation:
                 thread_id,
                 "Please only use the valid commands listed below.\n"
                 "/help (To get more information on how this channel works)\n"
-                "/next (To get the next conversation link that requires feedback)\n"
+                "/begin (To begin a grading conversation)\n"
             )
 
             while True:
@@ -108,24 +108,30 @@ class HaveTAGradingConversation:
 
                     if user_input.startswith('/'):
                         if user_input == '/help':
-                            await self._send_message(thread_id, 'Help message')
+                            await self._send_message(thread_id,
+                            '''
+                            To begin a grading conversation enter "/begin" this will give you a continuous stream of messages to review.\n 
+                            You must provide feedback to receive more conversations.\n 
+                            If you leave the queue after five minutes you will not be able to review any more messages.\n
+                            '''
+                            )
                             continue
 
-                        elif user_input == '/next':
+                        elif user_input == '/begin':
                             await self._serve_next_message(thread_id, settings)
 
                             continue
 
                         else:
                             await self._send_message(thread_id,
-                                                     "Not a valid command. Please use /help or /next.\n")
+                                                     "Not a valid command. Please use /help or /begin.\n")
                             continue
 
                     else:
                         await self._send_message(thread_id,
                                                  "Please only use the valid commands listed below.\n"
                                                  "/help (To get more information on how this channel works)\n"
-                                                 "/next (To get the next conversation link that requires feedback)"
+                                                 "/begin (To begin a grading conversation)\n"
                                                  )
 
                 except asyncio.TimeoutError:
