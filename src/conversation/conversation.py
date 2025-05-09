@@ -2,12 +2,16 @@ import asyncio
 import logging
 import traceback as tb
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import TypedDict, Protocol
+from typing import TypedDict, Protocol, Coroutine, Any
 
+from discord.abc import GuildChannel
 from quest import step, queue, wrap_steps
 
+from ..metrics.feedback import GetTAFeedback
 from ..metrics.feedback_manager import FeedbackManager
+from ..utils.config_types import ServerConfig
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
 
 
@@ -197,13 +201,19 @@ class HaveTAGradingConversation:
                  send_message: SendMessage,
                  report_error: ReportError,
                  typing: IndicateTyping,
-                 feedback_manager: FeedbackManager
+                 feedback_manager: FeedbackManager,
+                 get_feedback: GetTAFeedback,
+                 fetch_channel: Callable[[int], Coroutine[Any, Any, GuildChannel]],
+                 thread_to_duck: dict[int, str]
                  ):
         self._record_message = step(record_message)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._typing = typing
         self._feedback_manager = feedback_manager
+        self._get_feedback = step(get_feedback)
+        self._fetch_channel = step(fetch_channel)
+        self._thread_to_duck = thread_to_duck
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
 
@@ -233,11 +243,22 @@ class HaveTAGradingConversation:
                             if not conversation_thread_id:
                                 await self._send_message(thread_id, "No more conversations to review.")
                                 continue
+                            student_convo_link = f"<#{conversation_thread_id}>"
 
-                            await self._send_message(thread_id, conversation_thread_id)
+                            ta_convo_link = f"<#{thread_id}>"
+                            await self._send_message(thread_id, "Student Conversation: " + student_convo_link)
+
+                            await self._send_message(conversation_thread_id, "Back to Grading: " + ta_convo_link)
+                            student_thread_object = await self._fetch_channel(conversation_thread_id)
+                            members = await student_thread_object.fetch_members()
+
+                            guild_id = student_thread_object.guild_id  # ID of the guild
+                            user_id = next((member for member in members if not member.bot), None)
+                            # channel_id = student_thread_object.parent_id  # Redundant if you already have it
+                            await self._get_feedback(self._thread_to_duck[conversation_thread_id], guild_id, conversation_thread_id, user_id, settings)
 
                             message_history.append(GPTMessage(role='user', content=user_input))
-                            message_history.append(GPTMessage(role='assistant', content=f'<#{conversation_thread_id}>'))
+                            message_history.append(GPTMessage(role='assistant', content=student_convo_link))
 
                             await self._record_message(
                                 message['guild_id'],

@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from .metrics.feedback import GetTAFeedback
 from .utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -139,13 +140,24 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         setup_conversation
     )
 
+    get_ta_feedback = GetTAFeedback(
+        bot.send_message,
+        bot.add_reaction,
+        metrics_handler.record_feedback,
+    )
+    thread_to_duck: dict[int, str] = {}
+
     have_ta_conversation = HaveTAGradingConversation(
         metrics_handler.record_message,
         bot.send_message,
         report_error,
         bot.typing,
-        feedback_manager
+        feedback_manager,
+        get_ta_feedback,
+        bot.fetch_channel,
+        thread_to_duck
     )
+
 
     commands = create_commands(bot.send_message, metrics_handler, reporter)
     commands_workflow = BotCommands(commands, bot.send_message)
@@ -154,7 +166,7 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         'standard_conversation': have_conversation,
         'ta_grading_conversation': have_ta_conversation,
         'command': commands_workflow
-    }
+    }, thread_to_duck
 
 
 async def main(config: Config):
@@ -176,12 +188,13 @@ async def main(config: Config):
         }) as persistent_queues:
 
             feedback_manager = FeedbackManager(persistent_queues)
-            ducks = setup_ducks(config, bot, sql_session, feedback_manager)
+            ducks, thread_to_duck = setup_ducks(config, bot, sql_session, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 ducks,
-                feedback_manager.remember_conversation
+                feedback_manager.remember_conversation,
+                thread_to_duck
             )
 
             channel_configs = {

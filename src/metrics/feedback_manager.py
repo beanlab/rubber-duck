@@ -10,7 +10,8 @@ class FeedbackManager:
         self._queues = queues
 
     def remember_conversation(self, channel_id: int, thread_id: int):
-        if queue := self._queues.get(channel_id):
+        queue = self._queues.get(channel_id)
+        if queue is not None:
             queue.put(thread_id)
 
     async def get_conversation(self, channel_id) -> int | None:

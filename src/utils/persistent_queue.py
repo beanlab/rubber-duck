@@ -1,6 +1,6 @@
 from quest.persistence import BlobStorage
 
-from src.utils.logger import duck_logger
+from ..utils.logger import duck_logger
 
 
 class PersistentQueue:
@@ -29,5 +29,5 @@ class PersistentQueue:
 
     def __bool__(self) -> bool:
         # Check if the queue is empty
-        duck_logger.info = f"Queue {self._storage_key} is empty" if not self._queue else f"Queue {self._storage_key} is not empty"
+        duck_logger.debug(f"Queue {self._storage_key} is empty" if not self._queue else f"Queue {self._storage_key} is not empty")
         return bool(self._queue)
