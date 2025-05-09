@@ -169,11 +169,23 @@ async def main(config: Config):
 
         queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
 
-        with these({
-            channel_config['channel_id']: PersistentQueue(str(channel_config['channel_id']), queue_blob_storage)
+        convo_review_ducks = (
+            duck
             for server_config in config['servers'].values()
             for channel_config in server_config['channels']
-            if 'feedback' in channel_config
+            for duck in channel_config['ducks']
+            if duck['workflow_type'] == 'conversation_review'
+        )
+
+        target_channel_ids = (
+            target_id
+            for duck in convo_review_ducks
+            for target_id in duck['settings']['target_channel_ids']
+        )
+
+        with these({
+            target_id: PersistentQueue(str(target_id), queue_blob_storage)
+            for target_id in target_channel_ids
         }) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             ducks = setup_ducks(config, bot, sql_session, feedback_manager)

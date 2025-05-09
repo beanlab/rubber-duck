@@ -17,12 +17,12 @@ class PersistentQueue(Generic[T]):
     def _stash(self):
         self._storage.write_blob(self._storage_key, self._queue)
 
-    async def __aenter__(self):
+    def __enter__(self):
         # Rehydrate my data
         self._queue = self._storage.read_blob(self._storage_key)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self._stash()
 
     def put(self, item: T):
