@@ -11,7 +11,7 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
-from ..storage.sql_metrics import SQLMetricsHandler
+# from ..storage.sql_metrics import SQLMetricsHandler
 
 
 def fancy_preproccesing(df, guilds):
@@ -309,10 +309,27 @@ class Reporter:
 
 if __name__ == '__main__':
     from pathlib import Path
+    import argparse
+    from src.storage.sql_metrics import SQLMetricsHandler
+    from src.storage.sql_connection import create_sql_session
+    from src.main import load_local_config
 
-    this_file = Path(__file__)
-    config = json.loads((this_file.parent.parent / 'config.json').read_text())
-    SQLMetricsHandler = SQLMetricsHandler(this_file.parent.parent / 'state' / 'metrics')
-    reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
+    # Get the project root directory (parent of src directory)
+    project_root = Path(__file__).parent.parent.parent
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', type=Path, required=True, help='Path to the config file (relative to project root)')
+    parser.add_argument('--report', type=str, default='f1', help='Report to generate (e.g., f1, f2, u1, etc.)')
+    args = parser.parse_args()
 
-    reporter.get_report('!report f1')
+    # Load config from project root
+    config_path = project_root / args.config
+    config = load_local_config(config_path)
+    
+    # Create SQL session and metrics handler
+    sql_session = create_sql_session(config['sql'])
+    metrics_handler = SQLMetricsHandler(sql_session)
+    
+    reporter = Reporter(metrics_handler, config['reporting'], show_fig=True)
+    reporter.get_report(f'!report {args.report}')
