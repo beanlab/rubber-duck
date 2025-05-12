@@ -4,6 +4,8 @@ import sys
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
+import os
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -11,8 +13,8 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
-# from ..storage.sql_metrics import SQLMetricsHandler
-
+from src.storage.sql_metrics import SQLMetricsHandler
+from src.storage.sql_connection import create_sql_session
 
 def fancy_preproccesing(df, guilds):
     df['guild_name'] = df['guild_id'].map(guilds)  # TODO: Lets use channel ids instead of guild ids.
@@ -114,6 +116,12 @@ class Reporter:
             data = self.SQLMetricsHandler.get_message()
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
+        
+        # Convert list to DataFrame if necessary
+        if isinstance(data, list):
+            # Use first row as column names
+            columns = data[0]
+            data = pd.DataFrame(data[1:], columns=columns)
         return data
 
     def compute_cost(self, row):
@@ -133,7 +141,7 @@ class Reporter:
             else:
                 cutoff = now - timedelta(days=self.time_periods[args.period])
 
-            df = df[df['timestamp'] >= cutoff]
+                df = df[df['timestamp'] >= cutoff]
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
@@ -310,26 +318,33 @@ class Reporter:
 if __name__ == '__main__':
     from pathlib import Path
     import argparse
-    from src.storage.sql_metrics import SQLMetricsHandler
     from src.storage.sql_connection import create_sql_session
-    from src.main import load_local_config
 
-    # Get the project root directory (parent of src directory)
+    # Load environment variables from .env file
     project_root = Path(__file__).parent.parent.parent
-    
-    # Parse command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, required=True, help='Path to the config file (relative to project root)')
-    parser.add_argument('--report', type=str, default='f1', help='Report to generate (e.g., f1, f2, u1, etc.)')
+    load_dotenv(project_root / '.env')
+
+    parser = argparse.ArgumentParser(description='Run reporter with specified config')
+    parser.add_argument('--config', type=str, help='Path to config.json file')
+    parser.add_argument('--report', type=str, default='f1', help='Report command to run (default: f1)')
     args = parser.parse_args()
 
-    # Load config from project root
-    config_path = project_root / args.config
-    config = load_local_config(config_path)
+    this_file = Path(__file__)
+    project_root = this_file.parent.parent.parent  # Go up three levels to reach project root
+
+    # Use provided config path or fall back to default
+    config_path = Path(args.config) if args.config else project_root / 'config.json'
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found at {config_path}")
+
+    config = json.loads(config_path.read_text())
     
-    # Create SQL session and metrics handler
-    sql_session = create_sql_session(config['sql'])
-    metrics_handler = SQLMetricsHandler(sql_session)
+    # Create SQL session and initialize handler
+    db_name = os.getenv('DB_NAME')  # Get DB_NAME from env
+    metrics_db_path = project_root / db_name
+    session = create_sql_session({'db_type': 'sqlite', 'database': str(metrics_db_path)})
+    SQLMetricsHandler = SQLMetricsHandler(session)
     
-    reporter = Reporter(metrics_handler, config['reporting'], show_fig=True)
+    reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
+
     reporter.get_report(f'!report {args.report}')
