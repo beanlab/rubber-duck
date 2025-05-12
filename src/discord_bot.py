@@ -116,7 +116,7 @@ class MyClient(discord.Client):
         self._command_channel = self.admin_settings['admin_channel_id']
 
         # Rubber duck feature
-        self._duck_config = config['rubber_duck']
+        self._duck_config = config['src']
         self._duck_channels = set(conf.get('name') or conf.get('id') for conf in self._duck_config['channels'])
 
         # Registration channel feature

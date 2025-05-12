@@ -1,6 +1,6 @@
 import pytest
 
-from rubber_duck.sql_metrics import SQLMetricsHandler, create_sqlite_session
+from src.sql_metrics import SQLMetricsHandler, create_sqlite_session
 
 testValuesDict = {
     "guild_id": 1234,
