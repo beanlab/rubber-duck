@@ -13,7 +13,7 @@ from src.metrics.feedback import HaveTAGradingConversation
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, SinglePromptConversation
+from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
@@ -72,9 +72,15 @@ def load_local_config(file_path: Path) -> Config:
     return json.loads(file_path.read_text())
 
 
-def setup_workflow_manager(duck_orchestrator, sql_session):
+def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
+    reporter = Reporter(metrics_handler, config['reporting'])
+
+    commands = create_commands(send_message, metrics_handler, reporter)
+    commands_workflow = BotCommands(commands, send_message)
+
     workflows = {
         'duck-orchestrator': duck_orchestrator,
+        'command': commands_workflow
     }
 
     def create_workflow(wtype: str):
@@ -90,19 +96,13 @@ def setup_workflow_manager(duck_orchestrator, sql_session):
     return workflow_manager
 
 
-def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
+def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
     # admin settings
     admin_settings = config['admin_settings']
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
     # Command channel feature
     command_channel = admin_settings['admin_channel_id']
-
-    # SQLMetricsHandler initialization
-    metrics_handler = SQLMetricsHandler(sql_session)
-
-    # TODO - use this
-    reporter = Reporter(metrics_handler, config['reporting'])  # TODO get the config to work with this
 
     setup_conversation = BasicSetupConversation(
         metrics_handler.record_message,
@@ -112,31 +112,21 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         os.environ['OPENAI_API_KEY'], [add_math]
     )
 
-    async def report_error(msg: str, notify_admins: bool = False):
-        if notify_admins:
-            user_ids_to_mention = [admin_settings["admin_role_id"]]
-            mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
-            msg = mentions + '\n' + msg
-            try:
-                await bot.send_message(command_channel, msg)
-            except:
-                duck_logger.exception(f'Unable to message channel {command_channel}')
-
     retryable_ai_client = RetryableGenAI(
         ai_client,
         bot.send_message,
-        report_error,
+        bot.report_error,
         bot.typing,
         ai_completion_retry_protocol
     )
 
-    have_conversation = SinglePromptConversation(
+    have_conversation = BasicPromptConversation(
         retryable_ai_client,
         metrics_handler.record_message,
         metrics_handler.record_usage,
         bot.typing,
         bot.send_message,
-        report_error,
+        bot.report_error,
         bot.add_reaction,
         setup_conversation
     )
@@ -146,16 +136,12 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         metrics_handler.record_feedback,
         bot.send_message,
         bot.add_reaction,
-        report_error
+        bot.report_error
     )
-
-    commands = create_commands(bot.send_message, metrics_handler, reporter)
-    commands_workflow = BotCommands(commands, bot.send_message)
 
     return {
         'basic_prompt_conversation': have_conversation,
         'conversation_review': have_ta_conversation,
-        'command': commands_workflow
     }
 
 
@@ -189,10 +175,14 @@ async def main(config: Config):
             for target_id in target_channel_ids
         }) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
-            ducks = setup_ducks(config, bot, sql_session, feedback_manager)
+            metrics_handler = SQLMetricsHandler(sql_session)
+
+            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
+                bot.send_message,
+                bot.report_error,
                 ducks,
                 feedback_manager.remember_conversation
             )
@@ -203,9 +193,20 @@ async def main(config: Config):
                 for channel_config in server_config['channels']
             }
 
-            async with setup_workflow_manager(duck_orchestrator, sql_session) as workflow_manager:
-                rubber_duck = RubberDuckApp(channel_configs, workflow_manager)
-                bot.set_duck_app(rubber_duck, config['admin_settings']['admin_channel_id'])
+            async with setup_workflow_manager(
+                    config,
+                    duck_orchestrator,
+                    sql_session,
+                    metrics_handler,
+                    bot.send_message
+            ) as workflow_manager:
+                admin_channel_id = config['admin_settings']['admin_channel_id']
+                rubber_duck = RubberDuckApp(
+                    admin_channel_id,
+                    channel_configs,
+                    workflow_manager
+                )
+                bot.set_duck_app(rubber_duck, admin_channel_id)
                 await bot.start(os.environ['DISCORD_TOKEN'])
 
 

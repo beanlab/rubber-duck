@@ -29,7 +29,6 @@
             {
               "name": "conversation_review",
               "workflow_type": "conversation_review",
-              "weight": 1,
               "settings": {
                 "target_channel_ids": [1234556460453597276],
                 "timeout": 300
@@ -44,7 +43,6 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "basic_prompt_conversation",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -65,7 +63,6 @@
             {
               "name": "conversation_review",
               "workflow_type": "conversation_review",
-              "weight": 1,
               "settings": {
                 "target_channel_ids": [1195490291134779502],
                 "timeout": 300
@@ -80,7 +77,6 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "basic_prompt_conversation",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -101,7 +97,6 @@
             {
               "name": "conversation_review",
               "workflow_type": "conversation_review",
-              "weight": 1,
               "settings": {
                 "target_channel_ids": [1365456542287269919],
                 "timeout": 300
@@ -116,7 +111,6 @@
             {
               "name": "basic_prompt_conversation",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -137,7 +131,6 @@
             {
               "name": "conversation_review",
               "workflow_type": "conversation_review",
-              "weight": 1,
               "settings": {
                 "target_channel_ids": [1363949528201564170],
                 "timeout": 300
@@ -152,7 +145,6 @@
             {
               "name": "basic_prompt_conversation",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -168,7 +160,6 @@
             {
               "name": "conversation_review",
               "workflow_type": "conversation_review",
-              "weight": 1,
               "settings": {
                 "target_channel_ids": [1359587525605458030],
                 "timeout": 300
@@ -183,7 +174,6 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",

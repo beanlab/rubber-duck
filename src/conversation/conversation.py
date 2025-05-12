@@ -1,7 +1,4 @@
 import asyncio
-import logging
-import traceback as tb
-import uuid
 from pathlib import Path
 from typing import TypedDict, Protocol
 
@@ -57,19 +54,6 @@ class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
-def generate_error_message(guild_id, thread_id, ex):
-    error_code = str(uuid.uuid4()).split('-')[0].upper()
-    logging.exception('Error getting completion: ' + error_code)
-    logging.exception('Error getting completion: ' + error_code)
-    error_message = (
-        f'😵 **Error code {error_code}** 😵'
-        f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
-        f'\n{ex}\n'
-        '\n'.join(tb.format_exception(ex))
-    )
-    return error_message, error_code
-
-
 class BasicSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
@@ -84,7 +68,7 @@ class BasicSetupConversation:
         return message_history
 
 
-class SinglePromptConversation:
+class BasicPromptConversation:
     def __init__(self,
                  ai_client: RetryableGenAIClient,
                  record_message: RecordMessage,
@@ -172,25 +156,8 @@ class SinglePromptConversation:
 
                     await self._send_message(thread_id, response)
 
-                except GenAIException as ex:
-                    web_mention = ex.web_mention
-                    error_message, _ = generate_error_message(guild_id, thread_id, ex)
+                except GenAIException:
                     await self._send_message(thread_id,
-                                             'I\'m having trouble processing your request, '
-                                             'I have notified your professor to look into the problem!')
-                    genai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{genai_error_message}\n{web_mention}")
-                    await self._report_error(error_message, True)
-                    break
-
-                except Exception as ex:
-                    error_message, error_code = generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵'
-                                             f'\nAn unexpected error occurred. Please contact support.'
-                                             f'\nError code for reference: {error_code}')
-                    await self._report_error(error_message)
-                    break
-
-            # After while loop
-            await self._send_message(thread_id, '*This conversation has been closed.*')
+                                             'I\'m having trouble processing your request.'
+                                             'The admins are aware. Please try again later.')
+                    raise

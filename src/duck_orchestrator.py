@@ -1,11 +1,14 @@
 import random
 import re
+import traceback as tb
+import uuid
 from typing import Protocol, Callable
 
 from quest import step, alias
 
 from .metrics.feedback_manager import FeedbackData
 from .utils.config_types import ChannelConfig, DuckConfig
+from .utils.logger import duck_logger
 from .utils.protocols import Message
 
 
@@ -17,14 +20,30 @@ class HaveConversation(Protocol):
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message): ...
 
 
+def generate_error_message(thread_id, ex):
+    error_code = str(uuid.uuid4()).split('-')[0].upper()
+    duck_logger.exception('Error: ' + error_code)
+    error_message = (
+        f'😵 **Error code {error_code}** 😵'
+        f'\n<@#{thread_id}>'
+        f'\n{ex}\n'
+        '\n'.join(tb.format_exception(ex))
+    )
+    return error_message, error_code
+
+
 class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
+                 send_message,
+                 report_error,
                  ducks: dict[str, HaveConversation],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
         self._setup_thread = step(setup_thread)
+        self._send_message = step(send_message)
+        self._report_error = step(report_error)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
@@ -64,7 +83,15 @@ class DuckOrchestrator:
         thread_id = await self._setup_thread(initial_message)
 
         async with alias(str(thread_id)):
-            await duck(thread_id, settings, initial_message)
+            try:
+                await duck(thread_id, settings, initial_message)
+
+            except Exception as ex:
+                error_message, error_code = generate_error_message(thread_id, ex)
+                await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵\n')
+                await self._report_error(error_message)
+
+        await self._send_message(thread_id, '*This conversation has been closed.*')
 
         # Remember conversation
         self._remember_conversation(FeedbackData(
