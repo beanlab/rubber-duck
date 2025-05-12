@@ -4,7 +4,6 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..conversation.conversation import generate_error_message
 from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
 
 
@@ -80,8 +79,9 @@ class HaveTAGradingConversation:
                 except asyncio.TimeoutError:
                     self._feedback_manager.remember_conversation(data)
                     await self._add_reaction(thread_id, message_id, '❌')
+                    raise
 
-    async def _serve_next_message(self, thread_id, settings: ConversationReviewSettings):
+    async def _serve_messages(self, thread_id, settings: ConversationReviewSettings):
         target_channel_ids = settings['target_channel_ids']
 
         for target_channel_id in target_channel_ids:
@@ -91,55 +91,14 @@ class HaveTAGradingConversation:
 
     async def __call__(self, thread_id: int, settings: ConversationReviewSettings, initial_message: Message):
 
-        timeout = settings.get("timeout", 60 * 5)
+        await self._send_message(
+            thread_id,
+            'After you provide feedback on a conversation, another will be served.\n '
+            'If you leave the queue after five minutes, this session will end.\n'
+        )
 
-        async with queue('messages', None) as messages:
-            await self._send_message(
-                thread_id,
-                "Please only use the valid commands listed below.\n"
-                "/help (To get more information on how this channel works)\n"
-                "/begin (To begin a grading conversation)\n"
-            )
+        try:
+            await self._serve_messages(thread_id, settings)
 
-            while True:
-                try:
-                    message: Message = await asyncio.wait_for(messages.get(), timeout)
-                    user_input = message['content'].strip()
-
-                    if user_input.startswith('/'):
-                        if user_input == '/help':
-                            await self._send_message(thread_id, (
-                                'To begin a grading conversation enter "/begin".\n'
-                                'After you provide feedback on a conversation, another will be served.\n '
-                                'If you leave the queue after five minutes, this session will end.\n'
-                            ))
-                            continue
-
-                        elif user_input == '/begin':
-                            await self._serve_next_message(thread_id, settings)
-                            continue
-
-                        else:
-                            await self._send_message(thread_id,
-                                                     "Not a valid command. Please use /help or /begin.\n")
-                            continue
-
-                    else:
-                        await self._send_message(thread_id,
-                                                 "Please only use the valid commands listed below.\n"
-                                                 "/help (To get more information on how this channel works)\n"
-                                                 "/begin (To begin a grading conversation)\n"
-                                                 )
-
-                except asyncio.TimeoutError:
-                    await self._send_message(thread_id, "*This conversation has timed out.*")
-                    break
-
-                except Exception as ex:
-                    error_message, error_code = generate_error_message(message.get('guild_id', 0), thread_id, ex)
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵\n'
-                                             f'An unexpected error occurred. Please contact support.\n'
-                                             f'Error code for reference: {error_code}')
-                    await self._report_error(error_message)
-                    break
+        except asyncio.TimeoutError:
+            await self._send_message(thread_id, "*This conversation has timed out.*")
