@@ -315,6 +315,42 @@ class Reporter:
         return graph_name, graph
 
 
+    def interactive_report(self):
+        # Interactive report selection loop
+        print("\nAvailable reports:")
+        for key, (_, description) in self.pre_baked.items():
+            print(f"  {key}: {description}")
+        print("\nType 'help' to see this menu again")
+        print("Type 'exit' to quit")
+        while True:
+            command = input("\nEnter report command (or 'help'/'exit'): ").strip()
+            
+            if command.lower() == 'exit':
+                break
+            elif command.lower() == 'help':
+                print("\nAvailable reports:")
+                for key, (_, description) in self.pre_baked.items():
+                    print(f"  {key}: {description}")
+                continue
+            
+            # Check if it's a pre-baked command
+            if command in self.pre_baked:
+                command = self.pre_baked[command][0]  # Get the actual command string
+                if command is None:  # Handle special cases like ftrend
+                    command = f"!report {command}"
+            else:
+                print(f"Unknown command: {command}")
+                print("Type 'help' to see available commands")
+                continue
+            
+            # Add !report prefix if not present
+            if not command.startswith('!report'):
+                command = f"!report {command}"
+            
+            print(f"Running command: {command}")  # Debug print
+            self.get_report(command)
+
+
 if __name__ == '__main__':
     from pathlib import Path
     import argparse
@@ -322,11 +358,14 @@ if __name__ == '__main__':
 
     # Load environment variables from .env file
     project_root = Path(__file__).parent.parent.parent
-    load_dotenv(project_root / '.env')
+    env_files = list(project_root.glob('*env'))
+    if env_files:
+        load_dotenv(env_files[0])  # Load the first env file found
+    else:
+        print("Warning: No .env file found in project root")
 
     parser = argparse.ArgumentParser(description='Run reporter with specified config')
     parser.add_argument('--config', type=str, help='Path to config.json file')
-    parser.add_argument('--report', type=str, default='f1', help='Report command to run (default: f1)')
     args = parser.parse_args()
 
     this_file = Path(__file__)
@@ -347,4 +386,4 @@ if __name__ == '__main__':
     
     reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
 
-    reporter.get_report(f'!report {args.report}')
+    reporter.interactive_report()
