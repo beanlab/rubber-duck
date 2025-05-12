@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - webhook-config
   workflow_dispatch:
 
 jobs:
