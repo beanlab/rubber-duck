@@ -23,16 +23,26 @@
       "server_name": "CS 110",
       "channels": [
         {
+          "channel_id": 1296158078017736725,
+          "channel_name": "review-cs-110",
+          "ducks": [
+            {
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1234556460453597276],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
           "channel_id": 1234556460453597276,
           "channel_name": "general/duck-pond",
-          "feedback": {
-            "ta_review_channel_id": 1296158078017736725
-          },
           "ducks": [
             {
               "name": "standard-rubber-duck",
-              "workflow_type": "duck",
-              "weight": 1,
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -47,16 +57,26 @@
       "server_name": "CS 235",
       "channels": [
         {
+          "channel_id": 1327385245036838912,
+          "channel_name": "review-cs-235",
+          "ducks": [
+            {
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1195490291134779502],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
           "channel_id": 1195490291134779502,
           "channel_name": "student-text-channels/duck-pond",
-          "feedback": {
-            "ta_review_channel_id": 1327385245036838912
-          },
           "ducks": [
             {
               "name": "standard-rubber-duck",
-              "workflow_type": "duck",
-              "weight": 1,
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -71,16 +91,26 @@
       "server_name": "CS 111",
       "channels": [
         {
-          "channel_id": 1365456542287269919,
-          "channel_name": "Student Text Channels/duck-pond",
-          "feedback": {
-            "ta_review_channel_id": 1329934513333338244
-          },
+          "channel_id": 1329934513333338244,
+          "channel_name": "review-cs-111",
           "ducks": [
             {
-              "name": "standard-rubber-duck",
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1365456542287269919],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
+          "channel_id": 1365456542287269919,
+          "channel_name": "Student Text Channels/duck-pond",
+          "ducks": [
+            {
+              "name": "basic_prompt_conversation",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -95,16 +125,26 @@
       "server_name": "Physics",
       "channels": [
         {
-          "channel_id": 1363949528201564170,
-          "channel_name": "physics-230-phys230",
-          "feedback": {
-            "ta_review_channel_id": 1359587713749094700
-          },
+          "channel_id": 1363949553102880869,
+          "channel_name": "review-phys-230",
           "ducks": [
             {
-              "name": "standard-rubber-duck",
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1363949528201564170],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
+          "channel_id": 1363949528201564170,
+          "channel_name": "physics-230-phys230",
+          "ducks": [
+            {
+              "name": "basic_prompt_conversation",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -114,16 +154,26 @@
           ]
         },
         {
+          "channel_id": 1359587713749094700,
+          "channel_name": "review-phys-430",
+          "ducks": [
+            {
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1359587525605458030],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
           "channel_id": 1359587525605458030,
           "channel_name": "physics-430-phys430",
-          "feedback": {
-            "ta_review_channel_id": 1359587713749094700
-          },
           "ducks": [
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -138,17 +188,25 @@
       "server_name": "Duck Demo",
       "channels": [
         {
+          "channel_id": 1338619665789751337,
+          "channel_name": "review-duck-pond",
+          "ducks": [
+            {
+              "name": "review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [1338616283671040000]
+              }
+            }
+          ]
+        },
+        {
           "channel_id": 1338616283671040000,
           "channel_name": "text-channels-duck-pond",
-          "allow_self_feedback": true,
-          "feedback": {
-            "ta_review_channel_id": 1338619665789751337
-          },
           "ducks": [
             {
               "name": "standard-rubber-duck",
               "workflow_type": "duck",
-              "weight": 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",

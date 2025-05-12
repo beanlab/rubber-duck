@@ -1,12 +1,10 @@
 import asyncio
-import logging
-import traceback as tb
-import uuid
+from pathlib import Path
 from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
+from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
 
 class RetryableException(Exception):
@@ -49,20 +47,11 @@ class GenAIClient(Protocol):
 
 class RetryableGenAIClient(Protocol):
     async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
-    tuple[list, dict]: ...
+            tuple[list, dict]: ...
 
 
-def generate_error_message(guild_id, thread_id, ex):
-    error_code = str(uuid.uuid4()).split('-')[0].upper()
-    logging.exception('Error getting completion: ' + error_code)
-    logging.exception('Error getting completion: ' + error_code)
-    error_message = (
-        f'😵 **Error code {error_code}** 😵'
-        f'\nhttps://discord.com/channels/{guild_id}/{thread_id}'
-        f'\n{ex}\n'
-        '\n'.join(tb.format_exception(ex))
-    )
-    return error_message, error_code
+class HaveConversation(Protocol):
+    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
 class BasicSetupConversation:
@@ -79,21 +68,47 @@ class BasicSetupConversation:
         return message_history
 
 
-class HaveStandardGptConversation:
-    def __init__(self, ai_client: RetryableGenAIClient,
-                 record_message: RecordMessage, record_usage: RecordUsage,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
-                 retry_config: RetryConfig):
-        self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
-        self._send_message = step(send_message)
-        self._report_error = step(report_error)
+class BasicPromptConversation:
+    def __init__(self,
+                 ai_client: RetryableGenAIClient,
+                 record_message: RecordMessage,
+                 record_usage: RecordUsage,
+                 typing: IndicateTyping,
+                 send_message: SendMessage,
+                 report_error: ReportError,
+                 add_reaction: AddReaction,
+                 setup_conversation: BasicSetupConversation
+                 ):
         self._ai_client = ai_client
         wrap_steps(self._ai_client, ['get_completion'])
-        self._typing = typing
-        self._retry_config = retry_config
 
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600):
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
+
+        self._typing = typing
+        self._send_message = step(send_message)
+        self._report_error = step(report_error)
+        self._add_reaction: AddReaction = step(add_reaction)
+
+        self._setup_conversation = step(setup_conversation)
+
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+
+        prompt_file = settings["prompt_file"]
+        if prompt_file:
+            prompt = Path(prompt_file).read_text(encoding="utf-8")
+        else:
+            prompt = initial_message['content']
+
+        # Get engine and timeout from duck settings, falling back to defaults if not set
+        engine = settings["engine"]
+        timeout = settings["timeout"]
+
+        if 'duck' in initial_message['content']:
+            await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
+
+        message_history = await self._setup_conversation(thread_id, prompt, initial_message)
+
         async with queue('messages', None) as messages:
             while True:
                 # TODO - if the conversation is getting long, and the user changes the subject
@@ -141,25 +156,8 @@ class HaveStandardGptConversation:
 
                     await self._send_message(thread_id, response)
 
-                except GenAIException as ex:
-                    web_mention = ex.web_mention
-                    error_message, _ = generate_error_message(guild_id, thread_id, ex)
+                except GenAIException:
                     await self._send_message(thread_id,
-                                             'I\'m having trouble processing your request, '
-                                             'I have notified your professor to look into the problem!')
-                    genai_error_message = f"*** {type(ex).__name__} ***"
-                    await self._report_error(f"{genai_error_message}\n{web_mention}")
-                    await self._report_error(error_message, True)
-                    break
-
-                except Exception as ex:
-                    error_message, error_code = generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id,
-                                             f'😵 **Error code {error_code}** 😵'
-                                             f'\nAn unexpected error occurred. Please contact support.'
-                                             f'\nError code for reference: {error_code}')
-                    await self._report_error(error_message)
-                    break
-
-            # After while loop
-            await self._send_message(thread_id, '*This conversation has been closed.*')
+                                             'I\'m having trouble processing your request.'
+                                             'The admins are aware. Please try again later.')
+                    raise

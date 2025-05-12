@@ -1,10 +1,7 @@
-import logging
 
 import discord
+from ..utils.logger import duck_logger
 
-from ..commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, \
-    StatusCommand, \
-    ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
 from ..utils.protocols import Attachment, Message
 
 
@@ -28,20 +25,6 @@ def as_attachment(attachment):
         description=attachment.description,
         filename=attachment.filename
     )
-
-
-def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
-    # Create and return the list of commands
-    return [
-        messages := MessagesMetricsCommand(send_message, metrics_handler),
-        usage := UsageMetricsCommand(send_message, metrics_handler),
-        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
-        MetricsCommand(messages, usage, feedback),
-        StatusCommand(send_message),
-        ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message)),
-        ActiveWorkflowsCommand(send_message, active_workflow_function)
-    ]
 
 
 def _parse_blocks(text: str, limit=1990):
@@ -87,11 +70,11 @@ class DiscordBot(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
         self._rubber_duck = None
-        self._command_channel = None  # Will be set when rubber duck app is set
+        self._admin_channel = None  # Will be set when rubber duck app is set
 
-    def set_duck_app(self, rubber_duck):
+    def set_duck_app(self, rubber_duck, admin_channel_id: int):
         self._rubber_duck = rubber_duck
-        self._command_channel = rubber_duck._command_channel
+        self._admin_channel = admin_channel_id
 
     async def __aenter__(self):
         return self
@@ -101,20 +84,20 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         # print out information when the bot wakes up
-        logging.info('Logged in as')
-        logging.info(self.user.name)
-        logging.info(self.user.id)
-        logging.info('Starting workflow manager')
+        duck_logger.info('Logged in as')
+        duck_logger.info(self.user.name)
+        duck_logger.info(self.user.id)
+        duck_logger.info('Starting workflow manager')
 
         try:
-            await self.send_message(self._command_channel, 'Duck online')
+            await self.send_message(self._admin_channel, 'Duck online')
         except:
-            logging.exception(f'Unable to message channel {self._command_channel}')
+            duck_logger.error(f'Unable to message channel {self._admin_channel}')
 
-        logging.info('------')
+        duck_logger.info('------')
 
     async def close(self):
-        logging.warning("-- Suspending --")
+        duck_logger.warning("-- Suspending --")
         await super().close()
 
     async def on_message(self, message: discord.Message):
@@ -149,7 +132,7 @@ class DiscordBot(discord.Client):
     async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
         channel = self.get_channel(channel_id)
         if channel is None:
-            await self.report_error(f'Tried to send message on {channel_id}, but no channel found.')
+            duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
         curr_message = None
@@ -178,7 +161,7 @@ class DiscordBot(discord.Client):
             msg = await channel.fetch_message(message_id)
             await msg.edit(content=new_content)
         except Exception as e:
-            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+            duck_logger.error(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
     async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
@@ -195,3 +178,11 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
+
+    async def report_error(self, msg: str, notify_admins: bool = False):
+        if notify_admins:
+            try:
+                await self.send_message(self._admin_channel, msg)
+            except:
+                duck_logger.exception(f'Unable to message channel {self._admin_channel}')
+
