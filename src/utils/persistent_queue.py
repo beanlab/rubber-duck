@@ -12,14 +12,13 @@ class PersistentQueue(Generic[T]):
         # Use the provided SQL session
         self._storage = blob_storage
         self._storage_key = storage_key
-        self._queue = []
 
     def _stash(self):
         self._storage.write_blob(self._storage_key, self._queue)
 
     def __enter__(self):
         # Rehydrate my data
-        self._queue = self._storage.read_blob(self._storage_key)
+        self._queue = self._storage.read_blob(self._storage_key) or []
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

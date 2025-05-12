@@ -13,7 +13,7 @@ from src.metrics.feedback import HaveTAGradingConversation
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
+from .conversation.conversation import BasicSetupConversation, SinglePromptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
@@ -129,14 +129,14 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         ai_completion_retry_protocol
     )
 
-    have_conversation = HaveStandardGptConversation(
+    have_conversation = SinglePromptConversation(
         retryable_ai_client,
         metrics_handler.record_message,
         metrics_handler.record_usage,
+        bot.typing,
         bot.send_message,
         report_error,
-        bot.typing,
-        ai_completion_retry_protocol,
+        bot.add_reaction,
         setup_conversation
     )
 

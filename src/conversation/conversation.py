@@ -7,7 +7,7 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping
+from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
 
 class RetryableException(Exception):
@@ -84,25 +84,28 @@ class BasicSetupConversation:
         return message_history
 
 
-class HaveStandardGptConversation:
+class SinglePromptConversation:
     def __init__(self,
                  ai_client: RetryableGenAIClient,
                  record_message: RecordMessage,
                  record_usage: RecordUsage,
+                 typing: IndicateTyping,
                  send_message: SendMessage,
                  report_error: ReportError,
-                 typing: IndicateTyping,
-                 retry_config: RetryConfig,
+                 add_reaction: AddReaction,
                  setup_conversation: BasicSetupConversation
                  ):
-        self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
-        self._send_message = step(send_message)
-        self._report_error = step(report_error)
         self._ai_client = ai_client
         wrap_steps(self._ai_client, ['get_completion'])
+
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
+
         self._typing = typing
-        self._retry_config = retry_config
+        self._send_message = step(send_message)
+        self._report_error = step(report_error)
+        self._add_reaction: AddReaction = step(add_reaction)
+
         self._setup_conversation = step(setup_conversation)
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
@@ -116,6 +119,9 @@ class HaveStandardGptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
+
+        if 'duck' in initial_message['content']:
+            await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
 
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
 

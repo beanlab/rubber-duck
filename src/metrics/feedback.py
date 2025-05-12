@@ -1,7 +1,7 @@
 import asyncio
 from typing import Protocol, TypedDict
 
-from quest import step, alias, queue
+from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
 from ..conversation.conversation import generate_error_message
@@ -28,7 +28,7 @@ class HaveTAGradingConversation:
                  add_reaction: AddReaction,
                  report_error: ReportError,
                  ):
-        self._feedback_manager = feedback_manager
+        self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
 
         self._record_feedback: RecordFeedback = step(record_feedback)
 
@@ -37,6 +37,7 @@ class HaveTAGradingConversation:
         self._report_error = step(report_error)
 
         self._reactions = {
+            '⏭️': 'nan',
             '1️⃣': 1,
             '2️⃣': 2,
             '3️⃣': 3,
@@ -57,14 +58,13 @@ class HaveTAGradingConversation:
             async with alias(str(message_id)), queue("feedback", None) as feedback_queue:
                 for reaction in self._reactions:
                     await self._add_reaction(thread_id, message_id, reaction)
-                    await asyncio.sleep(0.5)  # per discord policy, we wait
 
                 try:
                     feedback_emoji, reviewer_id = await asyncio.wait_for(
                         feedback_queue.get(),
                         timeout=timeout
                     )
-                    feedback_score = self._reactions[feedback_emoji]
+                    feedback_score = self._reactions.get(feedback_emoji, 'nan')
                     await self._add_reaction(thread_id, message_id, '✅')
 
                     await self._record_feedback(
@@ -91,7 +91,7 @@ class HaveTAGradingConversation:
 
     async def __call__(self, thread_id: int, settings: ConversationReviewSettings, initial_message: Message):
 
-        timeout = settings["timeout"]
+        timeout = settings.get("timeout", 60 * 5)
 
         async with queue('messages', None) as messages:
             await self._send_message(
@@ -108,18 +108,15 @@ class HaveTAGradingConversation:
 
                     if user_input.startswith('/'):
                         if user_input == '/help':
-                            await self._send_message(thread_id,
-                            '''
-                            To begin a grading conversation enter "/begin" this will give you a continuous stream of messages to review.\n 
-                            You must provide feedback to receive more conversations.\n 
-                            If you leave the queue after five minutes you will not be able to review any more messages.\n
-                            '''
-                            )
+                            await self._send_message(thread_id, (
+                                'To begin a grading conversation enter "/begin".\n'
+                                'After you provide feedback on a conversation, another will be served.\n '
+                                'If you leave the queue after five minutes, this session will end.\n'
+                            ))
                             continue
 
                         elif user_input == '/begin':
                             await self._serve_next_message(thread_id, settings)
-
                             continue
 
                         else:
