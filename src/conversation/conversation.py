@@ -84,7 +84,7 @@ class BasicSetupConversation:
         return message_history
 
 
-class SinglePromptConversation:
+class BasicPromptConversation:
     def __init__(self,
                  ai_client: RetryableGenAIClient,
                  record_message: RecordMessage,
