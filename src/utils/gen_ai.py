@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
@@ -12,20 +13,54 @@ from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
 class OpenAI():
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, tools: list = None):
         self._client = AsyncOpenAI(api_key=openai_api_key)
+        self.tools = tools or []
 
     async def get_completion(self, engine, message_history) -> tuple[list, dict]:
         try:
+            functions = [
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.params_json_schema
+                }
+                for tool in self.tools
+            ]
+
             completion: ChatCompletion = await self._client.chat.completions.create(
                 model=engine,
-                messages=message_history
+                messages=message_history,
+                functions=functions if functions else None
             )
-            logging.debug(f"Completion: {completion}")
-            completion_dict = completion.dict()
-            choices = completion_dict['choices']
-            usage = completion_dict['usage']
-            return choices, usage
+            choice = completion.choices[0]
+            message = choice.message
+
+            if message.function_call:
+                function_name = message.function_call.name
+                arguments = json.loads(message.function_call.arguments)
+
+                for tool in self.tools:
+                    if tool.name == function_name:
+                        tool_result = await tool.on_invoke_tool(None, json.dumps(arguments))
+                        break
+                else:
+                    raise Exception(f"Tool '{function_name}' not found.")
+
+                message_history.append({"role": "assistant", "function_call": message.function_call})
+                message_history.append({"role": "function", "name": function_name, "content": tool_result})
+
+                second_completion = await self._client.chat.completions.create(
+                    model=engine,
+                    messages=message_history
+                )
+
+                second_completion_dict = second_completion.dict()
+                return second_completion_dict['choices'], second_completion_dict['usage']
+            else:
+                completion_dict = completion.dict()
+                return completion_dict['choices'], completion_dict['usage']
+
         except (
                 APITimeoutError, InternalServerError,
                 UnprocessableEntityError) as ex:

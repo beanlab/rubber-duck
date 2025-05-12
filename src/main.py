@@ -27,6 +27,7 @@ from .utils.config_types import (
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
+from .armory.stat_tools import add_math
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -108,7 +109,7 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
     )
 
     ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY'],
+        os.environ['OPENAI_API_KEY'], [add_math]
     )
 
     async def report_error(msg: str, notify_admins: bool = False):
