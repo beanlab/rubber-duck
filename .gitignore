@@ -15,3 +15,7 @@ state/
 /aubry.json
 *.db/
 requirements.txt
+/.bashrc
+/github_secrets.txt
+/rubberduckdb
+/v2-production-config.json
