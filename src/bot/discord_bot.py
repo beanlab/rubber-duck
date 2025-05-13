@@ -92,7 +92,7 @@ class DiscordBot(discord.Client):
         try:
             await self.send_message(self._admin_channel, 'Duck online')
         except:
-            duck_logger.error(f'Unable to message channel {self._command_channel}')
+            duck_logger.error(f'Unable to message channel {self._admin_channel}')
 
         duck_logger.info('------')
 
@@ -178,3 +178,11 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
+
+    async def report_error(self, msg: str, notify_admins: bool = False):
+        if notify_admins:
+            try:
+                await self.send_message(self._admin_channel, msg)
+            except:
+                duck_logger.exception(f'Unable to message channel {self._admin_channel}')
+

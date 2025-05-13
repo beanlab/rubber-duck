@@ -7,7 +7,7 @@ from openai.types.chat import ChatCompletion
 from quest import step
 
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
-    RetryConfig, generate_error_message
+    RetryConfig
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
@@ -62,10 +62,7 @@ class RetryableGenAI:
                     await self._send_message(thread_id, 'Trying to contact servers...')
                 retries += 1
                 if retries > max_retries:
-                    error_message, _ = generate_error_message(guild_id, thread_id, ex)
-                    await self._send_message(thread_id, ex.message)
-                    await self._report_error(error_message)
-                    raise GenAIException(ex, error_message)
+                    raise GenAIException(ex, 'Retry limit exceeded')
 
                 logging.warning(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
