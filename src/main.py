@@ -10,7 +10,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 
 from src.metrics.feedback import HaveTAGradingConversation
-from .workflows.register_workflow import RegistrationWorkflow
+from .workflows.registration_workflow import RegistrationWorkflow
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -149,7 +149,11 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         report_error
     )
 
-    register_workflow = RegistrationWorkflow()
+    registration_workflow = RegistrationWorkflow(
+        bot.send_message,
+        bot.get_channel,
+        bot.fetch_guild,
+    )
 
     commands = create_commands(bot.send_message, metrics_handler, reporter)
     commands_workflow = BotCommands(commands, bot.send_message)
@@ -158,7 +162,7 @@ def setup_ducks(config: Config, bot: DiscordBot, sql_session, feedback_manager):
         'basic_prompt_conversation': have_conversation,
         'conversation_review': have_ta_conversation,
         'command': commands_workflow,
-        'register_workflow': register_workflow,
+        'registration': registration_workflow,
     }
 
 

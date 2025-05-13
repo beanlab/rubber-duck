@@ -4,7 +4,7 @@ from canvasapi import Canvas
 from canvasapi.course import Course
 
 
-def _get_course(api_token: str, api_url: str, canvas_course_id: int) -> Course:
+def get_course(api_token: str, api_url: str, canvas_course_id: int) -> Course:
     """
     Returns a Canvas Course object for the given API URL, API token, and course ID.
 

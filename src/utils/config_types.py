@@ -25,6 +25,7 @@ class DuckConfig(TypedDict):
 class ChannelConfig(TypedDict):
     channel_id: int
     channel_name: str
+    canvas_course_id: int | None
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
     ducks: list[DuckConfig]
 

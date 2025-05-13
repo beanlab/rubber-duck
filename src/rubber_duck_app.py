@@ -20,7 +20,6 @@ class RubberDuckApp:
                 message
             )
 
-
         # Belongs to an existing conversation
         str_id = str(message["channel_id"])
         if self._workflow_manager.has_workflow(str_id):
