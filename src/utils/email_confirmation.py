@@ -48,9 +48,9 @@ class EmailConfirmation:
             logging.exception("Error sending email")
             return False
 
-    def send_email_with_token(self, email):
+    def send_email_with_token(self, email, subject,):
         token = self.generate_token(email)
-        subject = "Confirm Your Email Address"
+        subject = "Registration confirmation"
         body = f"""
         <html>
         <body>
@@ -61,4 +61,6 @@ class EmailConfirmation:
         </body>
         </html>
         """
-        return self.send_email(email, subject, body)
+        self.send_email(email, subject, body)
+
+        return token

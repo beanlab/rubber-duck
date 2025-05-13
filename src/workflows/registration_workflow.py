@@ -1,105 +1,138 @@
 import asyncio
-import os
+import uuid
 
-import requests
-from canvasapi.enrollment import Enrollment
-from canvasapi.user import User
+from discord import Guild, Member
 from quest import step, queue, alias
-from discord import Member
 
-from ..utils.OAuthServer import OAuthServer
-from ..utils.canvas_api import get_course
+from ..utils.canvas_api import CanvasApi
+from ..utils.email_confirmation import EmailConfirmation
 from ..utils.protocols import Message
 
-client_id = os.getenv("CLIENT_ID")
-redirect_uri = os.getenv("REDIRECT_URI")
 
-intro_message = (
-    "Hello! My name is Duck, and I'm your friendly registration assistant.\n"
-    "I'm here to help you get set up for your classes.\n\n"
-    "✅ Let's start by verifying your credentials.\n"
-    "Click the link below to log in with your BYU Canvas account:\n"
-    f"https://byu.instructure.com/login/oauth2/auth?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}"
-)
-timeout_message ="❌ Login timed out. Please try again."
-success_message = f"✅ Registration complete!"
-
+confirm_message ="Check your BYU Email to confirm your registration.\n  Type in your code into the chat to confirm your registration."
 class RegistrationWorkflow:
     def __init__(self,
                  send_message,
+                 create_thread,
+                 canvas_api: CanvasApi,
+                 email_confirmation: EmailConfirmation,
                  get_channel,
-                 fetch_guild,
+                 fetch_guild
                  ):
         self._send_message = step(send_message)
+        self._create_thread = step(create_thread)
+        self._canvas_api = canvas_api
+        self._email_confirmation = email_confirmation
         self._get_channel = get_channel
         self._get_guild = fetch_guild
-        self._api_url = "https://byu.instructure.com"
-        self._canvas_token = None
-        self.current_user: Member = None
-        self.oauth_server = None
+        self.current_user:Member = None
 
-    async def __call__(self, thread_id: int, prompt: str, initial_message: Message):
-        # Start Flask Server for the OAuth2 callback
-        self.oauth_server = OAuthServer(self)
-        self.oauth_server.run()
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+        # Start the registration process
+        author_name, guild_id, user_id = self._parse_settings(initial_message)
 
-        # Verify user
-        await self._send_message(thread_id, intro_message)
+        await self._send_message(
+            thread_id,
+            f"Hello <@{author_name}>, welcome to the registration process! Please follow the prompts."
+        )
 
-        for _ in range(30):
-            if self._canvas_token:
-                break
-            await asyncio.sleep(1)
+        # Get the ID
+        net_id = await self._get_net_id(guild_id, thread_id)
 
-        if not self._canvas_token:
-            await self._send_message(thread_id, timeout_message)
+        # Verify it via outlook.
+        if not await self._confirm_registration_via_email(guild_id, thread_id, user_id, net_id):
+            await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
-        # Proceed with the registration workflow using the token
-        course = get_course(
-            self._canvas_token,
-            self._api_url,
-            self._get_course_id(),  # Replace with actual course ID
-        )
-        role = course["user_id"]["enrollment_type"]
 
-        await self._assign_role(role)
+        # add the role
 
-        # Check if the user is already enrolled
-        user_data = await self._get_user_data(self._canvas_token)
+    def _parse_settings(self, initial_message):
+        author_name = initial_message['author_name']
+        guild_id = initial_message['guild_id']
+        user_id = initial_message['author_id']
+        return author_name, guild_id, user_id
 
-        # Clean things up
-        await self._send_message(thread_id, success_message)
-        self.oauth_server.stop()
+    @step
+    async def _get_net_id(self, guild_id, thread_id) -> str:
+        await self._send_message(thread_id, "What is your BYU Net ID?")
+        timeout = 120
 
-    def receive_token(self, state, token):
-        """This method will be called by the Flask server to pass the token."""
-        self._canvas_token = token
+        async with alias(str(thread_id)), queue("messages", None) as message_queue:
+            while True:
+                message: Message = await asyncio.wait_for(message_queue.get(), timeout)
+                net_id = message['content'].strip()
 
-    def _get_course_id(self) -> int:
-        # TODO: Figure out where we get the course ID from
-        """
-        This method should retrieve the course ID from the guild configuration.
-        For now, we'll just return a placeholder value.
-        """
-        pass
+                if not await self._is_valid_net_id(guild_id, net_id):
+                    await self._send_message(thread_id, "Invalid BYU Net ID. Please try again.")
+                    continue
 
-    async def _get_user_data(self, token) -> User:
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-        api_url = f"{self._api_url}/api/v1/users/self"
+                return net_id
 
-        response = requests.get(api_url, headers=headers)
+    @step
+    async def _is_valid_net_id(self, guild_id, net_id):
+        users = self._canvas_api.get_canvas_users(guild_id)
+        return net_id in users
 
-        if response.status_code == 200:
-            user_data = response.json()
-            return user_data
+    async def _confirm_registration_via_email(self, thread_id, net_id):
+        email = f'{net_id}@byu.edu'
+        token = await self._email_confirmation.send_email(email)
+        if not token:
+            pass
+
+        await self._send_message(thread_id, confirm_message)
+
+        async with queue('messages', None) as messages:
+            while True:
+                users_token_response = await messages.get()
+                if users_token_response != token:
+                    pass ## TODO - wrong token
+                return True
+
+                # if self._email_confirmation.confirm_token(email, users_token_response.content):
+                #     await self._send_message(thread_id, "Your registration was successful.")
+                #     break
+                # else:
+                #     await self._send_message(thread_id, "The code you entered is incorrect. Please try again.")
+
+    def _collect_canvas_data(self):
+        self._canvas_config = []
+        self._canvas_users = self._canvas_api.get_canvas_users(self._guild_id)
+
+    async def _fetch_user_response(self, user_id, channel_id):
+        """Fetch the next message from a user in the thread."""
+
+        def check(message):
+            return message.author.id == user_id and message.channel.id == channel_id
+
+        # Await a message from the user that passes the check
+        try:
+            message = await self._wait_for('message', check=check, timeout=300.0)  # 5-minute timeout
+            return message
+        except asyncio.TimeoutError:
+            # Send a message to the same channel where registration is happening
+            await self._send_message(channel_id, "You took too long to respond. Please try again later.")
+            return None
+
+    async def _confirmation_check(self, byu_id, thread_id, user_id, channel_id):
+        name, email, canvas_role = self._canvas_users[byu_id]
+        await self._send_message(thread_id, f"Is this correct?\n{name}\n{email}")
+        answer = await self._fetch_user_response(user_id, channel_id)
+        if answer == "Yes":
+            await self._send_message(channel_id, "Thank you for confirming.")
         else:
-            raise Exception(f"Failed to fetch user data: {response.status_code} - {response.text}")
+            await self._send_message(channel_id, "Thank you for your time, "
+                                                 "please return back to the registration channel.")
+            quit()
 
+        return name, email, canvas_role
 
-    async def _get_enrollment(self, course_id) -> Enrollment:
-        pass
-
-    async def _assign_role(self, role):
+    async def _validate_byu_id(self, byu_id, thread_id):
+        if len(self._canvas_users) == 0:
+            if self._canvas_users == 0:
+                await self._send_message(thread_id, "Canvas is processing too many requests. "
+                                                    "Please try again later.")
+        if byu_id in self._canvas_users:
+            return True
+        else:
+            return False
