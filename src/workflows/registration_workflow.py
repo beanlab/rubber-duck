@@ -12,13 +12,12 @@ confirm_message ="Check your BYU Email to confirm your registration.\n  Type in 
 class RegistrationWorkflow:
     def __init__(self,
                  send_message,
-                 canvas_api: CanvasApi,
                  email_confirmation: EmailConfirmation,
                  get_channel,
                  fetch_guild
                  ):
         self._send_message = step(send_message)
-        self._canvas_api = canvas_api
+        self._canvas_api = None
         self._email_confirmation = email_confirmation
         self._get_channel = get_channel
         self._get_guild = fetch_guild
@@ -26,8 +25,9 @@ class RegistrationWorkflow:
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         # Start the registration process
-        author_name, guild_id, user_id = self._parse_settings(initial_message)
-        self._canvas_api(guild_id, settings)
+        author_name, server_id, user_id = self._parse_settings(initial_message)
+        self._canvas_api = CanvasApi(server_id, settings)
+        self._canvas_api()
 
         await self._send_message(
             thread_id,
@@ -35,13 +35,12 @@ class RegistrationWorkflow:
         )
 
         # Get the ID
-        net_id = await self._get_net_id(guild_id, thread_id, author_name)
+        net_id = await self._get_net_id(server_id, thread_id, author_name)
 
         # Verify it via outlook.
         if not await self._confirm_registration_via_email(thread_id, net_id):
             await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
             return
-
 
         # add the role
 
