@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 from pathlib import Path
 from typing import TypedDict, Protocol
 
@@ -41,13 +42,20 @@ class RecordUsage(Protocol):
                        output_tokens: int): ...
 
 
+Sendable = str | tuple[str, BytesIO]
+
+
 class GenAIClient(Protocol):
-    async def get_completion(self, engine: str, message_history: list[GPTMessage], tools: [str]) -> tuple[list, dict, Path | None]: ...
-
-
-class RetryableGenAIClient(Protocol):
-    async def get_completion(self, thread_id: int, engine: str, message_history: list[GPTMessage], tools: [str]) -> \
-            tuple[list, dict, Path | None]: ...
+    async def get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            tools: [str]
+    ) -> list[Sendable]: ...
 
 
 class HaveConversation(Protocol):
@@ -70,7 +78,7 @@ class BasicSetupConversation:
 
 class BasicPromptConversation:
     def __init__(self,
-                 ai_client: RetryableGenAIClient,
+                 ai_client: GenAIClient,
                  record_message: RecordMessage,
                  record_usage: RecordUsage,
                  typing: IndicateTyping,
@@ -143,23 +151,28 @@ class BasicPromptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage, path = await self._ai_client.get_completion(thread_id, engine, message_history, tools)
+                    sendables = await self._ai_client.get_completion(
+                        guild_id,
+                        initial_message['channel_id'],
+                        thread_id,
+                        user_id,
+                        engine,
+                        message_history,
+                        tools
+                    )
 
-                    response_message = choices[0]['message']
-                    response = response_message['content'].strip()
+                    for sendable in sendables:
+                        if isinstance(sendable, str):
+                            await self._record_message(
+                                guild_id, thread_id, user_id, 'assistant', sendable)
+                            await self._send_message(thread_id, message=sendable)
+                            message_history.append(GPTMessage(role='assistant', content=sendable))
 
-                    await self._record_usage(guild_id, thread_id, user_id,
-                                             engine,
-                                             usage['prompt_tokens'],
-                                             usage['completion_tokens'])
-
-                    await self._record_message(
-                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
-
-                    message_history.append(GPTMessage(role='assistant', content=response))
-
-                    await self._send_message(thread_id, response, path)
-
+                        else:  # tuple of str, BytesIO -> i.e. an image
+                            await self._record_message(
+                                guild_id, thread_id, user_id, 'assistant', f'<image {sendable[0]}>')
+                            await self._send_message(thread_id, file=sendable)
+                            message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
 
                 except GenAIException:
                     await self._send_message(thread_id,

@@ -1,83 +1,107 @@
 import asyncio
-import json
 import logging
-from collections.abc import Callable
-from pathlib import Path
+from typing import Callable
 
+from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 from quest import step
-from .logger import duck_logger
+
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
-    RetryConfig
+    RetryConfig, Sendable
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
-
-class OpenAI():
-    def __init__(self, openai_api_key: str, tools: dict[str, Callable]):
+class OpenAI:
+    def __init__(self, openai_api_key: str, get_tool: Callable[[str], FunctionTool]):
         self._client = AsyncOpenAI(api_key=openai_api_key)
-        self.tool_mapping = tools
-    async def get_completion(self, engine: str, message_history, tools: [str]) -> tuple[list, dict, Path | None]:
-        tools_to_use = []
-        for tool in tools:
-            try:
-                tool_instance = self.tool_mapping[tool]
-            except ValueError as ex:
-                duck_logger.error(f"Tool '{tool}' not found in mapping: {ex}")
-                continue
+        self._get_tool = get_tool
 
-            tools_to_use.append(tool_instance)
+    async def _get_completion_with_usage(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            functions
+    ):
+        # TODO - pull this out into a function that tracks usage and returns the completion
+        completion: ChatCompletion = await self._client.chat.completions.create(
+            model=engine,
+            messages=message_history,
+            functions=functions
+        )
+        # TODO - record usage
+        return completion
 
-        try:
-            functions = [
-                {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.params_json_schema
-                }
-                for tool in tools_to_use
-            ]
-            image_path = None
+    async def _get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            tools: [str]
+    ) -> list[Sendable]:
+        tools_to_use = {tool: self._get_tool(tool) for tool in tools}
 
-            while True:
-                completion: ChatCompletion = await self._client.chat.completions.create(
-                    model=engine,
-                    messages=message_history,
-                    functions=functions if functions else None
-                )
-                choice = completion.choices[0]
-                message = choice.message
+        functions = [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.params_json_schema
+            }
+            for tool in tools_to_use.values()
+        ]
 
-                if message.function_call:
-                    function_name = message.function_call.name
-                    arguments = json.loads(message.function_call.arguments)
+        result: list[Sendable] = []
 
-                    for tool in tools_to_use:
-                        if tool.name == function_name:
-                            tool_result = await tool.on_invoke_tool(None, json.dumps(arguments))
-                            break
-                    else:
-                        raise Exception(f"Tool '{function_name}' not found.")
+        while True:
+            completion = await self._get_completion_with_usage(
+                guild_id, parent_channel_id, thread_id, user_id, engine, message_history, functions
+            )
+            message = completion.choices[0].message
 
-                    # Check if the tool result is an image path
-                    if isinstance(tool_result, Path) and tool_result.suffix in {".pdf", ".png"}:
-                        image_path = tool_result  # Save the image path
+            if message.function_call:
+                function_name = message.function_call.name
 
-                    message_history.append({"role": "assistant", "function_call": message.function_call})
-                    message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
+                tool = tools_to_use[function_name]
+                tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
 
-                    continue
+                message_history.append({"role": "assistant", "function_call": message.function_call})
+                message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
 
+                result.append(tool_result)
+                continue  # i.e. allow the bot to call another tool or add a message
+
+            else:
                 message_history.append({
                     "role": "assistant",
                     "content": message.content
                 })
 
-                completion_dict = completion.dict()
-                return completion_dict['choices'], completion_dict['usage'], image_path
+                result.append(message.content)
+                break  # i.e. the bot is done responding
 
+        return result
+
+    async def get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            tools: [str]
+    ) -> list[Sendable]:
+        try:
+            return await self._get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
+                                              tools)
         except (
                 APITimeoutError, InternalServerError,
                 UnprocessableEntityError) as ex:
@@ -113,6 +137,7 @@ class RetryableGenAI:
             try:
                 async with self._typing(thread_id):
                     return await self._genai.get_completion(engine, message_history, tools)
+
             except RetryableException as ex:
                 if retries == 0:
                     await self._send_message(thread_id, 'Trying to contact servers...')

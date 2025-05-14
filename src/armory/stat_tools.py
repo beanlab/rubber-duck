@@ -1,17 +1,16 @@
 import hashlib
 from pathlib import Path
 
-import pandas as pd
-import numpy as np
-from src.core.decorators import register_tool
-from ..utils.logger import duck_logger
-import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from scipy.stats import skew, gaussian_kde
-from ..utils.data_store import get_dataset
 
-OUTPUT_DIR = Path("generated_images")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+from .tools import register_tool
+from ..utils.data_store import get_dataset
+from ..utils.logger import duck_logger
+
 
 def _is_categorical(series) -> bool:
     if isinstance(series, list) or isinstance(series, dict):
@@ -19,6 +18,7 @@ def _is_categorical(series) -> bool:
     if not isinstance(series, pd.Series):
         raise ValueError(f"Expected a pandas Series, got {type(series)}")
     return series.dtype == object or pd.api.types.is_categorical_dtype(series)
+
 
 def _plot_message_with_axes(data: pd.DataFrame, column: str, title: str, kind: str):
     plt.figure(figsize=(8, 6))
@@ -41,13 +41,16 @@ def _plot_message_with_axes(data: pd.DataFrame, column: str, title: str, kind: s
         ax.set_ylim(0, 1)
         ax.set_xlabel(column)
 
-    ax.text(0.5, 0.5, f"{title.split()[0]}s are not appropriate for categorical data", fontsize=12, ha='center', va='center', transform=ax.transAxes)
+    ax.text(0.5, 0.5, f"{title.split()[0]}s are not appropriate for categorical data", fontsize=12, ha='center',
+            va='center', transform=ax.transAxes)
     ax.tick_params(axis='both', which='both', length=0)
+
 
 def _generate_cache_key(*args):
     """Generate a cache key based on the function name and arguments."""
     key_str = "_".join(str(arg) for arg in args)
     return hashlib.md5(key_str.encode()).hexdigest()
+
 
 def _save_plot(file_path: Path) -> Path:
     plt.savefig(file_path, format="png")
@@ -55,9 +58,11 @@ def _save_plot(file_path: Path) -> Path:
     duck_logger.debug(f"Saved plot to {file_path}")
     return file_path
 
+
 def _cached_path(dataset: str, column: str, kind: str) -> Path:
     cache_key = _generate_cache_key(dataset, column, kind)
     return OUTPUT_DIR / f"{cache_key}.png"
+
 
 @register_tool
 def get_variable_names(dataset: str) -> list[str]:
@@ -65,6 +70,7 @@ def get_variable_names(dataset: str) -> list[str]:
     duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
     data = get_dataset(dataset)
     return data.columns.to_list()
+
 
 @register_tool
 def get_column_data(dataset: str, column: str) -> pd.Series:
@@ -88,7 +94,6 @@ def plot_histogram(dataset: str, column: str) -> Path:
         duck_logger.debug(f"Using cached histogram at {output_path}")
         return output_path
 
-
     if _is_categorical(data[column]):
         _plot_message_with_axes(data, column, f"Histogram of {column}", "hist")
     else:
@@ -98,6 +103,7 @@ def plot_histogram(dataset: str, column: str) -> Path:
         plt.xlabel(column)
         plt.ylabel("Frequency")
     return _save_plot(output_path)
+
 
 @register_tool
 def plot_boxplot(dataset: str, column: str) -> Path:
@@ -122,6 +128,7 @@ def plot_boxplot(dataset: str, column: str) -> Path:
         plt.ylabel(column)
     return _save_plot(output_path)
 
+
 @register_tool
 def plot_dotplot(dataset: str, column: str) -> Path:
     """Creates a dot plot (strip plot) for the specified numeric column, or a message image if the column is categorical."""
@@ -145,6 +152,7 @@ def plot_dotplot(dataset: str, column: str) -> Path:
         plt.xlabel(column)
     return _save_plot(output_path)
 
+
 @register_tool
 def plot_barplot(dataset: str, column: str) -> Path:
     """Creates a bar plot of value counts for a categorical column in the dataset."""
@@ -166,6 +174,7 @@ def plot_barplot(dataset: str, column: str) -> Path:
     plt.ylabel("Count")
     return _save_plot(output_path)
 
+
 @register_tool
 def plot_pie_chart(dataset: str, column: str) -> Path:
     """Creates a pie chart of value proportions for a categorical column, or a message image if the column is numeric."""
@@ -186,7 +195,8 @@ def plot_pie_chart(dataset: str, column: str) -> Path:
         value_counts = data[column].dropna().value_counts()
         labels = [f"{label} ({round(p * 100, 1)}%)" for label, p in (value_counts / value_counts.sum()).items()]
         plt.figure(figsize=(8, 6))
-        plt.pie(value_counts.values, labels=labels, colors=sns.color_palette("pastel"), startangle=140, autopct='%1.1f%%')
+        plt.pie(value_counts.values, labels=labels, colors=sns.color_palette("pastel"), startangle=140,
+                autopct='%1.1f%%')
         plt.title(f"Pie Chart of {column}")
         plt.axis("equal")
     return _save_plot(output_path)
@@ -202,6 +212,7 @@ def calculate_mean(dataset: str, column: str) -> str:
         return "Mean cannot be calculated for categorical data"
     return f"Mean = {round(series.dropna().mean(), 4)}"
 
+
 @register_tool
 def calculate_skewness(dataset: str, column: str) -> str:
     """Calculates the skewness (asymmetry) of a numeric column in the dataset."""
@@ -211,6 +222,7 @@ def calculate_skewness(dataset: str, column: str) -> str:
     if _is_categorical(series):
         return "Skewness cannot be calculated for categorical data"
     return f"Skewness = {round(skew(series.dropna()), 4)}"
+
 
 @register_tool
 def calculate_std(dataset: str, column: str) -> str:
@@ -222,6 +234,7 @@ def calculate_std(dataset: str, column: str) -> str:
         return "Standard Deviation cannot be calculated for categorical data"
     return f"Standard Deviation = {round(series.dropna().std(), 4)}"
 
+
 @register_tool
 def calculate_median(dataset: str, column: str) -> str:
     """Calculates the median (middle value) of a numeric column in the dataset."""
@@ -231,6 +244,7 @@ def calculate_median(dataset: str, column: str) -> str:
     if _is_categorical(series):
         return "Median cannot be calculated for categorical data"
     return f"Median = {round(series.dropna().median(), 4)}"
+
 
 @register_tool
 def calculate_mode(dataset: str, column: str) -> str:
@@ -253,6 +267,7 @@ def calculate_mode(dataset: str, column: str) -> str:
         duck_logger.error(f"Error in KDE-based mode estimation: {e}")
         return "Error calculating mode"
 
+
 @register_tool
 def calculate_five_number_summary(dataset: str, column: str) -> str:
     """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
@@ -265,6 +280,7 @@ def calculate_five_number_summary(dataset: str, column: str) -> str:
     labels = ["Min", "Q1", "Median", "Q3", "Max"]
     return "; ".join(f"{label}={round(val, 4)}" for label, val in zip(labels, summary))
 
+
 @register_tool
 def calculate_table_of_counts(dataset: str, column: str) -> dict | str:
     """Returns a frequency table (category counts) for a categorical column in the dataset."""
@@ -276,6 +292,7 @@ def calculate_table_of_counts(dataset: str, column: str) -> dict | str:
     counts = series.value_counts(dropna=True).reset_index()
     counts.columns = ["Category", "Count"]
     return counts.to_dict(orient="records")
+
 
 @register_tool
 def calculate_proportions(dataset: str, column: str) -> dict | str:
