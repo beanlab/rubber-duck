@@ -111,10 +111,7 @@ class BasicPromptConversation:
 
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
 
-        await self._send_message(
-            thread_id,
-            'How can I help you today?\n '
-        )
+        await self._send_message(thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
