@@ -13,7 +13,7 @@ class SetupPrivateThread:
         )
 
         # Send welcome message to add the user to the thread
-        await self._send_message(thread_id, f'Hello {initial_message["author_mention"]}, how can I help you?')
+        await self._send_message(thread_id, f'{initial_message["author_mention"]}')
 
         # Notify the user in the original channel of the new thread
         await self._send_message(
