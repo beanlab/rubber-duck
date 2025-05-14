@@ -1,6 +1,6 @@
 import asyncio
 
-from discord import Guild, Member
+from discord import Guild, Member, Role
 from quest import step, queue, alias
 
 from ..utils.canvas_api import CanvasApi
@@ -8,10 +8,20 @@ from ..utils.email_confirmation import EmailConfirmation
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
-welcome_message = f"Hello, welcome to the registration process! Please follow the prompts."
-confirm_message ="Check your BYU Email to confirm your registration.\n Type in your code into the chat to confirm your registration."
-failed_email_message= 'Unable to validate your email. Please talk to a TA or your instructor.'
+welcome_message = "Hello, welcome to the registration process! Please follow the prompts."
+confirm_message = "Check your BYU Email to confirm your registration.\n Type in your code into the chat to confirm your registration."
+failed_email_message = 'Unable to validate your email. Please talk to a TA or your instructor.'
+
 class RegistrationWorkflow:
+    # Map Canvas enrollment types to Discord role names
+    ROLE_MAPPING = {
+        'TeacherEnrollment': 'Teacher',
+        'StudentEnrollment': 'Student',
+        'TaEnrollment': 'TA',
+        'DesignerEnrollment': 'Course Designer',
+        'ObserverEnrollment': 'Observer'
+    }
+
     def __init__(self,
                  send_message,
                  get_channel,
@@ -25,12 +35,7 @@ class RegistrationWorkflow:
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         # Start the registration process
-        author_name, server_id, user_id = self._parse_settings(initial_message)
-        self._canvas_api = CanvasApi(server_id, settings)
-        self._email_confirmation = EmailConfirmation(settings['sender_email'])
-        self._canvas_api()
-
-        await self._send_message(thread_id, welcome_message,)
+        author_name, server_id = await self._set_up(initial_message, settings, thread_id)
 
         # Get the ID
         net_id = await self._get_net_id(server_id, thread_id, author_name)
@@ -40,13 +45,24 @@ class RegistrationWorkflow:
             await self._send_message(failed_email_message)
             return
 
-        # add the role
+        # Get user's Canvas enrollment type and assign Discord role
+        await self._assign_role(server_id, thread_id, net_id, initial_message['author_id'])
 
-    def _parse_settings(self, initial_message):
+    @step
+    async def _set_up(self, initial_message, settings, thread_id):
+        # Extract info from initial message
         author_name = initial_message['author_name']
-        guild_id = initial_message['guild_id']
-        user_id = initial_message['author_id']
-        return author_name, guild_id, user_id
+        server_id = initial_message['guild_id']
+
+        # Set up dependencies
+        self._canvas_api = CanvasApi(server_id, settings)
+        self._email_confirmation = EmailConfirmation(settings['sender_email'])
+        self._canvas_api()
+
+        # Send welcome message
+        await self._send_message(thread_id, welcome_message)
+
+        return author_name, server_id
 
     @step
     async def _get_net_id(self, guild_id, thread_id, author_name) -> str:
@@ -91,3 +107,51 @@ class RegistrationWorkflow:
                 except asyncio.TimeoutError:
                     await self._send_message(thread_id, "Timed out waiting for token. Please exit the discord thread and start a new conversation")
                     return False
+
+    @step
+    async def _assign_role(self, server_id: str, thread_id: int, net_id: str, user_id: int):
+        """
+        Assigns the appropriate Discord role based on the user's Canvas enrollment type.
+        """
+        try:
+            # Get the user's enrollment type from Canvas
+            canvas_users = self._canvas_api.get_canvas_users(server_id)
+            if net_id not in canvas_users:
+                await self._send_message(thread_id, "Error: Could not find your enrollment information.")
+                return
+
+            _, _, enrollment_type = canvas_users[net_id]
+            role_name = self.ROLE_MAPPING.get(enrollment_type, 'Student')  # Default to Student if unknown type
+
+            # Get Discord guild and roles
+            guild: Guild = await self._get_guild(server_id)
+            if not guild:
+                duck_logger.error(f"Could not find Discord server with ID {server_id}")
+                await self._send_message(thread_id, "Error: Could not find Discord server.")
+                return
+
+            # Find the role that matches the mapped name
+            roles = await guild.fetch_roles()
+            role = next((r for r in roles if r.name == role_name), None)
+            
+            if not role:
+                duck_logger.error(f"Could not find role '{role_name}' in server {server_id}")
+                await self._send_message(thread_id, f"Error: Could not find role '{role_name}' in server.")
+                return
+
+            # Get the member and assign the role
+            member = await guild.fetch_member(user_id)
+            if not member:
+                duck_logger.error(f"Could not find member with ID {user_id} in server {server_id}")
+                await self._send_message(thread_id, "Error: Could not find your Discord account in the server.")
+                return
+
+            await member.add_roles(role, reason="Canvas course registration")
+            await self._send_message(
+                thread_id, 
+                f"Successfully assigned you the {role_name} role based on your Canvas enrollment!"
+            )
+
+        except Exception as e:
+            duck_logger.error(f"Error assigning role: {str(e)}")
+            await self._send_message(thread_id, "Error assigning role. Please contact an administrator.")

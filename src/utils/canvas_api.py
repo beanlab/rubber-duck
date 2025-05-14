@@ -86,15 +86,17 @@ class CanvasApi:
                     user = enrollment.user
                     login_id = user.get('login_id')
                     if login_id:
+                        # Get the enrollment type (TeacherEnrollment, StudentEnrollment, etc.)
+                        enrollment_type = getattr(enrollment, 'type', 'StudentEnrollment')
                         user_dict[login_id] = (
                             user.get('name', 'Unknown'),
                             user.get('email', f"{login_id}@byu.edu"),
-                            enrollment.type if hasattr(enrollment, 'type') else 'Unknown'
+                            enrollment_type
                         )
             
             # Store the user dictionary
             self.canvas_users[self._server_id] = user_dict
-            duck_logger.debug(f"Retrieved {len(user_dict)} users for course")
+            duck_logger.debug(f"Retrieved {len(user_dict)} users with their enrollment types")
             
         except Exception as e:
             duck_logger.error(f"Error retrieving users for course {course_id}: {str(e)}")
