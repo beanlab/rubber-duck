@@ -9,7 +9,10 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.metrics import reporter
 from src.metrics.feedback import HaveTAGradingConversation
+from src.utils.canvas_api import CanvasApi
+from src.utils.email_confirmation import EmailConfirmation
 from .workflows.registration_workflow import RegistrationWorkflow
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -139,8 +142,10 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.report_error
     )
 
+
     registration_workflow = RegistrationWorkflow(
         bot.send_message,
+        EmailConfirmation,
         bot.get_channel,
         bot.fetch_guild,
     )

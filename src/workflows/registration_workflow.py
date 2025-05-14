@@ -1,5 +1,4 @@
 import asyncio
-import uuid
 
 from discord import Guild, Member
 from quest import step, queue, alias
@@ -13,14 +12,12 @@ confirm_message ="Check your BYU Email to confirm your registration.\n  Type in 
 class RegistrationWorkflow:
     def __init__(self,
                  send_message,
-                 create_thread,
                  canvas_api: CanvasApi,
                  email_confirmation: EmailConfirmation,
                  get_channel,
                  fetch_guild
                  ):
         self._send_message = step(send_message)
-        self._create_thread = step(create_thread)
         self._canvas_api = canvas_api
         self._email_confirmation = email_confirmation
         self._get_channel = get_channel
@@ -30,17 +27,18 @@ class RegistrationWorkflow:
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         # Start the registration process
         author_name, guild_id, user_id = self._parse_settings(initial_message)
+        self._canvas_api(guild_id, settings)
 
         await self._send_message(
             thread_id,
-            f"Hello <@{author_name}>, welcome to the registration process! Please follow the prompts."
+            f"Hello, welcome to the registration process! Please follow the prompts."
         )
 
         # Get the ID
-        net_id = await self._get_net_id(guild_id, thread_id)
+        net_id = await self._get_net_id(guild_id, thread_id, author_name)
 
         # Verify it via outlook.
-        if not await self._confirm_registration_via_email(guild_id, thread_id, user_id, net_id):
+        if not await self._confirm_registration_via_email(thread_id, net_id):
             await self._send_message('Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
@@ -54,11 +52,11 @@ class RegistrationWorkflow:
         return author_name, guild_id, user_id
 
     @step
-    async def _get_net_id(self, guild_id, thread_id) -> str:
+    async def _get_net_id(self, guild_id, thread_id, author_name) -> str:
         await self._send_message(thread_id, "What is your BYU Net ID?")
         timeout = 120
 
-        async with alias(str(thread_id)), queue("messages", None) as message_queue:
+        async with alias(str(thread_id)+author_name), queue("messages", None) as message_queue:
             while True:
                 message: Message = await asyncio.wait_for(message_queue.get(), timeout)
                 net_id = message['content'].strip()
@@ -88,12 +86,6 @@ class RegistrationWorkflow:
                 if users_token_response != token:
                     pass ## TODO - wrong token
                 return True
-
-                # if self._email_confirmation.confirm_token(email, users_token_response.content):
-                #     await self._send_message(thread_id, "Your registration was successful.")
-                #     break
-                # else:
-                #     await self._send_message(thread_id, "The code you entered is incorrect. Please try again.")
 
     def _collect_canvas_data(self):
         self._canvas_config = []
