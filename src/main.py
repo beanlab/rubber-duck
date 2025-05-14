@@ -10,7 +10,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 
 from src.metrics.feedback import HaveTAGradingConversation
-from src.utils.data_store import get_dataset
+from src.utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -26,11 +26,13 @@ from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
 from .utils.gen_ai import OpenAI, RetryableGenAI
-from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
-from .armory.stat_tools import plot_barplot, plot_histogram, plot_boxplot, plot_dotplot, calculate_skewness, \
-    calculate_std, calculate_median, calculate_mode, calculate_five_number_summary, calculate_table_of_counts, \
-    calculate_proportions, calculate_mean
+from .core.tool_registry import TOOLS_REGISTRY
+
+TOOLS_MD = Path(__file__).resolve().parent / "TOOLS.md"
+TOOLS_MD.write_text("# Available Tools\n\n")
+
+from .armory import stat_tools
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -112,7 +114,8 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
     )
 
     ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY']
+        os.environ['OPENAI_API_KEY'],
+        TOOLS_REGISTRY
     )
 
     retryable_ai_client = RetryableGenAI(

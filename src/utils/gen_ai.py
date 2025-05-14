@@ -1,43 +1,24 @@
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 from quest import step
-
 from .logger import duck_logger
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
-from ..armory.stat_tools import plot_barplot, plot_histogram, plot_boxplot, plot_dotplot, calculate_skewness, \
-    calculate_std, calculate_median, calculate_mode, calculate_five_number_summary, calculate_table_of_counts, \
-    calculate_proportions, calculate_mean, get_column_data, get_variable_names, plot_pie_chart
+
 
 
 class OpenAI():
-    def __init__(self, openai_api_key: str):
+    def __init__(self, openai_api_key: str, tools: dict[str, Callable]):
         self._client = AsyncOpenAI(api_key=openai_api_key)
-        self.tool_mapping = {
-            "get_variable_names": get_variable_names,
-            "get_column_data": get_column_data,
-            "plot_barplot": plot_barplot,
-            "plot_histogram": plot_histogram,
-            "plot_boxplot": plot_boxplot,
-            "plot_dotplot": plot_dotplot,
-            "plot_pie_chart": plot_pie_chart,
-            "calculate_skewness": calculate_skewness,
-            "calculate_std": calculate_std,
-            "calculate_median": calculate_median,
-            "calculate_mode": calculate_mode,
-            "calculate_five_number_summary": calculate_five_number_summary,
-            "calculate_table_of_counts": calculate_table_of_counts,
-            "calculate_proportions": calculate_proportions,
-            "calculate_mean": calculate_mean,
-        }
-
+        self.tool_mapping = tools
     async def get_completion(self, engine: str, message_history, tools: [str]) -> tuple[list, dict, Path | None]:
         tools_to_use = []
         for tool in tools:

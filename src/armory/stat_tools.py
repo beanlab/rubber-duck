@@ -1,13 +1,9 @@
 import hashlib
-import os
 from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from agents import function_tool
-from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError
-
-from ..conversation.conversation import RetryableException
+from src.core.decorators import register_tool
 from ..utils.logger import duck_logger
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -63,14 +59,14 @@ def _cached_path(dataset: str, column: str, kind: str) -> Path:
     cache_key = _generate_cache_key(dataset, column, kind)
     return OUTPUT_DIR / f"{cache_key}.png"
 
-@function_tool
+@register_tool
 def get_variable_names(dataset: str) -> list[str]:
     """Returns the variable names (columns) of the dataset."""
     duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
     data = get_dataset(dataset)
     return data.columns.to_list()
 
-@function_tool
+@register_tool
 def get_column_data(dataset: str, column: str) -> pd.Series:
     """Returns the data of a specific column in the dataset."""
     data = get_dataset(dataset)
@@ -79,7 +75,7 @@ def get_column_data(dataset: str, column: str) -> pd.Series:
     return data[column]
 
 
-@function_tool
+@register_tool
 def plot_histogram(dataset: str, column: str) -> Path:
     """Generates a histogram with KDE for the specified numeric column in a dataset, or a message image if the column is categorical."""
     duck_logger.debug(f"Used plot_histogram on dataset={dataset}, column={column}")
@@ -103,7 +99,7 @@ def plot_histogram(dataset: str, column: str) -> Path:
         plt.ylabel("Frequency")
     return _save_plot(output_path)
 
-@function_tool
+@register_tool
 def plot_boxplot(dataset: str, column: str) -> Path:
     """Creates a boxplot of the specified numeric column in a dataset, or a message image if the column is categorical."""
     duck_logger.debug(f"Used plot_boxplot on dataset={dataset}, column={column}")
@@ -126,7 +122,7 @@ def plot_boxplot(dataset: str, column: str) -> Path:
         plt.ylabel(column)
     return _save_plot(output_path)
 
-@function_tool
+@register_tool
 def plot_dotplot(dataset: str, column: str) -> Path:
     """Creates a dot plot (strip plot) for the specified numeric column, or a message image if the column is categorical."""
     duck_logger.debug(f"Used plot_dotplot on dataset={dataset}, column={column}")
@@ -149,7 +145,7 @@ def plot_dotplot(dataset: str, column: str) -> Path:
         plt.xlabel(column)
     return _save_plot(output_path)
 
-@function_tool
+@register_tool
 def plot_barplot(dataset: str, column: str) -> Path:
     """Creates a bar plot of value counts for a categorical column in the dataset."""
     duck_logger.debug(f"Used plot_barplot on dataset={dataset}, column={column}")
@@ -170,7 +166,7 @@ def plot_barplot(dataset: str, column: str) -> Path:
     plt.ylabel("Count")
     return _save_plot(output_path)
 
-@function_tool
+@register_tool
 def plot_pie_chart(dataset: str, column: str) -> Path:
     """Creates a pie chart of value proportions for a categorical column, or a message image if the column is numeric."""
     duck_logger.debug(f"Used plot_pie_chart on dataset={dataset}, column={column}")
@@ -196,7 +192,7 @@ def plot_pie_chart(dataset: str, column: str) -> Path:
     return _save_plot(output_path)
 
 
-@function_tool
+@register_tool
 def calculate_mean(dataset: str, column: str) -> str:
     """Calculates the mean of a numeric column in the dataset, if not categorical."""
     duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
@@ -206,7 +202,7 @@ def calculate_mean(dataset: str, column: str) -> str:
         return "Mean cannot be calculated for categorical data"
     return f"Mean = {round(series.dropna().mean(), 4)}"
 
-@function_tool
+@register_tool
 def calculate_skewness(dataset: str, column: str) -> str:
     """Calculates the skewness (asymmetry) of a numeric column in the dataset."""
     duck_logger.debug(f"Calculating skewness for: {column} in dataset: {dataset}")
@@ -216,7 +212,7 @@ def calculate_skewness(dataset: str, column: str) -> str:
         return "Skewness cannot be calculated for categorical data"
     return f"Skewness = {round(skew(series.dropna()), 4)}"
 
-@function_tool
+@register_tool
 def calculate_std(dataset: str, column: str) -> str:
     """Calculates the standard deviation of a numeric column in the dataset."""
     duck_logger.debug(f"Calculating standard deviation for: {column} in dataset: {dataset}")
@@ -226,7 +222,7 @@ def calculate_std(dataset: str, column: str) -> str:
         return "Standard Deviation cannot be calculated for categorical data"
     return f"Standard Deviation = {round(series.dropna().std(), 4)}"
 
-@function_tool
+@register_tool
 def calculate_median(dataset: str, column: str) -> str:
     """Calculates the median (middle value) of a numeric column in the dataset."""
     duck_logger.debug(f"Calculating median for: {column} in dataset: {dataset}")
@@ -236,7 +232,7 @@ def calculate_median(dataset: str, column: str) -> str:
         return "Median cannot be calculated for categorical data"
     return f"Median = {round(series.dropna().median(), 4)}"
 
-@function_tool
+@register_tool
 def calculate_mode(dataset: str, column: str) -> str:
     """Estimates the mode of a numeric column using the peak of a KDE (kernel density estimate)."""
     duck_logger.debug(f"Calculating approximate mode (KDE) for: {column} in dataset: {dataset}")
@@ -257,7 +253,7 @@ def calculate_mode(dataset: str, column: str) -> str:
         duck_logger.error(f"Error in KDE-based mode estimation: {e}")
         return "Error calculating mode"
 
-@function_tool
+@register_tool
 def calculate_five_number_summary(dataset: str, column: str) -> str:
     """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
     duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
@@ -269,7 +265,7 @@ def calculate_five_number_summary(dataset: str, column: str) -> str:
     labels = ["Min", "Q1", "Median", "Q3", "Max"]
     return "; ".join(f"{label}={round(val, 4)}" for label, val in zip(labels, summary))
 
-@function_tool
+@register_tool
 def calculate_table_of_counts(dataset: str, column: str) -> dict | str:
     """Returns a frequency table (category counts) for a categorical column in the dataset."""
     duck_logger.debug(f"Calculating table of counts for: {column} in dataset: {dataset}")
@@ -281,7 +277,7 @@ def calculate_table_of_counts(dataset: str, column: str) -> dict | str:
     counts.columns = ["Category", "Count"]
     return counts.to_dict(orient="records")
 
-@function_tool
+@register_tool
 def calculate_proportions(dataset: str, column: str) -> dict | str:
     """Returns the relative proportions of each category in a categorical column of the dataset."""
     duck_logger.debug(f"Calculating proportions for: {column} in dataset: {dataset}")
