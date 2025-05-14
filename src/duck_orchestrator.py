@@ -48,6 +48,7 @@ class DuckOrchestrator:
         self._remember_conversation = remember_conversation
 
     def _get_duck_config(self, possible_ducks, initial_message: Message) -> DuckConfig | None:
+
         """
         Duck selection rules:
         - Go through ducks -> find the first one with a matching regex. Return it.
