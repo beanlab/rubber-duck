@@ -1,3 +1,4 @@
+from pathlib import Path
 
 import discord
 from ..utils.logger import duck_logger
@@ -141,17 +142,25 @@ class DiscordBot(discord.Client):
             curr_message = await channel.send(block)
 
         if file is not None:
-            if isinstance(file, list):
-                curr_message = await channel.send("", files=file)
-                # TODO: check that all instances are discord.File objects.
-            elif not isinstance(file, discord.File):
-                file = discord.File(file)
-                curr_message = await channel.send("", file=file)
-            else:
-                curr_message = await channel.send("", file=file)
+            # If it's a Path object or str, open it as a discord.File
+            if isinstance(file, (str, Path)):
+                with open(file, "rb") as f:
+                    discord_file = discord.File(f)
+                    curr_message = await channel.send(file=discord_file)
+            elif isinstance(file, discord.File):
+                curr_message = await channel.send(file=file)
+            elif isinstance(file, list):
+                # Assume all items are discord.File or str/Path to be opened
+                files = []
+                for item in file:
+                    if isinstance(item, (str, Path)):
+                        files.append(discord.File(open(item, "rb")))
+                    elif isinstance(item, discord.File):
+                        files.append(item)
+                curr_message = await channel.send(files=files)
 
         if view is not None:
-            await channel.send("", view=view)
+            await channel.send(view=view)
 
         return curr_message.id
 

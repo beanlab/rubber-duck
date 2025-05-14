@@ -42,12 +42,12 @@ class RecordUsage(Protocol):
 
 
 class GenAIClient(Protocol):
-    async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
+    async def get_completion(self, engine: str, message_history: list[GPTMessage], tools: [str]) -> tuple[list, dict, Path | None]: ...
 
 
 class RetryableGenAIClient(Protocol):
-    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
-            tuple[list, dict]: ...
+    async def get_completion(self, thread_id: int, engine: str, message_history: list[GPTMessage], tools: [str]) -> \
+            tuple[list, dict, Path | None]: ...
 
 
 class HaveConversation(Protocol):
@@ -103,6 +103,8 @@ class BasicPromptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
+        tools = settings["tools"] if "tools" in settings else None
+        introduction = settings["introduction"] if "introduction" in settings else "Hi, how can I help you?"
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
@@ -139,7 +141,7 @@ class BasicPromptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage = await self._ai_client.get_completion(guild_id, thread_id, engine, message_history)
+                    choices, usage, path = await self._ai_client.get_completion(thread_id, engine, message_history, tools)
 
                     response_message = choices[0]['message']
                     response = response_message['content'].strip()
@@ -154,7 +156,8 @@ class BasicPromptConversation:
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 
-                    await self._send_message(thread_id, response)
+                    await self._send_message(thread_id, response, path)
+
 
                 except GenAIException:
                     await self._send_message(thread_id,

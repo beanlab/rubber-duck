@@ -1,23 +1,54 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
 
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from .logger import duck_logger
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
     RetryConfig
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
+from ..armory.stat_tools import plot_barplot, plot_histogram, plot_boxplot, plot_dotplot, calculate_skewness, \
+    calculate_std, calculate_median, calculate_mode, calculate_five_number_summary, calculate_table_of_counts, \
+    calculate_proportions, calculate_mean, get_column_data, get_variable_names, plot_pie_chart
 
 
 class OpenAI():
-    def __init__(self, openai_api_key: str, tools: list = None):
+    def __init__(self, openai_api_key: str):
         self._client = AsyncOpenAI(api_key=openai_api_key)
-        self.tools = tools or []
+        self.tool_mapping = {
+            "get_variable_names": get_variable_names,
+            "get_column_data": get_column_data,
+            "plot_barplot": plot_barplot,
+            "plot_histogram": plot_histogram,
+            "plot_boxplot": plot_boxplot,
+            "plot_dotplot": plot_dotplot,
+            "plot_pie_chart": plot_pie_chart,
+            "calculate_skewness": calculate_skewness,
+            "calculate_std": calculate_std,
+            "calculate_median": calculate_median,
+            "calculate_mode": calculate_mode,
+            "calculate_five_number_summary": calculate_five_number_summary,
+            "calculate_table_of_counts": calculate_table_of_counts,
+            "calculate_proportions": calculate_proportions,
+            "calculate_mean": calculate_mean,
+        }
 
-    async def get_completion(self, engine, message_history) -> tuple[list, dict]:
+    async def get_completion(self, engine: str, message_history, tools: [str]) -> tuple[list, dict, Path | None]:
+        tools_to_use = []
+        for tool in tools:
+            try:
+                tool_instance = self.tool_mapping[tool]
+            except ValueError as ex:
+                duck_logger.error(f"Tool '{tool}' not found in mapping: {ex}")
+                continue
+
+            tools_to_use.append(tool_instance)
+
         try:
             functions = [
                 {
@@ -25,41 +56,46 @@ class OpenAI():
                     "description": tool.description,
                     "parameters": tool.params_json_schema
                 }
-                for tool in self.tools
+                for tool in tools_to_use
             ]
+            image_path = None
 
-            completion: ChatCompletion = await self._client.chat.completions.create(
-                model=engine,
-                messages=message_history,
-                functions=functions if functions else None
-            )
-            choice = completion.choices[0]
-            message = choice.message
-
-            if message.function_call:
-                function_name = message.function_call.name
-                arguments = json.loads(message.function_call.arguments)
-
-                for tool in self.tools:
-                    if tool.name == function_name:
-                        tool_result = await tool.on_invoke_tool(None, json.dumps(arguments))
-                        break
-                else:
-                    raise Exception(f"Tool '{function_name}' not found.")
-
-                message_history.append({"role": "assistant", "function_call": message.function_call})
-                message_history.append({"role": "function", "name": function_name, "content": tool_result})
-
-                second_completion = await self._client.chat.completions.create(
+            while True:
+                completion: ChatCompletion = await self._client.chat.completions.create(
                     model=engine,
-                    messages=message_history
+                    messages=message_history,
+                    functions=functions if functions else None
                 )
+                choice = completion.choices[0]
+                message = choice.message
 
-                second_completion_dict = second_completion.dict()
-                return second_completion_dict['choices'], second_completion_dict['usage']
-            else:
+                if message.function_call:
+                    function_name = message.function_call.name
+                    arguments = json.loads(message.function_call.arguments)
+
+                    for tool in tools_to_use:
+                        if tool.name == function_name:
+                            tool_result = await tool.on_invoke_tool(None, json.dumps(arguments))
+                            break
+                    else:
+                        raise Exception(f"Tool '{function_name}' not found.")
+
+                    # Check if the tool result is an image path
+                    if isinstance(tool_result, Path) and tool_result.suffix in {".pdf", ".png"}:
+                        image_path = tool_result  # Save the image path
+
+                    message_history.append({"role": "assistant", "function_call": message.function_call})
+                    message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
+
+                    continue
+
+                message_history.append({
+                    "role": "assistant",
+                    "content": message.content
+                })
+
                 completion_dict = completion.dict()
-                return completion_dict['choices'], completion_dict['usage']
+                return completion_dict['choices'], completion_dict['usage'], image_path
 
         except (
                 APITimeoutError, InternalServerError,
@@ -74,16 +110,20 @@ class OpenAI():
 
 
 class RetryableGenAI:
-    def __init__(self, genai: GenAIClient,
-                 send_message: SendMessage, report_error: ReportError, typing: IndicateTyping,
-                 retry_config: RetryConfig):
+    def __init__(self,
+                 genai: GenAIClient,
+                 send_message: SendMessage,
+                 report_error: ReportError,
+                 typing: IndicateTyping,
+                 retry_config: RetryConfig
+                 ):
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._typing = typing
         self._retry_config = retry_config
         self._genai = genai
 
-    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]):
+    async def get_completion(self, thread_id: int, engine: str, message_history: list[GPTMessage], tools: [str]):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
@@ -91,7 +131,7 @@ class RetryableGenAI:
         while True:
             try:
                 async with self._typing(thread_id):
-                    return await self._genai.get_completion(engine, message_history)
+                    return await self._genai.get_completion(engine, message_history, tools)
             except RetryableException as ex:
                 if retries == 0:
                     await self._send_message(thread_id, 'Trying to contact servers...')

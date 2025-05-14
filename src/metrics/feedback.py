@@ -93,7 +93,7 @@ class HaveTAGradingConversation:
 
         await self._send_message(
             thread_id,
-            'After you provide feedback on a conversation, another will be served.\n '
+            'After you provide feedback on a conversation, another will be served.\n'
             'If you leave the queue after five minutes, this session will end.\n'
         )
 
