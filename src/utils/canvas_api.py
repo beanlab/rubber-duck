@@ -32,7 +32,7 @@ class CanvasApi:
         self._server_id = server_id
         self._canvas_settings = canvas_settings
         self._courses = {}
-        self.cache_timeout = 604800 # 7 days
+        self.cache_timeout = canvas_settings["cache_timeout"] # 7 days
         self.canvas_users = {}  # guild_id -> users
         self.last_called = {}  # guild_id -> timestamp
         self._canvas_token = os.environ.get("CANVAS_TOKEN")
@@ -52,7 +52,7 @@ class CanvasApi:
                 self._courses[course_id] = get_course(self._canvas_token, self._api_url, course_id)
 
                 # Initialize the user cache for the server
-                self._retrieve_users(course_id)
+                self._populate_users(course_id)
 
                 duck_logger.debug(f"Canvas API for guild '{server_id}' initialized with course ID {course_id}")
 
@@ -62,10 +62,10 @@ class CanvasApi:
 
     def get_canvas_users(self, guild_id):
         if self._is_data_stale(guild_id):
-            self._retrieve_users(guild_id)
+            self._populate_users(guild_id)
         return self.canvas_users[guild_id]
 
-    def _retrieve_users(self, course_id: str):
+    def _populate_users(self, course_id: str):
         """
         Retrieves user data for the given course ID and updates the local cache.
         """

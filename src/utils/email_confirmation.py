@@ -3,6 +3,8 @@ import boto3
 import uuid
 import os
 
+from src.utils.logger import duck_logger
+
 
 class EmailConfirmation:
     def __init__(self, sender_email):
@@ -33,7 +35,7 @@ class EmailConfirmation:
     def _retrieve_token(self, email):
         return self.token_store.get(email)
 
-    def send_email(self, email, subject, body):
+    def _send_email(self, email, subject, body) -> bool:
         try:
             self._ses_client.send_email(
                 Source=self._sender_email,
@@ -43,12 +45,13 @@ class EmailConfirmation:
                     "Body": {"Html": {"Data": body}},
                 },
             )
+            duck_logger.debug(f"Email sent to {email}")
             return True
         except Exception as e:
-            logging.exception("Error sending email")
+            duck_logger.exception("Error sending email")
             return False
 
-    def send_email_with_token(self, email, subject,):
+    def prepare_email(self, email) -> str | None:
         token = self.generate_token(email)
         subject = "Registration confirmation"
         body = f"""
@@ -61,6 +64,8 @@ class EmailConfirmation:
         </body>
         </html>
         """
-        self.send_email(email, subject, body)
-
-        return token
+        if self._send_email(email, subject, body):
+            return token
+        else:
+            duck_logger.warning(f"Email not sent to {email}")
+            return None

@@ -145,7 +145,6 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
     registration_workflow = RegistrationWorkflow(
         bot.send_message,
-        EmailConfirmation,
         bot.get_channel,
         bot.fetch_guild,
     )
