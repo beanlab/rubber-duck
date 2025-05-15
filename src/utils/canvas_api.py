@@ -14,12 +14,13 @@ class CanvasApi:
                  ):
         self._server_id = server_id
         self._canvas_settings = canvas_settings
-        self._courses = {}
         self.cache_timeout = canvas_settings["cache_timeout"]
-        self.canvas_users = {}
+        self._courses = {}
+        self.section_enrollments = {}
         self.last_called = {}
         self._canvas_token = os.environ.get("CANVAS_TOKEN")
         self._api_url = os.environ.get("BYU_CANVAS_URL")
+        self.canvas = None
 
         server_id = self._server_id  # Use the stored server_id
         
@@ -31,11 +32,11 @@ class CanvasApi:
             canvas_course_ids = list(self._canvas_settings.get('courses_in_server', {}).values())
 
             for course_id in canvas_course_ids:
-                self._courses[course_id] = self._get_course(self._canvas_token, self._api_url, course_id)
+                course = self._get_course(self._canvas_token, self._api_url, course_id)
+                self._courses[course_id] = course
 
-                # Initialize the user cache for the server
-                self._populate_users(course_id)
-
+                # Initialize the section enrollments for the server
+                self._populate_section_enrollments(course_id)
                 duck_logger.debug(f"Canvas API for guild '{server_id}' initialized with course ID {course_id}")
 
         else:
@@ -50,58 +51,127 @@ class CanvasApi:
         :param canvas_course_id: int: The ID of the Canvas course.
         :return: Course: A Canvas Course object.
         """
-        canvas = Canvas(api_url, api_token)
+        self.canvas = Canvas(api_url, api_token)
         try:
-            course: Course = canvas.get_course(canvas_course_id)
+            course: Course = self.canvas.get_course(canvas_course_id)
         except Exception as e:
             duck_logger.error(f"Error fetching course {canvas_course_id}: {e}")
             raise
         return course
 
     def get_canvas_users(self, guild_id):
-        if self._is_data_stale(guild_id):
-            self._populate_users(guild_id)
-        return self.canvas_users[guild_id]
-
-    def _populate_users(self, course_id: str):
         """
-        Retrieves user data for the given course ID and updates the local cache.
+        Returns a flattened dictionary of all users across all sections.
+        Format: {net_id: (name, email, enrollment_type)}
+        """
+        if self._is_data_stale(guild_id):
+            course_id = list(self._canvas_settings.get('courses_in_server', {}).values())[0]
+            self._populate_section_enrollments(course_id)
+        
+        # Flatten section enrollments into the format expected by the registration workflow
+        users_dict = {}
+        for section_data in self.section_enrollments[self._server_id].values():
+            for user_info in section_data['enrollments'].values():
+                net_id = user_info['login_id']
+                users_dict[net_id] = (
+                    user_info['name'],
+                    user_info['email'],
+                    user_info['enrollment_type']
+                )
+        return users_dict
+
+    def _populate_section_enrollments(self, course_id: int):
+        """
+        Retrieves section and enrollment data for the given course ID and updates the local cache.
         """
         if course_id not in self._courses:
-            raise ValueError("Course not found in courses Cache.")
+            raise ValueError(f"Course ID {course_id} not found in cache.")
 
         course = self._courses[course_id]
-        
-        try:
-            # Get enrollments from the course
-            enrollments = list(course.get_enrollments(include=["user", "email", "enrollments"]))
-            
-            # Process enrollments based on the structure we observed in the debug log
-            user_dict = {}
-            for enrollment in enrollments:
-                # Based on the debug log, we know enrollment.user is a dictionary
-                if hasattr(enrollment, 'user') and isinstance(enrollment.user, dict):
-                    user = enrollment.user
-                    login_id = user.get('login_id')
-                    if login_id:
-                        # Get the enrollment type (TeacherEnrollment, StudentEnrollment, etc.)
-                        enrollment_type = getattr(enrollment, 'type', 'StudentEnrollment')
-                        user_dict[login_id] = (
-                            user.get('name', 'Unknown'),
-                            user.get('email', f"{login_id}@byu.edu"),
-                            enrollment_type
-                        )
-            
-            # Store the user dictionary
-            self.canvas_users[self._server_id] = user_dict
-            duck_logger.debug(f"Retrieved {len(user_dict)} users with their enrollment types")
-            
-        except Exception as e:
-            duck_logger.error(f"Error retrieving users for course {course_id}: {str(e)}")
-            # Initialize with empty dict to prevent further errors
-            self.canvas_users[self._server_id] = {}
+        section_data = {}
 
-        self.last_called[self._server_id] = time.time()
+        try:
+            sections = course.get_sections()
+            for section in sections:
+                section_number = section.name
+                section_data[section_number] = {
+                    'id': section.id,
+                    'sis_section_id': getattr(section, 'sis_section_id', None),
+                    'enrollments': {}
+                }
+                
+                # Get enrollments for this section
+                enrollments = section.get_enrollments(include=["user", "email"])
+                for enrollment in enrollments:
+                    if hasattr(enrollment, 'user') and isinstance(enrollment.user, dict):
+                        user = enrollment.user
+                        login_id = user.get('login_id')
+                        if login_id:
+                            section_data[section_number]['enrollments'][login_id] = {
+                                'name': user.get('name', 'Unknown'),
+                                'email': user.get('email', f"{login_id}@byu.edu"),
+                                'enrollment_type': getattr(enrollment, 'type', 'StudentEnrollment'),
+                                'login_id': login_id
+                            }
+
+            self.section_enrollments[self._server_id] = section_data
+            self.last_called[self._server_id] = time.time()
+            duck_logger.debug(f"Retrieved section enrollments for course {course_id}")
+
+        except Exception as e:
+            duck_logger.error(f"Error retrieving section enrollments for course {course_id}: {str(e)}")
+            self.section_enrollments[self._server_id] = {}
+            self.last_called[self._server_id] = time.time()
+
+    def get_course_sections(self, course_id: int = None):
+        """
+        Returns section information from the cached section enrollments.
+        """
+        if self._server_id not in self.section_enrollments:
+            if course_id is None:
+                course_id = list(self._canvas_settings.get('courses_in_server', {}).values())[0]
+            self._populate_section_enrollments(course_id)
+
+        sections = []
+        for section_number, data in self.section_enrollments[self._server_id].items():
+            sections.append({
+                'id': data['id'],
+                'name': section_number,
+                'sis_section_id': data['sis_section_id']
+            })
+        return sections
+
+    def get_section_enrollments(self, course_id: int) -> dict:
+        """
+        Returns a dictionary mapping section numbers to their enrolled students and their enrollment types.
+        Format: {section_number: {student_name: enrollment_type}}
+        """
+        if course_id not in self._courses:
+            raise ValueError(f"Course ID {course_id} not found in cache.")
+
+        course = self._courses[course_id]
+        section_enrollments = {}
+
+        try:
+            sections = course.get_sections()
+            for section in sections:
+                section_number = section.name
+                section_enrollments[section_number] = {}
+                
+                # Get enrollments for this section
+                enrollments = section.get_enrollments(include=["user"])
+                for enrollment in enrollments:
+                    if hasattr(enrollment, 'user') and isinstance(enrollment.user, dict):
+                        user = enrollment.user
+                        student_name = user.get('name', 'Unknown')
+                        enrollment_type = getattr(enrollment, 'type', 'StudentEnrollment')
+                        section_enrollments[section_number][student_name] = enrollment_type
+
+            return section_enrollments
+
+        except Exception as e:
+            duck_logger.error(f"Error fetching section enrollments for course {course_id}: {e}")
+            return {}
 
     # TODO figure out if this is needed
     def _is_data_stale(self, server_id):

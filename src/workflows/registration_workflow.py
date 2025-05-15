@@ -1,6 +1,6 @@
 import asyncio
 
-from discord import Guild, Member, Role
+from discord import Guild
 from quest import step, queue, alias
 
 from ..utils.canvas_api import CanvasApi
@@ -9,7 +9,7 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
 welcome_message = "Hello, welcome to the registration process! Please follow the prompts."
-confirm_message = "We sent a code do your byu email.\n Type in your code into the chat to confirm your registration."
+confirm_message = "We sent a code o your byu email.\n Type in your code into the chat to confirm your identity."
 failed_email_message = 'Unable to validate your email. Please talk to a TA or your instructor.'
 
 class RegistrationWorkflow:
@@ -110,16 +110,28 @@ class RegistrationWorkflow:
     @step
     async def _assign_role(self, server_id: str, thread_id: int, net_id: str, user_id: int):
         """
-        Assigns the appropriate Discord role based on the user's Canvas enrollment type.
+        Assigns the appropriate Discord roles based on:
+        1. The user's Canvas enrollment type (Student/Faculty/TA)
+        2. The user's section number
         """
         try:
-            # Get the user's enrollment type from Canvas
-            canvas_users = self._canvas_api.get_canvas_users(server_id)
-            if net_id not in canvas_users:
+            # Get the user's enrollment type and section from Canvas
+            section_data = self._canvas_api.section_enrollments[server_id]
+            
+            # Find the user's section and enrollment type
+            user_section = None
+            enrollment_type = None
+            for section_number, data in section_data.items():
+                if net_id in data['enrollments']:
+                    user_section = section_number
+                    enrollment_type = data['enrollments'][net_id]['enrollment_type']
+                    break
+
+            if not user_section or not enrollment_type:
                 await self._send_message(thread_id, "Error: Could not find your enrollment information.")
                 return
 
-            _, _, enrollment_type = canvas_users[net_id]
+            # Map the enrollment type to a role name
             role_name = self.ROLE_MAPPING.get(enrollment_type, 'Student')  # Default to Student if unknown type
 
             # Get Discord guild and roles
@@ -129,28 +141,36 @@ class RegistrationWorkflow:
                 await self._send_message(thread_id, "Error: Could not find Discord server.")
                 return
 
-            # Find the role that matches the mapped name
+            # Find both the enrollment role and section role
             roles = await guild.fetch_roles()
-            role = next((r for r in roles if r.name == role_name), None)
+            enrollment_role = next((r for r in roles if r.name == role_name), None)
+            section_role = next((r for r in roles if r.name == user_section), None)
             
-            if not role:
+            if not enrollment_role:
                 duck_logger.error(f"Could not find role '{role_name}' in server {server_id}")
                 await self._send_message(thread_id, f"Error: Could not find role '{role_name}' in server.")
                 return
 
-            # Get the member and assign the role
+            if not section_role:
+                duck_logger.error(f"Could not find section role '{user_section}' in server {server_id}")
+                await self._send_message(thread_id, f"Error: Could not find section role '{user_section}' in server.")
+                return
+
+            # Get the member and assign both roles
             member = await guild.fetch_member(user_id)
             if not member:
                 duck_logger.error(f"Could not find member with ID {user_id} in server {server_id}")
                 await self._send_message(thread_id, "Error: Could not find your Discord account in the server.")
                 return
 
-            await member.add_roles(role, reason="Canvas course registration")
+            await member.add_roles(enrollment_role, reason="Canvas course registration - enrollment type")
+            await member.add_roles(section_role, reason="Canvas course registration - section assignment")
+            
             await self._send_message(
                 thread_id, 
-                f"Successfully assigned you the {role_name} role based on your Canvas enrollment!"
+                f"Successfully assigned you the {role_name} role and {user_section} section role based on your Canvas enrollment!"
             )
 
         except Exception as e:
-            duck_logger.error(f"Error assigning role: {str(e)}")
-            await self._send_message(thread_id, "Error assigning role. Please contact an administrator.")
+            duck_logger.error(f"Error assigning roles: {str(e)}")
+            await self._send_message(thread_id, "Error assigning roles. Please contact an administrator.")
