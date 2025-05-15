@@ -12,6 +12,7 @@ welcome_message = "Hello, welcome to the registration process! Please follow the
 confirm_message = "We sent a code o your byu email.\n Type in your code into the chat to confirm your identity."
 failed_email_message = 'Unable to validate your email. Please talk to a TA or your instructor.'
 
+
 class RegistrationWorkflow:
     # Map Canvas enrollment types to Discord role names
     ROLE_MAPPING = {
@@ -68,7 +69,7 @@ class RegistrationWorkflow:
         await self._send_message(thread_id, "What is your BYU Net ID?")
         timeout = 120
 
-        async with alias(str(thread_id)+author_name), queue("messages", None) as message_queue:
+        async with alias(str(thread_id) + author_name), queue("messages", None) as message_queue:
             while True:
                 message: Message = await asyncio.wait_for(message_queue.get(), timeout)
                 net_id = message['content'].strip()
@@ -104,7 +105,8 @@ class RegistrationWorkflow:
                         duck_logger.error(f"Token mismatch: {res_token} != {token}")
                         await self._send_message(thread_id, "Invalid token. Please try again.")
                 except asyncio.TimeoutError:
-                    await self._send_message(thread_id, "Timed out waiting for token. Please exit the discord thread and start a new conversation")
+                    await self._send_message(thread_id,
+                                             "Timed out waiting for token. Please exit the discord thread and start a new conversation")
                     return False
 
     @step
@@ -117,7 +119,7 @@ class RegistrationWorkflow:
         try:
             # Get the user's enrollment type and section from Canvas
             section_data = self._canvas_api.section_enrollments[server_id]
-            
+
             # Find the user's section and enrollment type
             user_section = None
             enrollment_type = None
@@ -145,7 +147,7 @@ class RegistrationWorkflow:
             roles = await guild.fetch_roles()
             enrollment_role = next((r for r in roles if r.name == role_name), None)
             section_role = next((r for r in roles if r.name == user_section), None)
-            
+
             if not enrollment_role:
                 duck_logger.error(f"Could not find role '{role_name}' in server {server_id}")
                 await self._send_message(thread_id, f"Error: Could not find role '{role_name}' in server.")
@@ -165,9 +167,9 @@ class RegistrationWorkflow:
 
             await member.add_roles(enrollment_role, reason="Canvas course registration - enrollment type")
             await member.add_roles(section_role, reason="Canvas course registration - section assignment")
-            
+
             await self._send_message(
-                thread_id, 
+                thread_id,
                 f"Successfully assigned you the {role_name} role and {user_section} section role based on your Canvas enrollment!"
             )
 

@@ -173,6 +173,18 @@ class CanvasApi:
             duck_logger.error(f"Error fetching section enrollments for course {course_id}: {e}")
             return {}
 
-    # TODO figure out if this is needed
-    def _is_data_stale(self, server_id):
-        return server_id not in self.last_called or (time.time() - self.last_called[server_id] > self.cache_timeout)
+    def _is_data_stale(self, server_id: str) -> bool:
+        """
+        Checks if the cached data for a server is stale and needs to be refreshed.
+        Returns True if:
+        1. No data exists for the server
+        2. Last update was more than cache_timeout seconds ago
+        """
+        if (
+            server_id not in self.last_called or
+            server_id not in self.section_enrollments 
+        ):
+            return True
+
+        time_since_update = time.time() - self.last_called[server_id]
+        return time_since_update > self.cache_timeout
