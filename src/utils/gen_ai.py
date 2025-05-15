@@ -9,14 +9,15 @@ from openai.types.chat import ChatCompletion
 from quest import step
 
 from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
-    RetryConfig, Sendable
+    RetryConfig, Sendable, RecordUsage
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 
 class OpenAI:
-    def __init__(self, openai_api_key: str, get_tool: Callable[[str], FunctionTool]):
+    def __init__(self, openai_api_key: str, get_tool: Callable[[str], FunctionTool], record_usage: RecordUsage,):
         self._client = AsyncOpenAI(api_key=openai_api_key)
         self._get_tool = get_tool
+        self._record_usage = step(record_usage)
 
     async def _get_completion_with_usage(
             self,
@@ -28,13 +29,24 @@ class OpenAI:
             message_history: list[GPTMessage],
             functions
     ):
-        # TODO - pull this out into a function that tracks usage and returns the completion
         completion: ChatCompletion = await self._client.chat.completions.create(
             model=engine,
             messages=message_history,
             functions=functions
         )
+
+        completion_dict = completion.model_dump()
         # TODO - record usage
+        await self._record_usage(
+                                 guild_id,
+                                 parent_channel_id,
+                                 thread_id, user_id,
+                                 engine,
+                                 completion_dict['usage']['prompt_tokens'],
+                                 completion_dict['usage']['completion_tokens'],
+                                 completion_dict['usage'].get('cached_tokens', 0),
+                                 completion_dict['usage'].get('reasoning_tokens', 0)
+                                 )
         return completion
 
     async def _get_completion(

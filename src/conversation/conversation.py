@@ -38,8 +38,8 @@ class RecordMessage(Protocol):
 
 
 class RecordUsage(Protocol):
-    async def __call__(self, guild_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
-                       output_tokens: int): ...
+    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
+                       output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
 Sendable = str | tuple[str, BytesIO]
