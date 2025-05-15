@@ -9,7 +9,8 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.metrics.feedback import HaveTAGradingConversation
+from .metrics.feedback import HaveTAGradingConversation
+from .utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -25,8 +26,8 @@ from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
 from .utils.gen_ai import OpenAI, RetryableGenAI
-from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
+from .armory.tools import get_tool
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -109,6 +110,8 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
     ai_client = OpenAI(
         os.environ['OPENAI_API_KEY'],
+        get_tool,
+        metrics_handler.record_usage
     )
 
     retryable_ai_client = RetryableGenAI(

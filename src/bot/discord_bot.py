@@ -1,8 +1,7 @@
-
 import discord
-from ..utils.logger import duck_logger
 
-from ..utils.protocols import Attachment, Message
+from ..utils.logger import duck_logger
+from ..utils.protocols import Attachment, Message, SendableFile
 
 
 def as_message(message: discord.Message) -> Message:
@@ -129,31 +128,38 @@ class DiscordBot(discord.Client):
     # Methods for message-handling protocols
     #
 
-    async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
+    def _make_discord_file(self, file) -> discord.File:
+        if isinstance(file, discord.File):
+            return file
+        if isinstance(file, tuple):
+            return discord.File(file[1], file[0])
+        raise NotImplementedError(f"Unsupported file type: {file}")
+
+    async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
         channel = self.get_channel(channel_id)
         if channel is None:
             duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
-        curr_message = None
-
-        for block in _parse_blocks(message):
+        for block in _parse_blocks(message or ''):
             curr_message = await channel.send(block)
+            return curr_message.id
 
         if file is not None:
-            if isinstance(file, list):
-                curr_message = await channel.send("", files=file)
-                # TODO: check that all instances are discord.File objects.
-            elif not isinstance(file, discord.File):
-                file = discord.File(file)
-                curr_message = await channel.send("", file=file)
+            files_to_send = []
+            if not isinstance(file, list):
+                files_to_send.append(file)
             else:
-                curr_message = await channel.send("", file=file)
+                files_to_send = file
+
+            file_to_send = [self._make_discord_file(file) for file in files_to_send]
+            curr_message = await channel.send(files=file_to_send)
+            return curr_message.id
 
         if view is not None:
-            await channel.send("", view=view)
+            return (await channel.send(view=view)).id
 
-        return curr_message.id
+        raise Exception('Must sent message, file, or view')
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str):
         channel = self.get_channel(channel_id)
@@ -185,4 +191,3 @@ class DiscordBot(discord.Client):
                 await self.send_message(self._admin_channel, msg)
             except:
                 duck_logger.exception(f'Unable to message channel {self._admin_channel}')
-

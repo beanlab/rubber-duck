@@ -1,53 +1,12 @@
 import asyncio
+from io import BytesIO
 from pathlib import Path
 from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
+from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
-
-
-class RetryableException(Exception):
-    def __init__(self, exception, message):
-        self.exception = exception
-        self.message = message
-        super().__init__(self.exception.__str__())
-
-
-class GenAIException(Exception):
-    def __init__(self, exception, web_mention):
-        self.exception = exception
-        self.web_mention = web_mention
-        super().__init__(self.exception.__str__())
-
-
-class RetryConfig(TypedDict):
-    max_retries: int
-    delay: int
-    backoff: int
-
-
-class GPTMessage(TypedDict):
-    role: str
-    content: str
-
-
-class RecordMessage(Protocol):
-    async def __call__(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str): ...
-
-
-class RecordUsage(Protocol):
-    async def __call__(self, guild_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
-                       output_tokens: int): ...
-
-
-class GenAIClient(Protocol):
-    async def get_completion(self, engine, message_history) -> tuple[list, dict]: ...
-
-
-class RetryableGenAIClient(Protocol):
-    async def get_completion(self, guild_id: int, thread_id: int, engine: str, message_history: list[GPTMessage]) -> \
-            tuple[list, dict]: ...
 
 
 class HaveConversation(Protocol):
@@ -70,7 +29,7 @@ class BasicSetupConversation:
 
 class BasicPromptConversation:
     def __init__(self,
-                 ai_client: RetryableGenAIClient,
+                 ai_client: RetryableGenAI,
                  record_message: RecordMessage,
                  record_usage: RecordUsage,
                  typing: IndicateTyping,
@@ -103,16 +62,15 @@ class BasicPromptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
+        tools = settings["tools"] if "tools" in settings else None
+        introduction = settings["introduction"] if "introduction" in settings else "Hi, how can I help you?"
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
 
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
 
-        await self._send_message(
-            thread_id,
-            'How can I help you today?\n '
-        )
+        await self._send_message(thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
@@ -144,22 +102,28 @@ class BasicPromptConversation:
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
 
-                    choices, usage = await self._ai_client.get_completion(guild_id, thread_id, engine, message_history)
+                    sendables = await self._ai_client.get_completion(
+                        guild_id,
+                        initial_message['channel_id'],
+                        thread_id,
+                        user_id,
+                        engine,
+                        message_history,
+                        tools
+                    )
 
-                    response_message = choices[0]['message']
-                    response = response_message['content'].strip()
+                    for sendable in sendables:
+                        if isinstance(sendable, str):
+                            await self._record_message(
+                                guild_id, thread_id, user_id, 'assistant', sendable)
+                            await self._send_message(thread_id, message=sendable)
+                            message_history.append(GPTMessage(role='assistant', content=sendable))
 
-                    await self._record_usage(guild_id, thread_id, user_id,
-                                             engine,
-                                             usage['prompt_tokens'],
-                                             usage['completion_tokens'])
-
-                    await self._record_message(
-                        guild_id, thread_id, user_id, response_message['role'], response_message['content'])
-
-                    message_history.append(GPTMessage(role='assistant', content=response))
-
-                    await self._send_message(thread_id, response)
+                        else:  # tuple of str, BytesIO -> i.e. an image
+                            await self._record_message(
+                                guild_id, thread_id, user_id, 'assistant', f'<image {sendable[0]}>')
+                            await self._send_message(thread_id, file=sendable)
+                            message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
 
                 except GenAIException:
                     await self._send_message(thread_id,

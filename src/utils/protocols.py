@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import Protocol, TypedDict
 
 
@@ -19,12 +20,14 @@ class Message(TypedDict):
     file: list[Attachment]
 
 
+SendableFile = tuple[str, BytesIO]
+
+
 class SendMessage(Protocol):
-    async def __call__(self, channel_id: int, message: str, file=None, view=None) -> int: ...
+    async def __call__(self, channel_id: int, message: str = None, file: SendableFile = None, view=None) -> int: ...
 
 
 class EditMessage(Protocol):
-
     async def __call__(self, channel_id: int, message_id: int, new_content: str): ...
 
 
