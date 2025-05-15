@@ -9,7 +9,7 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
 welcome_message = "Hello, welcome to the registration process! Please follow the prompts."
-confirm_message = "Check your BYU Email to confirm your registration.\n Type in your code into the chat to confirm your registration."
+confirm_message = "We sent a code do your byu email.\n Type in your code into the chat to confirm your registration."
 failed_email_message = 'Unable to validate your email. Please talk to a TA or your instructor.'
 
 class RegistrationWorkflow:

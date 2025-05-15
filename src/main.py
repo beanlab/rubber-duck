@@ -9,10 +9,8 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.metrics import reporter
-from src.metrics.feedback import HaveTAGradingConversation
-from src.utils.canvas_api import CanvasApi
-from src.utils.email_confirmation import EmailConfirmation
+from .metrics import reporter
+from .metrics.feedback import HaveTAGradingConversation
 from .workflows.registration_workflow import RegistrationWorkflow
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
