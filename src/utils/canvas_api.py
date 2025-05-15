@@ -6,7 +6,7 @@ from ..utils.logger import duck_logger
 class CanvasApi:
     def __init__(self, server_id: str, canvas_settings: dict):
         self._server_id = server_id
-        self._canvas = Canvas(os.environ.get("BYU_CANVAS_URL"), os.environ.get("CANVAS_TOKEN"))
+        self._canvas = Canvas(os.environ.get("CANVAS_BYU_URL"), os.environ.get("CANVAS_TOKEN"))
         self._last_update = 0
         self._enrollment_cache = {}
         
