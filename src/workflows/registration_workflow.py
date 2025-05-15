@@ -15,11 +15,11 @@ failed_email_message = 'Unable to validate your email. Please talk to a TA or yo
 class RegistrationWorkflow:
     # Map Canvas enrollment types to Discord role names
     ROLE_MAPPING = {
-        'TeacherEnrollment': 'Teacher',
+        'TeacherEnrollment': 'Faculty',
         'StudentEnrollment': 'Student',
         'TaEnrollment': 'TA',
-        'DesignerEnrollment': 'Course Designer',
-        'ObserverEnrollment': 'Observer'
+        'DesignerEnrollment': 'TA',
+        'ObserverEnrollment': 'TA'
     }
 
     def __init__(self,
