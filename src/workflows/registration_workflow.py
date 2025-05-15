@@ -39,7 +39,7 @@ class RegistrationWorkflow:
         author_name, server_id = await self._set_up(initial_message, settings, thread_id)
 
         # Get and verify the Net ID
-        net_id = await self._get_net_id(server_id, thread_id, author_name)
+        net_id = await self._get_net_id(thread_id, author_name)
         if not await self._confirm_registration_via_email(thread_id, net_id):
             await self._send_message(thread_id, failed_email_message)
             return
@@ -71,7 +71,7 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _get_net_id(self, guild_id, thread_id, author_name) -> str:
+    async def _get_net_id(self, thread_id, author_name) -> str:
         await self._send_message(thread_id, "What is your BYU Net ID?")
         
         async with alias(str(thread_id) + author_name), queue("messages", None) as message_queue:
@@ -90,23 +90,33 @@ class RegistrationWorkflow:
         token = self._email_confirmation.prepare_email(email)
         if not token:
             return False
-            
+
+        max_attempts = 3
+        attempts = 0
         await self._send_message(thread_id, confirm_message)
 
         async with queue('messages', None) as messages:
-            try:
-                message: Message = await asyncio.wait_for(messages.get(), timeout=300)
-                if message['content'].strip() == token:
-                    await self._send_message(thread_id, "Successfully registered. Adding you to your class!")
-                    return True
-                    
-                duck_logger.error(f"Token mismatch: {message['content'].strip()} != {token}")
-                await self._send_message(thread_id, "Invalid token. Please try again.")
-                return False
-                
-            except asyncio.TimeoutError:
-                await self._send_message(thread_id, "Timed out waiting for token. Please exit the discord thread and start a new conversation")
-                return False
+            while attempts < max_attempts:
+                try:
+                    message: Message = await asyncio.wait_for(messages.get(), timeout=300)
+                    user_input = message['content'].strip()
+
+                    if user_input == token:
+                        await self._send_message(thread_id, "Successfully registered. Adding you to your class!")
+                        return True
+                    else:
+                        attempts += 1
+                        duck_logger.error(f"Token mismatch: {user_input} != {token}")
+                        if attempts < max_attempts:
+                            await self._send_message(thread_id, f"Invalid token. Please try again. ({attempts}/{max_attempts})")
+                        else:
+                            await self._send_message(thread_id, "Too many invalid attempts. Please exit the thread and start again.")
+                            return False
+
+                except asyncio.TimeoutError:
+                    await self._send_message(thread_id, "Timed out waiting for token. Please exit the discord thread and start a new conversation.")
+                    return False
+            return None
 
     @step
     async def _assign_role(self, server_id: str, thread_id: int, net_id: str, user_id: int):
