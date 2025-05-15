@@ -1,9 +1,8 @@
-import logging
 import boto3
 import uuid
 import os
 
-from src.utils.logger import duck_logger
+from ..utils.logger import duck_logger
 
 
 class EmailConfirmation:

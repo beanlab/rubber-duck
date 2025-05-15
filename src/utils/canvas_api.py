@@ -7,23 +7,6 @@ from canvasapi.course import Course
 from ..utils.logger import duck_logger
 
 
-def get_course(api_token: str, api_url: str, canvas_course_id: int) -> Course:
-    """
-    Returns a Canvas Course object for the given API URL, API token, and course ID.
-
-    :param api_url: str: The URL for the Canvas API.
-    :param api_token: str: The authentication token for the Canvas API.
-    :param canvas_course_id: int: The ID of the Canvas course.
-    :return: Course: A Canvas Course object.
-    """
-    canvas = Canvas(api_url, api_token)
-    try:
-        course: Course = canvas.get_course(canvas_course_id)
-    except Exception as e:
-        duck_logger.error(f"Error fetching course {canvas_course_id}: {e}")
-        raise
-    return course
-
 class CanvasApi:
     def __init__(self,
                  server_id: str,
@@ -32,13 +15,12 @@ class CanvasApi:
         self._server_id = server_id
         self._canvas_settings = canvas_settings
         self._courses = {}
-        self.cache_timeout = canvas_settings["cache_timeout"] # 7 days
-        self.canvas_users = {}  # guild_id -> users
-        self.last_called = {}  # guild_id -> timestamp
+        self.cache_timeout = canvas_settings["cache_timeout"]
+        self.canvas_users = {}
+        self.last_called = {}
         self._canvas_token = os.environ.get("CANVAS_TOKEN")
         self._api_url = os.environ.get("BYU_CANVAS_URL")
 
-    def __call__(self):
         server_id = self._server_id  # Use the stored server_id
         
         # Check if course is not in the cache
@@ -49,7 +31,7 @@ class CanvasApi:
             canvas_course_ids = list(self._canvas_settings.get('courses_in_server', {}).values())
 
             for course_id in canvas_course_ids:
-                self._courses[course_id] = get_course(self._canvas_token, self._api_url, course_id)
+                self._courses[course_id] = self._get_course(self._canvas_token, self._api_url, course_id)
 
                 # Initialize the user cache for the server
                 self._populate_users(course_id)
@@ -58,7 +40,23 @@ class CanvasApi:
 
         else:
             duck_logger.debug(f"Canvas API for guild '{server_id}' already exists - using cached course")
-        
+
+    def _get_course(self, api_token: str, api_url: str, canvas_course_id: int) -> Course:
+        """
+        Returns a Canvas Course object for the given API URL, API token, and course ID.
+
+        :param api_url: str: The URL for the Canvas API.
+        :param api_token: str: The authentication token for the Canvas API.
+        :param canvas_course_id: int: The ID of the Canvas course.
+        :return: Course: A Canvas Course object.
+        """
+        canvas = Canvas(api_url, api_token)
+        try:
+            course: Course = canvas.get_course(canvas_course_id)
+        except Exception as e:
+            duck_logger.error(f"Error fetching course {canvas_course_id}: {e}")
+            raise
+        return course
 
     def get_canvas_users(self, guild_id):
         if self._is_data_stale(guild_id):
@@ -105,5 +103,6 @@ class CanvasApi:
 
         self.last_called[self._server_id] = time.time()
 
+    # TODO figure out if this is needed
     def _is_data_stale(self, server_id):
         return server_id not in self.last_called or (time.time() - self.last_called[server_id] > self.cache_timeout)

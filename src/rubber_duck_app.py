@@ -30,7 +30,6 @@ class RubberDuckApp:
                 self._channel_configs[message['channel_id']],
                 message
             )
-
             return
 
         # Belongs to an existing conversation

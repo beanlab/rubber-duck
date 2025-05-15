@@ -57,7 +57,6 @@ class RegistrationWorkflow:
         # Set up dependencies
         self._canvas_api = CanvasApi(server_id, settings)
         self._email_confirmation = EmailConfirmation(settings['sender_email'])
-        self._canvas_api()
 
         # Send welcome message
         await self._send_message(thread_id, welcome_message)
