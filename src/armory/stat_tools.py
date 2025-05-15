@@ -1,11 +1,12 @@
-import hashlib
-from pathlib import Path
+import io
+from functools import lru_cache
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import skew, gaussian_kde
+from scipy.stats import skew
+from seaborn.external.kde import gaussian_kde
 
 from .tools import register_tool
 from ..utils.data_store import get_dataset
@@ -25,74 +26,84 @@ def _plot_message_with_axes(data: pd.DataFrame, column: str, title: str, kind: s
     ax = plt.gca()
     ax.set_title(title, fontsize=14)
 
-    values = pd.to_numeric(data[column], errors='coerce').dropna()
+    fallback_messages = {
+        "hist": f"{title.split()[0]}s are not appropriate for categorical data",
+        "box": f"{title.split()[0]}s are not appropriate for categorical data",
+        "dot": f"{title.split()[0]}s are not appropriate for categorical data",
+        "pie": f"{title.split()[0]}s are not appropriate for numeric data",
+        "proportion": f"{title.split()[0]}s are not appropriate for quantitative data"
+    }
 
-    if kind == "hist":
-        ax.set_xlim(values.min(), values.max())
-        ax.set_ylim(0, 1)
-        ax.set_xlabel(column)
-        ax.set_ylabel("Frequency")
-    elif kind == "box":
-        ax.set_ylim(values.min(), values.max())
-        ax.set_xlim(-1, 1)
-        ax.set_ylabel(column)
-    elif kind == "dot":
-        ax.set_xlim(values.min(), values.max())
-        ax.set_ylim(0, 1)
-        ax.set_xlabel(column)
+    if kind in {"hist", "box", "dot"}:
+        values = pd.to_numeric(data[column], errors='coerce').dropna()
+        if kind == "hist":
+            ax.set_xlim(values.min(), values.max())
+            ax.set_ylim(0, 1)
+            ax.set_xlabel(column)
+            ax.set_ylabel("Frequency")
+        elif kind == "box":
+            ax.set_ylim(values.min(), values.max())
+            ax.set_xlim(-1, 1)
+            ax.set_ylabel(column)
+        elif kind == "dot":
+            ax.set_xlim(values.min(), values.max())
+            ax.set_ylim(0, 1)
+            ax.set_xlabel(column)
 
-    ax.text(0.5, 0.5, f"{title.split()[0]}s are not appropriate for categorical data", fontsize=12, ha='center',
-            va='center', transform=ax.transAxes)
-    ax.tick_params(axis='both', which='both', length=0)
+        # Show fallback message for non-numeric in these kinds
+        ax.text(0.5, 0.5, fallback_messages[kind], fontsize=12, ha='center', va='center', transform=ax.transAxes)
+        ax.tick_params(axis='both', which='both', length=0)
+
+    elif kind == "pie" or kind == "proportion":
+        if kind == "pie" or not _is_categorical(data[column]):
+            # Show fallback for pie or invalid proportion
+            ax.text(0.5, 0.5, fallback_messages[kind], fontsize=12, ha='center', va='center', transform=ax.transAxes)
+            ax.axis("off")
+        else:
+            # Proper categorical proportion bar plot
+            counts = data[column].dropna().value_counts()
+            proportions = (counts / counts.sum()).reset_index()
+            proportions.columns = [column, "Proportion"]
+            plt.clf()  # clear figure for new plot
+            plt.figure(figsize=(8, 6))
+            sns.barplot(data=proportions, x=column, y="Proportion", color="lightblue")
+            plt.title(f"Proportion Barplot of {column}")
+            plt.ylabel("Proportion")
+            plt.xlabel(column)
 
 
-def _generate_cache_key(*args):
-    """Generate a cache key based on the function name and arguments."""
-    key_str = "_".join(str(arg) for arg in args)
-    return hashlib.md5(key_str.encode()).hexdigest()
-
-
-def _save_plot(file_path: Path) -> Path:
-    plt.savefig(file_path, format="png")
+def _save_plot(name: str) -> tuple[str, io.BytesIO]:
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
     plt.close()
-    duck_logger.debug(f"Saved plot to {file_path}")
-    return file_path
+    return name, buffer
 
 
-def _cached_path(dataset: str, column: str, kind: str) -> Path:
-    cache_key = _generate_cache_key(dataset, column, kind)
-    return OUTPUT_DIR / f"{cache_key}.png"
+def _cache_key(dataset: str, column: str, kind: str) -> str:
+    return f"{dataset}_{column}_{kind}.png"
 
 
 @register_tool
-def get_variable_names(dataset: str) -> list[str]:
-    """Returns the variable names (columns) of the dataset."""
+def get_variable_names(dataset: str) -> str:
     duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
-    data = get_dataset(dataset)
-    return data.columns.to_list()
+    data = get_dataset(dataset).columns.to_list()
+    return f"Variable names in {dataset}: {', '.join(data)}"
 
 
 @register_tool
-def get_column_data(dataset: str, column: str) -> pd.Series:
-    """Returns the data of a specific column in the dataset."""
+def plot_histogram(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_histogram(dataset, column)
+
+
+@lru_cache(maxsize=128)
+def _cached_histogram(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating histogram plot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
+    name = _cache_key(dataset, column, "histogram") + ".png"
+
     if column not in data.columns.to_list():
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
-    return data[column]
-
-
-@register_tool
-def plot_histogram(dataset: str, column: str) -> Path:
-    """Generates a histogram with KDE for the specified numeric column in a dataset, or a message image if the column is categorical."""
-    duck_logger.debug(f"Used plot_histogram on dataset={dataset}, column={column}")
-    data = get_dataset(dataset)
-    if column not in data.columns.to_list():
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
-
-    output_path = _cached_path(dataset, column, "histogram")
-    if output_path.exists():
-        duck_logger.debug(f"Using cached histogram at {output_path}")
-        return output_path
+        raise ValueError(f"Column '{column}' not found in dataset.")
 
     if _is_categorical(data[column]):
         _plot_message_with_axes(data, column, f"Histogram of {column}", "hist")
@@ -102,22 +113,22 @@ def plot_histogram(dataset: str, column: str) -> Path:
         plt.title(f"Histogram of {column}")
         plt.xlabel(column)
         plt.ylabel("Frequency")
-    return _save_plot(output_path)
+
+    return _save_plot(name)
 
 
 @register_tool
-def plot_boxplot(dataset: str, column: str) -> Path:
-    """Creates a boxplot of the specified numeric column in a dataset, or a message image if the column is categorical."""
-    duck_logger.debug(f"Used plot_boxplot on dataset={dataset}, column={column}")
+def plot_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_boxplot(dataset, column)
+
+@lru_cache(maxsize=128)
+def _cached_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating boxplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
+    name = _cache_key(dataset, column, "boxplot") + ".png"
+
     if column not in data.columns.to_list():
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
-
-    output_path = _cached_path(dataset, column, "boxplot")
-
-    if output_path.exists():
-        duck_logger.debug(f"Using cached histogram at {output_path}")
-        return output_path
+        raise ValueError(f"Column '{column}' not found.")
 
     if _is_categorical(data[column]):
         _plot_message_with_axes(data, column, f"Boxplot of {column}", "box")
@@ -126,22 +137,21 @@ def plot_boxplot(dataset: str, column: str) -> Path:
         sns.boxplot(y=data[column])
         plt.title(f"Boxplot of {column}")
         plt.ylabel(column)
-    return _save_plot(output_path)
 
+    return _save_plot(name)
 
 @register_tool
-def plot_dotplot(dataset: str, column: str) -> Path:
-    """Creates a dot plot (strip plot) for the specified numeric column, or a message image if the column is categorical."""
-    duck_logger.debug(f"Used plot_dotplot on dataset={dataset}, column={column}")
+def plot_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_dotplot(dataset, column)
+
+@lru_cache(maxsize=128)
+def _cached_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating dotplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
+    name = _cache_key(dataset, column, "dotplot") + ".png"
+
     if column not in data.columns.to_list():
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
-
-    output_path = _cached_path(dataset, column, "dotplot")
-
-    if output_path.exists():
-        duck_logger.debug(f"Using cached histogram at {output_path}")
-        return output_path
+        raise ValueError(f"Column '{column}' not found.")
 
     if _is_categorical(data[column]):
         _plot_message_with_axes(data, column, f"Dotplot of {column}", "dot")
@@ -150,44 +160,46 @@ def plot_dotplot(dataset: str, column: str) -> Path:
         sns.stripplot(x=data[column], jitter=True)
         plt.title(f"Dotplot of {column}")
         plt.xlabel(column)
-    return _save_plot(output_path)
+
+    return _save_plot(name)
+
 
 
 @register_tool
-def plot_barplot(dataset: str, column: str) -> Path:
-    """Creates a bar plot of value counts for a categorical column in the dataset."""
-    duck_logger.debug(f"Used plot_barplot on dataset={dataset}, column={column}")
+def plot_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_barplot(dataset, column)
+
+@lru_cache(maxsize=128)
+def _cached_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating barplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
+    name = _cache_key(dataset, column, "barplot") + ".png"
+
     if column not in data.columns.to_list():
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
+        raise ValueError(f"Column '{column}' not found.")
 
-    output_path = _cached_path(dataset, column, "barplot")
-
-    if output_path.exists():
-        duck_logger.debug(f"Using cached histogram at {output_path}")
-        return output_path
-
+    value_counts = data[column].value_counts()
     plt.figure(figsize=(8, 6))
-    sns.barplot(x=data[column].value_counts().index, y=data[column].value_counts().values)
+    sns.barplot(x=value_counts.index, y=value_counts.values)
     plt.title(f"Barplot of {column}")
     plt.xlabel(column)
     plt.ylabel("Count")
-    return _save_plot(output_path)
+
+    return _save_plot(name)
 
 
 @register_tool
-def plot_pie_chart(dataset: str, column: str) -> Path:
-    """Creates a pie chart of value proportions for a categorical column, or a message image if the column is numeric."""
-    duck_logger.debug(f"Used plot_pie_chart on dataset={dataset}, column={column}")
+def plot_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_pie_chart(dataset, column)
+
+@lru_cache(maxsize=128)
+def _cached_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating pie chart (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
+    name = _cache_key(dataset, column, "piechart") + ".png"
+
     if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found. Available: {list(data.columns)}")
-
-    output_path = _cached_path(dataset, column, "piechart")
-
-    if output_path.exists():
-        duck_logger.debug(f"Using cached pie chart at {output_path}")
-        return output_path
+        raise ValueError(f"Column '{column}' not found.")
 
     if not _is_categorical(data[column]):
         _plot_message_with_axes(data, column, f"Pie Chart of {column}", "dot")
@@ -199,8 +211,26 @@ def plot_pie_chart(dataset: str, column: str) -> Path:
                 autopct='%1.1f%%')
         plt.title(f"Pie Chart of {column}")
         plt.axis("equal")
-    return _save_plot(output_path)
 
+    return _save_plot(name)
+
+@register_tool
+def plot_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    return _cached_proportion_barplot(dataset, column)
+
+
+@lru_cache(maxsize=128)
+def _cached_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating proportion barplot (cached) for {dataset}.{column}")
+    data = get_dataset(dataset)
+
+    name = f"{dataset}_{column}_proportion_barplot.png"
+    title = f"Proportion Barplot of {column}"
+
+    # Let the enhanced plot message function handle fallback or actual plot
+    _plot_message_with_axes(data, column, title, kind="proportion")
+
+    return _save_plot(name)
 
 @register_tool
 def calculate_mean(dataset: str, column: str) -> str:

@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Callable
+from io import BytesIO
+from typing import Callable, TypedDict, Protocol
 
 from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
@@ -8,13 +9,63 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
-from ..conversation.conversation import GenAIException, RetryableException, GenAIClient, GPTMessage, \
-    RetryConfig, Sendable, RecordUsage
+
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
+from ..armory.stat_tools import *
+
+Sendable = str | tuple[str, BytesIO]
+
+class GPTMessage(TypedDict):
+    role: str
+    content: str
+
+class GenAIClient(Protocol):
+    async def get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            tools: [str]
+    ) -> list[Sendable]: ...
+
+class GenAIException(Exception):
+    def __init__(self, exception, web_mention):
+        self.exception = exception
+        self.web_mention = web_mention
+        super().__init__(self.exception.__str__())
+
+
+class RetryConfig(TypedDict):
+    max_retries: int
+    delay: int
+    backoff: int
+
+class RetryableException(Exception):
+    def __init__(self, exception, message):
+        self.exception = exception
+        self.message = message
+        super().__init__(self.exception.__str__())
+
+
+
+class RecordMessage(Protocol):
+    async def __call__(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str): ...
+
+
+class RecordUsage(Protocol):
+    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
+                       output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
 class OpenAI:
-    def __init__(self, openai_api_key: str, get_tool: Callable[[str], FunctionTool], record_usage: RecordUsage,):
+    def __init__(self,
+                 openai_api_key: str,
+                 get_tool: Callable[[str], FunctionTool],
+                 record_usage: RecordUsage
+                 ):
         self._client = AsyncOpenAI(api_key=openai_api_key)
         self._get_tool = get_tool
         self._record_usage = step(record_usage)
@@ -26,7 +77,7 @@ class OpenAI:
             thread_id: int,
             user_id: int,
             engine: str,
-            message_history: list[GPTMessage],
+            message_history,
             functions
     ):
         completion: ChatCompletion = await self._client.chat.completions.create(
@@ -87,7 +138,9 @@ class OpenAI:
                 message_history.append({"role": "assistant", "function_call": message.function_call})
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
 
-                result.append(tool_result)
+                if isinstance(tool_result, tuple):
+                    result.append(tool_result)
+
                 continue  # i.e. allow the bot to call another tool or add a message
 
             else:
@@ -140,7 +193,14 @@ class RetryableGenAI:
         self._retry_config = retry_config
         self._genai = genai
 
-    async def get_completion(self, thread_id: int, engine: str, message_history: list[GPTMessage], tools: [str]):
+    async def get_completion(self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history: list[GPTMessage],
+            tools: [str]):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
@@ -148,7 +208,8 @@ class RetryableGenAI:
         while True:
             try:
                 async with self._typing(thread_id):
-                    return await self._genai.get_completion(engine, message_history, tools)
+                    return await self._genai.get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
+                                              tools)
 
             except RetryableException as ex:
                 if retries == 0:

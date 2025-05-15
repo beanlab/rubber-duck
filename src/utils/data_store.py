@@ -1,20 +1,21 @@
 import pandas as pd
-import os
+import pathlib
 
-# Construct path relative to the project root
-ADMISSIONS = os.path.join(os.path.dirname(__file__), '..', '..', 'datasets', 'admissions.csv')
-GESTATIONAL = os.path.join(os.path.dirname(__file__), '..', '..', 'datasets', 'gestational.csv')
-CARPRICE = os.path.join(os.path.dirname(__file__), '..', '..', 'datasets', 'carprice.csv')
 
-# Load the DataFrame once
+BASE_DIR = pathlib.Path(__file__).resolve().parents[2]
+DATA_DIR = BASE_DIR / "datasets"
+
+ADMISSIONS = DATA_DIR / "admissions.csv"
+GESTATIONAL = DATA_DIR / "gestational.csv"
+CARPRICE = DATA_DIR / "carprice.csv"
 
 _loaded_datasets = {}
+datasets = {"admissions": ADMISSIONS, "gestational": GESTATIONAL, "carprice": CARPRICE}
 
 def get_dataset(name: str) -> pd.DataFrame:
     if name in _loaded_datasets:
         return _loaded_datasets[name]
 
-    datasets = {"admissions": ADMISSIONS, "gestational": GESTATIONAL, "carprice": CARPRICE}
     if name not in datasets:
         raise ValueError(f"Dataset '{name}' not found. Available: {list(datasets.keys())}")
 

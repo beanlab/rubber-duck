@@ -5,57 +5,8 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
+from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
-
-
-class RetryableException(Exception):
-    def __init__(self, exception, message):
-        self.exception = exception
-        self.message = message
-        super().__init__(self.exception.__str__())
-
-
-class GenAIException(Exception):
-    def __init__(self, exception, web_mention):
-        self.exception = exception
-        self.web_mention = web_mention
-        super().__init__(self.exception.__str__())
-
-
-class RetryConfig(TypedDict):
-    max_retries: int
-    delay: int
-    backoff: int
-
-
-class GPTMessage(TypedDict):
-    role: str
-    content: str
-
-
-class RecordMessage(Protocol):
-    async def __call__(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str): ...
-
-
-class RecordUsage(Protocol):
-    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
-                       output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
-
-
-Sendable = str | tuple[str, BytesIO]
-
-
-class GenAIClient(Protocol):
-    async def get_completion(
-            self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            engine: str,
-            message_history: list[GPTMessage],
-            tools: [str]
-    ) -> list[Sendable]: ...
 
 
 class HaveConversation(Protocol):
@@ -78,7 +29,7 @@ class BasicSetupConversation:
 
 class BasicPromptConversation:
     def __init__(self,
-                 ai_client: GenAIClient,
+                 ai_client: RetryableGenAI,
                  record_message: RecordMessage,
                  record_usage: RecordUsage,
                  typing: IndicateTyping,

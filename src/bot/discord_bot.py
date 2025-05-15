@@ -146,13 +146,14 @@ class DiscordBot(discord.Client):
             return curr_message.id
 
         if file is not None:
+            files_to_send = []
             if not isinstance(file, list):
-                files_to_send = list[file]
+                files_to_send.append(file)
             else:
                 files_to_send = file
 
-            files_to_send = [self._make_discord_file(file) for file in files_to_send]
-            curr_message = await channel.send(files=files_to_send)
+            file_to_send = [self._make_discord_file(file) for file in files_to_send]
+            curr_message = await channel.send(files=file_to_send)
             return curr_message.id
 
         if view is not None:
