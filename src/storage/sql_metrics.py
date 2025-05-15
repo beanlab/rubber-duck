@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Column, Integer, String, BigInteger
 from sqlalchemy.orm import declarative_base, Session
 
+from .migrations import migrate_usage_table
+
 MetricsBase = declarative_base()
 
 
@@ -69,6 +71,7 @@ class FeedbackModel(MetricsBase):
 class SQLMetricsHandler:
     def __init__(self, session: Session):
         MetricsBase.metadata.create_all(session.connection())
+        migrate_usage_table(session)
         self.session = session
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):

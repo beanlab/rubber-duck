@@ -61,6 +61,9 @@ class RecordUsage(Protocol):
 
 
 class OpenAI:
+    _current = None
+    _context = None
+
     def __init__(self,
                  openai_api_key: str,
                  get_tool: Callable[[str], FunctionTool],
@@ -69,6 +72,44 @@ class OpenAI:
         self._client = AsyncOpenAI(api_key=openai_api_key)
         self._get_tool = get_tool
         self._record_usage = step(record_usage)
+        OpenAI._current = self
+
+    @classmethod
+    def set_context(cls, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str = "gpt-3.5-turbo"):
+        """
+        Set the current context for OpenAI operations.
+        
+        Args:
+            guild_id: The Discord guild ID
+            parent_channel_id: The parent channel ID
+            thread_id: The thread ID
+            user_id: The user ID
+            engine: The OpenAI engine to use
+        """
+        cls._context = {
+            "guild_id": guild_id,
+            "parent_channel_id": parent_channel_id,
+            "thread_id": thread_id,
+            "user_id": user_id,
+            "engine": engine
+        }
+
+    @classmethod
+    def get_current(cls) -> tuple['OpenAI', dict]:
+        """
+        Get the current instance of the OpenAI client and its context.
+        
+        Returns:
+            tuple: (OpenAI instance, context dictionary)
+            
+        Raises:
+            RuntimeError: If no OpenAI instance has been initialized or no context has been set
+        """
+        if cls._current is None:
+            raise RuntimeError("No OpenAI instance has been initialized. Please create an instance first.")
+        if cls._context is None:
+            raise RuntimeError("No context has been set. Please call set_context first.")
+        return cls._current, cls._context
 
     async def _get_completion_with_usage(
             self,
