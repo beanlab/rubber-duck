@@ -62,8 +62,8 @@ class BasicPromptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
-        tools = settings["tools"] if "tools" in settings else None
-        introduction = settings["introduction"] if "introduction" in settings else "Hi, how can I help you?"
+        tools = settings.get('tools', None)
+        introduction = settings.get("introduction", "Hi, how can I help you?")
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")

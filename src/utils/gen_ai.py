@@ -87,7 +87,7 @@ class OpenAI:
         )
 
         completion_dict = completion.model_dump()
-        # TODO - record usage
+
         await self._record_usage(
                                  guild_id,
                                  parent_channel_id,
