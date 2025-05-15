@@ -9,7 +9,8 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.metrics.feedback import HaveTAGradingConversation
+from .workflows.registration_workflow import RegistrationWorkflow
+from .metrics.feedback import HaveTAGradingConversation
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -138,9 +139,16 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.report_error
     )
 
+    registration_workflow = RegistrationWorkflow(
+        bot.send_message,
+        bot.get_channel,
+        bot.fetch_guild,
+    )
+
     return {
         'basic_prompt_conversation': have_conversation,
         'conversation_review': have_ta_conversation,
+        'registration': registration_workflow,
     }
 
 
