@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from asyncio import sleep
 from io import BytesIO
-from typing import Callable, TypedDict, Protocol
+from typing import Callable, TypedDict, Protocol, Dict
 
 from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
@@ -61,9 +62,6 @@ class RecordUsage(Protocol):
 
 
 class OpenAI:
-    _current = None
-    _context = None
-
     def __init__(self,
                  openai_api_key: str,
                  get_tool: Callable[[str], FunctionTool],
@@ -72,44 +70,6 @@ class OpenAI:
         self._client = AsyncOpenAI(api_key=openai_api_key)
         self._get_tool = get_tool
         self._record_usage = step(record_usage)
-        OpenAI._current = self
-
-    @classmethod
-    def set_context(cls, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str = "gpt-3.5-turbo"):
-        """
-        Set the current context for OpenAI operations.
-        
-        Args:
-            guild_id: The Discord guild ID
-            parent_channel_id: The parent channel ID
-            thread_id: The thread ID
-            user_id: The user ID
-            engine: The OpenAI engine to use
-        """
-        cls._context = {
-            "guild_id": guild_id,
-            "parent_channel_id": parent_channel_id,
-            "thread_id": thread_id,
-            "user_id": user_id,
-            "engine": engine
-        }
-
-    @classmethod
-    def get_current(cls) -> tuple['OpenAI', dict]:
-        """
-        Get the current instance of the OpenAI client and its context.
-        
-        Returns:
-            tuple: (OpenAI instance, context dictionary)
-            
-        Raises:
-            RuntimeError: If no OpenAI instance has been initialized or no context has been set
-        """
-        if cls._current is None:
-            raise RuntimeError("No OpenAI instance has been initialized. Please create an instance first.")
-        if cls._context is None:
-            raise RuntimeError("No context has been set. Please call set_context first.")
-        return cls._current, cls._context
 
     async def _get_completion_with_usage(
             self,
@@ -180,7 +140,19 @@ class OpenAI:
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
 
                 if isinstance(tool_result, tuple):
-                    result.append(tool_result)
+                    if isinstance(tool_result[1], BytesIO):
+                        result.append(tool_result)
+                    elif isinstance(tool_result[1], dict):
+                        result.append(tool_result[0])
+                        await self._record_usage(
+                                     guild_id,
+                                     parent_channel_id,
+                                     thread_id, user_id,
+                                     engine,
+                                     tool_result[1]['prompt_tokens'],
+                                     tool_result[1]['completion_tokens'],
+                                     tool_result[1].get('cached_tokens', 0),
+                                     tool_result[1].get('reasoning_tokens', 0))
 
                 continue  # i.e. allow the bot to call another tool or add a message
 
