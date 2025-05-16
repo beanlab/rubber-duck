@@ -127,13 +127,10 @@ class EmailConfirmationView(View):
             pass  # Ignore if we can't edit the message
 
 class RoleSelectionView(View):
-    def __init__(self, roles: list[dict], guild: discord.Guild, member: discord.Member, timeout=300):
+    def __init__(self, roles: list[dict], timeout=300):
         super().__init__(timeout=timeout)
         self.selected_roles = []
         self.confirmed = False
-        self.guild = guild
-        self.member = member
-        self.assignment_complete = False
         
         # Create a select menu for roles
         select = Select(
@@ -152,98 +149,54 @@ class RoleSelectionView(View):
         select.callback = self.role_select_callback
         self.add_item(select)
         
-        # Add a confirm button
-        self.add_item(Button(
+        # Add a confirm button with its own callback
+        confirm_button = Button(
             label="Confirm Selection",
             style=discord.ButtonStyle.primary,
             custom_id="confirm_roles"
-        ))
+        )
+        confirm_button.callback = self.confirm_callback
+        self.add_item(confirm_button)
         
     async def role_select_callback(self, interaction: discord.Interaction):
         try:
             self.selected_roles = [int(value) for value in interaction.data["values"]]
-            await interaction.response.send_message(
-                f"Selected {len(self.selected_roles)} role(s). Click 'Confirm Selection' when ready.",
-                ephemeral=True
-            )
+            await interaction.response.defer()
         except Exception as e:
             await interaction.response.send_message(
                 "Error processing role selection. Please try again.",
                 ephemeral=True
             )
-        
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.data["custom_id"] == "confirm_roles":
-            if not self.selected_roles:
-                await interaction.response.send_message(
-                    "Please select at least one role first.",
-                    ephemeral=True
-                )
-                return False
-                
-            if self.confirmed:
-                await interaction.response.send_message(
-                    "Roles already confirmed. Please wait...",
-                    ephemeral=True
-                )
-                return False
-                
-            self.confirmed = True
+            
+    async def confirm_callback(self, interaction: discord.Interaction):
+        if not self.selected_roles:
             await interaction.response.send_message(
-                "Processing your role selection...",
+                "Please select at least one role first.",
                 ephemeral=True
             )
+            return
             
-            try:
-                # Get the role objects
-                selected_roles = []
-                for role_id in self.selected_roles:
-                    role = self.guild.get_role(role_id)
-                    if role:
-                        selected_roles.append(role)
-
-                if not selected_roles:
-                    await interaction.followup.send(
-                        "Error: Could not find the selected roles.",
-                        ephemeral=True
-                    )
-                    return False
-
-                # Assign roles
-                await self.member.add_roles(*selected_roles, reason="User registration")
-                
-                # Send confirmation message
-                role_names = ", ".join(role.name for role in selected_roles)
-                await interaction.followup.send(
-                    f"Successfully assigned you the following roles: {role_names}!",
-                    ephemeral=True
-                )
-                
-                self.assignment_complete = True
-                
-                # Destroy the view and all its widgets
-                self.clear_items()
-                self.stop()
-                
-                # Update the message to remove the view and show completion
-                try:
-                    await interaction.message.edit(
-                        content="✅ Role selection complete!",
-                        view=None
-                    )
-                except:
-                    pass  # Ignore if we can't edit the message
-                
-            except Exception as e:
-                await interaction.followup.send(
-                    "Error assigning roles. Please contact an administrator.",
-                    ephemeral=True
-                )
-                return False
-                
-            return True
+        if self.confirmed:
+            await interaction.response.send_message(
+                "Roles already confirmed. Please wait...",
+                ephemeral=True
+            )
+            return
             
-        return True
+        self.confirmed = True
+        await interaction.response.defer()
+        
+        # Clear the view and update message
+        self.clear_items()
+        self.stop()
+        
+        try:
+            await interaction.message.edit(
+                content="✅ Role selection complete!",
+                view=None
+            )
+        except:
+            pass  # Ignore if we can't edit the message
         
     async def on_timeout(self):
         # Destroy the view and all its widgets

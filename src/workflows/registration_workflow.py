@@ -126,7 +126,7 @@ class RegistrationWorkflow:
             ]
 
             # Create and show role selection view
-            view = RoleSelectionView(available_roles, guild, member)
+            view = RoleSelectionView(available_roles)
             await self._send_message(
                 thread_id,
                 "Please select the roles you need. You can select multiple roles.",
@@ -157,9 +157,27 @@ class RegistrationWorkflow:
             if not available_roles or not selected_role_ids:
                 return
 
-            # Role assignment is now handled in the RoleSelectionView
-            # This function is kept for backward compatibility and logging
-            duck_logger.info(f"Roles assigned successfully for user {user_id}")
+            # Get Discord guild and member
+            guild: Guild = await self._get_guild(server_id)
+            member = await guild.fetch_member(user_id)
+
+            # Get the role objects
+            selected_roles = []
+            for role_id in selected_role_ids:
+                role = guild.get_role(role_id)
+                if role:
+                    selected_roles.append(role)
+
+            if not selected_roles:
+                await self._send_message(thread_id, "Error: Could not find the selected roles.")
+                return
+
+            # Assign roles
+            await member.add_roles(*selected_roles, reason="User registration")
+            
+            # Send confirmation message
+            role_names = ", ".join(role.name for role in selected_roles)
+            await self._send_message(thread_id, f"Successfully assigned you the following roles: {role_names}!")
 
         except Exception as e:
             duck_logger.error(f"Error in role assignment process: {str(e)}")
