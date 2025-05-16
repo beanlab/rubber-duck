@@ -60,11 +60,12 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
+
 class OpenAI:
     def __init__(self,
                  openai_api_key: str,
                  get_tool: Callable[[str], FunctionTool],
-                 record_usage: RecordUsage
+                 record_usage: RecordUsage,
                  ):
         self._client = AsyncOpenAI(api_key=openai_api_key)
         self._get_tool = get_tool
@@ -153,6 +154,7 @@ class OpenAI:
                 break  # i.e. the bot is done responding
 
         return result
+
 
     async def get_completion(
             self,
