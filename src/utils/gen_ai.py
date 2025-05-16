@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from asyncio import sleep
 from io import BytesIO
 from typing import Callable, TypedDict, Protocol, Dict
 
@@ -12,7 +11,7 @@ from quest import step
 
 
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
-from ..armory.stat_tools import *
+
 
 Sendable = str | tuple[str, BytesIO]
 
