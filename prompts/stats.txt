@@ -35,7 +35,7 @@ If the students ask you to explain "What you can do" share the whole result of c
   `"The [measurement (ex. Mean, Median, Skewness)] is equal to [value]"`
 ### Example
 - Return the value result as a conversational reply, e.g.:
-  `"The mean is engine size is 74.3."`
+  `"The mean engine size is 74.3."`
 
 ## Conceptual Questions
 If the student is **not** using a tool, follow these Socratic principles:
