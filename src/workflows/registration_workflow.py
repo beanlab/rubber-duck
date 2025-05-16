@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import discord
 from discord import Guild
@@ -35,7 +36,7 @@ class RegistrationWorkflow:
             return
 
         # Assign Discord roles
-        await self._assign_roles(server_id, thread_id, initial_message['author_id'])
+        await self._assign_roles(server_id, thread_id, initial_message['author_id'], settings)
 
     @step
     async def _set_up(self, initial_message, settings, thread_id):
@@ -101,29 +102,34 @@ class RegistrationWorkflow:
         return False
 
     @step
-    async def _get_guild_roles(self, server_id: str, thread_id: int, user_id: int) -> tuple[list[dict], list[int]]:
+    async def _get_guild_roles(self, thread_id: int, server_id: int, settings: dict) -> tuple[list[dict], list[int]]:
         """Gets available guild roles and handles role selection"""
         try:
-            # Get Discord guild
-            guild: Guild = await self._get_guild(server_id)
+            # Get all roles from the guild
+            guild = await self._get_guild(server_id)
             if not guild:
-                duck_logger.error(f"Could not find Discord server with ID {server_id}")
-                await self._send_message(thread_id, "Error: Could not find Discord server.")
-                return [], []
+                raise ValueError("Guild not found")
 
-            # Get the member
-            member = await guild.fetch_member(user_id)
-            if not member:
-                duck_logger.error(f"Could not find member with ID {user_id} in server {server_id}")
-                await self._send_message(thread_id, "Error: Could not find your Discord account in the server.")
-                return [], []
+            # Get role patterns from config
+            role_patterns = settings.get("roles", {}).get("patterns", [])
+            if not role_patterns:
+                raise ValueError("No role patterns configured")
 
-            # Get available roles (excluding @everyone and managed roles)
-            available_roles = [
-                {"id": role.id, "name": role.name}
-                for role in await guild.fetch_roles()
-                if role.name != "@everyone" and not role.managed
-            ]
+            # Filter roles based on patterns
+            available_roles = []
+            for role in guild.roles:
+                for pattern_info in role_patterns:
+                    if re.match(pattern_info["pattern"], role.name):
+                        available_roles.append({
+                            "id": role.id,
+                            "name": role.name,
+                            "description": pattern_info["description"]
+                        })
+                        break
+
+            if not available_roles:
+                await self._send_message(thread_id, "No matching roles found. Please contact an administrator.")
+                return [], []
 
             # Create and show role selection view
             view = RoleSelectionView(available_roles)
@@ -148,11 +154,11 @@ class RegistrationWorkflow:
             return [], []
 
     @step
-    async def _assign_roles(self, server_id: str, thread_id: int, user_id: int):
+    async def _assign_roles(self, server_id: str, thread_id: int, user_id: int, settings: dict):
         """Assigns the selected Discord roles to the user"""
         try:
             # Get roles and selection
-            available_roles, selected_role_ids = await self._get_guild_roles(server_id, thread_id, user_id)
+            available_roles, selected_role_ids = await self._get_guild_roles(thread_id, server_id, settings)
             
             if not available_roles or not selected_role_ids:
                 return

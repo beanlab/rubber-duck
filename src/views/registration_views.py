@@ -58,7 +58,7 @@ class RegistrationView(View):
             self.stop()
             try:
                 await interaction.message.edit(
-                    content="✅ Net ID registration complete!",
+                    content="✅ Net ID Entered!",
                     view=None
                 )
             except:
@@ -130,7 +130,6 @@ class RoleSelectionView(View):
     def __init__(self, roles: list[dict], timeout=300):
         super().__init__(timeout=timeout)
         self.selected_roles = []
-        self.confirmed = False
         
         # Create a select menu for roles
         select = Select(
@@ -149,11 +148,10 @@ class RoleSelectionView(View):
         select.callback = self.role_select_callback
         self.add_item(select)
         
-        # Add a confirm button with its own callback
+        # Add a confirm button
         confirm_button = Button(
             label="Confirm Selection",
-            style=discord.ButtonStyle.primary,
-            custom_id="confirm_roles"
+            style=discord.ButtonStyle.primary
         )
         confirm_button.callback = self.confirm_callback
         self.add_item(confirm_button)
@@ -176,14 +174,6 @@ class RoleSelectionView(View):
             )
             return
             
-        if self.confirmed:
-            await interaction.response.send_message(
-                "Roles already confirmed. Please wait...",
-                ephemeral=True
-            )
-            return
-            
-        self.confirmed = True
         await interaction.response.defer()
         
         # Clear the view and update message
