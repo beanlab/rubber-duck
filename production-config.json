@@ -201,24 +201,6 @@
           ]
         },
         {
-          "channel_id": 1306497964461789184,
-          "channel_name": "Registration-Channel",
-          "ducks": [
-            {
-              "name": "Registration-Workflow",
-              "workflow_type": "registration",
-              "weight": 1,
-              "settings": {
-                "sender_email": "byu-cs-course-ops@cs.byu.edu",
-                "cache_timeout": 60800,
-                "courses_in_server": {
-                  "Bean Lab Testing Course": 20736
-                }
-              }
-            }
-          ]
-        },
-        {
           "channel_id": 1338616283671040000,
           "channel_name": "text-channels-duck-pond",
           "ducks": [

@@ -1,5 +1,20 @@
 from typing import TypedDict
 
+class CourseConfig(TypedDict):
+    name: str
+    "The name is not used in the code. It helps us identify what the settings are for a course."
+    api_token: str
+    "The API token is from the env file"
+    role_ids: dict[str, str]
+    "role ids and a section name and id"
+
+class CanvasConfig(TypedDict):
+    course_ids: dict[str,CourseConfig]
+    sender_email: str
+    # TODO: Ask Dr. Bean to make a rubberduck@byu.edu email for us to verify with AWS SES
+    global_role_id: str
+    # Student
+
 
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
