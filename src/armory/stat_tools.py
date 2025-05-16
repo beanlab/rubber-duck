@@ -84,7 +84,7 @@ def _cache_key(dataset: str, column: str, kind: str) -> str:
     return f"{dataset}_{column}_{kind}.png"
 
 @register_tool
-def explain_dataset(dataset: str) -> str:
+def describe_dataset(dataset: str) -> str:
     """Returns a description of the dataset."""
     duck_logger.debug(f"Used explain_dataset on dataset={dataset}")
     data = get_dataset(dataset)
@@ -106,7 +106,7 @@ def explain_capabilities():
     )
 
 @register_tool
-def get_all_datasets() -> str:
+def get_dataset_names() -> str:
     """Returns a list of all available datasets."""
     duck_logger.debug("Used get_available_datasets")
     datasets = get_available_datasets()
