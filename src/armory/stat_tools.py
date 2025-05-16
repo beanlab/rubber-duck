@@ -9,7 +9,7 @@ from scipy.stats import skew
 from seaborn.external.kde import gaussian_kde
 
 from .tools import register_tool
-from ..utils.data_store import get_dataset
+from ..utils.data_store import get_dataset, get_available_datasets
 from ..utils.logger import duck_logger
 
 
@@ -83,9 +83,38 @@ def _save_plot(name: str) -> tuple[str, io.BytesIO]:
 def _cache_key(dataset: str, column: str, kind: str) -> str:
     return f"{dataset}_{column}_{kind}.png"
 
+@register_tool
+def explain_dataset(dataset: str) -> str:
+    """Returns a description of the dataset."""
+    duck_logger.debug(f"Used explain_dataset on dataset={dataset}")
+    data = get_dataset(dataset)
+    return f"Dataset: {dataset}\nNumber of Rows: {len(data)}\nNumber of Columns: {len(data.columns)}\n" \
+           f"Columns: {', '.join(data.columns)}"
+
+@register_tool
+def explain_capabilities():
+    """Returns a description of the bots capabilites."""
+    duck_logger.debug("Used explain_capabilities")
+    return (
+        "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
+        "- Generate visualizations: histograms, boxplots, dotplots, barplots, pie charts, and proportion barplots.\n"
+        "- Compute statistics: mean, median, mode (via KDE), standard deviation, skewness, and five-number summaries.\n"
+        "- Summarize categorical data with frequency tables and proportions.\n"
+        "- List available datasets and variable names within datasets.\n"
+        "- Provide descriptions and metadata for datasets.\n\n"
+        "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
+    )
+
+@register_tool
+def get_all_datasets() -> str:
+    """Returns a list of all available datasets."""
+    duck_logger.debug("Used get_available_datasets")
+    datasets = get_available_datasets()
+    return f"Available datasets: {', '.join(datasets)}"
 
 @register_tool
 def get_variable_names(dataset: str) -> str:
+    """Returns a list of all variable names in the dataset."""
     duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
     data = get_dataset(dataset).columns.to_list()
     return f"Variable names in {dataset}: {', '.join(data)}"
