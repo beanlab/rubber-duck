@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from io import BytesIO
-from typing import Callable, TypedDict, Protocol
+from typing import Callable, TypedDict, Protocol, Dict
 
 from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
@@ -11,7 +11,7 @@ from quest import step
 
 
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
-from ..armory.stat_tools import *
+
 
 Sendable = str | tuple[str, BytesIO]
 
@@ -140,7 +140,19 @@ class OpenAI:
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
 
                 if isinstance(tool_result, tuple):
-                    result.append(tool_result)
+                    if isinstance(tool_result[1], BytesIO):
+                        result.append(tool_result)
+                    elif isinstance(tool_result[1], dict):
+                        result.append(tool_result[0])
+                        await self._record_usage(
+                                     guild_id,
+                                     parent_channel_id,
+                                     thread_id, user_id,
+                                     engine,
+                                     tool_result[1]['prompt_tokens'],
+                                     tool_result[1]['completion_tokens'],
+                                     tool_result[1].get('cached_tokens', 0),
+                                     tool_result[1].get('reasoning_tokens', 0))
 
                 continue  # i.e. allow the bot to call another tool or add a message
 
