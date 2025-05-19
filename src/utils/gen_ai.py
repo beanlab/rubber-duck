@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from io import BytesIO
 from typing import Callable, TypedDict, Protocol
 
@@ -9,15 +10,15 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
-
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
-from ..armory.stat_tools import *
 
 Sendable = str | tuple[str, BytesIO]
+
 
 class GPTMessage(TypedDict):
     role: str
     content: str
+
 
 class GenAIClient(Protocol):
     async def get_completion(
@@ -31,6 +32,7 @@ class GenAIClient(Protocol):
             tools: [str]
     ) -> list[Sendable]: ...
 
+
 class GenAIException(Exception):
     def __init__(self, exception, web_mention):
         self.exception = exception
@@ -43,6 +45,7 @@ class RetryConfig(TypedDict):
     delay: int
     backoff: int
 
+
 class RetryableException(Exception):
     def __init__(self, exception, message):
         self.exception = exception
@@ -50,13 +53,13 @@ class RetryableException(Exception):
         super().__init__(self.exception.__str__())
 
 
-
 class RecordMessage(Protocol):
     async def __call__(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str): ...
 
 
 class RecordUsage(Protocol):
-    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str, input_tokens: int,
+    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str,
+                       input_tokens: int,
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
@@ -88,17 +91,17 @@ class OpenAI:
         )
 
         completion_dict = completion.model_dump()
-        # TODO - record usage
+
         await self._record_usage(
-                                 guild_id,
-                                 parent_channel_id,
-                                 thread_id, user_id,
-                                 engine,
-                                 completion_dict['usage']['prompt_tokens'],
-                                 completion_dict['usage']['completion_tokens'],
-                                 completion_dict['usage'].get('cached_tokens', 0),
-                                 completion_dict['usage'].get('reasoning_tokens', 0)
-                                 )
+            guild_id,
+            parent_channel_id,
+            thread_id, user_id,
+            engine,
+            completion_dict['usage']['prompt_tokens'],
+            completion_dict['usage']['completion_tokens'],
+            completion_dict['usage'].get('cached_tokens', 0),
+            completion_dict['usage'].get('reasoning_tokens', 0)
+        )
         return completion
 
     async def _get_completion(
@@ -196,13 +199,13 @@ class RetryableGenAI:
         self._genai = genai
 
     async def get_completion(self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            engine: str,
-            message_history: list[GPTMessage],
-            tools: [str]):
+                             guild_id: int,
+                             parent_channel_id: int,
+                             thread_id: int,
+                             user_id: int,
+                             engine: str,
+                             message_history: list[GPTMessage],
+                             tools: [str]):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
@@ -210,8 +213,9 @@ class RetryableGenAI:
         while True:
             try:
                 async with self._typing(thread_id):
-                    return await self._genai.get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
-                                              tools)
+                    return await self._genai.get_completion(guild_id, parent_channel_id, thread_id, user_id, engine,
+                                                            message_history,
+                                                            tools)
 
             except RetryableException as ex:
                 if retries == 0:
