@@ -3,7 +3,7 @@ name: Update Production Environment File
 on:
   push:
     branches:
-      - master
+      - ECS-Teardown
   workflow_dispatch:
 
 jobs:
@@ -41,9 +41,19 @@ jobs:
         run: |
           aws s3 cp secrets.env "s3://rubber-duck-config/production-secrets.env" --no-progress
 
+      - name: Get commit info
+        id: commit_info
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
       - name: Send notification to Discord
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          MESSAGE="✅ Environment file has been successfully updated for production environment."
+          COMMIT_SHA="${{ steps.commit_info.outputs.sha }}"
+          COMMIT_MSG="${{ steps.commit_info.outputs.message }}"
+          MESSAGE="✅ Environment file has been successfully updated for production environment.\n\nCommit: \`$COMMIT_SHA\`\nMessage: \`$COMMIT_MSG\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
