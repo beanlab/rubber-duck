@@ -1,9 +1,7 @@
-import asyncio
 import re
 
-import discord
 from discord import Guild
-from quest import step, queue, alias
+from quest import step
 
 from ..utils.email_confirmation import EmailConfirmation
 from ..utils.logger import duck_logger
@@ -135,7 +133,8 @@ class RegistrationWorkflow:
             view = RoleSelectionView(available_roles)
             await self._send_message(
                 thread_id,
-                "Please select the roles you need. You can select multiple roles.",
+                "Please select your lecture section (if applicable, select your lab section).\n"
+                "You can find your lab section and lecture section in BYU MyMap\n",
                 view=view
             )
 
