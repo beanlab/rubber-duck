@@ -1,7 +1,6 @@
 import asyncio
-from io import BytesIO
 from pathlib import Path
-from typing import TypedDict, Protocol
+from typing import Protocol
 
 from quest import step, queue, wrap_steps
 
@@ -38,6 +37,7 @@ class BasicPromptConversation:
                  add_reaction: AddReaction,
                  setup_conversation: BasicSetupConversation,
                  ):
+
         self._ai_client = ai_client
         wrap_steps(self._ai_client, ['get_completion'])
 
@@ -115,6 +115,8 @@ class BasicPromptConversation:
                     await self._record_message(
                         guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
                     )
+
+
 
                     sendables = await self._ai_client.get_completion(
                         guild_id,

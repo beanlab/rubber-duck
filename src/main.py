@@ -97,7 +97,8 @@ def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metri
 
 
 def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
-    # admin settings
+
+    # Admin settings
     admin_settings = config['admin_settings']
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 

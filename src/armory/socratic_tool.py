@@ -1,43 +1,27 @@
-import os
-from typing import Tuple, Dict
-
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
-
 from .tools import register_tool
-from ..utils.logger import duck_logger
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def make_socratic_tool(conversation_instance):
+    @register_tool
+    async def socratic_tool(concept: str, guild_id: int, channel_id: int, thread_id: int, author_id: int, message_id: int) -> str:
+        prompt = f"Let's discuss the concept: {concept}"
+        settings = {
+            "prompt_file": None,
+            "engine": "gpt-4",
+            "timeout": 600,
+            "tools": None,
+            "introduction": "Let's begin our discussion."
+        }
+        initial_message = {
+            "content": prompt,
+            "author_id": author_id,
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "message_id": message_id,
+            "file": []
+        }
+        await conversation_instance(thread_id, settings, initial_message)
+        return "Conversation started with a new prompt."
+    return socratic_tool
 
 
-@register_tool
-async def make_example_tool(concept: str) -> Tuple[str, Dict[str, int]]:
-    """
-    This is a tool that takes in a concept and provides an example using OpenAI's completion.
-    
-    Args:
-        concept: The concept to generate an example for
-    """
-    # Create a simple message history with just the concept
-    duck_logger.debug("Make Example Tool is called")
-    message_history = [{
-        "role": "user",
-        "content": f"Context = {concept}\n\n"
-                   f"Please provide a detailed explanation in the following format:\n\n"
-                   f"### 1. Concept Explanation:\n"
-                   f"[Provide a clear, detailed explanation of the concept]\n\n"
-                   f"### 2. Analogy using Fruit:\n"
-                   f"[Create an analogy using fruit to illustrate the concept]\n\n"
-                   f"### 3. Example Problem:\n"
-                   f"[Create a practice problem to test understanding]\n\n"
-                   f"Make sure to use markdown formatting with ### for section headers and proper spacing between sections."
-    }]
 
-    completion: ChatCompletion = await client.chat.completions.create(
-        model='gpt-4.1-2025-04-14',
-        messages=message_history,
-    )
-
-    completion_dict = completion.model_dump()
-
-    return completion_dict['choices'][0]['message']['content'], completion_dict['usage']
