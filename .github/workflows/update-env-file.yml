@@ -1,12 +1,12 @@
-name: Manage Environment Files
+name: Update Production Environment File
 
 on:
   workflow_run:
-    workflows: ["Build, Push, and Deploy to AWS Infrastructure"]
+    workflows:
+      - "Build, Push, and Deploy to AWS Infrastructure"
     types:
       - completed
     branches:
-      - master
       - ECS-Teardown
   workflow_dispatch:
 

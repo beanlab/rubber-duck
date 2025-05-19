@@ -2,11 +2,11 @@ name: Update Production Config
 
 on:
   workflow_run:
-    workflows: ["Build, Push, and Deploy to AWS Infrastructure"]
+    workflows:
+      - "Build, Push, and Deploy to AWS Infrastructure"
     types:
       - completed
     branches:
-      - master
       - ECS-Teardown
   workflow_dispatch:
 
