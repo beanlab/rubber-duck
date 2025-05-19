@@ -142,7 +142,7 @@ class DiscordBot(discord.Client):
             raise Exception(f'No channel id {channel_id}')
 
         if message:
-            for block in _parse_blocks(message or ''):
+            for block in _parse_blocks(message):
                 curr_message = await channel.send(block)
             return curr_message.id
 
