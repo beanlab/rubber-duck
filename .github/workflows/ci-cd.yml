@@ -100,8 +100,6 @@ jobs:
         run: |
           COMBINED="${{ needs.extract_sha.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-
-          MESSAGE="**Deployment successfully to ECR!**\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
-          # Escape double quotes for JSON
+          MESSAGE="✅ Deployment successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
