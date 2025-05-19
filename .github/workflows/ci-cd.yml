@@ -13,41 +13,41 @@ on:
         type: string
 
 jobs:
-  extract_sha:
+  Extract_SHA:
     runs-on: ubuntu-latest
     outputs:
-      short_sha: ${{ steps.extract_sha.outputs.short_sha }}
-      extract_branch: ${{ steps.extract_branch.outputs.branch_name }}
-      combined: ${{ steps.short_sha_and_branch_name.outputs.combined }}
+      Short_SHA: ${{ steps.Extract_SHA.outputs.Short_SHA }}
+      Extract_Branch: ${{ steps.Extract_Branch.outputs.Branch_Name }}
+      Combined: ${{ steps.Short_SHA_and_Branch_Name.outputs.Combined }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Extract branch name
-        id: extract_branch
+        id: Extract_Branch
         run: |
           BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' | tr -cd '[:alnum:]-')
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
           echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
 
       - name: Extract short SHA
-        id: extract_sha
+        id: Extract_SHA
         run: |
           SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Combine short SHA and Branch Name
-        id: short_sha_and_branch_name
+        id: Short_SHA_and_Branch_Name
         run: |
           COMBINED="${BRANCH_NAME}-${SHORT_SHA}"
           echo "COMBINED=${COMBINED}" >> $GITHUB_ENV
           echo "combined=${COMBINED}" >> $GITHUB_OUTPUT
 
-  build_and_push:
+  Docker_Build_and_Push:
     runs-on: ubuntu-latest
     environment: pre-production
-    needs: extract_sha
+    needs: Extract_SHA
     outputs:
       docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
     steps:
@@ -75,7 +75,7 @@ jobs:
       - name: Tag and Push Docker Image
         id: set_outputs
         run: |
-          IMAGE_TAG="${{ needs.extract_sha.outputs.combined }}"
+          IMAGE_TAG="${{ needs.Extract_SHA.outputs.combined }}"
           echo "Tagging image as: $IMAGE_TAG"
 
           docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
@@ -87,12 +87,12 @@ jobs:
           echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Complete Docker push
-        run: echo "Docker image pushed to ECR with tag ${{ needs.extract_sha.outputs.combined }}!"
+        run: echo "Docker image pushed to ECR with tag ${{ needs.Extract_SHA.outputs.combined }}!"
 
-  update_env_file:
+  Update_Env_File:
     runs-on: ubuntu-latest
     environment: pre-production
-    needs: [build_and_push, extract_sha]
+    needs: [Docker_Build_and_Push, Extract_SHA]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -127,14 +127,14 @@ jobs:
       - name: Send notification to Discord
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          COMMIT_SHA="${{ needs.extract_sha.outputs.short_sha }}"
+          COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
           MESSAGE="✅ Environment file has been successfully updated for production environment.\nCommit: \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
-  update_production_config:
+  Update_Production_Config:
     runs-on: ubuntu-latest
-    needs: [build_and_push, extract_sha]
+    needs: [Docker_Build_and_Push, Extract_SHA]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -152,21 +152,27 @@ jobs:
       - name: Send notification to Discord
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          COMMIT_SHA="${{ needs.extract_sha.outputs.short_sha }}"
+          COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
           MESSAGE="✅ The production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
-  send_sha_via_discord_webhook:
+  Notify_Discord_of_Docker_Build_and_Push:
     runs-on: ubuntu-latest
-    needs: [extract_sha, build_and_push]
+    needs:
+      [
+        Extract_SHA,
+        Docker_Build_and_Push,
+        Update_Env_File,
+        Update_Production_Config,
+      ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Send SHA to Discord Webhook
         run: |
-          COMBINED="${{ needs.extract_sha.outputs.combined }}"
+          COMBINED="${{ needs.Extract_SHA.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           MESSAGE="✅ Docker Build and Push successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
