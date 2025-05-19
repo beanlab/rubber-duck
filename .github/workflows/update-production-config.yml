@@ -1,9 +1,8 @@
 name: Update Production Config
 
 on:
-  push:
-    branches:
-      - ECS-Teardown
+  repository_dispatch:
+    types: [update-production-config]
   workflow_dispatch:
 
 jobs:
@@ -34,14 +33,12 @@ jobs:
         id: commit_info
         run: |
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
       - name: Send notification to Discord
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ steps.commit_info.outputs.sha }}"
-          MESSAGE="✅ Production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
+          MESSAGE="✅ The production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"

@@ -1,9 +1,8 @@
 name: Update Production Environment File
 
 on:
-  push:
-    branches:
-      - ECS-Teardown
+  repository_dispatch:
+    types: [update-env-file]
   workflow_dispatch:
 
 jobs:
@@ -45,9 +44,7 @@ jobs:
         id: commit_info
         run: |
           COMMIT_SHA=$(git rev-parse --short HEAD)
-          COMMIT_MSG=$(git log -1 --pretty=%B)
           echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
       - name: Send notification to Discord
         run: |

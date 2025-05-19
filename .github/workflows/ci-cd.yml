@@ -89,9 +89,27 @@ jobs:
       - name: Complete Docker push
         run: echo "Docker image pushed to ECR with tag ${{ needs.extract_sha.outputs.combined }}!"
 
+  trigger_updates:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    steps:
+      - name: Trigger Update Env File Workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: update-env-file
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
+      - name: Trigger Update Production Config Workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: update-production-config
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
   send_sha_via_discord_webhook:
     runs-on: ubuntu-latest
-    needs: [extract_sha, build_and_push]
+    needs: [extract_sha, build_and_push, trigger_updates]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
