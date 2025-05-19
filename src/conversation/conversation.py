@@ -5,7 +5,7 @@ from typing import TypedDict, Protocol
 
 from quest import step, queue, wrap_steps
 
-from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException
+from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
 
@@ -36,7 +36,7 @@ class BasicPromptConversation:
                  send_message: SendMessage,
                  report_error: ReportError,
                  add_reaction: AddReaction,
-                 setup_conversation: BasicSetupConversation
+                 setup_conversation: BasicSetupConversation,
                  ):
         self._ai_client = ai_client
         wrap_steps(self._ai_client, ['get_completion'])
@@ -51,6 +51,20 @@ class BasicPromptConversation:
 
         self._setup_conversation = step(setup_conversation)
 
+    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int, message_history: list[GPTMessage]):
+        for sendable in sendables:
+            if isinstance(sendable, str):
+                await self._record_message(
+                    guild_id, thread_id, user_id, 'assistant', sendable)
+                await self._send_message(thread_id, message=sendable)
+                message_history.append(GPTMessage(role='assistant', content=sendable))
+
+            else:  # tuple of str, BytesIO -> i.e. an image
+                await self._record_message(
+                    guild_id, thread_id, user_id, 'assistant', f'<image {sendable[0]}>')
+                await self._send_message(thread_id, file=sendable)
+                message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
+
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
 
         prompt_file = settings["prompt_file"]
@@ -62,8 +76,8 @@ class BasicPromptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
-        tools = settings["tools"] if "tools" in settings else None
-        introduction = settings["introduction"] if "introduction" in settings else "Hi, how can I help you?"
+        tools = settings.get('tools', None)
+        introduction = settings.get("introduction", "Hi, how can I help you?")
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
@@ -112,21 +126,11 @@ class BasicPromptConversation:
                         tools
                     )
 
-                    for sendable in sendables:
-                        if isinstance(sendable, str):
-                            await self._record_message(
-                                guild_id, thread_id, user_id, 'assistant', sendable)
-                            await self._send_message(thread_id, message=sendable)
-                            message_history.append(GPTMessage(role='assistant', content=sendable))
-
-                        else:  # tuple of str, BytesIO -> i.e. an image
-                            await self._record_message(
-                                guild_id, thread_id, user_id, 'assistant', f'<image {sendable[0]}>')
-                            await self._send_message(thread_id, file=sendable)
-                            message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
+                    await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
 
                 except GenAIException:
                     await self._send_message(thread_id,
                                              'I\'m having trouble processing your request.'
                                              'The admins are aware. Please try again later.')
                     raise
+

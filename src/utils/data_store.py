@@ -22,3 +22,6 @@ def get_dataset(name: str) -> pd.DataFrame:
     df = pd.read_csv(datasets[name])
     _loaded_datasets[name] = df
     return df
+
+def get_available_datasets() -> list[str]:
+    return list(datasets.keys())
