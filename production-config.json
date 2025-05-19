@@ -187,7 +187,8 @@
                   "calculate_mode",
                   "calculate_five_number_summary",
                   "calculate_table_of_counts",
-                  "calculate_proportions"
+                  "calculate_proportions",
+                  "show_dataset_head"
                 ],
                 "engine": "gpt-4.1",
                 "timeout": 60
