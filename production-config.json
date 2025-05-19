@@ -1,10 +1,6 @@
 {
   "sql": {
-    "db_type": "mysql+pymysql",
-    "username": "env:DB_USER",
-    "password": "env:DB_PASSWORD",
-    "host": "env:DB_HOST",
-    "port": "env:DB_PORT",
+    "db_type": "sqlite",
     "database": "env:DB_NAME"
   },
   "reporting": {

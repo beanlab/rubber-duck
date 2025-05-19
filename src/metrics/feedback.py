@@ -59,6 +59,7 @@ class HaveTAGradingConversation:
                     await self._add_reaction(thread_id, message_id, reaction)
 
                 try:
+                    # TODO - perhaps run the reactions in parallel to the feedback get
                     feedback_emoji, reviewer_id = await asyncio.wait_for(
                         feedback_queue.get(),
                         timeout=timeout
@@ -94,7 +95,7 @@ class HaveTAGradingConversation:
         await self._send_message(
             thread_id,
             'After you provide feedback on a conversation, another will be served.\n'
-            'If you leave the queue after five minutes, this session will end.\n'
+            'If you do not respond for five minutes, this session will end.\n'
         )
 
         try:
