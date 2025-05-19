@@ -42,7 +42,6 @@ jobs:
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ steps.commit_info.outputs.sha }}"
-          COMMIT_MSG="${{ steps.commit_info.outputs.message }}"
-          MESSAGE="✅ The production config has been successfully updated.\n\nCommit: \`$COMMIT_SHA\`\nMessage: \`$COMMIT_MSG\`"
+          MESSAGE="✅ The production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"

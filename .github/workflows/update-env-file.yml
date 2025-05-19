@@ -53,7 +53,6 @@ jobs:
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ steps.commit_info.outputs.sha }}"
-          COMMIT_MSG="${{ steps.commit_info.outputs.message }}"
-          MESSAGE="✅ Environment file has been successfully updated for production environment.\n\nCommit: \`$COMMIT_SHA\`\nMessage: \`$COMMIT_MSG\`"
+          MESSAGE="✅ Environment file has been successfully updated for production environment.\nCommit: \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
