@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - ECS-Teardown
   workflow_dispatch:
     inputs:
       local_config:
@@ -173,51 +174,3 @@ jobs:
           # Escape double quotes for JSON
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
-
-  deploy_to_cloudformation:
-    needs: [build_and_push, send_config]
-    runs-on: ubuntu-latest
-    environment: pre-production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Deploy ECS Infrastructure with CloudFormation
-        id: deploy
-        run: |
-          IMAGE_TAG="${{needs.build_and_push.outputs.docker_image_tag}}"  # This is the docker image tag from build and push
-          echo "Deploying ECS with image tag: ${IMAGE_TAG}"
-
-          aws cloudformation deploy \
-            --stack-name rubber-duck-pre-production \
-            --template-file infra/ecs-infra.yml \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset \
-            --parameter-overrides \
-            Environment=pre-production \
-            ClusterName=DuckCluster-rubber-duck-pre-production \
-            TaskDefinitionFamily=rubber-duck-pre-production \
-            ContainerName=duck-container-pre-production \
-            "ImageURI=844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:${IMAGE_TAG}" \
-            "VpcId=${{ secrets.VPC_ID }}" \
-            "SubnetIds=${{ secrets.SUBNET_IDS }}" \
-            "SecurityGroupId=${{ secrets.SECURITY_GROUP_ID }}" \
-            "ExecutionRoleArn=${{secrets.EXECUTION_ROLE}}" \
-            "TaskRoleArn=${{secrets.EXECUTION_ROLE}}" \
-            "Cpu=1024" \
-            "Memory=2048" \
-            "EnvFileS3Path=${{ needs.send_config.outputs.arn_env }}"
-
-          # Wait for the ECS service to stabilize
-          echo "Waiting for ECS service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster DuckCluster-rubber-duck-pre-production \
-            --services rubber-duck-pre-production-Service \
-            --region ${{ secrets.AWS_REGION }}
