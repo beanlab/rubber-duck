@@ -159,8 +159,7 @@ jobs:
 
   send_sha_via_discord_webhook:
     runs-on: ubuntu-latest
-    needs:
-      [extract_sha, build_and_push, update_env_file, update_production_config]
+    needs: [extract_sha, build_and_push]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -169,6 +168,6 @@ jobs:
         run: |
           COMBINED="${{ needs.extract_sha.outputs.combined }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          MESSAGE="✅ Deployment successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
+          MESSAGE="✅ Docker Build and Push successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
