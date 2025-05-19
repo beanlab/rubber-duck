@@ -8,9 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       local_config:
-        description: "Path to local config file to upload (e.g., infra/pre-production-config.json)"
+        description: "Path to local config file to upload"
         required: false
-        default: "infra/pre-production-config.json"
         type: string
 
 jobs:
@@ -44,74 +43,6 @@ jobs:
           COMBINED="${BRANCH_NAME}-${SHORT_SHA}"
           echo "COMBINED=${COMBINED}" >> $GITHUB_ENV
           echo "combined=${COMBINED}" >> $GITHUB_OUTPUT
-
-  send_config:
-    runs-on: ubuntu-latest
-    environment: pre-production
-    needs: extract_sha
-    outputs:
-      config_s3_path: ${{ steps.set_outputs.outputs.config_s3_path }}
-      secrets_s3_path: ${{ steps.set_outputs.outputs.secrets_s3_path }}
-      arn_env: ${{ steps.set_outputs.outputs.arn_env }} # Consolidated ARN output
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Create secrets file
-        run: |
-          cat > secrets.env << EOL
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          DB_HOST=${{ secrets.DB_HOST }}
-          DB_PORT=${{ secrets.DB_PORT }}
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          CONFIG_FILE_S3_PATH=s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json
-          ENV_FILE_S3_PATH=s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env
-          ENVIRONMENT=pre-production
-          EOL
-
-      - name: Upload config and secrets to S3
-        id: set_outputs
-        run: |
-          CONFIG_S3_PATH="s3://rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
-          SECRETS_S3_PATH="s3://rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
-
-          # Debugging outputs
-          echo "Config file path: $CONFIG_S3_PATH"
-          echo "Secrets file path: $SECRETS_S3_PATH"
-
-          # Upload files
-          aws s3 cp "${{ inputs.local_config || 'infra/pre-production-config.json' }}" "$CONFIG_S3_PATH"
-          aws s3 cp secrets.env "$SECRETS_S3_PATH" --no-progress
-
-          # Set outputs for use in other jobs
-          echo "config_s3_path=$CONFIG_S3_PATH" >> $GITHUB_OUTPUT
-          echo "secrets_s3_path=$SECRETS_S3_PATH" >> $GITHUB_OUTPUT
-          echo "arn_env=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
-
-          echo "Uploaded config to: $CONFIG_S3_PATH"
-          echo "Uploaded secrets to: $SECRETS_S3_PATH"
-
-      - name: Upload Arn
-        id: arn_env
-        run: |
-          CONFIG_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/config-${{ needs.extract_sha.outputs.combined }}.json"
-          SECRETS_S3_ARN="arn:aws:s3:::rubber-duck-config/pre-production/secrets-${{ needs.extract_sha.outputs.combined }}.env"
-          echo "secrets_s3_path=$SECRETS_S3_ARN" >> $GITHUB_OUTPUT
 
   build_and_push:
     runs-on: ubuntu-latest

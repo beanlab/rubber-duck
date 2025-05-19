@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - ECS-Teardown
   workflow_dispatch:
 
 jobs:
@@ -29,7 +30,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
 
       - name: Send notification to Discord
         run: |

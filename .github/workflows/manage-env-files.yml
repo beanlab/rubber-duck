@@ -1,0 +1,50 @@
+name: Manage Environment Files
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - ECS-Teardown
+
+jobs:
+  create_env_file:
+    runs-on: ubuntu-latest
+    environment: pre-production # This is manually set to pre-production branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Create secrets file
+        run: |
+          cat > secrets.env << EOL
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVIRONMENT=pre-production
+          EOL
+
+      - name: Upload secrets to S3
+        run: |
+          aws s3 cp secrets.env "s3://rubber-duck-config/production-secrets.env" --no-progress
+
+      - name: Send notification to Discord
+        run: |
+          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+          MESSAGE="✅ Environment file has been successfully updated for production environment."
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
