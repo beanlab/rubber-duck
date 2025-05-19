@@ -1,11 +1,7 @@
 name: Update Production Environment File
 
 on:
-  workflow_run:
-    workflows:
-      - "Build, Push, and Deploy to AWS Infrastructure"
-    types:
-      - completed
+  push:
     branches:
       - ECS-Teardown
   workflow_dispatch:
@@ -13,7 +9,6 @@ on:
 jobs:
   create_env_file:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     environment: pre-production # This is manually set to pre-production branch
     steps:
       - name: Checkout code

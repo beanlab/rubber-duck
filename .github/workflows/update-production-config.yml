@@ -1,11 +1,7 @@
 name: Update Production Config
 
 on:
-  workflow_run:
-    workflows:
-      - "Build, Push, and Deploy to AWS Infrastructure"
-    types:
-      - completed
+  push:
     branches:
       - ECS-Teardown
   workflow_dispatch:
@@ -13,7 +9,6 @@ on:
 jobs:
   update_the_production_config:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
