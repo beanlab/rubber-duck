@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - ECS-Teardown
   workflow_dispatch:
     inputs:
       local_config:
