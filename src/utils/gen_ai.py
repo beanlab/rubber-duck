@@ -1,6 +1,5 @@
 import asyncio
 import logging
-
 from io import BytesIO
 from typing import Callable, TypedDict, Protocol
 
@@ -63,7 +62,6 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
-
 class OpenAI:
     def __init__(self,
                  openai_api_key: str,
@@ -84,6 +82,9 @@ class OpenAI:
             message_history,
             functions
     ):
+        if not functions:
+            functions = None
+
         completion: ChatCompletion = await self._client.chat.completions.create(
             model=engine,
             messages=message_history,
@@ -112,7 +113,7 @@ class OpenAI:
             user_id: int,
             engine: str,
             message_history: list[GPTMessage],
-            tools: [str]
+            tools: list[str]
     ) -> list[Sendable]:
         tools_to_use = {tool: self._get_tool(tool) for tool in tools}
 
@@ -158,7 +159,6 @@ class OpenAI:
 
         return result
 
-
     async def get_completion(
             self,
             guild_id: int,
@@ -167,7 +167,7 @@ class OpenAI:
             user_id: int,
             engine: str,
             message_history: list[GPTMessage],
-            tools: [str]
+            tools: list[str]
     ) -> list[Sendable]:
         try:
             return await self._get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
