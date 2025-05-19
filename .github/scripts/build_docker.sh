@@ -16,6 +16,7 @@ FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 COPY src /app/src
 COPY prompts /app/prompts
+COPY datasets /app/datasets
 ADD pyproject.toml /app/pyproject.toml
 WORKDIR /app
 RUN pip install --no-cache-dir poetry
