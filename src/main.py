@@ -134,7 +134,18 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.add_reaction,
         setup_conversation
     )
-    make_sub_conversation(have_conversation)
+
+    have_sub_conversation = BasicPromptConversation(
+        retryable_ai_client,
+        metrics_handler.record_message,
+        metrics_handler.record_usage,
+        bot.typing,
+        bot.send_message,
+        bot.report_error,
+        bot.add_reaction,
+        setup_conversation
+    )
+    make_sub_conversation(have_sub_conversation)
 
     have_ta_conversation = HaveTAGradingConversation(
         feedback_manager,

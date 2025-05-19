@@ -106,7 +106,7 @@ class OpenAI:
         return completion
 
     def _inject_secure_args(self, function_name: str, model_args: str, guild_id: int, parent_channel_id: int, thread_id: int,
-                           author_id: int, message_id: int) -> str:
+                           author_id: int) -> str:
 
         model_args = json.loads(model_args)
         secure_args = model_args.copy()
