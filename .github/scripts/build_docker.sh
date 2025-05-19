@@ -25,7 +25,7 @@ RUN poetry config virtualenvs.create false && \
 # Set up Python path
 ENV PYTHONPATH=/app/src
 
-CMD ["python", "-m", "src.main", "--config", "/config.json", "--log-console"]
+CMD ["python", "-m", "src.main", "--config", "/config.json"]
 EOF
 
 # Tag the image for ECR with both latest and commit SHA
