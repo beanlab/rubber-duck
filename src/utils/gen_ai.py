@@ -105,9 +105,10 @@ class OpenAI:
         )
         return completion
 
-    def _inject_secure_args(self, function_name: str, model_args: dict, guild_id: int, parent_channel_id: int, thread_id: int,
-                           author_id: int, message_id: int) -> dict:
+    def _inject_secure_args(self, function_name: str, model_args: str, guild_id: int, parent_channel_id: int, thread_id: int,
+                           author_id: int, message_id: int) -> str:
 
+        model_args = json.loads(model_args)
         secure_args = model_args.copy()
 
         if function_name == "provide_explanation":
@@ -115,9 +116,8 @@ class OpenAI:
             secure_args["channel_id"] = parent_channel_id
             secure_args["thread_id"] = thread_id
             secure_args["author_id"] = author_id
-            secure_args["message_id"] = message_id
 
-        return secure_args
+        return json.dumps(secure_args)
 
     async def _get_completion(
             self,
@@ -153,8 +153,8 @@ class OpenAI:
 
                 tool = tools_to_use[function_name]
 
-                tool_args = self._inject_secure_args(function_name, message.function_call.arguments, guild_id, parent_channel_id, thread_id, user_id, message.id)
-                tool_result = await tool.on_invoke_tool(None, json.dumps(tool_args))
+                tool_args = self._inject_secure_args(function_name, message.function_call.arguments, guild_id, parent_channel_id, thread_id, user_id)
+                tool_result = await tool.on_invoke_tool(None, tool_args)
 
                 message_history.append({"role": "assistant", "function_call": message.function_call})
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})

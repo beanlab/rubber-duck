@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from .armory.socratic_tool import make_sub_conversation
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
@@ -133,6 +134,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.add_reaction,
         setup_conversation
     )
+    make_sub_conversation(have_conversation)
 
     have_ta_conversation = HaveTAGradingConversation(
         feedback_manager,

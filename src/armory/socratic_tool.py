@@ -2,7 +2,7 @@ from .tools import register_tool
 
 def make_sub_conversation(conversation_instance):
     @register_tool
-    async def provide_explanation(concept: str, guild_id: int, channel_id: int, thread_id: int, author_id: int, message_id: int) -> str:
+    async def provide_explanation(concept: str, guild_id: int, channel_id: int, thread_id: int, author_id: int) -> str:
         prompt = f"Let's discuss the concept: {concept}"
         settings = {
             "prompt_file": None,
@@ -16,7 +16,7 @@ def make_sub_conversation(conversation_instance):
             "author_id": author_id,
             "guild_id": guild_id,
             "channel_id": channel_id,
-            "message_id": message_id,
+            "message_id": 0,
             "file": []
         }
         await conversation_instance(thread_id, settings, initial_message)
