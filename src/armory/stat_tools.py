@@ -84,6 +84,62 @@ def _cache_key(dataset: str, column: str, kind: str) -> str:
     return f"{dataset}_{column}_{kind}.png"
 
 @register_tool
+def show_dataset_head(dataset: str, n: int = 5) -> tuple[str, io.BytesIO]:
+    """
+    Return a (name, PNG image) of the first n rows of a dataset. When asked what a dataset looks like, this is the answer.
+    """
+    return _cached_dataset_head(dataset, n)
+
+
+@lru_cache(maxsize=128)
+def _cached_dataset_head(dataset: str, n: int) -> tuple[str, io.BytesIO]:
+    duck_logger.debug(f"Generating head preview (cached) for {dataset} with n={n}")
+    data = get_dataset(dataset)
+
+    if not isinstance(n, int) or n <= 0:
+        raise ValueError("n must be a positive integer.")
+
+    df = data.head(n)
+
+    # Wrap long column names with line breaks at ~12 chars
+    def wrap_colname(name, width=12):
+        import textwrap
+        return '\n'.join(textwrap.wrap(name, width))
+
+    wrapped_cols = [wrap_colname(str(col)) for col in df.columns]
+
+    fig_width = min(12, len(df.columns) * 2)
+    fig_height = 0.6 * (n + 1)
+
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis("off")
+
+    table = ax.table(
+        cellText=df.values,
+        colLabels=wrapped_cols,
+        loc="center",
+        cellLoc="center",
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+
+    # Adjust column widths proportionally
+    n_cols = len(df.columns)
+    for i in range(n_cols):
+        table.auto_set_column_width(i)
+
+    buf = io.BytesIO()
+    name = f"{dataset}_head_{n}_rows.png"
+
+    plt.tight_layout()
+    plt.savefig(buf, format="png", bbox_inches="tight", dpi=150)
+    plt.close(fig)
+    buf.seek(0)
+
+    return name, buf
+
+@register_tool
 def describe_dataset(dataset: str) -> str:
     """Returns a description of the dataset."""
     duck_logger.debug(f"Used explain_dataset on dataset={dataset}")
