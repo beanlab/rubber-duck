@@ -6,6 +6,10 @@ Welcome to the Rubber Duck project! This documentation will help you get started
 
 [![Build, Push, and Deploy to AWS Infrastructure](https://github.com/beanlab/rubber-duck/actions/workflows/ci-cd.yml/badge.svg?branch=master)](https://github.com/beanlab/rubber-duck/actions/workflows/ci-cd.yml)
 
+[![Update Production Config](https://github.com/beanlab/rubber-duck/actions/workflows/update-production-config.yml/badge.svg)](https://github.com/beanlab/rubber-duck/actions/workflows/update-production-config.yml)
+
+[![Update Production Environment File](https://github.com/beanlab/rubber-duck/actions/workflows/update-env-file.yml/badge.svg)](https://github.com/beanlab/rubber-duck/actions/workflows/update-env-file.yml)
+
 ## Table of Contents
 
 - [Getting Started](docs/getting-started.md)

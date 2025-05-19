@@ -3,7 +3,7 @@ name: Update Production Environment File
 on:
   push:
     branches:
-      - ECS-Teardown
+      - master
   workflow_dispatch:
 
 jobs:
