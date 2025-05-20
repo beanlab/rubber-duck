@@ -16,6 +16,7 @@ FROM python:3.11.9
 LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
 COPY src /app/src
 COPY prompts /app/prompts
+COPY datasets /app/datasets
 ADD pyproject.toml /app/pyproject.toml
 WORKDIR /app
 RUN pip install --no-cache-dir poetry
@@ -25,7 +26,7 @@ RUN poetry config virtualenvs.create false && \
 # Set up Python path
 ENV PYTHONPATH=/app/src
 
-CMD ["python", "-m", "src.main", "--config", "/config.json", "--log-console"]
+CMD ["python", "-m", "src.main", "--config", "/config.json"]
 EOF
 
 # Tag the image for ECR with both latest and commit SHA

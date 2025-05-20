@@ -2,10 +2,6 @@
 
 Welcome to the Rubber Duck project! This documentation will help you get started with contributing to and using our project.
 
-## Current Duck Status
-
-[![Build, Push, and Deploy to AWS Infrastructure](https://github.com/beanlab/rubber-duck/actions/workflows/ci-cd.yml/badge.svg?branch=master)](https://github.com/beanlab/rubber-duck/actions/workflows/ci-cd.yml)
-
 ## Table of Contents
 
 - [Getting Started](docs/getting-started.md)

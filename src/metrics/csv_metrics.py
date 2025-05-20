@@ -39,18 +39,20 @@ class CSVMetricsHandler:
             writer = csv.writer(file)
             writer.writerow([get_timestamp(), guild_id, thread_id, user_id, role, message])
 
-    async def record_usage(self, guild_id, thread_id, user_id, engine, input_tokens, output_tokens):
+    async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         with self._usage_file.open('at', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([get_timestamp(), guild_id, thread_id, user_id, engine, input_tokens, output_tokens])
+            writer.writerow([get_timestamp(), guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens, reasoning_tokens])
 
-    async def record_feedback(self, workflow_type, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, reviewer_id: int,
+    async def record_feedback(self, workflow_type, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int,
+                              reviewer_id: int,
                               feedback_score: int):
         try:
             with self._feedback_file.open('at', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(
-                    [get_timestamp(), workflow_type, guild_id, parent_channel_id, thread_id, user_id, reviewer_id, feedback_score])
+                    [get_timestamp(), workflow_type, guild_id, parent_channel_id, thread_id, user_id, reviewer_id,
+                     feedback_score])
         except Exception as e:
             logging.error(f"Failed to record feedback: {e}")
 

@@ -17,7 +17,10 @@ sqlalchemy = "^2.0.38"
 boto3 = "^1.36.6"
 requests = "^2.32.3"
 pymysql = "^1.1.1"
+openai-agents ="^0.0.14"
+scipy = "^1.15.3"
 websockets = "^15.0.1"
+
 
 [tool.poetry.dev-dependencies]
 

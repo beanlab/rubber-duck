@@ -1,10 +1,6 @@
 {
   "sql": {
-    "db_type": "mysql+pymysql",
-    "username": "env:DB_USER",
-    "password": "env:DB_PASSWORD",
-    "host": "env:DB_HOST",
-    "port": "env:DB_PORT",
+    "db_type": "sqlite",
     "database": "env:DB_NAME"
   },
   "reporting": {
@@ -30,7 +26,9 @@
               "name": "conversation_review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1234556460453597276],
+                "target_channel_ids": [
+                  1234556460453597276
+                ],
                 "timeout": 300
               }
             }
@@ -64,7 +62,9 @@
               "name": "conversation_review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1195490291134779502],
+                "target_channel_ids": [
+                  1195490291134779502
+                ],
                 "timeout": 300
               }
             }
@@ -98,7 +98,9 @@
               "name": "conversation_review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1365456542287269919],
+                "target_channel_ids": [
+                  1365456542287269919
+                ],
                 "timeout": 300
               }
             }
@@ -110,11 +112,86 @@
           "ducks": [
             {
               "name": "basic_prompt_conversation",
-              "workflow_type": "duck",
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
                 "timeout": 600
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "1371951485629370458": {
+      "server_name": "Stats",
+      "channels": [
+        {
+          "channel_id": 1371951756149260298,
+          "channel_name": "ta-review",
+          "ducks": [
+            {
+              "name": "conversation_review",
+              "workflow_type": "conversation_review",
+              "settings": {
+                "target_channel_ids": [
+                  1371951696061661215,
+                  1374066971523678279
+                ],
+                "timeout": 300
+              }
+            }
+          ]
+        },
+        {
+          "channel_id": 1371951696061661215,
+          "channel_name": "duck-pond",
+          "ducks": [
+            {
+              "name": "basic_prompt_conversation",
+              "workflow_type": "basic_prompt_conversation",
+              "settings": {
+                "prompt_file": "prompts/standard-rubber-duck.txt",
+                "engine": "gpt-4.1",
+                "timeout": 600
+              }
+            }
+          ]
+        },
+        {
+          "channel_id": 1374066971523678279,
+          "channel_name": "stats-tool",
+          "ducks": [
+            {
+              "name": "standard-rubber-duck",
+              "workflow_type": "basic_prompt_conversation",
+              "weight": 1,
+              "settings": {
+                "prompt_file": "prompts/stats.txt",
+                "introduction": "I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.",
+                "tools": [
+                  "explain_capabilities",
+                  "describe_dataset",
+                  "get_dataset_names",
+                  "get_variable_names",
+                  "plot_barplot",
+                  "plot_histogram",
+                  "plot_boxplot",
+                  "plot_dotplot",
+                  "plot_pie_chart",
+                  "plot_proportion_barplot",
+                  "calculate_mean",
+                  "calculate_skewness",
+                  "calculate_std",
+                  "calculate_median",
+                  "calculate_mode",
+                  "calculate_five_number_summary",
+                  "calculate_table_of_counts",
+                  "calculate_proportions",
+                  "show_dataset_head"
+                ],
+                "engine": "gpt-4.1",
+                "timeout": 60
               }
             }
           ]
@@ -132,7 +209,9 @@
               "name": "conversation_review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1363949528201564170],
+                "target_channel_ids": [
+                  1363949528201564170
+                ],
                 "timeout": 300
               }
             }
@@ -144,7 +223,7 @@
           "ducks": [
             {
               "name": "basic_prompt_conversation",
-              "workflow_type": "duck",
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -161,7 +240,9 @@
               "name": "conversation_review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1359587525605458030],
+                "target_channel_ids": [
+                  1359587525605458030
+                ],
                 "timeout": 300
               }
             }
@@ -173,7 +254,7 @@
           "ducks": [
             {
               "name": "standard-rubber-duck",
-              "workflow_type": "duck",
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -195,7 +276,9 @@
               "name": "review",
               "workflow_type": "conversation_review",
               "settings": {
-                "target_channel_ids": [1338616283671040000]
+                "target_channel_ids": [
+                  1338616283671040000
+                ]
               }
             }
           ]
@@ -206,7 +289,7 @@
           "ducks": [
             {
               "name": "standard-rubber-duck",
-              "workflow_type": "duck",
+              "workflow_type": "basic_prompt_conversation",
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
@@ -227,11 +310,5 @@
     "max_retries": 2,
     "delay": 2,
     "backoff": 2
-  },
-  "default_duck_settings": {
-    "duck": {
-      "engine": "gpt-4.1",
-      "timeout": 600
-    }
   }
 }
