@@ -31,9 +31,6 @@ class EmailConfirmation:
         self.token_store[email] = code
         return code
 
-    def _retrieve_token(self, email):
-        return self.token_store.get(email)
-
     def _send_email(self, email, subject, body) -> bool:
         try:
             self._ses_client.send_email(
@@ -50,8 +47,7 @@ class EmailConfirmation:
             duck_logger.exception("Error sending email")
             return False
 
-    def prepare_email(self, email) -> str | None:
-        token = self.generate_token(email)
+    def prepare_email(self, email, token) -> str | None:
         subject = "Registration confirmation"
         body = f"""
         <html>

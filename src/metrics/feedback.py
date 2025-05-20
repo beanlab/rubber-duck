@@ -5,6 +5,7 @@ from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
 from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
+from ..utils.logger import duck_logger
 
 
 class RecordFeedback(Protocol):
@@ -45,7 +46,9 @@ class HaveTAGradingConversation:
         }
 
     async def _flush_conversations_for_channel(self, thread_id, target_channel_id, timeout):
+        duck_logger.info(f"Flushing conversations for channel {target_channel_id}")
         while (data := self._feedback_manager.get_conversation(target_channel_id)) is not None:
+            duck_logger.info(f"Processing conversation: {data}")
 
             student_convo_link = f"<#{data['conversation_thread_id']}>"
             ta_convo_link = f"<#{thread_id}>"
@@ -66,6 +69,7 @@ class HaveTAGradingConversation:
                     feedback_score = self._reactions.get(feedback_emoji, 'nan')
                     await self._add_reaction(thread_id, message_id, '✅')
 
+                    duck_logger.info(f"Recording feedback: {feedback_score} from reviewer {reviewer_id}")
                     await self._record_feedback(
                         data['duck_type'],
                         data['guild_id'],
@@ -77,12 +81,14 @@ class HaveTAGradingConversation:
                     )
 
                 except asyncio.TimeoutError:
+                    duck_logger.warning(f"Feedback timeout for conversation {data}")
                     self._feedback_manager.remember_conversation(data)
                     await self._add_reaction(thread_id, message_id, '❌')
                     raise
 
     async def _serve_messages(self, thread_id, settings: ConversationReviewSettings):
         target_channel_ids = settings['target_channel_ids']
+        duck_logger.info(f"Serving messages for channels: {target_channel_ids}")
 
         for target_channel_id in target_channel_ids:
             await self._flush_conversations_for_channel(thread_id, target_channel_id, settings.get('timeout', 60 * 5))
@@ -90,6 +96,7 @@ class HaveTAGradingConversation:
         await self._send_message(thread_id, "No more conversations to review.")
 
     async def __call__(self, thread_id: int, settings: ConversationReviewSettings, initial_message: Message):
+        duck_logger.info(f"Starting TA review session in thread {thread_id}")
 
         await self._send_message(
             thread_id,
@@ -101,4 +108,5 @@ class HaveTAGradingConversation:
             await self._serve_messages(thread_id, settings)
 
         except asyncio.TimeoutError:
+            duck_logger.warning(f"TA review session timed out in thread {thread_id}")
             await self._send_message(thread_id, "*This conversation has timed out.*")

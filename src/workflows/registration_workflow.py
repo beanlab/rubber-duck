@@ -8,9 +8,9 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..views.registration_views import RegistrationView, RoleSelectionView, EmailConfirmationView
 
-welcome_message = "Hello, welcome to the registration process! Please click the button below to begin."
-confirm_message = "We sent a code to your BYU email.\nEnter the code below and click Submit, or click Resend to get a new code."
-failed_email_message = 'Unable to validate your email. Please talk to a TA or your instructor.'
+WELECOME_MESSAGE = "Hello, welcome to the registration process! Please click the button below to begin."
+CONFIRM_MESSAGE = "We sent a code to your BYU email.\nEnter the code below and click Submit, or click Resend to get a new code."
+FAILED_EMAIL_MESSAGE = 'Unable to validate your email. Please talk to a TA or your instructor.'
 
 
 class RegistrationWorkflow:
@@ -30,7 +30,7 @@ class RegistrationWorkflow:
 
         # Get and verify the email
         if not await self._confirm_registration_via_email(net_id,thread_id):
-            await self._send_message(thread_id, failed_email_message)
+            await self._send_message(thread_id, FAILED_EMAIL_MESSAGE)
             return
 
         # Assign Discord roles
@@ -46,7 +46,7 @@ class RegistrationWorkflow:
             
             # Create and send the registration view
             view = RegistrationView()
-            await self._send_message(thread_id, welcome_message, view=view)
+            await self._send_message(thread_id, WELECOME_MESSAGE, view=view)
             
             # Wait for the view to be completed
             await view.wait()
@@ -65,8 +65,8 @@ class RegistrationWorkflow:
     @step
     async def _confirm_registration_via_email(self, net_id, thread_id):
         email = f'{net_id}@byu.edu'  # You might want to collect the email address first
-        token = self._email_confirmation.prepare_email(email)
-        if not token:
+        token = self._email_confirmation.generate_token(email)
+        if not self._email_confirmation.prepare_email(email):
             return False
 
         max_attempts = 3
@@ -74,7 +74,7 @@ class RegistrationWorkflow:
         
         while attempts < max_attempts:
             view = EmailConfirmationView()
-            await self._send_message(thread_id, confirm_message, view=view)
+            await self._send_message(thread_id, CONFIRM_MESSAGE, view=view)
             
             # Wait for the view to be completed
             await view.wait()
