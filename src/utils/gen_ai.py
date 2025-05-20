@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from io import BytesIO
 from typing import Callable, TypedDict, Protocol
@@ -9,6 +10,7 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from ..armory.socratic_tools import create_explanation_tool
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
@@ -115,6 +117,15 @@ class OpenAI:
             message_history: list[GPTMessage],
             tools: list[str]
     ) -> list[Sendable]:
+        async def completion_tool(prompt) -> str:
+            history = [{'role': 'system', 'content': prompt}]
+            comp = await self._get_completion_with_usage(guild_id, parent_channel_id, thread_id, user_id,
+                                                         engine,
+                                                         history, functions)
+            return comp.choices[0].message.content
+
+        create_explanation_tool(completion_tool)
+
         tools_to_use = {tool: self._get_tool(tool) for tool in tools}
 
         functions = [
@@ -128,6 +139,8 @@ class OpenAI:
 
         result: list[Sendable] = []
 
+
+
         while True:
             completion = await self._get_completion_with_usage(
                 guild_id, parent_channel_id, thread_id, user_id, engine, message_history, functions
@@ -135,29 +148,17 @@ class OpenAI:
             message = completion.choices[0].message
 
             if message.function_call:
-                function_name = message.function_call.name
 
+                function_name = message.function_call.name
                 tool = tools_to_use[function_name]
                 tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
 
                 message_history.append({"role": "assistant", "function_call": message.function_call})
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
 
-                if isinstance(tool_result, tuple):
-                    if isinstance(tool_result[1], BytesIO):
-                        result.append(tool_result)
-                    elif isinstance(tool_result[1], dict):
-                        result.append(tool_result[0])
-                        await self._record_usage(
-                            guild_id,
-                            parent_channel_id,
-                            thread_id, user_id,
-                            engine,
-                            tool_result[1]['prompt_tokens'],
-                            tool_result[1]['usage']['completion_tokens'],
-                            tool_result[1]['usage'].get('cached_tokens', 0),
-                            tool_result[1]['usage'].get('reasoning_tokens', 0)
-                        )
+
+                result.append(tool_result)
+
                 continue  # i.e. allow the bot to call another tool or add a message
 
             else:
