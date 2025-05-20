@@ -84,15 +84,7 @@ def _cache_key(dataset: str, column: str, kind: str) -> str:
     return f"{dataset}_{column}_{kind}.png"
 
 @register_tool
-def show_dataset_head(dataset: str, n: int = 5) -> tuple[str, io.BytesIO]:
-    """
-    Return a (name, PNG image) of the first n rows of a dataset. When asked what a dataset looks like, this is the answer.
-    """
-    return _cached_dataset_head(dataset, n)
-
-
-@lru_cache(maxsize=128)
-def _cached_dataset_head(dataset: str, n: int) -> tuple[str, io.BytesIO]:
+def show_dataset_head(dataset: str, n: int) -> tuple[str, io.BytesIO]:
     duck_logger.debug(f"Generating head preview (cached) for {dataset} with n={n}")
     data = get_dataset(dataset)
 
@@ -178,14 +170,10 @@ def get_variable_names(dataset: str) -> str:
 
 @register_tool
 def plot_histogram(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_histogram(dataset, column)
-
-
-@lru_cache(maxsize=128)
-def _cached_histogram(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a histogram for the specified dataset column."""
     duck_logger.debug(f"Generating histogram plot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
-    name = _cache_key(dataset, column, "histogram") + ".png"
+    name = _cache_key(dataset, column, "histogram")
 
     if column not in data.columns.to_list():
         raise ValueError(f"Column '{column}' not found in dataset.")
@@ -204,13 +192,10 @@ def _cached_histogram(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
 @register_tool
 def plot_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_boxplot(dataset, column)
-
-@lru_cache(maxsize=128)
-def _cached_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a boxplot for the specified dataset column."""
     duck_logger.debug(f"Generating boxplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
-    name = _cache_key(dataset, column, "boxplot") + ".png"
+    name = _cache_key(dataset, column, "boxplot")
 
     if column not in data.columns.to_list():
         raise ValueError(f"Column '{column}' not found.")
@@ -227,13 +212,10 @@ def _cached_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
 @register_tool
 def plot_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_dotplot(dataset, column)
-
-@lru_cache(maxsize=128)
-def _cached_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a dotplot for the specified dataset column."""
     duck_logger.debug(f"Generating dotplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
-    name = _cache_key(dataset, column, "dotplot") + ".png"
+    name = _cache_key(dataset, column, "dotplot")
 
     if column not in data.columns.to_list():
         raise ValueError(f"Column '{column}' not found.")
@@ -252,13 +234,10 @@ def _cached_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
 @register_tool
 def plot_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_barplot(dataset, column)
-
-@lru_cache(maxsize=128)
-def _cached_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a barplot for the specified dataset column."""
     duck_logger.debug(f"Generating barplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
-    name = _cache_key(dataset, column, "barplot") + ".png"
+    name = _cache_key(dataset, column, "barplot")
 
     if column not in data.columns.to_list():
         raise ValueError(f"Column '{column}' not found.")
@@ -275,13 +254,10 @@ def _cached_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
 @register_tool
 def plot_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_pie_chart(dataset, column)
-
-@lru_cache(maxsize=128)
-def _cached_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a pie chart for the specified dataset column."""
     duck_logger.debug(f"Generating pie chart (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
-    name = _cache_key(dataset, column, "piechart") + ".png"
+    name = _cache_key(dataset, column, "piechart")
 
     if column not in data.columns:
         raise ValueError(f"Column '{column}' not found.")
@@ -301,15 +277,11 @@ def _cached_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
 @register_tool
 def plot_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
-    return _cached_proportion_barplot(dataset, column)
-
-
-@lru_cache(maxsize=128)
-def _cached_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    """Generate a proportion barplot for the specified dataset column."""
     duck_logger.debug(f"Generating proportion barplot (cached) for {dataset}.{column}")
     data = get_dataset(dataset)
 
-    name = f"{dataset}_{column}_proportion_barplot.png"
+    name = _cache_key(dataset, column, "proportionbarplot")
     title = f"Proportion Barplot of {column}"
 
     # Let the enhanced plot message function handle fallback or actual plot
