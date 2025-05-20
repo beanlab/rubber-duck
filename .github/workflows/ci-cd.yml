@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 117-commit-update
   workflow_dispatch:
     inputs:
       local_config:
@@ -18,6 +19,7 @@ jobs:
       Short_SHA: ${{ steps.Extract_SHA.outputs.Short_SHA }}
       Extract_Branch: ${{ steps.Extract_Branch.outputs.Branch_Name }}
       Combined: ${{ steps.Short_SHA_and_Branch_Name.outputs.Combined }}
+      Commit_Message: ${{ steps.Extract_Commit_Message.outputs.Commit_Message }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,6 +37,14 @@ jobs:
           SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
           echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Extract Commit Message
+        id: Extract_Commit_Message
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          # Escape newlines and quotes for JSON
+          COMMIT_MSG=$(echo "$COMMIT_MSG" | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
       - name: Combine short SHA and Branch Name
         id: Short_SHA_and_Branch_Name
@@ -127,7 +137,8 @@ jobs:
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
-          MESSAGE="✅ Environment file has been successfully updated for production environment.\nCommit: \`$COMMIT_SHA\`"
+
+          MESSAGE="✅ Environment file has been successfully updated for production environment.\n\n**Commit:** \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
@@ -152,19 +163,14 @@ jobs:
         run: |
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
-          MESSAGE="✅ The production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
+
+          MESSAGE="✅ The production config has been successfully updated.\n\n**Commit:** \`$COMMIT_SHA\`"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
   Notify_Discord_of_Docker_Build_and_Push:
     runs-on: ubuntu-latest
-    needs:
-      [
-        Extract_SHA,
-        Docker_Build_and_Push,
-        Update_Env_File,
-        Update_Production_Config,
-      ]
+    needs: [Extract_SHA, Docker_Build_and_Push]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -172,7 +178,9 @@ jobs:
       - name: Send SHA to Discord Webhook
         run: |
           COMBINED="${{ needs.Extract_SHA.outputs.combined }}"
+          COMMIT_MSG="${{ needs.Extract_SHA.outputs.Commit_Message }}"
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          MESSAGE="✅ Docker Build and Push successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
+
+          MESSAGE="✅ Docker Build and Push successfully to ECR!\n\n**Commit Message:**\n$COMMIT_MSG\n\n**Image Tag:**\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
