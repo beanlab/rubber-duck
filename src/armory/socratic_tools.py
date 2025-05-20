@@ -1,8 +1,4 @@
-import os
-from typing import Tuple, Dict, Callable, Any
-
-from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletion
+from typing import  Callable
 
 from .tools import register_tool
 from ..utils.logger import duck_logger
@@ -11,8 +7,7 @@ def create_explanation_tool(completion_tool: Callable):
     @register_tool
     async def provide_explanation(concept: str, ) -> str:
         """
-        This is a tool that takes in a concept and provides an example using OpenAI's completion.
-
+        This is tools explains a concept in detail, uses an analogy with fruit, and provides a practice problem.
         """
         # Create a simple message history with just the concept
         duck_logger.debug("Make Example Tool is called")
