@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from discord import Guild
 from quest import step
@@ -17,12 +18,13 @@ class RegistrationWorkflow:
     def __init__(self,
                  send_message,
                  get_channel,
-                 fetch_guild
+                 fetch_guild,
+                 email_confirmation: EmailConfirmation,
                  ):
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild
-        self._email_confirmation = None
+        self._email_confirmation = email_confirmation
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         # Start the registration process
@@ -36,14 +38,16 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, initial_message['author_id'], settings)
 
+    def _generate_token(self):
+        code = str(uuid.uuid4().int)[:6]
+        return code
+
     @step
-    async def _set_up(self, initial_message, settings, thread_id):
+    async def _set_up(self, initial_message, thread_id):
         try:
             author_name = initial_message['author_name']
             server_id = initial_message['guild_id']
-                
-            self._email_confirmation = EmailConfirmation(settings['sender_email'])
-            
+
             # Create and send the registration view
             view = RegistrationView()
             await self._send_message(thread_id, WELECOME_MESSAGE, view=view)
@@ -65,8 +69,8 @@ class RegistrationWorkflow:
     @step
     async def _confirm_registration_via_email(self, net_id, thread_id):
         email = f'{net_id}@byu.edu'  # You might want to collect the email address first
-        token = self._email_confirmation.generate_token(email)
-        if not self._email_confirmation.prepare_email(email):
+        token = self._generate_token()
+        if not self._email_confirmation.prepare_email(email,token):
             return False
 
         max_attempts = 3

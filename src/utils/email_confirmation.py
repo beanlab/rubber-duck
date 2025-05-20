@@ -8,7 +8,6 @@ from ..utils.logger import duck_logger
 class EmailConfirmation:
     def __init__(self, sender_email):
         self._sender_email = sender_email
-        self.token_store = {}
         self._setup()
 
     def _setup(self):
@@ -26,10 +25,6 @@ class EmailConfirmation:
             region_name=aws_region,
         )
 
-    def generate_token(self, email):
-        code = str(uuid.uuid4().int)[:6]
-        self.token_store[email] = code
-        return code
 
     def _send_email(self, email, subject, body) -> bool:
         try:

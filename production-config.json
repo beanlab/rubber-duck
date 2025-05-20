@@ -222,6 +222,7 @@
     "admin_channel_id": 1192895746672951340,
     "admin_role_id": 933123843038535741
   },
+  "sender_email": "byu-cs-course-ops@cs.byu.edu",
   "ai_completion_retry_protocol": {
     "max_retries": 2,
     "delay": 2,
