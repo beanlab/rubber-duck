@@ -5,7 +5,7 @@ import os
 from ..utils.logger import duck_logger
 
 
-class EmailConfirmation:
+class EmailSender:
     def __init__(self, sender_email):
         self._sender_email = sender_email
         self._setup()
@@ -42,7 +42,7 @@ class EmailConfirmation:
             duck_logger.exception("Error sending email")
             return False
 
-    def prepare_email(self, email, token) -> str | None:
+    def send_email(self, email, token) -> str | None:
         subject = "Registration confirmation"
         body = f"""
         <html>
