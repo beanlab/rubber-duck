@@ -3,7 +3,8 @@ name: Build, Push, and Deploy to AWS Infrastructure
 on:
   push:
     branches:
-      - master
+      - main
+      - 57-registration-bot-v2
   workflow_dispatch:
     inputs:
       local_config:
@@ -42,6 +43,13 @@ jobs:
           COMBINED="${BRANCH_NAME}-${SHORT_SHA}"
           echo "COMBINED=${COMBINED}" >> $GITHUB_ENV
           echo "combined=${COMBINED}" >> $GITHUB_OUTPUT
+
+      - name: Send Discord Notification
+        run: |
+          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+          MESSAGE="🚀 Deployment triggered!\nBranch: \`${{ needs.Extract_SHA.outputs.branch_name }}\`\nCommit: \`${{ needs.Extract_SHA.outputs.short_sha }}\`"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
 
   Docker_Build_and_Push:
     runs-on: ubuntu-latest
@@ -88,10 +96,30 @@ jobs:
       - name: Complete Docker push
         run: echo "Docker image pushed to ECR with tag ${{ needs.Extract_SHA.outputs.combined }}!"
 
+  Notify_Discord_of_Docker_Build_and_Push:
+    runs-on: ubuntu-latest
+    needs: [Extract_SHA, Docker_Build_and_Push]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Send SHA to Discord Webhook
+        run: |
+          COMBINED="${{ needs.Extract_SHA.outputs.combined }}"
+          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
+          MESSAGE="Workflow Triggered on \n✅ Docker Build Updated!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
+          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
+
   Update_Env_File:
     runs-on: ubuntu-latest
     environment: pre-production
-    needs: [Docker_Build_and_Push, Extract_SHA]
+    needs:
+      [
+        Docker_Build_and_Push,
+        Extract_SHA,
+        Notify_Discord_of_Docker_Build_and_Push,
+      ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -133,7 +161,12 @@ jobs:
 
   Update_Production_Config:
     runs-on: ubuntu-latest
-    needs: [Docker_Build_and_Push, Extract_SHA]
+    needs:
+      [
+        Docker_Build_and_Push,
+        Extract_SHA,
+        Notify_Discord_of_Docker_Build_and_Push,
+      ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -153,26 +186,5 @@ jobs:
           DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
           COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
           MESSAGE="✅ The production config has been successfully updated.\nCommit: \`$COMMIT_SHA\`"
-          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
-
-  Notify_Discord_of_Docker_Build_and_Push:
-    runs-on: ubuntu-latest
-    needs:
-      [
-        Extract_SHA,
-        Docker_Build_and_Push,
-        Update_Env_File,
-        Update_Production_Config,
-      ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Send SHA to Discord Webhook
-        run: |
-          COMBINED="${{ needs.Extract_SHA.outputs.combined }}"
-          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          MESSAGE="✅ Docker Build and Push successfully to ECR!\n\n\`\`\`md\n$COMBINED\n\`\`\`\n\n"
           ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
           curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
