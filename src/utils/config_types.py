@@ -1,11 +1,26 @@
 from typing import TypedDict
 
-
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None
     allow_self_feedback: bool | None
     feedback_timeout: int | None
+
+
+class RolePattern(TypedDict):
+    name: str
+    pattern: str
+    description: str
+
+
+class RolesSettings(TypedDict):
+    patterns: list[RolePattern]
+
+
+class RegistrationSettings(TypedDict):
+    cache_timeout: int
+    authenticated_user_role_name: str
+    roles: RolesSettings
 
 
 class DuckWorkflowSettings(TypedDict):
