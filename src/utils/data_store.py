@@ -33,7 +33,6 @@ class DataStore:
         datasets = set()
         local_locations, s3_locations = self._get_local_and_s3_locations()
 
-        # From local
         for folder_path in local_locations:
             try:
                 for f in folder_path.iterdir():
@@ -42,7 +41,6 @@ class DataStore:
             except FileNotFoundError:
                 continue  # In case the folder doesn't exist
 
-        # From S3
         for s3_path in s3_locations:
             bucket_name, folder = self._get_s3_info(s3_path)
             try:
