@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.conversation.MultiPromptConversation import MultiPromptConversation
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
 from .metrics.feedback import HaveTAGradingConversation
@@ -136,6 +137,17 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         setup_conversation
     )
 
+    have_advanced_conversation = MultiPromptConversation(
+        retryable_ai_client,
+        metrics_handler.record_message,
+        metrics_handler.record_usage,
+        bot.typing,
+        bot.send_message,
+        bot.report_error,
+        bot.add_reaction,
+        setup_conversation
+    )
+
     have_ta_conversation = HaveTAGradingConversation(
         feedback_manager,
         metrics_handler.record_feedback,
@@ -156,6 +168,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
     return {
         'basic_prompt_conversation': have_conversation,
+        'multi_prompt_conversation': have_advanced_conversation,
         'conversation_review': have_ta_conversation,
         'registration': registration_workflow,
     }

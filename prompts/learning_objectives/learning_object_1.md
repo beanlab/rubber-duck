@@ -1,0 +1,104 @@
+# Priority Queue (PQ) Concept Understanding
+
+This demonstrates a conversation where a bot is probing for more information to ensure the student understands the following concepts.
+
+---
+
+## 🧠 Learning Objectives
+
+### 1. What a Priority Queue (PQ) is and what it should be able to do  
+- **Correct answer:** A PQ is a data structure that removes the highest-priority item.
+
+#### Sub-Objectives:
+- **1a. Insert Function**  
+  Adds an item to the queue that can later be removed.
+
+- **1b. Pop Min Function**  
+  Removes the highest-priority item from the PQ.
+
+- **1c. Decrease Key**  
+  Changes the priority of a given item.
+
+- **1d. Empty**  
+  Returns whether the priority queue has any items.
+
+---
+
+## 💬 Sample Conversation
+
+> **Bot:** Tell me what you understand about priority queues.  
+> **Human:** I think they are a data structure that pops off the item that has the highest priority.  
+> `Objectives Mastered: 1`
+
+---
+
+> **Bot:** What else can you tell me about priority queues?  
+> _(We want the student to provide as much information as possible.)_  
+> **Human:** In class, we talked about using a binary tree or something to implement it. We also talked about using an array.
+
+---
+
+> **Bot:** That's right. You can use a binary tree or an array to implement a heap.  
+> How might you use an array to implement a PQ?  
+> **Human:** I think we talked about how I can just store all of the information in an array.  
+> So when we add stuff, we could just append it to the array.  
+> `Objectives Mastered: 1, 1a`
+
+---
+
+> **Bot:** That is right. What other functions might you have?  
+> **Human:** Another function I might need is `empty`.  
+> I could just check if the array is empty. I think there's a Python function for that.  
+> `Objectives Mastered: 1, 1a, 1d`
+
+---
+
+> **Bot:** What other functions can you think of?  
+> **Human:** Well, we have to remove stuff too. I don’t remember the name of it in class. I think it’s `pop` or something.
+
+---
+
+> **Bot:** Can you tell me how you might implement that?  
+> **Human:** I don’t know.
+
+---
+
+> **Bot:** What can you do with an array?  
+> **Human:** Well... I guess I could loop over it.
+
+---
+
+> **Bot:** You are on the right track. Tell me more.  
+> **Human:** I could loop over it, and keep track of the lowest value. Then return it at the end.  
+> `Objectives Mastered: 1, 1a, 1b, 1d`
+
+---
+
+> **Bot:** You got it. What other functions might you need?  
+> **Human:** I think I got all of them.
+
+---
+
+> **Bot:** You are still missing one.  
+> **Human:** I don’t know which one I’m missing.
+
+---
+
+> **Bot:** What happens if we need to change the priority of an item?  
+> **Human:** Oh! I remember now. That’s `decrease key`.  
+> I don’t remember how to do it with an array though.
+
+---
+
+> **Bot:** Just take a guess. How might you implement `decrease key` using an array?  
+> **Human:** Well... I could find my item.
+
+---
+
+> **Bot:** You are on the right track. What would you do after you found your item?  
+> **Human:** I could change its priority by updating its value in the array.  
+> `Objectives Mastered: 1, 1a, 1b, 1c, 1d`
+
+---
+
+_...conversation continues..._
