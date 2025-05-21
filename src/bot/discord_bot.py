@@ -196,15 +196,14 @@ class DiscordBot(discord.Client):
             except:
                 duck_logger.exception(f'Unable to message channel {self._admin_channel}')
 
-    async def wait_for_typing_or_skip(self, channel: Messageable, user: discord.User, timeout: float = 3.0):
+    async def wait_typing(self, channel_id: int, user_id: int, timeout: float = 3.0) -> bool:
         try:
-            def check_typing(event_channel, event_user, when):
-                return event_channel.id == channel.id and event_user.id == user.id
-
-            await self.wait_for("typing", timeout=timeout, check=check_typing)
-            # If we got here, user started typing
-            duck_logger.info(f"{user.name} started typing in {channel.name}")
+            def check(typing_channel, typing_user, when):
+                return (
+                    typing_channel.id == channel_id and
+                    typing_user.id == user_id
+                )
+            await self.wait_for("typing", timeout=timeout, check=check)
             return True
         except asyncio.TimeoutError:
-            duck_logger.info(f"{user.name} did not type in {timeout} seconds — skipping.")
             return False

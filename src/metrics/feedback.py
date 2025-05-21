@@ -82,6 +82,11 @@ class HaveTAGradingConversation:
                                 message_content = message['content']
                         else:
                             await self._send_message(thread_id, "Skipping due to no response.")
+                            message_content = ''
+                    elif feedback_score == 5:
+                        message_content = "Conversation was rated as excellent, no additional feedback needed."
+                    else:
+                        message_content = "No feedback provided."
 
 
 

@@ -140,7 +140,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         feedback_manager,
         metrics_handler.record_feedback,
         bot.send_message,
-        bot.wait_for_typing_or_skip,
+        bot.wait_typing,
         bot.add_reaction,
         bot.report_error
     )
