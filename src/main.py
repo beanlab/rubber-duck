@@ -193,7 +193,11 @@ async def main(config: Config):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             # Initialize and start the feedback notifier
-            feedback_notifier = FeedbackNotifier(feedback_manager, bot.send_message)
+            feedback_notifier = FeedbackNotifier(
+                feedback_manager, 
+                bot.send_message,
+                asyncio.get_event_loop()
+            )
             feedback_notifier.start()
 
             ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
