@@ -2,13 +2,14 @@ import schedule
 import time
 import threading
 import asyncio
-from typing import Protocol, Callable
+from typing import Protocol, Callable, TypedDict
+
+from .config_types import ServerConfig
 from ..utils.logger import duck_logger
 
 
 class SendMessage(Protocol):
     async def __call__(self, channel_id: int, message: str) -> None: ...
-
 
 class FeedbackNotifier:
     """
@@ -18,7 +19,9 @@ class FeedbackNotifier:
     def __init__(self,
                  feedback_manager,
                  send_message: SendMessage,
-                 loop: asyncio.AbstractEventLoop):
+                 loop: asyncio.AbstractEventLoop,
+                 servers: ServerConfig
+                 ):
         self._feedback_manager = feedback_manager
         self._send_message = send_message
         self._running = False
@@ -78,10 +81,17 @@ class FeedbackNotifier:
         if self._thread:
             self._thread.join()
 
+    def _find_feedback_channels(self, server_config: ServerConfig) ->dict[int,list[int]]:
+        """
+        Find the feedback channel associated with the conversation review workflow
+        """
+        pass
+
+
     def _run_scheduler(self):
         """
         Run the scheduler loop
         """
         while self._running:
             schedule.run_pending()
-            time.sleep(10)  # Check every 10 seconds
+            time.sleep(60)  # Check every 1 minute

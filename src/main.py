@@ -196,7 +196,8 @@ async def main(config: Config):
             feedback_notifier = FeedbackNotifier(
                 feedback_manager, 
                 bot.send_message,
-                asyncio.get_event_loop()
+                asyncio.get_event_loop(),
+                config['servers']
             )
             feedback_notifier.start()
 
