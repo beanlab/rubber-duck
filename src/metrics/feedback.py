@@ -4,7 +4,7 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
+from ..utils.protocols import AddReaction, SendMessage, ReportError, Message, WaitTyping
 from ..utils.logger import duck_logger
 
 
@@ -12,7 +12,7 @@ class RecordFeedback(Protocol):
     async def __call__(self,
                        workflow_type: str, guild_id: int, parent_channel_id: int,
                        thread_id: int, user_id: int, reviewer_id: int,
-                       feedback_score: int): ...
+                       feedback_score: int, written_feedback: str): ...
 
 
 class ConversationReviewSettings(TypedDict):
@@ -25,6 +25,7 @@ class HaveTAGradingConversation:
                  feedback_manager: FeedbackManager,
                  record_feedback: RecordFeedback,
                  send_message: SendMessage,
+                 wait_typing: WaitTyping,
                  add_reaction: AddReaction,
                  report_error: ReportError,
                  ):
@@ -33,6 +34,7 @@ class HaveTAGradingConversation:
         self._record_feedback: RecordFeedback = step(record_feedback)
 
         self._send_message = step(send_message)
+        self._wait_typing = step(wait_typing)
         self._add_reaction = step(add_reaction)
         self._report_error = step(report_error)
 
@@ -70,6 +72,19 @@ class HaveTAGradingConversation:
                     feedback_score = self._reactions.get(feedback_emoji, 'nan')
                     await self._add_reaction(thread_id, message_id, '✅')
 
+
+                    if feedback_score != 'nan' and feedback_score < 5:
+                        await self._send_message(thread_id, "Add any additional feedback about this conversation.")
+                        did_start_typing = await self._wait_typing(thread_id, reviewer_id, timeout=3)
+                        if did_start_typing:
+                            async with queue('messages', None) as messages:
+                                message: Message = await asyncio.wait_for(messages.get(), timeout)
+                                message_content = message['content']
+                        else:
+                            await self._send_message(thread_id, "Skipping due to no response.")
+
+
+
                     duck_logger.info(f"Recording feedback: {feedback_score} from reviewer {reviewer_id}")
                     await self._record_feedback(
                         data['duck_type'],
@@ -78,7 +93,8 @@ class HaveTAGradingConversation:
                         data['conversation_thread_id'],
                         data['user_id'],
                         reviewer_id,
-                        feedback_score
+                        feedback_score,
+                        message_content
                     )
 
                 except asyncio.TimeoutError:

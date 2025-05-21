@@ -1,4 +1,7 @@
+import asyncio
+
 import discord
+from discord.abc import Messageable
 
 from ..utils.logger import duck_logger
 from ..utils.protocols import Attachment, Message, SendableFile
@@ -192,3 +195,16 @@ class DiscordBot(discord.Client):
                 await self.send_message(self._admin_channel, msg)
             except:
                 duck_logger.exception(f'Unable to message channel {self._admin_channel}')
+
+    async def wait_for_typing_or_skip(self, channel: Messageable, user: discord.User, timeout: float = 3.0):
+        try:
+            def check_typing(event_channel, event_user, when):
+                return event_channel.id == channel.id and event_user.id == user.id
+
+            await self.wait_for("typing", timeout=timeout, check=check_typing)
+            # If we got here, user started typing
+            duck_logger.info(f"{user.name} started typing in {channel.name}")
+            return True
+        except asyncio.TimeoutError:
+            duck_logger.info(f"{user.name} did not type in {timeout} seconds — skipping.")
+            return False
