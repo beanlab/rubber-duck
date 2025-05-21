@@ -77,3 +77,4 @@ class Config(TypedDict):
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     default_duck_settings: dict[str, dict]
+    sender_email: str

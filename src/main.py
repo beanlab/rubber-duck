@@ -9,28 +9,27 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from .utils.send_email import EmailSender
-from .workflows.registration_workflow import RegistrationWorkflow
-from .metrics.feedback import HaveTAGradingConversation
-from .metrics.feedback import HaveTAGradingConversation
-from .utils.logger import duck_logger
+from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
+from .conversation.conversation import BasicPromptConversation, BasicSetupConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
+from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.config_types import (
-    Config, )
+from .utils.config_types import Config
+from .utils.feedback_notifier import FeedbackNotifier
 from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
-from .armory.tools import get_tool
+from .utils.send_email import EmailSender
+from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -192,6 +191,10 @@ async def main(config: Config):
         }) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
+
+            # Initialize and start the feedback notifier
+            feedback_notifier = FeedbackNotifier(feedback_manager, bot.send_message)
+            feedback_notifier.start()
 
             ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
 
