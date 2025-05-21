@@ -1,5 +1,4 @@
 import io
-from functools import lru_cache
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,8 +8,24 @@ from scipy.stats import skew
 from seaborn.external.kde import gaussian_kde
 
 from .tools import register_tool
-from ..utils.data_store import get_dataset, get_available_datasets
 from ..utils.logger import duck_logger
+
+
+def set_data_store(ds):
+    global _data_store
+    _data_store = ds
+
+
+def get_dataset(name):
+    if _data_store is None:
+        raise RuntimeError("DataStore not set")
+    return _data_store.get_dataset(name)
+
+
+def get_available_datasets():
+    if _data_store is None:
+        raise RuntimeError("DataStore not set")
+    return _data_store.get_available_datasets()
 
 
 def _is_categorical(series) -> bool:
@@ -83,6 +98,7 @@ def _save_plot(name: str) -> tuple[str, io.BytesIO]:
 def _cache_key(dataset: str, column: str, kind: str) -> str:
     return f"{dataset}_{column}_{kind}.png"
 
+
 @register_tool
 def show_dataset_head(dataset: str, n: int) -> tuple[str, io.BytesIO]:
     duck_logger.debug(f"Generating head preview (cached) for {dataset} with n={n}")
@@ -131,6 +147,7 @@ def show_dataset_head(dataset: str, n: int) -> tuple[str, io.BytesIO]:
 
     return name, buf
 
+
 @register_tool
 def describe_dataset(dataset: str) -> str:
     """Returns a description of the dataset."""
@@ -138,6 +155,7 @@ def describe_dataset(dataset: str) -> str:
     data = get_dataset(dataset)
     return f"Dataset: {dataset}\nNumber of Rows: {len(data)}\nNumber of Columns: {len(data.columns)}\n" \
            f"Columns: {', '.join(data.columns)}"
+
 
 @register_tool
 def explain_capabilities():
@@ -153,12 +171,14 @@ def explain_capabilities():
         "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
     )
 
+
 @register_tool
 def get_dataset_names() -> str:
     """Returns a list of all available datasets."""
     duck_logger.debug("Used get_available_datasets")
     datasets = get_available_datasets()
     return f"Available datasets: {', '.join(datasets)}"
+
 
 @register_tool
 def get_variable_names(dataset: str) -> str:
@@ -210,6 +230,7 @@ def plot_boxplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
     return _save_plot(name)
 
+
 @register_tool
 def plot_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
     """Generate a dotplot for the specified dataset column."""
@@ -229,7 +250,6 @@ def plot_dotplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
         plt.xlabel(column)
 
     return _save_plot(name)
-
 
 
 @register_tool
@@ -275,6 +295,7 @@ def plot_pie_chart(dataset: str, column: str) -> tuple[str, io.BytesIO]:
 
     return _save_plot(name)
 
+
 @register_tool
 def plot_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]:
     """Generate a proportion barplot for the specified dataset column."""
@@ -288,6 +309,7 @@ def plot_proportion_barplot(dataset: str, column: str) -> tuple[str, io.BytesIO]
     _plot_message_with_axes(data, column, title, kind="proportion")
 
     return _save_plot(name)
+
 
 @register_tool
 def calculate_mean(dataset: str, column: str) -> str:
