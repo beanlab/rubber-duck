@@ -1,8 +1,16 @@
-from quest import step, wrap_steps
+import asyncio
+from asyncio import timeout
+from typing import Optional
+
+from quest import step, wrap_steps, queue
+import discord
+from discord.ui import View, Select
 
 from ..conversation.conversation import BasicSetupConversation
-from ..utils.gen_ai import RetryableGenAI, RecordMessage, GPTMessage, RecordUsage
+from ..utils.gen_ai import RetryableGenAI, RecordMessage, GPTMessage, RecordUsage, GenAIException, Sendable
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, IndicateTyping, AddReaction, ReportError
+from ..views.assignment_selection_view import AssignmentSelectionView
 
 
 class MultiPromptConversation:
@@ -27,42 +35,37 @@ class MultiPromptConversation:
         self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
 
+        self._prompt_index = 0
         self._setup_conversation = step(setup_conversation)
+        self._selected_assignment: Optional[str] = None
 
-    async def __call__(self, thread_id: int, prompts: list[str], initial_message: Message, settings: dict):
-        message_history = []
-        user_id = initial_message['author_id']
-        guild_id = initial_message['guild_id']
-        channel_id = initial_message['channel_id']
-        engine = settings["engine"]
-        tools = settings.get("tools", [])
+    async def _handle_assignment_selection(self, assignment: str):
+        self._selected_assignment = assignment
+        # Convert assignment name to folder name (e.g., "Project 1" -> "project_1")
+        folder_name = assignment.lower().replace(' ', '_')
+        print(f"Selected project folder: {folder_name}")
+        return [folder_name]
 
-        # Add first user message to history
-        message_history.append(GPTMessage(role="user", content=initial_message["content"]))
-        await self._record_message(guild_id, thread_id, user_id, "user", initial_message["content"])
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+        assignments = settings["assignment_names"]
+        timeout = settings["timeout"]
 
-        for i, system_prompt in enumerate(prompts):
-            # System prompt comes at the start
-            staged_history = [GPTMessage(role="system", content=system_prompt)] + message_history
+        # Create and send the view with assignment selection
+        view = AssignmentSelectionView(assignments, self._handle_assignment_selection, timeout=timeout)
+        await self._send_message(thread_id, view=view)
 
-            # Get model response
-            sendables = await self._ai_client.get_completion(
-                guild_id,
-                channel_id,
-                thread_id,
-                user_id,
-                engine,
-                staged_history,
-                tools
-            )
+        # Wait for assignment selection
+        while not self._selected_assignment:
+            await asyncio.sleep(0.1)
+            if timeout > 0:
+                timeout -= 0.1
+                if timeout <= 0:
+                    break
 
-            for sendable in sendables:
-                if isinstance(sendable, str):
-                    await self._record_message(guild_id, thread_id, user_id, "assistant", sendable)
-                    await self._send_message(thread_id, message=sendable)
-                    message_history.append(GPTMessage(role="assistant", content=sendable))
-                else:
-                    await self._record_message(guild_id, thread_id, user_id, "assistant", f"<image {sendable[0]}>")
-                    await self._send_message(thread_id, file=sendable)
-                    message_history.append(GPTMessage(role="assistant", content=f"<image {sendable[0]}>"))
+        if not self._selected_assignment:
+            await self._send_message(thread_id, "No assignment selected. Please try again.")
+            return
 
+        # Continue with the selected assignment
+        folder_name = await self._handle_assignment_selection(self._selected_assignment)
+        return folder_name

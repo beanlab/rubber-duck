@@ -9,16 +9,14 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.conversation.MultiPromptConversation import MultiPromptConversation
 from .utils.send_email import EmailSender
-from .workflows.registration_workflow import RegistrationWorkflow
-from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
+from .conversation.multi_prompt_conversation import MultiPromptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
@@ -27,11 +25,12 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .utils.persistent_queue import PersistentQueue
+from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.config_types import (
     Config, )
-from .utils.gen_ai import OpenAI, RetryableGenAI
-from .utils.persistent_queue import PersistentQueue
 from .armory.tools import get_tool
+from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
