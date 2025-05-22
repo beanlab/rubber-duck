@@ -9,16 +9,15 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from .armory import stat_tools
-from .utils.data_store import DataStore
-from .metrics.feedback import HaveTAGradingConversation
-from .utils.logger import duck_logger
+from src.armory.armory import Armory
+from src.armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
+from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
@@ -27,9 +26,10 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
+from .utils.data_store import DataStore
 from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
-from .armory.tools import get_tool
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -102,8 +102,12 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
     # admin settings
     admin_settings = config['admin_settings']
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+
     data_store = DataStore(config['dataset_folder_locations'])
-    stat_tools.set_data_store(data_store)
+    stat_tool = StatsTools(data_store)
+    armory = Armory()
+    armory.set_tool(stat_tool)
+
     # Command channel feature
     command_channel = admin_settings['admin_channel_id']
 
@@ -113,7 +117,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
     ai_client = OpenAI(
         os.environ['OPENAI_API_KEY'],
-        get_tool,
+        armory.get_tool,
         metrics_handler.record_usage
     )
 
