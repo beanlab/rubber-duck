@@ -1,5 +1,6 @@
 import discord
 from discord.ui import View, Select, Button
+import asyncio
 
 
 class AssignmentSelectionView(View):
@@ -7,6 +8,7 @@ class AssignmentSelectionView(View):
         super().__init__(timeout=timeout)
         self.callback = callback
         self.selected_assignment = None
+        self.future = asyncio.Future()
 
         # Create a select menu for assignments
         select = Select(
@@ -60,9 +62,22 @@ class AssignmentSelectionView(View):
                 content=f"Selected assignment: {self.selected_assignment}",
                 view=None
             )
+            
+            # Set the future result
+            if not self.future.done():
+                self.future.set_result(self.selected_assignment)
         except Exception as e:
             print(f"Error in confirm callback: {e}")
             await interaction.response.send_message(
                 "There was an error processing your selection. Please try again.",
                 ephemeral=True
-            ) 
+            )
+
+    async def wait_for_selection(self):
+        """Wait for the user to select and confirm an assignment."""
+        try:
+            return await asyncio.wait_for(self.future, timeout=self.timeout)
+        except asyncio.TimeoutError:
+            if not self.future.done():
+                self.future.set_exception(TimeoutError("Selection timed out"))
+            raise 
