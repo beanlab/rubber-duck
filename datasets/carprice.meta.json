@@ -1,4 +1,5 @@
 {
+  "location": "/Users/nicholaslewis/CS_Classes/CS-301R/mybot/rubber-duck/datasets/carprice.meta.json",
   "name": "carprice",
   "columns": [
     { "name": "car_ID", "dtype": "int64", "description": "" },

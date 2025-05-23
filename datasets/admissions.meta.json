@@ -1,4 +1,5 @@
 {
+  "location": "/Users/nicholaslewis/CS_Classes/CS-301R/mybot/rubber-duck/datasets/admissions.meta.json",
   "name": "admissions",
   "columns": [
     { "name": "Serial No.", "dtype": "int64", "description": "" },
