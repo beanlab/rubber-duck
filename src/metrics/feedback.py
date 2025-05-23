@@ -75,7 +75,7 @@ class HaveTAGradingConversation:
 
                     if feedback_score != 'nan' and feedback_score < 5:
                         await self._send_message(thread_id, "Add any additional feedback about this conversation.")
-                        did_start_typing = await self._wait_typing(thread_id, reviewer_id, timeout=3)
+                        did_start_typing = await self._wait_typing(thread_id, reviewer_id, timeout=5)
                         if did_start_typing:
                             async with queue('messages', None) as messages:
                                 message: Message = await asyncio.wait_for(messages.get(), timeout)
