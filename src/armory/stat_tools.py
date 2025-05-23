@@ -7,6 +7,7 @@ import seaborn as sns
 from scipy.stats import skew
 from seaborn.external.kde import gaussian_kde
 
+from .cache import Cache, cache_result
 from .tools import register_tool
 from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
@@ -15,8 +16,9 @@ from ..utils.logger import duck_logger
 
 
 class StatsTools:
-    def __init__(self, datastore: DataStore):
+    def __init__(self, datastore: DataStore, cache: Cache):
         self._datastore = datastore
+        self._cache = cache
 
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
@@ -85,13 +87,15 @@ class StatsTools:
         return name, buffer
 
 
-    def _cache_key(self, dataset: str, column: str, kind: str) -> str:
+    def _photo_name(self, dataset: str, column: str, kind: str) -> str:
         return f"{dataset}_{column}_{kind}.png"
 
 
     @register_tool
+    @cache_result
     def show_dataset_head(self, dataset: str, n: int) -> tuple[str, io.BytesIO]:
-        duck_logger.debug(f"Generating head preview (cached) for {dataset} with n={n}")
+
+        duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
         data = self._datastore.get_dataset(dataset)
 
         if not isinstance(n, int) or n <= 0:
@@ -134,6 +138,7 @@ class StatsTools:
         plt.savefig(buf, format="png", bbox_inches="tight", dpi=150)
         plt.close(fig)
         buf.seek(0)
+
 
         return name, buf
 
@@ -179,11 +184,12 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_histogram(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a histogram for the specified dataset column."""
-        duck_logger.debug(f"Generating histogram plot (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
-        name = self._cache_key(dataset, column, "histogram")
+        name = self._photo_name(dataset, column, "histogram")
 
         if column not in data.columns.to_list():
             raise ValueError(f"Column '{column}' not found in dataset.")
@@ -201,11 +207,12 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_boxplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a boxplot for the specified dataset column."""
-        duck_logger.debug(f"Generating boxplot (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
-        name = self._cache_key(dataset, column, "boxplot")
+        name = self._photo_name(dataset, column, "boxplot")
 
         if column not in data.columns.to_list():
             raise ValueError(f"Column '{column}' not found.")
@@ -222,11 +229,12 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_dotplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a dotplot for the specified dataset column."""
-        duck_logger.debug(f"Generating dotplot (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
-        name = self._cache_key(dataset, column, "dotplot")
+        name = self._photo_name(dataset, column, "dotplot")
 
         if column not in data.columns.to_list():
             raise ValueError(f"Column '{column}' not found.")
@@ -243,11 +251,12 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a barplot for the specified dataset column."""
-        duck_logger.debug(f"Generating barplot (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
-        name = self._cache_key(dataset, column, "barplot")
+        name = self._photo_name(dataset, column, "barplot")
 
         if column not in data.columns.to_list():
             raise ValueError(f"Column '{column}' not found.")
@@ -263,11 +272,12 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a pie chart for the specified dataset column."""
-        duck_logger.debug(f"Generating pie chart (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
-        name = self._cache_key(dataset, column, "piechart")
+        name = self._photo_name(dataset, column, "piechart")
 
         if column not in data.columns:
             raise ValueError(f"Column '{column}' not found.")
@@ -287,12 +297,13 @@ class StatsTools:
 
 
     @register_tool
+    @cache_result
     def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a proportion barplot for the specified dataset column."""
-        duck_logger.debug(f"Generating proportion barplot (cached) for {dataset}.{column}")
+        duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
 
-        name = self._cache_key(dataset, column, "proportionbarplot")
+        name = self._photo_name(dataset, column, "proportionbarplot")
         title = f"Proportion Barplot of {column}"
 
         # Let the enhanced plot message function handle fallback or actual plot

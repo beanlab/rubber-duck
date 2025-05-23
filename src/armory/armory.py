@@ -2,12 +2,14 @@ from typing import Callable
 
 from agents import FunctionTool, function_tool
 
+from ..armory.cache import Cache
+
 
 class Armory:
     def __init__(self):
         self._tools = {}
 
-    def scrub_tool(self, tool_instance: object):
+    def scrub_tools(self, tool_instance: object):
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue
@@ -19,8 +21,7 @@ class Armory:
             if not hasattr(method, "is_tool"):
                 continue
 
-            tool = function_tool(method)
-            self._tools[attr_name] = tool, method
+            self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
         tool = function_tool(tool_function)

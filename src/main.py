@@ -9,8 +9,9 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.armory.armory import Armory
-from src.armory.stat_tools import StatsTools
+from .armory.cache import Cache
+from .armory.armory import Armory
+from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -104,9 +105,10 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
     data_store = DataStore(config['dataset_folder_locations'])
-    stat_tools = StatsTools(data_store)
+    cache = Cache()
     armory = Armory()
-    armory.scrub_tool(stat_tools)
+    stat_tools = StatsTools(data_store, cache)
+    armory.scrub_tools(stat_tools)
 
     # Command channel feature
     command_channel = admin_settings['admin_channel_id']

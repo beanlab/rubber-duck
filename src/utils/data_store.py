@@ -14,7 +14,6 @@ class ColumnMetadata(TypedDict):
 
 
 class DatasetMetadata(TypedDict):
-    location: str
     name: str
     columns: list[ColumnMetadata]
 
@@ -28,24 +27,41 @@ class DataStore:
         for location in locations:
             self._metadata.update(dict(self._load_metadata(location)))
 
-    def _is_s3_location(self, location: str):
-        return location.startswith("s3://")
-
-    def _get_s3_info(self, link: str) -> tuple[str, str]:
-        link = link.replace("s3://", "").split("/", 1)
-        return link[0], link[1] if len(link) > 1 else ""
-
-    def _file_exists(self, path: str, s3: bool, bucket: str = ""):
-        if s3:
-            try:
-                self._s3_client.head_object(Bucket=bucket, Key=path)
-                return True
-            except Exception as e:
-                if e.response['Error']['Code'] == '404':
-                    return False
-                raise e
+    def _load_metadata(self, location: str):
+        if self._is_s3_location(location):
+            yield from self._load_md_from_s3(location)
         else:
-            return Path(path).exists()
+            yield from self._load_md_from_local(location)
+
+    def _s3_file_extraction(self, bucket, obj, prefix):
+        key = obj['Key']
+        if key.endswith('.csv'):
+            key = str(key)
+            metadata_file = key[:-len('.csv')] + '.meta.json'
+            if self._file_exists(metadata_file, True, bucket):
+                yield from self._load_md_from_json(metadata_file, True, bucket)
+            else:
+                yield from self._load_md_from_csv(key, True, bucket, prefix)
+
+    def _load_md_from_s3(self, location: str):
+        bucket, prefix = self._get_s3_info(location)
+        if not prefix.endswith('/'):
+            prefix += '/'
+        response = self._s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        for obj in response.get('Contents', []):
+            yield from self._s3_file_extraction(bucket, obj, prefix)
+
+    def _local_file_extraction(self, file):
+        if file.is_file() and file.name.endswith('.csv'):
+            metadata_file = str(file.with_suffix('.meta.json'))
+            if self._file_exists(metadata_file, False):
+                yield from self._load_md_from_json(metadata_file, False)
+            else:
+                yield from self._load_md_from_csv(str(file), False)
+
+    def _load_md_from_local(self, location: str):
+        for file in Path(location).iterdir():
+            yield from self._local_file_extraction(file)
 
     def _load_md_from_json(self, location: str, s3: bool, bucket: str = ""):
         if s3:
@@ -72,29 +88,24 @@ class DataStore:
         columns = [ColumnMetadata(name=col, dtype=str(df[col].dtype), description="") for col in df.columns]
         yield name, DatasetMetadata(location=full_location, name=name, columns=columns)
 
-    def _load_metadata(self, location: str):
-        if self._is_s3_location(location):
-            bucket, prefix = self._get_s3_info(location)
-            if not prefix.endswith('/'):
-                prefix += '/'
-            response = self._s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
-            for obj in response.get('Contents', []):
-                key = obj['Key']
-                if key.endswith('.csv'):
-                    key = str(key)
-                    metadata_file = key[:-len('.csv')] + '.meta.json'
-                    if self._file_exists(metadata_file, True, bucket):
-                        yield from self._load_md_from_json(metadata_file, True, bucket)
-                    else:
-                        yield from self._load_md_from_csv(key, True, bucket, prefix)
+    def _is_s3_location(self, location: str):
+        return location.startswith("s3://")
+
+    def _get_s3_info(self, link: str) -> tuple[str, str]:
+        link = link.replace("s3://", "").split("/", 1)
+        return link[0], link[1] if len(link) > 1 else ""
+
+    def _file_exists(self, path: str, s3: bool, bucket: str = ""):
+        if s3:
+            try:
+                self._s3_client.head_object(Bucket=bucket, Key=path)
+                return True
+            except Exception as e:
+                if e.response['Error']['Code'] == '404':
+                    return False
+                raise e
         else:
-            for file in Path(location).iterdir():
-                if file.is_file() and file.name.endswith('.csv'):
-                    metadata_file = str(file.with_suffix('.meta.json'))
-                    if self._file_exists(metadata_file, False):
-                        yield from self._load_md_from_json(metadata_file, False)
-                    else:
-                        yield from self._load_md_from_csv(str(file), False)
+            return Path(path).exists()
 
     def get_dataset_metadata(self) -> dict[str, DatasetMetadata]:
         return self._metadata
