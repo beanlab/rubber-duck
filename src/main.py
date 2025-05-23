@@ -104,9 +104,9 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
     data_store = DataStore(config['dataset_folder_locations'])
-    stat_tool = StatsTools(data_store)
+    stat_tools = StatsTools(data_store)
     armory = Armory()
-    armory.set_tool(stat_tool)
+    armory.scrub_tool(stat_tools)
 
     # Command channel feature
     command_channel = admin_settings['admin_channel_id']
@@ -117,7 +117,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
     ai_client = OpenAI(
         os.environ['OPENAI_API_KEY'],
-        armory.get_tool,
+        armory,
         metrics_handler.record_usage
     )
 

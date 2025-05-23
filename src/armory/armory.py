@@ -1,25 +1,13 @@
-import inspect
-import json
-from functools import wraps
+from typing import Callable
 
 from agents import FunctionTool, function_tool
 
-def make_on_invoke_tool(func):
-    @wraps(func)
-    async def wrapped_tool(context, arg_json: str):
-        args = json.loads(arg_json)
-        if inspect.iscoroutinefunction(func):
-            return await func(**args)
-        else:
-            return func(**args)
-    return wrapped_tool
 
 class Armory:
     def __init__(self):
         self._tools = {}
 
-    def set_tool(self, tool_instance: object):
-        # Iterate over the INSTANCE, not the class
+    def scrub_tool(self, tool_instance: object):
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue
@@ -28,18 +16,28 @@ class Armory:
             if not callable(method):
                 continue
 
-            if not getattr(method, "is_tool", False):
+            if not hasattr(method, "is_tool"):
                 continue
 
-            # Wrap it as a function tool, passing the bound method
             tool = function_tool(method)
-            tool.on_invoke_tool = make_on_invoke_tool(method)
-            self._tools[attr_name] = tool
+            self._tools[attr_name] = tool, method
 
-    def get_tools(self) -> dict[str, FunctionTool]:
-        return self._tools
+    def add_tool(self, tool_function: Callable):
+        tool = function_tool(tool_function)
+        self._tools[tool_function.__name__] = tool, tool_function
 
-    def get_tool(self, tool_name: str):
+    def get_tools(self) -> dict[str, Callable]:
+        return {name: tool[1] for name, tool in self._tools.items()}
+
+    def get_tool_metadata(self) -> dict[str, FunctionTool]:
+        return {name: tool[0] for name, tool in self._tools.items()}
+
+    def get_specific_tool_metadata(self, tool_name: str) -> FunctionTool:
         if tool_name in self._tools:
-            return self._tools[tool_name]
+            return self._tools[tool_name][0]
+        raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
+
+    def get_specific_tool(self, tool_name: str):
+        if tool_name in self._tools:
+            return self._tools[tool_name][1]
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
