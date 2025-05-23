@@ -27,9 +27,9 @@ class FolderUtils:
         duck_logger.debug(f"Found project folder: {folder_path}")
         return folder_path
 
-    def get_folder_contents(self, folder_name: List[str]) -> Optional[List[str]]:
+    def get_text_files(self, folder_name: List[str]) -> Optional[List[str]]:
         """
-        Get all files in the project folder.
+        Get all .txt files in the project folder.
         Returns None if folder_name is empty or no contents found.
         """
         if not folder_name:
@@ -42,8 +42,30 @@ class FolderUtils:
             return None
 
         try:
-            files = [str(f) for f in folder_path.iterdir() if f.is_file()]
-            duck_logger.debug(f"Found files in {folder_path}: {files}")
+            files = [str(f) for f in folder_path.iterdir() if f.is_file() and f.suffix == '.txt']
+            duck_logger.debug(f"Found .txt files in {folder_path}: {files}")
+            return files
+        except Exception as e:
+            duck_logger.error(f"Error reading folder contents: {e}")
+            return None
+
+    def get_yaml_files(self, folder_name: List[str]) -> Optional[List[str]]:
+        """
+        Get all .yaml files in the project folder.
+        Returns None if folder_name is empty or no contents found.
+        """
+        if not folder_name:
+            return None
+
+        folder_path = self.get_project_folder(folder_name[0])
+        
+        if not folder_path or not folder_path.exists():
+            duck_logger.error(f"Folder not found: {folder_path}")
+            return None
+
+        try:
+            files = [str(f) for f in folder_path.iterdir() if f.is_file() and f.suffix in ['.yaml', '.yml']]
+            duck_logger.debug(f"Found YAML files in {folder_path}: {files}")
             return files
         except Exception as e:
             duck_logger.error(f"Error reading folder contents: {e}")

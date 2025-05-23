@@ -1,0 +1,25 @@
+- Priority Queue Questions:
+    - Question: What is a Priority Queue and what are its main functions?
+      Answer: A Priority Queue is a data structure that removes the highest-priority item. Its main functions are Insert, Pop Min, Decrease Key, and Empty.
+
+    - Question: What does the Insert function do in a Priority Queue?
+      Answer: The Insert function adds an item to the queue that can later be removed.
+
+    - Question: What does the Pop Min function do in a Priority Queue?
+      Answer: The Pop Min function removes the highest-priority item from the PQ.
+
+    - Question: What does the Decrease Key function do in a Priority Queue?
+      Answer: The Decrease Key function changes the priority of a given item.
+
+    - Question: What does the Empty function do in a Priority Queue?
+      Answer: The Empty function returns whether the priority queue has any items.
+
+- Dijkstra's Algorithm Questions:
+    - Question: What is Dijkstra's Algorithm?
+      Answer: An algorithm that finds the shortest path between two nodes in a graph.
+
+    - Question: How is a Priority Queue used in Dijkstra's Algorithm?
+      Answer: To efficiently find the node with the smallest distance.
+
+    - Question: What is the time complexity of Dijkstra's Algorithm?
+      Answer: O(V^2)

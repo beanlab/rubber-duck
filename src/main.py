@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.conversation.learning_objectives_tracker import LearningObjectivesTracker
 from .utils.send_email import EmailSender
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
@@ -136,6 +137,10 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         setup_conversation
     )
 
+    learning_objectives = LearningObjectivesTracker(
+        retryable_ai_client,
+    )
+
     have_advanced_conversation = MultiPromptConversation(
         retryable_ai_client,
         metrics_handler.record_message,
@@ -144,7 +149,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.send_message,
         bot.report_error,
         bot.add_reaction,
-        setup_conversation
+        setup_conversation,
     )
 
     have_ta_conversation = HaveTAGradingConversation(
