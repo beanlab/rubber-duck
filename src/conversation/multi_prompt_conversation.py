@@ -1,5 +1,6 @@
 import asyncio
 from asyncio import timeout
+from pathlib import Path
 from typing import Optional
 
 from quest import step, wrap_steps, queue
@@ -34,6 +35,8 @@ class MultiPromptConversation:
         self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
 
+        self._token_present = False
+        self._user_ready = False
         self._prompt_index = 0
         self._setup_conversation = step(setup_conversation)
         self._selected_assignment: Optional[str] = None
@@ -57,17 +60,112 @@ class MultiPromptConversation:
         except TimeoutError:
             raise TimeoutError("User did not select an assignment in time.")
 
+    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
+                                    message_history: list[GPTMessage]):
+        for sendable in sendables:
+            if isinstance(sendable, str):
+                await self._record_message(
+                    guild_id, thread_id, user_id, 'assistant', sendable)
+                await self._send_message(thread_id, message=sendable)
+                message_history.append(GPTMessage(role='assistant', content=sendable))
+
+            else:  # tuple of str, BytesIO -> i.e. an image
+                await self._record_message(
+                    guild_id, thread_id, user_id, 'assistant', f'<image {sendable[0]}>')
+                await self._send_message(thread_id, file=sendable)
+                message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
+
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         assignments = settings["assignment_names"]
         timeout = settings["timeout"]
+        engine = settings["engine"]
+        introduction = settings["introduction"]
+        tools = settings.get("tool", [])  # Get tools from settings, default to empty list
 
         # Create and send the view with assignment selection
         folder_name = await self.extract_assignment(assignments, thread_id, timeout)
 
         # Get folder contents using the utility class
-        contents = self._folder_utils.get_folder_contents(folder_name)
-        if not contents:
-            await self._send_message(thread_id, "No files found in the selected assignment.")
-            return None
+        prompts = self._folder_utils.get_folder_contents(folder_name)
+        if not prompts:
+            raise ValueError("No files found in the selected assignment.")
+        else:
+            duck_logger.debug(f"Found {len(prompts)} files in the selected assignment.")
+            await self._send_message(thread_id, f"Found selected assignment. Beginning conversation.")
+            await self._send_message(thread_id, introduction)
 
-        return contents
+        # Do a do short convo
+        while prompts:  # don't remove the prompt early
+            current_prompt = prompts.pop(0)
+            prompt = Path(current_prompt).read_text(encoding="utf-8")
+            message_history = await self._setup_conversation(thread_id, prompt, initial_message)
+
+            async with queue('messages', None) as messages:
+                while True:
+                    try:  # catch all errors
+                        try:
+                            # Waiting for a response from the user
+                            message: Message = await asyncio.wait_for(messages.get(), timeout)
+
+                        except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                            break
+
+                        if len(message['file']) > 0:
+                            await self._send_message(
+                                thread_id,
+                                "I'm sorry, I can't read file attachments. "
+                                "Please resend your message with the relevant parts of your file included in the message."
+                            )
+                            continue
+
+                        message_history.append(GPTMessage(role='user', content=message['content']))
+
+                        self._confirm_user_ready(message_history)
+
+                        if self._advance_prompt():
+                            break
+
+                        user_id = message['author_id']
+                        guild_id = message['guild_id']
+
+                        await self._record_message(
+                            guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
+                        )
+
+                        sendables = await self._ai_client.get_completion(
+                            guild_id,
+                            initial_message['channel_id'],
+                            thread_id,
+                            user_id,
+                            engine,
+                            message_history,
+                            tools
+                        )
+
+                        await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
+                        self._confirm_token(message_history)
+
+                    except GenAIException:
+                        await self._send_message(thread_id,
+                                                 'I\'m having trouble processing your request.'
+                                                 'The admins are aware. Please try again later.')
+                        raise
+
+    def _advance_prompt(self):
+        """Checks if the user typed continue and the object is completed"""
+        if self._token_present & self._user_ready:
+            self._token_present = False
+            self._user_ready = False
+            duck_logger.debug(f"User and prompt are ready. Advancing to next prompt.")
+
+    def _confirm_token(self, message_history) -> bool | None:
+        most_recent_info = message_history[-1].get('content')
+        if "Objective Complete!" in most_recent_info:
+            duck_logger.debug("Objective Complete and token present")
+            self._token_present = True
+
+    def _confirm_user_ready(self, message_history) -> bool | None:
+        most_recent_info = message_history[-1].get('content')
+        if "continue" in most_recent_info:
+            duck_logger.debug("User is ready to continue")
+            self._user_ready = True

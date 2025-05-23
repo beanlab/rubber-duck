@@ -42,7 +42,7 @@ class FolderUtils:
             return None
 
         try:
-            files = [f.name for f in folder_path.iterdir() if f.is_file()]
+            files = [str(f) for f in folder_path.iterdir() if f.is_file()]
             duck_logger.debug(f"Found files in {folder_path}: {files}")
             return files
         except Exception as e:

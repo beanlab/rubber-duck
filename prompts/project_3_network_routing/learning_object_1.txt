@@ -2,6 +2,20 @@
 
 This demonstrates a conversation where a bot is probing for more information to ensure the student understands the following concepts.
 
+## Rules
+1. You should not give the students code or visuals to help them.
+2. When a student has completed all the objectives, you should send a message saying objective complete.
+
+Example:
+---
+
+> **Bot:** How might you implement `decrease key` using a binary tree?
+> **Human:** I don't know. Can you give me some code or visuals to help me?
+> **Bot:** Sorry, I can't do that. But I can help you think through it.
+
+---
+
+
 ---
 
 ## 🧠 Learning Objectives
@@ -101,4 +115,10 @@ This demonstrates a conversation where a bot is probing for more information to 
 
 ---
 
-_...conversation continues..._
+> **Bot:** Great! It seems like you have a good of the concepts. Objective Complete! You can keep asking questions about this topic or you can type in `continue` to move on to the next objective.
+> **Human:** continue
+> `Objectives Mastered: 1, 1a, 1b, 1c, 1d`
+
+---
+
+_...conversation ends..._
