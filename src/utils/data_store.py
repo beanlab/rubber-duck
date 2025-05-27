@@ -111,7 +111,10 @@ class DataStore:
         return self._metadata
 
     def get_columns_metadata(self, name) -> list[ColumnMetadata]:
-        return self._metadata[name].columns
+        try:
+            return self._metadata[name]['columns']
+        except KeyError:
+            raise KeyError(f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
 
     def get_available_datasets(self) -> list[str]:
         return sorted(list(self._metadata.keys()))
@@ -120,17 +123,20 @@ class DataStore:
         if name in self._loaded_datasets:
             return self._loaded_datasets[name]
 
-        if self._metadata[name]:
-            location = self._metadata[name]['location']
-            if self._is_s3_location(location):
-                bucket_name, key = self._get_s3_info(location)
-                csv_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
-                df = pd.read_csv(StringIO(csv_obj['Body'].read().decode('utf-8')))
-            else:
-                df = pd.read_csv(location)
+        try:
+            if self._metadata[name]:
+                location = self._metadata[name]['location']
+                if self._is_s3_location(location):
+                    bucket_name, key = self._get_s3_info(location)
+                    csv_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
+                    df = pd.read_csv(StringIO(csv_obj['Body'].read().decode('utf-8')))
+                else:
+                    df = pd.read_csv(location)
 
-            self._loaded_datasets[name] = df
-            return df
+                self._loaded_datasets[name] = df
+                return df
+        except KeyError:
+            raise KeyError(f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
 
         raise FileNotFoundError(
             f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}")

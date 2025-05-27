@@ -140,7 +140,11 @@ class OpenAI:
                 function_name = message.function_call.name
                 tool = self._armory.get_specific_tool(function_name)
                 arguments = json.loads(message.function_call.arguments)
-                tool_result = tool(**arguments)
+                try:
+                    tool_result = tool(**arguments)
+                except Exception as ex:
+                    tool_result = f"Error when calling function {tool.__name__}, with arguments {arguments}. \
+                    The error message was of type {ex.__class__.__name__} with the message: {str(ex)}"
 
                 message_history.append({"role": "assistant", "function_call": message.function_call})
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})

@@ -13,12 +13,11 @@ from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
 
 
-
-
 class StatsTools:
     def __init__(self, datastore: DataStore, cache: Cache):
         self._datastore = datastore
         self._cache = cache
+
 
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
@@ -26,7 +25,6 @@ class StatsTools:
         if not isinstance(series, pd.Series):
             raise ValueError(f"Expected a pandas Series, got {type(series)}")
         return series.dtype == object or pd.api.types.is_categorical_dtype(series)
-
 
     def _plot_message_with_axes(self, data: pd.DataFrame, column: str, title: str, kind: str):
         plt.figure(figsize=(8, 6))
@@ -43,6 +41,8 @@ class StatsTools:
 
         if kind in {"hist", "box", "dot"}:
             values = pd.to_numeric(data[column], errors='coerce').dropna()
+            if values.empty:
+                raise ValueError(f"No valid numeric data found in column '{column}' for plotting.")
             if kind == "hist":
                 ax.set_xlim(values.min(), values.max())
                 ax.set_ylim(0, 1)
@@ -64,7 +64,8 @@ class StatsTools:
         elif kind == "pie" or kind == "proportion":
             if kind == "pie" or not self._is_categorical(data[column]):
                 # Show fallback for pie or invalid proportion
-                ax.text(0.5, 0.5, fallback_messages[kind], fontsize=12, ha='center', va='center', transform=ax.transAxes)
+                ax.text(0.5, 0.5, fallback_messages[kind], fontsize=12, ha='center', va='center',
+                        transform=ax.transAxes)
                 ax.axis("off")
             else:
                 # Proper categorical proportion bar plot
@@ -78,7 +79,6 @@ class StatsTools:
                 plt.ylabel("Proportion")
                 plt.xlabel(column)
 
-
     def _save_plot(self, name: str) -> tuple[str, io.BytesIO]:
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
@@ -86,15 +86,13 @@ class StatsTools:
         plt.close()
         return name, buffer
 
-
     def _photo_name(self, dataset: str, column: str, kind: str) -> str:
         return f"{dataset}_{column}_{kind}.png"
-
 
     @register_tool
     @cache_result
     def show_dataset_head(self, dataset: str, n: int) -> tuple[str, io.BytesIO]:
-
+        """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
         data = self._datastore.get_dataset(dataset)
 
@@ -139,18 +137,15 @@ class StatsTools:
         plt.close(fig)
         buf.seek(0)
 
-
         return name, buf
-
 
     @register_tool
     def describe_dataset(self, dataset: str) -> str:
         """Returns a description of the dataset."""
-        duck_logger.debug(f"Used explain_dataset on dataset={dataset}")
-        data = self._datastore.get_dataset(dataset)
-        return f"Dataset: {dataset}\nNumber of Rows: {len(data)}\nNumber of Columns: {len(data.columns)}\n" \
-               f"Columns: {', '.join(data.columns)}"
-
+        duck_logger.debug(f"Used describe_dataset on dataset={dataset}")
+        data = self._datastore.get_columns_metadata(dataset)
+        data_expanded = [f"Column Name: {col['name']}, Column Data Type {col['dtype']}. Column Description: {col['description']}" for col in data]
+        return " ".join(data_expanded) if data_expanded else "No columns found in dataset."
 
     @register_tool
     def explain_capabilities(self):
@@ -166,7 +161,6 @@ class StatsTools:
             "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
         )
 
-
     @register_tool
     def get_dataset_names(self) -> str:
         """Returns a list of all available datasets."""
@@ -174,14 +168,12 @@ class StatsTools:
         datasets = self._datastore.get_available_datasets()
         return f"Available datasets: {', '.join(datasets)}"
 
-
     @register_tool
-    def get_variable_names(self,dataset: str) -> str:
+    def get_variable_names(self, dataset: str) -> str:
         """Returns a list of all variable names in the dataset."""
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
         data = self._datastore.get_dataset(dataset).columns.to_list()
         return f"Variable names in {dataset}: {', '.join(data)}"
-
 
     @register_tool
     @cache_result
@@ -205,7 +197,6 @@ class StatsTools:
 
         return self._save_plot(name)
 
-
     @register_tool
     @cache_result
     def plot_boxplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
@@ -226,7 +217,6 @@ class StatsTools:
             plt.ylabel(column)
 
         return self._save_plot(name)
-
 
     @register_tool
     @cache_result
@@ -249,7 +239,6 @@ class StatsTools:
 
         return self._save_plot(name)
 
-
     @register_tool
     @cache_result
     def plot_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
@@ -269,7 +258,6 @@ class StatsTools:
         plt.ylabel("Count")
 
         return self._save_plot(name)
-
 
     @register_tool
     @cache_result
@@ -295,7 +283,6 @@ class StatsTools:
 
         return self._save_plot(name)
 
-
     @register_tool
     @cache_result
     def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
@@ -311,7 +298,6 @@ class StatsTools:
 
         return self._save_plot(name)
 
-
     @register_tool
     def calculate_mean(self, dataset: str, column: str) -> str:
         """Calculates the mean of a numeric column in the dataset, if not categorical."""
@@ -321,7 +307,6 @@ class StatsTools:
         if self._is_categorical(series):
             return "Mean cannot be calculated for categorical data"
         return f"Mean = {round(series.dropna().mean(), 4)}"
-
 
     @register_tool
     def calculate_skewness(self, dataset: str, column: str) -> str:
@@ -333,7 +318,6 @@ class StatsTools:
             return "Skewness cannot be calculated for categorical data"
         return f"Skewness = {round(skew(series.dropna()), 4)}"
 
-
     @register_tool
     def calculate_std(self, dataset: str, column: str) -> str:
         """Calculates the standard deviation of a numeric column in the dataset."""
@@ -344,7 +328,6 @@ class StatsTools:
             return "Standard Deviation cannot be calculated for categorical data"
         return f"Standard Deviation = {round(series.dropna().std(), 4)}"
 
-
     @register_tool
     def calculate_median(self, dataset: str, column: str) -> str:
         """Calculates the median (middle value) of a numeric column in the dataset."""
@@ -354,7 +337,6 @@ class StatsTools:
         if self._is_categorical(series):
             return "Median cannot be calculated for categorical data"
         return f"Median = {round(series.dropna().median(), 4)}"
-
 
     @register_tool
     def calculate_mode(self, dataset: str, column: str) -> str:
@@ -377,7 +359,6 @@ class StatsTools:
             duck_logger.error(f"Error in KDE-based mode estimation: {e}")
             return "Error calculating mode"
 
-
     @register_tool
     def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
@@ -390,7 +371,6 @@ class StatsTools:
         labels = ["Min", "Q1", "Median", "Q3", "Max"]
         return "; ".join(f"{label}={round(val, 4)}" for label, val in zip(labels, summary))
 
-
     @register_tool
     def calculate_table_of_counts(self, dataset: str, column: str) -> dict | str:
         """Returns a frequency table (category counts) for a categorical column in the dataset."""
@@ -402,7 +382,6 @@ class StatsTools:
         counts = series.value_counts(dropna=True).reset_index()
         counts.columns = ["Category", "Count"]
         return counts.to_dict(orient="records")
-
 
     @register_tool
     def calculate_proportions(self, dataset: str, column: str) -> dict | str:
