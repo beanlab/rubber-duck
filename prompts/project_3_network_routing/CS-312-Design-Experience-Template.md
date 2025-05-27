@@ -74,7 +74,10 @@ Example:
 - **Write key sub-methods or helper functions in pseudocode (Python-style):**
 
 ```python
-def find_max_element(arr):
+"""
+Record all of your key functions here in pseudocode. 
+""" 
+def example_function(arr):
     max_val = arr[0]
     for elem in arr:
         if elem > max_val:
