@@ -83,12 +83,12 @@ class OpenAI:
             functions
     ):
         if not functions:
-            functions = None
+            functions= None
 
-        completion: ChatCompletion = await self._client.chat.completions.create(
+        completion = await self._client.responses.create(
             model=engine,
-            messages=message_history,
-            functions=functions
+            input=message_history,
+            tools=functions
         )
 
         completion_dict = completion.model_dump()
@@ -98,10 +98,10 @@ class OpenAI:
             parent_channel_id,
             thread_id, user_id,
             engine,
-            completion_dict['usage']['prompt_tokens'],
-            completion_dict['usage']['completion_tokens'],
-            completion_dict['usage'].get('cached_tokens', 0),
-            completion_dict['usage'].get('reasoning_tokens', 0)
+            completion_dict['usage']['input_tokens'],
+            completion_dict['usage']['output_tokens'],
+            completion_dict['usage']['input_tokens_details'].get('cached_tokens', 0),
+            completion_dict['usage']['output_tokens_details'].get('reasoning_tokens', 0)
         )
         return completion
 
@@ -119,6 +119,7 @@ class OpenAI:
 
         functions = [
             {
+                "type": "function",
                 "name": tool.name,
                 "description": tool.description,
                 "parameters": tool.params_json_schema
@@ -132,30 +133,37 @@ class OpenAI:
             completion = await self._get_completion_with_usage(
                 guild_id, parent_channel_id, thread_id, user_id, engine, message_history, functions
             )
-            message = completion.choices[0].message
 
-            if message.function_call:
-                function_name = message.function_call.name
+            message = completion.output[0]
+
+            if message.name:
+                function_name = message.name
 
                 tool = tools_to_use[function_name]
-                tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
+                tool_result = await tool.on_invoke_tool(None, message.arguments)
 
-                message_history.append({"role": "assistant", "function_call": message.function_call})
-                message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
+                message_history.append({
+                    "role": "assistant",
+                    "function_call": {
+                        "name": message.name,
+                        "arguments": message.arguments
+                    }
+                })
+
+                message_history.append({"role": "function", "name": function_name, "content": str(tool_result) if tool_result is not None else "No content returned"})
 
                 if isinstance(tool_result, tuple):
                     result.append(tool_result)
 
-                continue  # i.e. allow the bot to call another tool or add a message
+                continue
 
             else:
                 message_history.append({
                     "role": "assistant",
-                    "content": message.content
+                    "content": message.output
                 })
-
-                result.append(message.content)
-                break  # i.e. the bot is done responding
+                result.append(message.output)
+                break
 
         return result
 
@@ -170,18 +178,16 @@ class OpenAI:
             tools: list[str]
     ) -> list[Sendable]:
         try:
-            return await self._get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
-                                              tools)
+            return await self._get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history, tools)
         except (
-                APITimeoutError, InternalServerError,
-                UnprocessableEntityError) as ex:
-            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                         'please open up a separate conversation and try again') from ex
+            APITimeoutError, InternalServerError,
+            UnprocessableEntityError) as ex:
+            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, please open up a separate conversation and try again') from ex
         except (APIConnectionError, BadRequestError,
                 AuthenticationError, ConflictError, NotFoundError,
                 RateLimitError) as ex:
-            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                     "for more details on how to resolve this error") from ex
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors for more details on how to resolve this error") from ex
+
 
 
 class RetryableGenAI:
