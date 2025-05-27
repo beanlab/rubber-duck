@@ -47,7 +47,7 @@ class HaveTAGradingConversation:
 
     async def _flush_conversations_for_channel(self, thread_id, target_channel_id, timeout):
         duck_logger.info(f"Flushing conversations for channel {target_channel_id}")
-        while (data := self._feedback_manager.get_conversation(target_channel_id)) is not None:
+        while (data := await self._feedback_manager.get_conversation(target_channel_id)) is not None:
             duck_logger.info(f"Processing conversation: {data}")
 
             student_convo_link = f"<#{data['conversation_thread_id']}>"

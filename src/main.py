@@ -9,17 +9,14 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from .utils.send_email import EmailSender
-from .workflows.registration_workflow import RegistrationWorkflow
-from .metrics.feedback import HaveTAGradingConversation
-from .metrics.feedback import HaveTAGradingConversation
-from .utils.logger import duck_logger
+from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
+from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
@@ -29,8 +26,10 @@ from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
 from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
-from .armory.tools import get_tool
+from .utils.send_email import EmailSender
+from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -99,66 +98,74 @@ def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metri
     return workflow_manager
 
 
+def _has_workflow_of_type(config: Config, wtype: str):
+    return any(
+        duck['workflow_type'] == wtype
+        for server_id, server_config in config['servers'].items()
+        for channel_config in server_config['channels']
+        for duck in channel_config['ducks']
+    )
+
+
 def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
-    # admin settings
-    admin_settings = config['admin_settings']
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+    ducks = {}
 
-    # Command channel feature
-    command_channel = admin_settings['admin_channel_id']
+    if _has_workflow_of_type(config, 'basic_prompt_conversation'):
+        ai_client = OpenAI(
+            os.environ['OPENAI_API_KEY'],
+            get_tool,
+            metrics_handler.record_usage
+        )
 
-    setup_conversation = BasicSetupConversation(
-        metrics_handler.record_message,
-    )
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+        retryable_ai_client = RetryableGenAI(
+            ai_client,
+            bot.send_message,
+            bot.report_error,
+            bot.typing,
+            ai_completion_retry_protocol
+        )
 
-    ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY'],
-        get_tool,
-        metrics_handler.record_usage
-    )
+        setup_conversation = BasicSetupConversation(
+            metrics_handler.record_message,
+        )
 
-    retryable_ai_client = RetryableGenAI(
-        ai_client,
-        bot.send_message,
-        bot.report_error,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
+        have_conversation = BasicPromptConversation(
+            retryable_ai_client,
+            metrics_handler.record_message,
+            metrics_handler.record_usage,
+            bot.send_message,
+            bot.report_error,
+            bot.add_reaction,
+            setup_conversation
+        )
+        ducks['basic_prompt_conversation'] = have_conversation
 
-    have_conversation = BasicPromptConversation(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.typing,
-        bot.send_message,
-        bot.report_error,
-        bot.add_reaction,
-        setup_conversation
-    )
+    if _has_workflow_of_type(config, 'conversation_review'):
+        have_ta_conversation = HaveTAGradingConversation(
+            feedback_manager,
+            metrics_handler.record_feedback,
+            bot.send_message,
+            bot.add_reaction,
+            bot.report_error
+        )
+        ducks['conversation_review'] = have_ta_conversation
 
-    have_ta_conversation = HaveTAGradingConversation(
-        feedback_manager,
-        metrics_handler.record_feedback,
-        bot.send_message,
-        bot.add_reaction,
-        bot.report_error
-    )
+    if _has_workflow_of_type(config, 'registration'):
+        email_confirmation = EmailSender(config['sender_email'])
 
+        registration_workflow = RegistrationWorkflow(
+            bot.send_message,
+            bot.get_channel,
+            bot.fetch_guild,
+            email_confirmation
+        )
+        ducks['registration'] = registration_workflow
 
-    email_confirmation = EmailSender(config['sender_email'])
+    if not ducks:
+        raise ValueError('No ducks were requested in the config')
 
-    registration_workflow = RegistrationWorkflow(
-        bot.send_message,
-        bot.get_channel,
-        bot.fetch_guild,
-        email_confirmation
-    )
-
-    return {
-        'basic_prompt_conversation': have_conversation,
-        'conversation_review': have_ta_conversation,
-        'registration': registration_workflow,
-    }
+    return ducks
 
 
 async def main(config: Config):

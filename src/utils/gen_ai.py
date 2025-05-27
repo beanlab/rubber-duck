@@ -82,6 +82,7 @@ class OpenAI:
             message_history,
             functions
     ):
+
         if not functions:
             functions = None
 
@@ -135,9 +136,19 @@ class OpenAI:
             message = completion.choices[0].message
 
             if message.function_call:
+                async def completion_tool(prompt) -> str:
+                    history = [{'role': 'system', 'content': prompt}]
+                    comp = await self._get_completion_with_usage(guild_id, parent_channel_id, thread_id, user_id,
+                                                                 engine,
+                                                                 history, functions)
+                    return comp.choices[0].message.content
+
                 function_name = message.function_call.name
 
                 tool = tools_to_use[function_name]
+                arguments = json.loads(message.function_call.arguments)
+                if True:
+                    arguments['completion_tool'] = completion_tool
                 tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
 
                 message_history.append({"role": "assistant", "function_call": message.function_call})
