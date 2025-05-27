@@ -8,6 +8,22 @@ class FeedbackConfig(TypedDict):
     feedback_timeout: int | None
 
 
+class RolePattern(TypedDict):
+    name: str
+    pattern: str
+    description: str
+
+
+class RolesSettings(TypedDict):
+    patterns: list[RolePattern]
+
+
+class RegistrationSettings(TypedDict):
+    cache_timeout: int
+    authenticated_user_role_name: str
+    roles: RolesSettings
+
+
 class DuckWorkflowSettings(TypedDict):
     prompt_file: str
     engine: str
@@ -62,4 +78,4 @@ class Config(TypedDict):
     admin_settings: AdminSettings
     dataset_folder_locations : list[str]
     ai_completion_retry_protocol: RetryProtocol
-    default_duck_settings: dict[str, dict]
+    sender_email: str
