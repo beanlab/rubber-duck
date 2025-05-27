@@ -16,7 +16,7 @@ Sendable = str | tuple[str, BytesIO]
 
 class GPTMessage(TypedDict):
     role: str
-    content: str
+    content: str | list[str]
 
 
 class GenAIClient(Protocol):

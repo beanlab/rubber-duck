@@ -8,8 +8,9 @@ If it meets the criteria, explain why. If it does not, explain why.
 Be concise in your answer.
 
 # Output Format
-You will be given a pdf, and a list of requirements.
+You will be given a some user messages, and a list of requirements.
 You are to say whether or not each item in the list of requirements is met in the provided response.
+If little information or no response is provided, just return false for everything.
 
 For each item in the list of requirements, you are to return the **exactly** following format:
 {

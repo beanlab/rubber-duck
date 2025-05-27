@@ -92,10 +92,11 @@ class MultiPromptConversation:
         self._learning_objectives_tracker(
             guild_id=initial_message['guild_id'],
             thread_id=thread_id,
+            parent_channel_id=initial_message['channel_id'],
             user_id=initial_message['author_id'],
             engine=engine,
-            learning_objective_file_path="/prompts/project3_network_routing/learning_objects_pq2.yaml",
-            prompt_file_path="/prompts/learning_objectives_prompt.txt"
+            learning_objective_file_path="prompts/project_3_network_routing/learning_objects_pq2.yaml",
+            prompt_file_path="prompts/learning_objectives_prompt.txt"
         )
 
         await self._send_message(thread_id, f"Found selected assignment. Beginning conversation.")
@@ -125,16 +126,16 @@ class MultiPromptConversation:
                             )
                             continue
 
-                        missing_objectives = self._learning_objectives_tracker.get_missing_objectives(message['content'])
+                        missing_objectives = await self._learning_objectives_tracker.get_missing_objectives(message['content'])
 
                         user_id = message['author_id']
                         guild_id = message['guild_id']
 
                         if self._learning_objectives_tracker.all_objectives_complete():
-                            await self._orchestrate_messages("All objectives have been complete", guild_id, thread_id, user_id, [])
+                            await self._orchestrate_messages(["All objectives have been complete"], guild_id, thread_id, user_id, [])
                             break
 
-                        await self._orchestrate_messages(missing_objectives, guild_id, thread_id, user_id, [])
+                        await self._orchestrate_messages([missing_objectives[:1500]], guild_id, thread_id, user_id, [])
 
                         # TODO add a sub conversation -- ask the user what they would like to talk about next.
                             # Then ask a sub bot to have that conversation about that objective
