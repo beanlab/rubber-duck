@@ -5,11 +5,6 @@ _tools: dict[str, FunctionTool] = {}
 
 def register_tool(func) -> FunctionTool:
     tool = function_tool(func)
-    tool.params_json_schema = {
-        k: v
-        for k, v in tool.params_json_schema['properties'].items()
-        if k != '_get_completion'
-    }
     _tools[func.__name__] = tool
     return tool
 
