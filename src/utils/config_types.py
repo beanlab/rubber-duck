@@ -1,5 +1,6 @@
 from typing import TypedDict
 
+
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None
@@ -76,4 +77,4 @@ class Config(TypedDict):
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
-    default_duck_settings: dict[str, dict]
+    sender_email: str

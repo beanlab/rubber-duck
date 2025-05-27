@@ -82,6 +82,7 @@ class OpenAI:
             message_history,
             functions
     ):
+
         if not functions:
             functions = None
 
@@ -136,7 +137,6 @@ class OpenAI:
 
             if message.function_call:
                 function_name = message.function_call.name
-
                 tool = tools_to_use[function_name]
                 tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
 
