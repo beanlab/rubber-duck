@@ -89,14 +89,13 @@ class MultiPromptConversation:
 
         prompts, learning_objectives = await self.get_prompts_and_objectives(folder_name, thread_id)
         
-        # Initialize learning objectives tracker with the first YAML file
-        objectives = self._learning_objectives_tracker.parse_yaml_objectives(learning_objectives[0])
         self._learning_objectives_tracker(
-            learning_objectives=objectives,
             guild_id=initial_message['guild_id'],
             thread_id=thread_id,
             user_id=initial_message['author_id'],
-            engine=engine
+            engine=engine,
+            learning_objective_file_path="/prompts/project3_network_routing/learning_objects_pq2.yaml",
+            prompt_file_path="/prompts/learning_objectives_prompt.txt"
         )
 
         await self._send_message(thread_id, f"Found selected assignment. Beginning conversation.")
@@ -126,34 +125,24 @@ class MultiPromptConversation:
                             )
                             continue
 
-                        message_history.append(GPTMessage(role='user', content=message['content']))
-
-                        self._token_present = self._learning_objectives_tracker.check_objectives_complete(message['content'])
-
-                        self._confirm_user_ready(message_history)  # Is user ready to continue?
-
-                        if self._ready_for_next_set_of_learning_objectives():
-                            break
+                        missing_objectives = self._learning_objectives_tracker.get_missing_objectives(message['content'])
 
                         user_id = message['author_id']
                         guild_id = message['guild_id']
 
-                        await self._record_message(
-                            guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
-                        )
+                        if self._learning_objectives_tracker.all_objectives_complete():
+                            await self._orchestrate_messages("All objectives have been complete", guild_id, thread_id, user_id, [])
+                            break
 
-                        sendables = await self._ai_client.get_completion(
-                            guild_id,
-                            initial_message['channel_id'],
-                            thread_id,
-                            user_id,
-                            engine,
-                            message_history,
-                            tools
-                        )
+                        await self._orchestrate_messages(missing_objectives, guild_id, thread_id, user_id, [])
 
-                        await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
-                        self._confirm_token(message_history)
+                        # TODO add a sub conversation -- ask the user what they would like to talk about next.
+                            # Then ask a sub bot to have that conversation about that objective
+
+                        # await self._record_message(
+                        #     guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
+                        # )
+
 
                     except GenAIException:
                         await self._send_message(thread_id,

@@ -15,81 +15,86 @@ class LearningObjectivesTracker:
         self.user_id = None
         self.engine = None
 
-        self._learning_objectives = None
-        self._current_objective_complete = None
-        self._prompt = self._get_prompt()
-
-    def __call__(self, learning_objectives: list[dict], guild_id: int, thread_id, user_id, engine):
-        self._learning_objectives = learning_objectives
-        self._current_objective_complete = [False] * len(learning_objectives)
+    def __call__(self, guild_id: int, thread_id, user_id, engine, learning_objective_file_path, prompt_file_path):
+        self._current_objectives_complete = [False] * len(learning_objectives)
+        self._current_objectives_partial = [False] * len(learning_objectives)
         self.guild_id = guild_id
         self.thread_id = thread_id
         self.user_id = user_id
         self.engine = engine
 
-    def parse_yaml_objectives(self, yaml_file_path: str) -> list[dict]:
-        """
-        Parse a YAML file containing learning objectives into a list of dictionaries.
-        Each dictionary contains the question and its answer.
-        
-        Returns:
-            List of dictionaries, each containing:
-            {
-                'question': str,  # The learning objective question
-                'answer': str,    # The correct answer
-                'section': str    # The section the question belongs to
-            }
-        """
-        try:
-            with open(yaml_file_path, 'r', encoding='utf-8') as file:
-                yaml_content = yaml.safe_load(file)
-                
-            objectives_list = []
-            
-            # Handle the list structure of the YAML
-            if isinstance(yaml_content, list):
-                for section in yaml_content:
-                    if isinstance(section, dict):
-                        for section_name, questions in section.items():
-                            if isinstance(questions, list):
-                                for question in questions:
-                                    if isinstance(question, dict):
-                                        for q, a in question.items():
-                                            if q.startswith('Question:'):
-                                                question_text = q.replace('Question:', '').strip()
-                                                answer_text = a.replace('Answer:', '').strip()
-                                                objectives_list.append({
-                                                    'question': question_text,
-                                                    'answer': answer_text,
-                                                    'section': section_name
-                                                })
-            
-            return objectives_list
-            
-        except Exception as e:
-            print(f"Error parsing YAML file: {e}")
-            return []
+        self._learning_objectives = self._get_learning_objectives_from_file(learning_objective_file_path)
+        self._prompt = self._get_prompt(prompt_file_path)
+        self._message_history = [GPTMessage(role="user_data", content=self._learning_objectives)]
 
-    def _get_prompt(self):
-        return Path("prompts/learning_objectives_prompt.txt").read_text(encoding="utf-8")
 
-    async def check_objectives_complete(self, most_recent_user_message: str) -> bool:
-        if not self._learning_objectives:
-            return False
-            
-        chat_result = await self._call_gpt(most_recent_user_message)
-        
-        if not isinstance(chat_result, list):
-            return False
+    def _get_learning_objectives_from_file(self, file_path):
+        # assumes any title/non Learning objective line will have a * in front of it
+        with open(file_path, 'r') as rubric_file:
+            objectives_dict = yaml.load(rubric_file, Loader=yaml.SafeLoader)
 
-        self._current_objective_complete = [
-            objective_already_complete or chat_response_objective.get('met', False) 
-            for objective_already_complete, chat_response_objective 
-            in zip(self._current_objective_complete, chat_result)
+        learning_objectives = []
+
+        def helper(dict):
+            for key, value in dict.items():
+                if key.starts_with("Objective"):
+                    learning_objectives.append(value)
+                else:
+                    for item in value:
+                        helper(item)
+
+        helper(objectives_dict)
+        return learning_objectives
+
+    def _get_prompt(self, prompt_file_path):
+        return Path(prompt_file_path).read_text(encoding="utf-8")
+
+    def _update_current_objectives_complete(self, chat_result):
+        self._current_objectives_complete = [
+            objective_already_complete or chat_response_objective.get('met', False)
+            for objective_already_complete, chat_response_objective
+            in zip(self._current_objectives_complete, chat_result)
         ]
-        return all(self._current_objective_complete)
 
-    async def _call_gpt(self, message: str) -> list[dict]:
+    def _update_learning_objectives_partial(self, chat_result):
+        self._current_objectives_partial = [
+            objective_partial or chat_response_partial.get('mentioned', False)
+            for objective_partial, chat_response_partial
+            in zip(self._current_objectives_partial, chat_result)
+        ]
+
+    def all_objectives_complete(self):
+        return all(self._current_objectives_complete)
+
+    def _create_partial_and_complete_lists(self, chat_results):
+        missing_objectives = [
+            lo
+            for lo, partial, bot_result in zip(self._learning_objectives, self._current_objectives_partial, chat_results)
+            if not partial
+        ]
+
+        partial_objectives = [
+            (lo, bot_result['reason'])
+            for lo, is_complete, bot_result in zip(self._learning_objectives, self._current_objectives_complete, chat_results)
+            if not is_complete
+        ]
+
+        missing_str = f"The following objectives are not mentioned: {(('\n - ' + obj) for obj in missing_objectives)}"
+        partial_str = f"The following objectives are not fully understood: {(('\n - ' + objective + " because " + reason) for objective, reason in partial_objectives)}"
+
+        return missing_str + '\n\n' + partial_str
+
+    async def get_missing_objectives(self, most_recent_user_message: str) -> bool:
+        self._message_history.append(GPTMessage(role='user', content=most_recent_user_message))
+
+        chat_result = await self._call_gpt()
+
+        self._update_current_objectives_complete(chat_result)
+        self._update_current_objectives_partial(chat_result)
+
+        return self._create_partial_and_complete_lists(chat_result)
+
+    async def _call_gpt(self) -> list[dict]:
         if not all([self.guild_id, self.thread_id, self.user_id, self.engine]):
             return []
 
@@ -99,7 +104,7 @@ class LearningObjectivesTracker:
             self.thread_id,
             self.user_id,
             self.engine,
-            GPTMessage(role='user', content=message),
+            self.message_history,
             tools=None
         )
 

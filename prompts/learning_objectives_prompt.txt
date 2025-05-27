@@ -9,13 +9,14 @@ Be concise in your answer.
 
 # Output Format
 You will be given a pdf, and a list of requirements.
-You are to say whether or not each item in the list of requirements is found in the pdf.
+You are to say whether or not each item in the list of requirements is met in the provided response.
 
 For each item in the list of requirements, you are to return the **exactly** following format:
 {
     "citation": _a **direct** quote from the submission_,
     "reason": _a reason for why or why not the submission met the criteria_,
-    "met": _true or false_
+    "met": _true or false_,
+    "mentioned": _true or false_
 }
 
 Place each of the generated objects into an array. It is shown below how exactly this should be done.
@@ -30,27 +31,33 @@ Submission: "I like fruit, particularly purple bananas. I also like dragonfruit 
 </user_query>
 
 <assistant_response>
+```
 [
     {
         "citation": "...purple bananas. I also like dragonfruit.",
         "reason": "the submission has the word banana and dragonfruit, which are both fruit",
-        "met": true
+        "met": True,
+        "mentioned": True;
     },
     {
         "citation": "particularly purple bananas",
         "reason": "the submission says purple which is a color",
-        "met": false
+        "met": True,
+        "mentioned": True
     },
     {
         "citation": "",
         "reason": "The sentences did not have any numbers",
-        "met": false
+        "met": False,
+        "mentioned": False
     },
     {
         "citation": "I also like dragonfruit when they are cut in triangles.",
         "reason": "A triangle is not a quadrilateral",
-        "met": false
+        "met": False,
+        "mentioned": False
     }
 ]
 </assistant_response>
+
 
