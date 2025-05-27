@@ -1,0 +1,29 @@
+- Priority Queue Questions:
+    - Objective: Can correctly explain what a PQ is
+    - Objective: Can correctly identify the four main functions of a priority queue (insert, pop min, decrease key, empty)
+
+    - Objective: Can correctly explain what the insert function does.
+    - Objective: Can correctly explain why the insert function matters
+    - Objective: Can correctly explain what the insert function takes in  for an array and all details would still work with other provided pseudo code
+    - Objective: Explains how the insert function will work (implementation details) and the psuedo code provided would work correctly. for an array and all details would still work with other provided pseudo code
+    - Objective: Can correctly explain what the insert function returns for an array and all details would still work with other provided pseudo code
+
+    - Objective: Can correctly explain what the pop min function does.
+    - Objective: Can correctly explain why the pop function matters
+    - Objective: Can correctly explain what the pop min function takes in for an array and all details would still work with other provided pseudo code
+    - Objective: Explains how the pop min function will work (implementation details) and the psuedo code provided would work correctly.  for an array and all details would still work with other provided pseudo code
+    - Objective: Can correctly explain what the pop min function returns for an array and all details would still work with other provided pseudo code
+
+    - Objective: Can correctly explain what the decrease key function does.
+    - Objective: Can correctly explain why the decrease key function matters
+    - Objective: Can correctly explain what the decrease key function takes in for an array and all details would still work with other provided pseudo code
+    - Objective: Explains how the decrease key function will work (implementation details) and the psuedo code provided would work correctly. for an array and all details would still work with other provided pseudo code
+    - Objective: Can correctly explain what the decrease key function returns for an array and all details would still work with other provided pseudo code
+
+    - Objective: Can correctly explain what the empty function does.
+    - Objective: Can correctly explain why the empty function matters
+    - Objective: Can correctly explain what the empty function takes in for an array and all details would still work with other provided pseudo code
+    - Objective: Explains how the empty function will work (implementation details) and the psuedo code provided would work correctly. for an array and all details would still work with other provided pseudo code
+    - Objective: Can correctly explain what the empty function returns for an array and all details would still work with other provided pseudo code
+
+    - Objective: All the provided pseudo code would work correctly together
