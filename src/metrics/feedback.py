@@ -69,19 +69,21 @@ class HaveTAGradingConversation:
                     await self._add_reaction(thread_id, message_id, '✅')
 
 
-
-                    await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
-                    try:
-                        async with queue('messages', None) as messages:
-                                    message: Message = await asyncio.wait_for(messages.get(), timeout=90)
-                                    message_content = message['content']
-                        if message_content == '-':
+                    if feedback_score != 'nan':
+                        await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
+                        try:
+                            async with queue('messages', None) as messages:
+                                        message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                                        message_content = message['content']
+                            if message_content == '-':
+                                await self._send_message(thread_id, "No feedback provided, skipping.")
+                            else:
+                                await self._send_message(thread_id, f"Feedback recorded, thank you.")
+                        except asyncio.TimeoutError:
+                            message_content = '-'
                             await self._send_message(thread_id, "No feedback provided, skipping.")
-                        else:
-                            await self._send_message(thread_id, f"Feedback recorded, thank you.")
-                    except asyncio.TimeoutError:
+                    else:
                         message_content = '-'
-                        await self._send_message(thread_id, "No feedback provided, skipping.")
 
 
 
