@@ -9,7 +9,10 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from .armory.tools import get_tool
+from src.armory.stat_tools import StatsTools
+from src.utils.data_store import DataStore
+from .armory.armory import Armory
+from .armory.cache import Cache
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -109,11 +112,15 @@ def _has_workflow_of_type(config: Config, wtype: str):
 
 def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
     ducks = {}
-
     if _has_workflow_of_type(config, 'basic_prompt_conversation'):
+        data_store = DataStore(config['dataset_folder_locations'])
+        cache = Cache()
+        armory = Armory()
+        stat_tools = StatsTools(data_store, cache)
+        armory.scrub_tools(stat_tools)
         ai_client = OpenAI(
             os.environ['OPENAI_API_KEY'],
-            get_tool,
+            armory,
             metrics_handler.record_usage
         )
 
