@@ -28,10 +28,10 @@ class Armory:
         self._tools[tool_function.__name__] = tool, tool_function
 
     def get_tools(self) -> dict[str, Callable]:
-        return {name: tool[1] for name, tool in self._tools.items()}
+        return {name: method for name,(meta, method) in self._tools.items()}
 
     def get_tool_metadata(self) -> dict[str, FunctionTool]:
-        return {name: tool[0] for name, tool in self._tools.items()}
+        return {name: meta for name,(meta, method) in self._tools.items()}
 
     def get_specific_tool_metadata(self, tool_name: str) -> FunctionTool:
         if tool_name in self._tools:

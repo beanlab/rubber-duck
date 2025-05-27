@@ -20,7 +20,6 @@ pymysql = "^1.1.1"
 openai-agents ="^0.0.14"
 scipy = "^1.15.3"
 websockets = "^15.0.1"
-joblib = "^1.5.1"
 
 
 [tool.poetry.dev-dependencies]
