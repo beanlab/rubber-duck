@@ -86,27 +86,3 @@ def example_function(arr):
 ```
 
 ---
-
-## 4. Time & Space Complexity
-
-- **What is the overall time complexity of your algorithm?**  
-  _Use Big-O notation (e.g., O(n log n), O(n²))._
-
-```
-# Write answer here
-```
-
-- **What is the overall space complexity?**
-
-```
-# Write answer here
-```
-
-- **What are the main contributors to the time and space cost?**  
-  _Explain which parts of the algorithm have the biggest impact._
-
-```
-# Write answer here
-```
-
----

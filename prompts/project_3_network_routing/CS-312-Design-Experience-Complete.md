@@ -170,34 +170,4 @@ def delete_min(self):
     return root
 
 ```
-
----
-
-## 4. Time & Space Complexity
-
-- **What is the overall time complexity of your algorithm?**  
-  _Use Big-O notation (e.g., O(n log n), O(n²))._
-  
-```
-  - Heap-based Dijkstra:
-    Time: O((V + E) log V)
-    Space: O(V)
-  - Array-based Dijkstra:
-    Time: O(V^2 + E)
-    Space: O(V)
-```
-
-- **What is the overall space complexity?**
-```
-  - O(n) for both heap and array implementations, where n is the number of nodes in the graph.
-```
-
-- **What are the main contributors to the time and space cost?**  
-  _Explain which parts of the algorithm have the biggest impact._
-```
-  - Time complexity is dominated by the priority queue operations (insert and extract-min) for the heap-based version. For the array version, it is the delete operation that takes the longest.
-  - Space complexity is due to the queue size or the amount of nodes in the graph.
-```
-
-
 ---
