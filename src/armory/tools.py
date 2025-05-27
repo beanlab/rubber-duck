@@ -1,4 +1,4 @@
-from agents import function_tool, FunctionTool
+from agents import FunctionTool
 
 _tools: dict[str, FunctionTool] = {}
 
