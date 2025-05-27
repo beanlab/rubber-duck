@@ -4,7 +4,7 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..utils.protocols import AddReaction, SendMessage, ReportError, Message, WaitTyping
+from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
 from ..utils.logger import duck_logger
 
 
@@ -25,16 +25,12 @@ class HaveTAGradingConversation:
                  feedback_manager: FeedbackManager,
                  record_feedback: RecordFeedback,
                  send_message: SendMessage,
-                 wait_typing: WaitTyping,
                  add_reaction: AddReaction,
                  report_error: ReportError,
                  ):
         self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
-
         self._record_feedback: RecordFeedback = step(record_feedback)
-
         self._send_message = step(send_message)
-        self._wait_typing = step(wait_typing)
         self._add_reaction = step(add_reaction)
         self._report_error = step(report_error)
 
@@ -73,20 +69,21 @@ class HaveTAGradingConversation:
                     await self._add_reaction(thread_id, message_id, '✅')
 
 
-                    if feedback_score != 'nan' and feedback_score < 5:
-                        await self._send_message(thread_id, "Add any additional feedback about this conversation.")
-                        did_start_typing = await self._wait_typing(thread_id, reviewer_id, timeout=5)
-                        if did_start_typing:
-                            async with queue('messages', None) as messages:
-                                message: Message = await asyncio.wait_for(messages.get(), timeout)
-                                message_content = message['content']
+
+                    await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
+                    try:
+                        async with queue('messages', None) as messages:
+                                    message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                                    message_content = message['content']
+                        if message_content == '-':
+                            await self._send_message(thread_id, "No feedback provided, skipping.")
                         else:
-                            await self._send_message(thread_id, "Skipping due to no response.")
-                            message_content = ''
-                    elif feedback_score == 5:
-                        message_content = "Conversation was rated as excellent, no additional feedback needed."
-                    else:
-                        message_content = "No feedback provided."
+                            await self._send_message(thread_id, f"Feedback recorded, thank you.")
+                    except asyncio.TimeoutError:
+                        message_content = '-'
+                        await self._send_message(thread_id, "No feedback provided, skipping.")
+
+
 
 
 

@@ -1,7 +1,4 @@
-import asyncio
-
 import discord
-from discord.abc import Messageable
 
 from ..utils.logger import duck_logger
 from ..utils.protocols import Attachment, Message, SendableFile
@@ -195,15 +192,3 @@ class DiscordBot(discord.Client):
                 await self.send_message(self._admin_channel, msg)
             except:
                 duck_logger.exception(f'Unable to message channel {self._admin_channel}')
-
-    async def wait_typing(self, channel_id: int, user_id: int, timeout: float = 3.0) -> bool:
-        try:
-            def check(typing_channel, typing_user, when):
-                return (
-                    typing_channel.id == channel_id and
-                    typing_user.id == user_id
-                )
-            await self.wait_for("typing", timeout=timeout, check=check)
-            return True
-        except asyncio.TimeoutError:
-            return False

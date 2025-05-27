@@ -1,9 +1,6 @@
 from io import BytesIO
 from typing import Protocol, TypedDict
 
-import discord
-from discord.abc import Messageable
-
 
 class Attachment(TypedDict):
     attachment_id: int
@@ -41,8 +38,6 @@ class AddReaction(Protocol):
 class ReportError(Protocol):
     async def __call__(self, msg: str, notify_admin: bool = False): ...
 
-class WaitTyping(Protocol):
-    async def __call__(self, channel_id: int, user_id: int, timeout: float = 3.0) -> bool: ...
 
 class Context(Protocol):
     async def __aenter__(self): ...

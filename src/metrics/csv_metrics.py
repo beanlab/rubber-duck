@@ -23,7 +23,7 @@ class CSVMetricsHandler:
         self._usage_file = metrics_folder / 'usage.csv'
         if not self._usage_file.exists():
             self._usage_file.write_text(
-                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'engine', 'input_tokens',
+                ','.join(['timestamp', 'guild_id', 'parent_channel_id', 'thread_id', 'user_id', 'engine', 'input_tokens',
                           'output_tokens', 'cached_tokens','reasoning_tokens']) + '\n')
 
         self._feedback_file = metrics_folder / 'feedback.csv'
