@@ -137,7 +137,7 @@ class MultiPromptConversation:
 
                         await self._orchestrate_messages([missing_objectives[:1500]], guild_id, thread_id, user_id, [])
 
-                        # TODO add a sub conversation -- ask the user what they would like to talk about next.
+                        # TODO: We are going to probe the user for the learning objectives
                             # Then ask a sub bot to have that conversation about that objective
 
                         # await self._record_message(
