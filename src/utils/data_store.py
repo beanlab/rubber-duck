@@ -5,6 +5,7 @@ from typing import TypedDict
 
 import boto3
 import pandas as pd
+from boto3.exceptions import ResourceNotExistsError
 
 
 class ColumnMetadata(TypedDict):
@@ -14,6 +15,7 @@ class ColumnMetadata(TypedDict):
 
 
 class DatasetMetadata(TypedDict):
+    location: str
     name: str
     columns: list[ColumnMetadata]
 
@@ -33,15 +35,15 @@ class DataStore:
         else:
             yield from self._load_md_from_local(location)
 
-    def _s3_file_extraction(self, bucket, obj, prefix):
+    def _read_md_from_s3_object(self, bucket, obj, prefix):
         key = obj['Key']
         if key.endswith('.csv'):
             key = str(key)
             metadata_file = key[:-len('.csv')] + '.meta.json'
-            if self._file_exists(metadata_file, True, bucket):
-                yield from self._load_md_from_json(metadata_file, True, bucket)
+            if self._s3_file_exists(bucket, metadata_file):
+                yield from self._load_md_from_s3_json(bucket, metadata_file)
             else:
-                yield from self._load_md_from_csv(key, True, bucket, prefix)
+                yield from self._load_md_from_s3_csv(bucket, key)
 
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
@@ -49,44 +51,52 @@ class DataStore:
             prefix += '/'
         response = self._s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
         for obj in response.get('Contents', []):
-            yield from self._s3_file_extraction(bucket, obj, prefix)
+            yield from self._read_md_from_s3_object(bucket, obj, prefix)
 
-    def _local_file_extraction(self, file):
+    def _read_md_from_local_file(self, file):
         if file.is_file() and file.name.endswith('.csv'):
-            metadata_file = str(file.with_suffix('.meta.json'))
-            if self._file_exists(metadata_file, False):
-                yield from self._load_md_from_json(metadata_file, False)
+            metadata_file = file.with_suffix('.meta.json')
+            if metadata_file.exists():
+                yield from self._load_md_from_local_json(metadata_file)
             else:
-                yield from self._load_md_from_csv(str(file), False)
+                yield from self._load_md_from_local_csv(file)
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
-            yield from self._local_file_extraction(file)
+            yield from self._read_md_from_local_file(file)
 
-    def _load_md_from_json(self, location: str, s3: bool, bucket: str = ""):
-        if s3:
-            full_location = f"s3://{bucket}/{location}"
-            obj = self._s3_client.get_object(Bucket=bucket, Key=location)
-            metadata = json.loads(obj['Body'].read().decode('utf-8'))
-        else:
-            full_location = str(Path(location).resolve())
-            with open(location, 'r') as meta_file:
-                metadata = json.load(meta_file)
-        name = metadata['name']
-        columns = [ColumnMetadata(**col) for col in metadata['columns']]
-        yield name, DatasetMetadata(location=full_location, name=name, columns=columns)
+    def _load_md_from_s3_json(self, bucket: str, obj: str) -> DatasetMetadata:
+        obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
+        md = json.loads(obj['Body'].read().decode('utf-8'))
+        md['location'] = f"s3://{bucket}/{obj}"
+        return md
 
-    def _load_md_from_csv(self, location: str, s3: bool, bucket: str = "", prefix: str = ""):
-        name = Path(location).stem if not s3 else location.replace(prefix, '').replace('.csv', '')
-        if s3:
-            full_location = f"s3://{bucket}/{location}"
-            obj = self._s3_client.get_object(Bucket=bucket, Key=location)
-            df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')), nrows=0)
-        else:
-            full_location = str(Path(location).resolve())
-            df = pd.read_csv(location, nrows=0)
-        columns = [ColumnMetadata(name=col, dtype=str(df[col].dtype), description="") for col in df.columns]
-        yield name, DatasetMetadata(location=full_location, name=name, columns=columns)
+    def _load_md_from_local_json(self, location: Path):
+        metadata = json.loads(location.read_text())
+        metadata['location'] = str(location.resolve())
+        return metadata
+
+    def _load_md_from_s3_csv(self, bucket: str, obj: str) -> DatasetMetadata:
+        full_location = f"s3://{bucket}/{obj}"
+        name = obj.replace('.csv', '')
+
+        obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
+        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')), nrows=0)
+        columns = [
+            ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
+            for col in df.columns
+        ]
+        return DatasetMetadata(location=full_location, name=name, columns=columns)
+
+    def _load_md_from_local_csv(self, location: Path) -> DatasetMetadata:
+        name = location.stem
+        full_location = str(Path(location).resolve())
+        df = pd.read_csv(location, nrows=0)
+        columns = [
+            ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
+            for col in df.columns
+        ]
+        return DatasetMetadata(location=full_location, name=name, columns=columns)
 
     def _is_s3_location(self, location: str):
         return location.startswith("s3://")
@@ -95,17 +105,14 @@ class DataStore:
         link = link.replace("s3://", "").split("/", 1)
         return link[0], link[1] if len(link) > 1 else ""
 
-    def _file_exists(self, path: str, s3: bool, bucket: str = ""):
-        if s3:
-            try:
-                self._s3_client.head_object(Bucket=bucket, Key=path)
-                return True
-            except Exception as e:
-                if e.response['Error']['Code'] == '404':
-                    return False
-                raise e
-        else:
-            return Path(path).exists()
+    def _s3_file_exists(self, bucket: str, obj: str):
+        try:
+            self._s3_client.head_object(Bucket=bucket, Key=obj)
+            return True
+        except ResourceNotExistsError as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+            raise e
 
     def get_dataset_metadata(self) -> dict[str, DatasetMetadata]:
         return self._metadata
@@ -114,7 +121,8 @@ class DataStore:
         try:
             return self._metadata[name]['columns']
         except KeyError:
-            raise KeyError(f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
+            raise KeyError(
+                f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
 
     def get_available_datasets(self) -> list[str]:
         return sorted(list(self._metadata.keys()))
@@ -136,7 +144,8 @@ class DataStore:
                 self._loaded_datasets[name] = df
                 return df
         except KeyError:
-            raise KeyError(f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
+            raise KeyError(
+                f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
 
         raise FileNotFoundError(
             f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}")
