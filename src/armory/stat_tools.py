@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import skew
+from scipy import stats
+from scipy.stats import skew, norm, ttest_1samp, t
 from seaborn.external.kde import gaussian_kde
 
 from .cache import Cache, cache_tool, BytesIOPrep
@@ -85,8 +86,8 @@ class StatsTools:
         plt.close()
         return name, buffer
 
-    def _photo_name(self, dataset: str, column: str, kind: str) -> str:
-        return f"{dataset}_{column}_{kind}.png"
+    def _photo_name(self, *args) -> str:
+        return "_".join(str(arg) for arg in args if arg) + ".png"
 
     @register_tool
     def describe_dataset(self, dataset: str) -> str:
@@ -176,6 +177,7 @@ class StatsTools:
 
         return name, buf
 
+    # Tools for dataset statistics and visualizations
     @register_tool
     @cache_tool(BytesIOPrep())
     def plot_histogram(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
@@ -395,3 +397,165 @@ class StatsTools:
         proportions = (series.value_counts(normalize=True, dropna=True).round(4).reset_index())
         proportions.columns = ["Category", "Proportion"]
         return proportions.to_dict(orient="records")
+
+    # Tools for distribution statistics and visualizations
+
+    @register_tool
+    def calculate_probability_from_normal_distribution(self, z1, z2=None, mean=0, std=1, tail="Upper Tail"):
+        """Calculates the probability for one or two z-scores from a normal distribution."""
+        duck_logger.debug(f"Calculating probability for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
+        z = (z1 - mean) / std
+        if z2 is not None:
+            z2 = (z2 - mean) / std
+
+        if tail == "Upper Tail":
+            return round(norm.sf(z), 4)
+        elif tail == "Lower Tail":
+            return round(norm.cdf(z), 4)
+        elif tail == "Between" and z2 is not None:
+            return round(norm.cdf(max(z, z2)) - norm.cdf(min(z, z2)), 4)
+        else:
+            raise ValueError("Invalid input for tail or missing z2")
+
+    @register_tool
+    def calculate_percentiles_from_normal_distribution(self, p1, p2=None, mean=0, std=1, tail="Lower Tail"):
+        """Calculates z-score values corresponding to given percentiles from a normal distribution."""
+        duck_logger.debug(f"Calculating percentiles for p1={p1}, p2={p2}, mean={mean}, std={std}, tail={tail}")
+        p1 = p1 / 100 if p1 > 1 else p1
+        if p2 is not None:
+            p2 = p2 / 100 if p2 > 1 else p2
+
+        if tail == "Upper Tail":
+            return round(norm.ppf(1 - p1, loc=mean, scale=std), 4)
+        elif tail == "Lower Tail":
+            return round(norm.ppf(p1, loc=mean, scale=std), 4)
+        elif tail == "Between" and p2 is not None:
+            lower = norm.ppf(min(p1, p2), loc=mean, scale=std)
+            upper = norm.ppf(max(p1, p2), loc=mean, scale=std)
+            return round(lower, 4), round(upper, 4)
+        else:
+            raise ValueError("Invalid input for tail or missing p2")
+
+    @register_tool
+    @cache_tool(BytesIOPrep())
+    def plot_normal_distribution(self, z1, z2=None, mean=0, std=1, tail="Upper Tail") -> tuple[str, io.BytesIO]:
+        """Plots a normal distribution with shaded areas for specified z-scores. If only one z-score is provided, it will shade the area for that z-score."""
+        duck_logger.debug(f"Plotting normal distribution for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
+        x = np.linspace(mean - 4 * std, mean + 4 * std, 1000)
+        y = norm.pdf(x, mean, std)
+        name = self._photo_name(z1, z2, mean, std, tail, "distribution")
+        plt.figure(figsize=(10, 5))
+        plt.plot(x, y, 'black')
+
+        if tail == "Upper Tail":
+            plt.fill_between(x, y, where=(x >= z1), color='blue', alpha=0.3)
+        elif tail == "Lower Tail":
+            plt.fill_between(x, y, where=(x <= z1), color='blue', alpha=0.3)
+        elif tail == "Between" and z2 is not None:
+            plt.fill_between(x, y, where=((x >= min(z1, z2)) & (x <= max(z1, z2))), color='blue', alpha=0.3)
+
+        plt.title(f'Normal Distribution (mean={mean}, std={std})')
+        plt.xlabel('Value')
+        plt.ylabel('Density')
+        plt.grid(True)
+        return self._save_plot(name)
+
+    #Tools for Mean EDA
+
+    @register_tool
+    def calculate_confidence_interval_and_t_test(self, dataset, variable, alternative="two.sided", mu=0, conf_level=0.95) -> str:
+        """Performs a one-sample t-test and returns a formatted summary string of the test results."""
+        duck_logger.debug(f"Calculating confidence interval and t-test for {dataset}.{variable} with alternative={alternative}, mu={mu}, conf_level={conf_level}")
+        data = self._datastore.get_dataset(dataset)
+        sample_data = data[variable].dropna()
+        t_stat, p_value = ttest_1samp(sample_data, popmean=mu)
+        df = len(sample_data) - 1
+        mean_estimate = sample_data.mean()
+        se = sample_data.std(ddof=1) / np.sqrt(len(sample_data))
+        ci_range = t.interval(conf_level, df, loc=mean_estimate, scale=se)
+
+        if alternative == "greater":
+            p_value = p_value / 2 if t_stat > 0 else 1 - p_value / 2
+        elif alternative == "less":
+            p_value = p_value / 2 if t_stat < 0 else 1 - p_value / 2
+
+        summary = (
+            f"t-Test for H0: Mean({variable}) = {mu}.\n"
+            f"Alternative Hypothesis = {alternative}.\n"
+            f"y-bar = {round(mean_estimate, 4)}.\n"
+            f"t Test statistic = {round(t_stat, 4)}.\n"
+            f"p-value = {round(p_value, 4)}.\n"
+            f"{int(conf_level * 100)}% Confidence Interval: "
+            f"{tuple(round(x, 4) for x in ci_range)}.\n"
+        )
+        return summary
+
+    @register_tool
+    @cache_tool(BytesIOPrep())
+    def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative="two.sided", mu=0,
+                                                    conf_level=0.95) -> tuple[str, io.BytesIO]:
+        """
+        Plots the t-distribution with the test statistic and confidence interval.
+        Returns a message and the image buffer of the plot.
+        """
+        duck_logger.debug(
+            f"Plotting t-distribution for column={column} in dataset={dataset}, alternative={alternative}, mu={mu}, conf_level={conf_level}")
+
+        name = self._photo_name(dataset, alternative, mu, conf_level, "t_distribution")
+        data = self._datastore.get_dataset(dataset)
+        series = data[column]
+
+        if self._is_categorical(series):
+            return ("T-statistic cannot be calculated for categorical data", io.BytesIO())
+
+        series_clean = series.dropna()
+        n = len(series_clean)
+        if n < 2:
+            return ("Not enough data to perform t-test", io.BytesIO())
+
+        mean_estimate = series_clean.mean()
+        std_err = np.std(series_clean, ddof=1) / np.sqrt(n)
+        df = n - 1
+
+        if std_err == 0:
+            return ("Standard error is zero, cannot perform t-test", io.BytesIO())
+
+        t_stat = (mean_estimate - mu) / std_err
+
+        try:
+            conf_int = stats.t.interval(conf_level, df, loc=mean_estimate, scale=std_err)
+        except Exception as e:
+            duck_logger.error(f"Confidence interval calculation failed: {e}")
+            return ("Error calculating confidence interval", io.BytesIO())
+
+        # Plotting
+        x = np.linspace(stats.t.ppf(0.001, df), stats.t.ppf(0.999, df), 1000)
+        y = stats.t.pdf(x, df)
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(x, y, 'black', label='t-distribution')
+        plt.axvline(t_stat, color='blue', linestyle='--', label=f't = {round(t_stat, 4)}')
+        plt.xlabel('t')
+        plt.ylabel('Density')
+        plt.title('t-Distribution with Confidence Interval')
+
+        # Shading rejection regions
+        if alternative == "greater":
+            plt.fill_between(x, y, where=(x >= stats.t.ppf(1 - (1 - conf_level), df)), color='red', alpha=0.3,
+                             label='Rejection Region')
+        elif alternative == "less":
+            plt.fill_between(x, y, where=(x <= stats.t.ppf((1 - conf_level), df)), color='red', alpha=0.3,
+                             label='Rejection Region')
+        elif alternative == "two.sided":
+            alpha = 1 - conf_level
+            t_crit = stats.t.ppf(1 - alpha / 2, df)
+            plt.fill_between(x, y, where=(x <= -t_crit), color='red', alpha=0.3, label='Rejection Region')
+            plt.fill_between(x, y, where=(x >= t_crit), color='red', alpha=0.3)
+
+        # Confidence Interval line
+        plt.axvline((conf_int[0] - mu) / std_err, color='green', linestyle='--', label=f'{int(conf_level * 100)}% CI')
+        plt.axvline((conf_int[1] - mu) / std_err, color='green', linestyle='--')
+        plt.legend()
+        plt.grid(True)
+
+        return self._save_plot(name)
