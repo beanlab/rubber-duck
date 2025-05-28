@@ -460,7 +460,7 @@ class StatsTools:
         plt.grid(True)
         return self._save_plot(name)
 
-    #Tools for Mean EDA
+    # Tools for Single Mean EDA
 
     @register_tool
     def calculate_confidence_interval_and_t_test(self, dataset, variable, alternative="two.sided", mu=0, conf_level=0.95) -> str:
@@ -503,7 +503,7 @@ class StatsTools:
 
         name = self._photo_name(dataset, alternative, mu, conf_level, "t_distribution")
         data = self._datastore.get_dataset(dataset)
-        series = data[column]
+        series = data[column].dropna()
 
         if self._is_categorical(series):
             return ("T-statistic cannot be calculated for categorical data", io.BytesIO())
@@ -559,3 +559,66 @@ class StatsTools:
         plt.grid(True)
 
         return self._save_plot(name)
+
+    # Tools for Two Mean EDA
+    @register_tool
+    def calculate_two_mean_t_test(self, dataset: str, column1: str, column2: str, alternative="two.sided",
+                                   conf_level=0.95) -> str:
+        """Performs a two-sample t-test on a numeric variable split by a categorical variable."""
+
+        duck_logger.debug(f"Calculating two-sample t-test for {dataset}.{column1} and {dataset}.{column2}, "
+                          f"alternative={alternative}, conf_level={conf_level}")
+
+        data = self._datastore.get_dataset(dataset)
+
+        # Identify categorical and numeric columns
+        if self._is_categorical(column1) and not self._is_categorical(column2):
+            group_col, value_col = column1, column2
+        elif self._is_categorical(column2) and not self._is_categorical(column1):
+            group_col, value_col = column2, column1
+        else:
+            return "Exactly one of the two columns must be categorical (with 2 levels) and the other numeric."
+
+        # Drop missing values
+        subset = data[[group_col, value_col]].dropna()
+
+        # Get unique groups
+        groups = subset[group_col].unique()
+        if len(groups) != 2:
+            return f"Categorical variable '{group_col}' must have exactly 2 levels for a two-sample t-test."
+
+        # Extract the two samples
+        group1_vals = subset[subset[group_col] == groups[0]][value_col]
+        group2_vals = subset[subset[group_col] == groups[1]][value_col]
+
+        if len(group1_vals) < 2 or len(group2_vals) < 2:
+            return "Not enough data in one or both groups to perform the t-test."
+
+        # Perform t-test
+        t_stat, p_value = stats.ttest_ind(group1_vals, group2_vals, equal_var=False)
+
+        # Degrees of freedom
+        df = len(group1_vals) + len(group2_vals) - 2
+
+        # Mean difference and CI
+        mean_diff = group1_vals.mean() - group2_vals.mean()
+        se_diff = np.sqrt(group1_vals.var(ddof=1) / len(group1_vals) +
+                          group2_vals.var(ddof=1) / len(group2_vals))
+        ci_range = stats.t.interval(conf_level, df, loc=mean_diff, scale=se_diff)
+
+        # Adjust p-value based on one-sided test
+        if alternative == "greater":
+            p_value = p_value / 2 if t_stat > 0 else 1 - p_value / 2
+        elif alternative == "less":
+            p_value = p_value / 2 if t_stat < 0 else 1 - p_value / 2
+
+        summary = (
+            f"Two-Sample t-Test for H0: Mean({groups[0]}) = Mean({groups[1]}) on '{value_col}'.\n"
+            f"Alternative Hypothesis: {alternative}.\n"
+            f"Mean Difference = {round(mean_diff, 4)}.\n"
+            f"t Test Statistic = {round(t_stat, 4)}.\n"
+            f"p-value = {round(p_value, 4)}.\n"
+            f"{int(conf_level * 100)}% Confidence Interval: "
+            f"{tuple(round(x, 4) for x in ci_range)}.\n"
+        )
+        return summary

@@ -46,7 +46,5 @@ def cache_tool(prep: PrepProtocol = CommonPrep()):
             result = method(self, *args, **kwargs)
             self._cache.put(key, result)
             return result
-
         return wrapper
-
     return cache_result
