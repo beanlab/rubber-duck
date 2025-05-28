@@ -76,6 +76,6 @@ class Config(TypedDict):
     reporting: dict[str, str]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
-    dataset_folder_locations : list[str]
+    dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     sender_email: str
