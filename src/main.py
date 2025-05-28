@@ -9,10 +9,9 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.armory.stat_tools import StatsTools
-from src.utils.data_store import DataStore
 from .armory.armory import Armory
 from .armory.cache import Cache
+from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -28,6 +27,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import (
     Config, )
+from .utils.data_store import DataStore
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue

@@ -1,18 +1,31 @@
 import functools
 import io
+from typing import Protocol
 
 from ..utils.logger import duck_logger
+
+
+class PrepProtocol(Protocol):
+    def run(self, value):
+        ...
+
+
+class CommonPrep:
+    def run(self, value):
+        return value
+
+
+class BytesIOPrep:
+    def run(self, value):
+        for output in value:
+            if isinstance(output, io.BytesIO):
+                output.seek(0)
+        return value
 
 
 class Cache:
     def __init__(self):
         self.cache = {}
-
-    @staticmethod
-    def cache_key(*args, **kwargs):
-        key_parts = [str(arg) for arg in args]
-        key_parts += [f"{k}={v}" for k, v in sorted(kwargs.items())]
-        return "_".join(key_parts)
 
     def get(self, key):
         return self.cache.get(key)
@@ -21,20 +34,19 @@ class Cache:
         self.cache[key] = value
 
 
-def cache_result(method):
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        key = Cache.cache_key(method.__name__, *args, **kwargs)
-        if value := self._cache.get(key):
-            duck_logger.debug(f"Using cached result for {method.__name__} with key={key}")
-            if isinstance(value, tuple) and any(isinstance(v, io.BytesIO) for v in value):
-                for v in value:
-                    if isinstance(v, io.BytesIO):
-                        v.seek(0)
-            return value
+def cache_tool(prep: PrepProtocol = CommonPrep()):
+    def cache_result(method):
+        @functools.wraps(method)
+        def wrapper(self, *args, **kwargs):
+            key = (method.__name__, *args, tuple(sorted(kwargs.items())))
+            if value := self._cache.get(key):
+                value = prep.run(value)
+                return value
+            duck_logger.debug(f"Caching result for {method.__name__} with key={key}")
+            result = method(self, *args, **kwargs)
+            self._cache.put(key, result)
+            return result
 
-        duck_logger.debug(f"Caching result for {method.__name__} with key={key}")
-        result = method(self, *args, **kwargs)
-        self._cache.put(key, result)
-        return result
-    return wrapper
+        return wrapper
+
+    return cache_result

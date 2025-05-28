@@ -7,7 +7,7 @@ import seaborn as sns
 from scipy.stats import skew
 from seaborn.external.kde import gaussian_kde
 
-from .cache import Cache, cache_result
+from .cache import Cache, cache_tool, BytesIOPrep
 from .tools import register_tool
 from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
@@ -17,7 +17,6 @@ class StatsTools:
     def __init__(self, datastore: DataStore, cache: Cache):
         self._datastore = datastore
         self._cache = cache
-
 
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
@@ -90,7 +89,45 @@ class StatsTools:
         return f"{dataset}_{column}_{kind}.png"
 
     @register_tool
-    @cache_result
+    def describe_dataset(self, dataset: str) -> str:
+        """Returns a description of the dataset."""
+        duck_logger.debug(f"Used describe_dataset on dataset={dataset}")
+        data = self._datastore.get_columns_metadata(dataset)
+        data_expanded = [
+            f"Column Name: {col['name']}, Column Data Type {col['dtype']}. Column Description: {col['description']}" for
+            col in data]
+        return " ".join(data_expanded) if data_expanded else "No columns found in dataset."
+
+    @register_tool
+    def explain_capabilities(self):
+        """Returns a description of the bots capabilites."""
+        duck_logger.debug("Used explain_capabilities")
+        return (
+            "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
+            "- Generate visualizations: histograms, boxplots, dotplots, barplots, pie charts, and proportion barplots.\n"
+            "- Compute statistics: mean, median, mode (via KDE), standard deviation, skewness, and five-number summaries.\n"
+            "- Summarize categorical data with frequency tables and proportions.\n"
+            "- List available datasets and variable names within datasets.\n"
+            "- Provide descriptions and metadata for datasets.\n\n"
+            "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
+        )
+
+    @register_tool
+    def get_dataset_names(self) -> str:
+        """Returns a list of all available datasets."""
+        duck_logger.debug("Used get_available_datasets")
+        datasets = self._datastore.get_available_datasets()
+        return f"Available datasets: {', '.join(datasets)}"
+
+    @register_tool
+    def get_variable_names(self, dataset: str) -> str:
+        """Returns a list of all variable names in the dataset."""
+        duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
+        data = self._datastore.get_dataset(dataset).columns.to_list()
+        return f"Variable names in {dataset}: {', '.join(data)}"
+
+    @register_tool
+    @cache_tool(BytesIOPrep())
     def show_dataset_head(self, dataset: str, n: int) -> tuple[str, io.BytesIO]:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
@@ -140,43 +177,7 @@ class StatsTools:
         return name, buf
 
     @register_tool
-    def describe_dataset(self, dataset: str) -> str:
-        """Returns a description of the dataset."""
-        duck_logger.debug(f"Used describe_dataset on dataset={dataset}")
-        data = self._datastore.get_columns_metadata(dataset)
-        data_expanded = [f"Column Name: {col['name']}, Column Data Type {col['dtype']}. Column Description: {col['description']}" for col in data]
-        return " ".join(data_expanded) if data_expanded else "No columns found in dataset."
-
-    @register_tool
-    def explain_capabilities(self):
-        """Returns a description of the bots capabilites."""
-        duck_logger.debug("Used explain_capabilities")
-        return (
-            "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
-            "- Generate visualizations: histograms, boxplots, dotplots, barplots, pie charts, and proportion barplots.\n"
-            "- Compute statistics: mean, median, mode (via KDE), standard deviation, skewness, and five-number summaries.\n"
-            "- Summarize categorical data with frequency tables and proportions.\n"
-            "- List available datasets and variable names within datasets.\n"
-            "- Provide descriptions and metadata for datasets.\n\n"
-            "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
-        )
-
-    @register_tool
-    def get_dataset_names(self) -> str:
-        """Returns a list of all available datasets."""
-        duck_logger.debug("Used get_available_datasets")
-        datasets = self._datastore.get_available_datasets()
-        return f"Available datasets: {', '.join(datasets)}"
-
-    @register_tool
-    def get_variable_names(self, dataset: str) -> str:
-        """Returns a list of all variable names in the dataset."""
-        duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
-        data = self._datastore.get_dataset(dataset).columns.to_list()
-        return f"Variable names in {dataset}: {', '.join(data)}"
-
-    @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_histogram(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
@@ -198,7 +199,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_boxplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
@@ -219,7 +220,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_dotplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
@@ -240,7 +241,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
@@ -260,7 +261,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
@@ -284,7 +285,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_result
+    @cache_tool(BytesIOPrep())
     def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
