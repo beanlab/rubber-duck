@@ -141,11 +141,6 @@ class DiscordBot(discord.Client):
             duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
-        if message:
-            for block in _parse_blocks(message):
-                curr_message = await channel.send(block)
-            return curr_message.id
-
         if file is not None:
             files_to_send = []
             if not isinstance(file, list):
@@ -157,7 +152,18 @@ class DiscordBot(discord.Client):
             curr_message = await channel.send(files=file_to_send)
             return curr_message.id
 
-        if view is not None:
+        if message:
+            if view is not None:
+                # Send message with view
+                curr_message = await channel.send(message, view=view)
+                return curr_message.id
+            else:
+                # Send message without view
+                for block in _parse_blocks(message):
+                    curr_message = await channel.send(block)
+                return curr_message.id
+        elif view is not None:
+            # Send only view
             return (await channel.send(view=view)).id
 
         raise Exception('Must send message, file, or view')
