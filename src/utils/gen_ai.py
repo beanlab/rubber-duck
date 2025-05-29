@@ -5,7 +5,7 @@ from typing import Callable, TypedDict, Protocol
 
 from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, NotGiven
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, NotGiven, OpenAI as OpenAIClient
 from openai.types.chat import ChatCompletion
 from quest import step
 
@@ -69,8 +69,41 @@ class OpenAI:
                  record_usage: RecordUsage,
                  ):
         self._client = AsyncOpenAI(api_key=openai_api_key)
+        self._response_client = OpenAIClient(api_key=openai_api_key)
         self._get_tool = get_tool
         self._record_usage = step(record_usage)
+
+
+    async def get_structured_response_with_usage(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            engine: str,
+            message_history,
+            text_format=NotGiven()
+    ):
+
+        completion = self._response_client.responses.parse(
+            model=engine,
+            input=message_history,
+            text_format=text_format
+        )
+
+        completion_dict = completion.model_dump()
+
+        await self._record_usage(
+            guild_id,
+            parent_channel_id,
+            thread_id, user_id,
+            engine,
+            completion_dict['usage']['prompt_tokens'],
+            completion_dict['usage']['completion_tokens'],
+            completion_dict['usage'].get('cached_tokens', 0),
+            completion_dict['usage'].get('reasoning_tokens', 0)
+        )
+        return completion
 
     async def _get_completion_with_usage(
             self,
@@ -80,8 +113,7 @@ class OpenAI:
             user_id: int,
             engine: str,
             message_history,
-            functions,
-            response_format=NotGiven()
+            functions
     ):
 
         if not functions:
@@ -91,7 +123,6 @@ class OpenAI:
             model=engine,
             messages=message_history,
             functions=functions,
-            response_format=response_format
         )
 
         completion_dict = completion.model_dump()

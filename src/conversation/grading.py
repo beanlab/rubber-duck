@@ -1,5 +1,6 @@
 import asyncio
 
+from pydantic import BaseModel
 from quest import wrap_steps, step, queue
 
 from ..bot.discord_bot import read_text_from_discord_url, download_discord_file
@@ -7,6 +8,12 @@ from ..conversation.conversation import BasicSetupConversation
 from ..utils.gen_ai import RecordMessage, RecordUsage, OpenAI
 from ..utils.protocols import SendMessage, ReportError, Message
 
+class Grade(BaseModel):
+    met: bool
+    justification: str
+
+class GradeReport(BaseModel):
+    report: list[Grade]
 
 class GradingWorkflow:
     def __init__(self,
@@ -48,8 +55,11 @@ class GradingWorkflow:
         while True:
             try:
                 async with queue('messages', None) as messages:
-                    message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                    message: Message = await asyncio.wait_for(messages.get(), timeout=timeout)
                     message_files = message['file']
+                    user_id = message['author_id']
+                    guild_id = message['guild_id']
+                    tools = []
 
                 if message_files is None:
                     await self._send_message(thread_id,
@@ -83,9 +93,20 @@ class GradingWorkflow:
                     continue
 
                 message_content = f"Report Path:\n{str(report_file_path)}\n\nCode Text:\n{code_file_text}"
+                message_history.append({'role': 'user', 'content': code_file})
 
+
+
+                completion = await self._ai_client.get_structured_response_with_usage(
+                        guild_id,
+                        initial_message['channel_id'],
+                        thread_id,
+                        user_id,
+                        engine,
+                        message_history,
+                        text_format=GradeReport
+                        )
                 break
 
             except asyncio.TimeoutError:
-                message_content = '-'
                 await self._send_message(thread_id, "No feedback provided, skipping.")
