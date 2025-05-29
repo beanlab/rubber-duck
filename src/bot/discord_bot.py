@@ -141,8 +141,9 @@ class DiscordBot(discord.Client):
             duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
-        for block in _parse_blocks(message or ''):
-            curr_message = await channel.send(block)
+        if message:
+            for block in _parse_blocks(message):
+                curr_message = await channel.send(block)
             return curr_message.id
 
         if file is not None:
@@ -173,8 +174,21 @@ class DiscordBot(discord.Client):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    class ChannelTyping:
+        def __init__(self, fetch_channel, channel_id):
+            self._fetch_channel = fetch_channel
+            self._channel_id = channel_id
+
+        async def __aenter__(self):
+            channel = await self._fetch_channel(self._channel_id)
+            self._typing = channel.typing()
+            return await self._typing.__aenter__()
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
+
     def typing(self, channel_id: int):
-        return self.get_channel(channel_id).typing()
+        return self.ChannelTyping(self.fetch_channel, channel_id)
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread

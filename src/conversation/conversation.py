@@ -31,20 +31,17 @@ class BasicPromptConversation:
                  ai_client: RetryableGenAI,
                  record_message: RecordMessage,
                  record_usage: RecordUsage,
-                 typing: IndicateTyping,
                  send_message: SendMessage,
                  report_error: ReportError,
                  add_reaction: AddReaction,
                  setup_conversation: BasicSetupConversation,
                  ):
 
-        self._ai_client = ai_client
-        wrap_steps(self._ai_client, ['get_completion'])
+        self._ai_client = wrap_steps(ai_client, ['get_completion'])
 
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
 
-        self._typing = typing
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
@@ -76,7 +73,7 @@ class BasicPromptConversation:
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
-        tools = settings.get('tools', None)
+        tools = settings.get('tools', [])
         introduction = settings.get("introduction", "Hi, how can I help you?")
 
         if 'duck' in initial_message['content']:
