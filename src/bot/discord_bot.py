@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import aiohttp
 import discord
 
@@ -35,6 +37,22 @@ async def read_text_from_discord_url(url):
                 return text
             else:
                 return None
+
+
+async def download_discord_file(file_url: str, filename: str, save_dir: str | Path) -> Path | None:
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    file_path = save_dir / filename
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as resp:
+                if resp.status == 200:
+                    file_path.write_bytes(await resp.read())
+                    return file_path
+                else:
+                    return None
+    except Exception as e:
+        return None
 
 def _parse_blocks(text: str, limit=1990):
     tick = '`'

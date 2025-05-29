@@ -1,0 +1,26 @@
+Complexity:
+  - Time:
+    - 3.0 Provided some discussion of time complexity (even if informal or vague).
+    - 2.0 Clearly identified the complexity of iterating through one side of the tangent as O(n).
+    - 2.0 Correctly explained the time complexity of finding a tangent as O(n) using the double-while loop and why each point is only visited once.
+    - 2.0 Clearly discussed the complexity of combining hulls as O(n) because finding the tangents is O(n) and then reorganizing the points is O(1) or O(n) depending on the implementation
+    - 8.0 Derived and explained the total recurrence relation (T(n) = 2T(n/2) + O(n)), correctly applied the Master Theorem (a = 2, b = 2, d = 1), and concluded O(n log n) with discussion justifying each term and how it maps to their algorithm.
+  - Space:
+    - 3.0 Provided some discussion of space complexity that is mostly correct.
+
+Experimental Data:
+  - 2.0 The student included raw data (at least 5 runs for different input sizes).
+  - 2.0 The student included mean runtimes clearly calculated and labeled.
+  - 2.0 The student provided a legible and labeled plot of input size vs runtime.
+  - 2.0 The student correctly analyzed the shape of the curve and argued that the pattern fits an expected order of growth (e.g., O(n log n)).
+  - 2.0 The student estimated and justified a constant of proportionality from the data, including assumptions made.
+
+Theoretical and Empirical Analysis:
+  - 3.0 The student referenced both theoretical and experimental results.
+  - 3.0 The student discussed whether the results aligned or diverged.
+  - 4.0 The student provided at least one plausible reason for any differences (e.g., constant factors, implementation overhead, system effects).
+
+Working Screenshots:
+  - 3.0 The student included a screenshot of the output for 100 points.
+  - 3.5 The student included a screenshot of the output for 1000 points.
+  - 3.5 The screenshots show correct convex hulls with valid output.

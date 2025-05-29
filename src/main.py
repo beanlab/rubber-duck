@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.conversation.grading import GradingWorkflow
 from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -140,6 +141,30 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             setup_conversation
         )
         ducks['basic_prompt_conversation'] = have_conversation
+
+    if _has_workflow_of_type(config, 'grading_workflow'):
+        ai_client = OpenAI(
+            os.environ['OPENAI_API_KEY'],
+            get_tool,
+            metrics_handler.record_usage
+        )
+
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+
+
+        setup_conversation = BasicSetupConversation(
+            metrics_handler.record_message,
+        )
+
+        have_grading_workflow = GradingWorkflow(
+            ai_client,
+            metrics_handler.record_message,
+            metrics_handler.record_usage,
+            bot.send_message,
+            bot.report_error,
+            setup_conversation
+        )
+        ducks['grading_workflow'] = have_grading_workflow
 
     if _has_workflow_of_type(config, 'conversation_review'):
         have_ta_conversation = HaveTAGradingConversation(

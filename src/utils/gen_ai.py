@@ -5,7 +5,7 @@ from typing import Callable, TypedDict, Protocol
 
 from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, NotGiven
 from openai.types.chat import ChatCompletion
 from quest import step
 
@@ -80,7 +80,8 @@ class OpenAI:
             user_id: int,
             engine: str,
             message_history,
-            functions
+            functions,
+            response_format=NotGiven()
     ):
 
         if not functions:
@@ -89,7 +90,8 @@ class OpenAI:
         completion: ChatCompletion = await self._client.chat.completions.create(
             model=engine,
             messages=message_history,
-            functions=functions
+            functions=functions,
+            response_format=response_format
         )
 
         completion_dict = completion.model_dump()
