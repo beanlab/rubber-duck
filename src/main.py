@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from .armory.socratic_tool import make_sub_conversation
 from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
