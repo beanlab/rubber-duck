@@ -27,7 +27,8 @@ class DataStore:
         self._dataset_locations = locations
         self._metadata = {}
         for location in locations:
-            self._metadata.update(dict(self._load_metadata(location)))
+            metadata_items = [item for item in self._load_metadata(location) if item is not None]
+            self._metadata.update(dict(metadata_items))
 
     def _load_metadata(self, location: str) -> Iterable:
         if self._is_s3_location(location):
@@ -44,6 +45,7 @@ class DataStore:
                 return self._load_md_from_s3_json(bucket, metadata_file)
             else:
                 return self._load_md_from_s3_csv(bucket, key)
+        return None
 
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
@@ -60,6 +62,7 @@ class DataStore:
                 return self._load_md_from_local_json(metadata_file)
             else:
                 return self._load_md_from_local_csv(file)
+        return None
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
