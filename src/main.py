@@ -11,6 +11,7 @@ from quest.extras.sql import SqlBlobStorage
 
 from src.conversation.learning_objectives_tracker import LearningObjectivesTracker
 from src.workflows.confirm_topic import ConfirmTopicWorkflow
+from src.workflows.dog_cat_bird_game import DogCatBirdGame
 from .utils.send_email import EmailSender
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
@@ -181,11 +182,22 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         bot.add_reaction,
         setup_conversation
     )
+    dog_cat_bird_game = DogCatBirdGame(
+        retryable_ai_client,
+        metrics_handler.record_message,
+        metrics_handler.record_usage,
+        bot.typing,
+        bot.send_message,
+        bot.report_error,
+        bot.add_reaction,
+        setup_conversation
+    )
 
     return {
         'basic_prompt_conversation': have_conversation,
         'multi_prompt_conversation': have_advanced_conversation,
         'confirm_topic': confirm_topic,
+        'dog_cat_bird_game': dog_cat_bird_game,
         'conversation_review': have_ta_conversation,
         'registration': registration_workflow,
     }
