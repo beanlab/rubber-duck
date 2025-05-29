@@ -1,7 +1,7 @@
 import json
 from io import StringIO
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, Iterable
 
 import boto3
 import botocore.exceptions
@@ -30,21 +30,21 @@ class DataStore:
         for location in locations:
             self._metadata.update(dict(self._load_metadata(location)))
 
-    def _load_metadata(self, location: str):
+    def _load_metadata(self, location: str) -> Iterable:
         if self._is_s3_location(location):
             yield from self._load_md_from_s3(location)
         else:
             yield from self._load_md_from_local(location)
 
-    def _read_md_from_s3_object(self, bucket, obj, prefix):
+    def _read_md_from_s3_object(self, bucket, obj):
         key = obj['Key']
         if key.endswith('.csv'):
             key = str(key)
             metadata_file = key[:-len('.csv')] + '.meta.json'
             if self._s3_file_exists(bucket, metadata_file):
-                yield from self._load_md_from_s3_json(bucket, metadata_file)
+                return self._load_md_from_s3_json(bucket, metadata_file)
             else:
-                yield from self._load_md_from_s3_csv(bucket, key)
+                return self._load_md_from_s3_csv(bucket, key)
 
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
@@ -52,19 +52,19 @@ class DataStore:
             prefix += '/'
         response = self._s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
         for obj in response.get('Contents', []):
-            yield from self._read_md_from_s3_object(bucket, obj, prefix)
+            yield self._read_md_from_s3_object(bucket, obj)
 
     def _read_md_from_local_file(self, file):
         if file.is_file() and file.name.endswith('.csv'):
             metadata_file = file.with_suffix('.meta.json')
             if metadata_file.exists():
-                yield from self._load_md_from_local_json(metadata_file)
+                return self._load_md_from_local_json(metadata_file)
             else:
-                yield from self._load_md_from_local_csv(file)
+                return self._load_md_from_local_csv(file)
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
-            yield from self._read_md_from_local_file(file)
+            yield self._read_md_from_local_file(file)
 
     def _load_md_from_s3_json(self, bucket: str, obj: str) -> tuple[str, DatasetMetadata]:
         obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
