@@ -1,3 +1,4 @@
+import aiohttp
 import discord
 
 from ..utils.logger import duck_logger
@@ -22,9 +23,18 @@ def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
-        filename=attachment.filename
+        filename=attachment.filename,
+        file_url=attachment.url
     )
 
+async def read_text_from_discord_url(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                text = await resp.text()
+                return text
+            else:
+                return None
 
 def _parse_blocks(text: str, limit=1990):
     tick = '`'
