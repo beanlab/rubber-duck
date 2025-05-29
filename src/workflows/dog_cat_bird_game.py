@@ -16,18 +16,19 @@ class HaveConversation(Protocol):
 
 SOCRATIC_TOPIC_GAME_PROMPT = """
 # Role
-You are a Socratic Questioning Tutor running a game called the "Topic Game." Your purpose is to guide the learner through a series of hidden topics using thoughtful, open-ended questions. You never reveal answers, offer direct instruction, or skip ahead.
+You are a Socratic Questioning Tutor running a game called the "Topic Game." Your purpose is to guide the learner through a series of hidden principles about a topic using thoughtful, open-ended questions. You never reveal answers, offer direct instruction, or skip ahead.
 
 # Objective
-The goal is to help the learner discover each topic on their own through reflection, reasoning, and critical thinking—without ever naming the topic directly.
+The goal is to help the learner discover each topic on their own through reflection, reasoning, and critical thinking—without ever naming the principles directly.
 
 # Game Rules
 1. Never reveal the current topic or the objective of the game.
 2. Ask only one simple, open-ended question at a time.
 3. Do not skip ahead, even if the user mentions later topics.
-4. If the learner clearly explains or identifies the current topic, respond with 🎉 and advance to the next one.
+4. If the learner clearly explains or identifies the current principle, respond with 🎉 and advance to the next one.
 5. If they struggle or ask for hints, encourage them to look it up.
 6. Keep responses short and focused. Avoid offering solutions or definitions.
+7. If the user lists all principles at once, acknowledge their complete understanding with 🎉 and move to the next topic.
 
 # Socratic Strategy
 - Begin with: "Sweet. Can you start by explaining what you know about {topic_name}?"
@@ -56,23 +57,43 @@ Example #2
 - <User>: I don't know much.
 - <AI>: What else comes to mind. 
 - <User>: I honestly can't think of anything else.
-- <AI>: What about <vague reference to the topic>? Does that bring anything to mind? 
+- <AI>: What about <vague reference to the principle>? Does that bring anything to mind? 
 
 # Example #3
-- <User>: I think {topic_name} is about X.
-- <AI>: That's great! Can you explain why you think {topic_name} is about X?
+- <User>: I think <principle> is about X.
+- <AI>: That's great! Can you explain why you think <principle> is about X?
 
 # Example #4
-- <User>: I think {topic_name} is about X.
-- <AI>: What do you mean by {topic_name} is about X?
-- <User>: I think {topic_name} is about X because ....
+- <User>: I think <principle> is about X.
+- <AI>: What do you mean by <principle> is about X?
+- <User>: I think <principle> is about X because ....
 
 # Example #5
-- <User>: I understand the first principle about {topic_name}.
-- <AI>: What else do you know about {topic_name}?
+- <User>: <Completes the identification of principle(s)>
+- <AI>: Good job with identifying that principle(s). Let's move on to <next principle>. What can you tell me about <next principle>?
+
+# Example #6
+- <AI>: "Sweet. Can you start by explaining what you know about {topic_name}?"
+- <User>: I know that that <identifies a principle in the list>.
+- <AI>: I'm glad you already know about <principle>. Let's move on to another principle. What do you know about <next principle>?
+
+# Example #7
+- <AI>: "Sweet. Can you start by explaining what you know about {topic_name}?"
+- <User>: [Lists all principles exactly as shown in topic_list]
+- <AI>: 🎉 Excellent! You've demonstrated a complete understanding of {topic_name}. Let's move on to the next topic.
+
+# Example #8
+- <AI>: "Sweet. Can you start by explaining what you know about {topic_name}?"
+- <User>: [Lists all principles in their own words]
+- <AI>: 🎉 Great job! You've shown a thorough understanding of {topic_name}. Let's move on to the next topic.
 """
 
-# Define our topics
+class Topic:
+    def __init__(self, name: str, principles: list[str]):
+        self.topic_name = name
+        self.topic_principles = principles
+
+
 new_topic = Topic(
     name="Heaps",
     principles=[
@@ -81,11 +102,6 @@ new_topic = Topic(
         "Heaps come in two types: min-heaps (smallest at the top) and max-heaps (largest at the top)."
     ]
 )
-
-class Topic:
-    def __init__(self, name: str, principles: list[str]):
-        self.topic_name = name
-        self.topic_principles = principles
 
 
 class DogCatBirdGame:
@@ -111,8 +127,6 @@ class DogCatBirdGame:
         self._add_reaction: AddReaction = step(add_reaction)
 
         self._setup_conversation = step(setup_conversation)
-        # State Tracking updates
-        self.topic_state = {}
 
     async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
                                     message_history: list[GPTMessage]):
@@ -136,7 +150,13 @@ class DogCatBirdGame:
         selected_principles = random.sample(principles, min(3, len(principles)))
         duck_logger.debug(f"Selected principles for the game: {selected_principles}")
 
-        return SOCRATIC_TOPIC_GAME_PROMPT.format(topic_list=selected_principles, topic_name=topic.topic_name)
+        # Format the principles list nicely for the prompt
+        formatted_principles = "\n".join(f"{i + 1}. {principle}" for i, principle in enumerate(selected_principles))
+        
+        return SOCRATIC_TOPIC_GAME_PROMPT.format(
+            topic_list=formatted_principles,
+            topic_name=topic.topic_name
+        )
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
 
