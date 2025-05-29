@@ -8,7 +8,6 @@ import botocore.exceptions
 import pandas as pd
 
 
-
 class ColumnMetadata(TypedDict):
     name: str
     dtype: str
