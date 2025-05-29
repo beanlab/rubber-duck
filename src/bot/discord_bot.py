@@ -1,3 +1,5 @@
+import io
+
 import discord
 
 from ..utils.logger import duck_logger
@@ -132,7 +134,7 @@ class DiscordBot(discord.Client):
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(file[1], file[0])
+            return discord.File(io.BytesIO(file[1]), file[0])
         raise NotImplementedError(f"Unsupported file type: {file}")
 
     async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
