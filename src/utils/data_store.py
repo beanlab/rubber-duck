@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import TypedDict
 
 import boto3
+import botocore.exceptions
 import pandas as pd
-from boto3.exceptions import ResourceNotExistsError
+
 
 
 class ColumnMetadata(TypedDict):
@@ -65,18 +66,18 @@ class DataStore:
         for file in Path(location).iterdir():
             yield from self._read_md_from_local_file(file)
 
-    def _load_md_from_s3_json(self, bucket: str, obj: str) -> DatasetMetadata:
+    def _load_md_from_s3_json(self, bucket: str, obj: str) -> tuple[str, DatasetMetadata]:
         obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
         md = json.loads(obj['Body'].read().decode('utf-8'))
         md['location'] = f"s3://{bucket}/{obj}"
-        return md
+        return md['name'], md
 
-    def _load_md_from_local_json(self, location: Path):
+    def _load_md_from_local_json(self, location: Path) -> tuple[str, DatasetMetadata]:
         metadata = json.loads(location.read_text())
         metadata['location'] = str(location.resolve())
-        return metadata
+        return metadata['name'], metadata
 
-    def _load_md_from_s3_csv(self, bucket: str, obj: str) -> DatasetMetadata:
+    def _load_md_from_s3_csv(self, bucket: str, obj: str) -> tuple[str, DatasetMetadata]:
         full_location = f"s3://{bucket}/{obj}"
         name = obj.replace('.csv', '')
 
@@ -86,9 +87,9 @@ class DataStore:
             ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
         ]
-        return DatasetMetadata(location=full_location, name=name, columns=columns)
+        return name, DatasetMetadata(location=full_location, name=name, columns=columns)
 
-    def _load_md_from_local_csv(self, location: Path) -> DatasetMetadata:
+    def _load_md_from_local_csv(self, location: Path) -> tuple[str, DatasetMetadata]:
         name = location.stem
         full_location = str(Path(location).resolve())
         df = pd.read_csv(location, nrows=0)
@@ -96,7 +97,7 @@ class DataStore:
             ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
         ]
-        return DatasetMetadata(location=full_location, name=name, columns=columns)
+        return name, DatasetMetadata(location=full_location, name=name, columns=columns)
 
     def _is_s3_location(self, location: str):
         return location.startswith("s3://")
@@ -109,10 +110,12 @@ class DataStore:
         try:
             self._s3_client.head_object(Bucket=bucket, Key=obj)
             return True
-        except ResourceNotExistsError as e:
-            if e.response['Error']['Code'] == '404':
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code in ['404', 'NoSuchKey']:
                 return False
-            raise e
+            else:
+                raise e
 
     def get_dataset_metadata(self) -> dict[str, DatasetMetadata]:
         return self._metadata
