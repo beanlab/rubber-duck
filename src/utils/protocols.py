@@ -6,6 +6,7 @@ class Attachment(TypedDict):
     attachment_id: int
     description: str
     filename: str
+    url: str
 
 
 class Message(TypedDict):

@@ -13,7 +13,7 @@ from ..utils.folder_utils import FolderUtils
 from ..views.assignment_selection_view import AssignmentSelectionView
 
 
-class MultiPromptConversation:
+class DesignerConversation:
     def __init__(self,
                  ai_client: RetryableGenAI,
                  record_message: RecordMessage,

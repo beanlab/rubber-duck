@@ -10,7 +10,7 @@ class FolderUtils:
     def get_project_folder(self, project_name: str) -> Path:
         """
         Find the actual project folder that matches the project number.
-        Handles cases like "project_3_network_routing"
+        Handles cases like "project_3"
         """
         # Convert project name to folder name format (e.g., "Project 1" -> "project_1")
         folder_name = project_name.lower().replace(' ', '_')

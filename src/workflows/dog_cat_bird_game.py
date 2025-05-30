@@ -94,14 +94,41 @@ class Topic:
         self.topic_principles = principles
 
 
-new_topic = Topic(
-    name="Heaps",
-    principles=[
-        "Heaps are complete binary trees, where all levels are fully filled except the last, which is filled left to right.",
-        "Heaps follow the heap order rule, meaning each parent is bigger (max-heap) or smaller (min-heap) than its children.",
-        "Heaps come in two types: min-heaps (smallest at the top) and max-heaps (largest at the top)."
-    ]
-)
+# Define our topics
+TOPICS = [
+    Topic(
+        name="Heaps",
+        principles=[
+            "Heaps are complete binary trees, where all levels are fully filled except the last, which is filled left to right.",
+            "Heaps follow the heap order rule, meaning each parent is bigger (max-heap) or smaller (min-heap) than its children.",
+            "Heaps come in two types: min-heaps (smallest at the top) and max-heaps (largest at the top)."
+        ]
+    ),
+    Topic(
+        name="For loops and functions",
+        principles=[
+            "For loops are used to iterate over a sequence of elements.",
+            "Functions are reusable blocks of code that perform a specific task.",
+            "For loops can break using the 'break' statement."
+        ]
+    ),
+    Topic(
+        name="Object-Oriented Programming",
+        principles=[
+            "Classes are blueprints for creating objects with specific attributes and methods.",
+            "Inheritance allows classes to inherit attributes and methods from parent classes.",
+            "Encapsulation bundles data and methods that operate on that data within a single unit."
+        ]
+    ),
+    Topic(
+        name="Data Structures",
+        principles=[
+            "Arrays store elements in contiguous memory locations.",
+            "Linked lists connect nodes through pointers, allowing dynamic memory allocation.",
+            "Stacks follow Last-In-First-Out (LIFO) principle for data access."
+        ]
+    )
+]
 
 
 class DogCatBirdGame:
@@ -127,6 +154,9 @@ class DogCatBirdGame:
         self._add_reaction: AddReaction = step(add_reaction)
 
         self._setup_conversation = step(setup_conversation)
+        # Track completed topics
+        self.completed_topics = set()
+        self.current_topic = None
 
     async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
                                     message_history: list[GPTMessage]):
@@ -145,8 +175,18 @@ class DogCatBirdGame:
 
     def _select_words(self) -> str:
         """Gets a random topic and its principles."""
-        topic = new_topic
-        principles = topic.topic_principles
+        # Get available topics (those not yet completed)
+        available_topics = [topic for topic in TOPICS if topic.topic_name not in self.completed_topics]
+        
+        # If all topics have been completed, reset the completed topics
+        if not available_topics:
+            self.completed_topics.clear()
+            available_topics = TOPICS
+            
+        # Select a random topic from available topics
+        self.current_topic = random.choice(available_topics)
+        
+        principles = self.current_topic.topic_principles
         selected_principles = random.sample(principles, min(3, len(principles)))
         duck_logger.debug(f"Selected principles for the game: {selected_principles}")
 
@@ -155,21 +195,19 @@ class DogCatBirdGame:
         
         return SOCRATIC_TOPIC_GAME_PROMPT.format(
             topic_list=formatted_principles,
-            topic_name=topic.topic_name
+            topic_name=self.current_topic.topic_name
         )
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
-
         # Get engine and timeout from duck settings, falling back to defaults if not set
         engine = settings["engine"]
         timeout = settings["timeout"]
         tools = settings.get('tools', [])
-        words = self._select_words()
 
         prompt = self._select_words()
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
-
-        await self._send_message(thread_id, "Welcome to the Dog, Cat, Bird game! Let's start playing!")
+        
+        await self._send_message(thread_id, "Welcome to the Topic Game! Let's start playing!")
         async with queue('messages', None) as messages:
             while True:
                 try:  # catch all errors
@@ -186,6 +224,18 @@ class DogCatBirdGame:
                             "I'm sorry, I can't read file attachments. "
                             "Please resend your message with the relevant parts of your file included in the message."
                         )
+                        continue
+
+                    # Check if user has listed all principles
+                    if self.current_topic and all(principle.lower() in message['content'].lower() 
+                                                for principle in self.current_topic.topic_principles):
+                        # Mark the current topic as completed
+                        self.completed_topics.add(self.current_topic.topic_name)
+                        # Get a new topic for the next interaction
+                        prompt = self._select_words()
+                        message_history = [GPTMessage(role='system', content=prompt)]
+                        # Send a message to start the new topic
+                        await self._send_message(thread_id, f"Great job! Let's move on to the next topic. What can you tell me about {self.current_topic.topic_name}?")
                         continue
 
                     message_history.append(GPTMessage(role='user', content=message['content']))

@@ -11,6 +11,7 @@ from quest.extras.sql import SqlBlobStorage
 
 from src.conversation.learning_objectives_tracker import LearningObjectivesTracker
 from src.workflows.confirm_topic import ConfirmTopicWorkflow
+from src.workflows.design_experience_workflow import DesignExperienceWorkflow
 from src.workflows.dog_cat_bird_game import DogCatBirdGame
 from .utils.send_email import EmailSender
 from .metrics.feedback import HaveTAGradingConversation
@@ -19,7 +20,7 @@ from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
-from .conversation.multi_prompt_conversation import MultiPromptConversation
+from .conversation.multi_prompt_conversation import DesignerConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback_manager import FeedbackManager
@@ -143,7 +144,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         retryable_ai_client,
     )
 
-    have_advanced_conversation = MultiPromptConversation(
+    have_advanced_conversation = DesignerConversation(
         retryable_ai_client,
         metrics_handler.record_message,
         metrics_handler.record_usage,
@@ -193,11 +194,23 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         setup_conversation
     )
 
+    learning_objectives = LearningObjectivesTracker(
+        retryable_ai_client,
+    )
+
+    design_experience = DesignExperienceWorkflow(
+        bot.send_message,
+        bot.get_channel,
+        bot.fetch_guild,
+        learning_objectives,
+    )
+
     return {
         'basic_prompt_conversation': have_conversation,
         'multi_prompt_conversation': have_advanced_conversation,
         'confirm_topic': confirm_topic,
         'dog_cat_bird_game': dog_cat_bird_game,
+        'design_experience': design_experience,
         'conversation_review': have_ta_conversation,
         'registration': registration_workflow,
     }

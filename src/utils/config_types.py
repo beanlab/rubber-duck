@@ -1,5 +1,9 @@
 from typing import TypedDict
 
+class LearningObjectiveSettings(TypedDict):
+    learning_objective_file_path: str
+    prompt_file_path: str
+
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None

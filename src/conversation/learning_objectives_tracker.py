@@ -3,60 +3,70 @@ from pathlib import Path
 import yaml
 import json
 
+from src.utils.config_types import LearningObjectiveSettings
+
 from ..utils.gen_ai import GPTMessage
 from ..utils.logger import duck_logger
 
+class Topic:
+    def __init__(self, name: str, principles: list[str]):
+        self.topic_name = name
+        self.topic_principles = principles
 
 class LearningObjectivesTracker:
     def __init__(self, ai_client):
         self._ai_client = ai_client
         wrap_steps(self._ai_client, ['get_completion'])
 
-        self.guild_id = None
-        self.thread_id = None
-        self.user_id = None
-        self.engine = None
+        self._guild_id = None
+        self._thread_id = None
+        self._user_id = None
+        self._engine = None
 
-    def __call__(self, guild_id: int, thread_id, parent_channel_id, user_id, engine, learning_objective_file_path, prompt_file_path):
-        self._learning_objectives = self._get_learning_objectives_from_file(learning_objective_file_path)
+    async def __call__(self, initial_message, settings: LearningObjectiveSettings):
+        self._learning_objectives = self._get_learning_objectives_from_file(settings['learning_objective_file_path'])
 
         self._current_objectives_complete = [False] * len(self._learning_objectives)
         self._current_objectives_partial = [False] * len(self._learning_objectives)
-        self.guild_id = guild_id
-        self.thread_id = thread_id
-        self.parent_channel_id = parent_channel_id
-        self.user_id = user_id
-        self.engine = engine
+        self._guild_id = initial_message['guild_id']
+        self._parent_channel_id = initial_message['channel_id']
+        self._user_id = initial_message['author_id']
+        self._engine = initial_message.get('engine', 'gpt-4')  # Default to gpt-4 if not specified
 
-        self._prompt = self._get_prompt(prompt_file_path)
+        self._prompt = self._get_prompt(settings['prompt_file_path'])
         self._message_history = [
             GPTMessage(role="assistant", content=str(self._learning_objectives)),
             GPTMessage(role='system', content=self._prompt)
         ]
-
+        return self  # Return self to allow method chaining
 
     def _get_learning_objectives_from_file(self, file_path: str):
-        # assumes any title/non Learning objective line will have a * in front of it
-
-        # path = Path(file_path)
-                # .read_text(encoding="utf-8"))
-        # with open(Path("prompts/project_3_network_routing/learning_objects_pq2.yaml"), 'r') as rubric_file:
-        #     objectives_dict = yaml.load(rubric_file, Loader=yaml.SafeLoader)
         duck_logger.debug("Attempting to read learning objectives from file: %s", file_path)
         with open(file_path, 'r') as rubric_file:
             objectives_dict = yaml.load(rubric_file, Loader=yaml.SafeLoader)
 
         learning_objectives = []
 
-        def helper(dict):
-            for key, value in dict.items():
-                if key.startswith("Objective"):
-                    learning_objectives.append(value)
-                else:
-                    for item in value:
-                        helper(item)
+        def helper(item):
+            if isinstance(item, dict):
+                # If the item is a dictionary with 'Question' key, it's a learning objective
+                if 'Question' in item:
+                    learning_objectives.append(item['Question'])
+                # If the item is a dictionary with a list value, process each item in the list
+                for value in item.values():
+                    if isinstance(value, list):
+                        for sub_item in value:
+                            helper(sub_item)
+            elif isinstance(item, list):
+                # If the item is a list, process each item in the list
+                for sub_item in item:
+                    helper(sub_item)
 
-        helper(objectives_dict[0])
+        # Process each top-level dictionary in the list
+        for item in objectives_dict:
+            helper(item)
+
+        duck_logger.debug(f"Extracted learning objectives: {learning_objectives}")
         return learning_objectives
 
     def _get_prompt(self, prompt_file_path):

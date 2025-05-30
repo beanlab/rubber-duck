@@ -22,7 +22,8 @@ def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
-        filename=attachment.filename
+        filename=attachment.filename,
+        url=attachment.url
     )
 
 
