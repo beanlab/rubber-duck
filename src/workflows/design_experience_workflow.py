@@ -80,7 +80,7 @@ class DesignExperienceWorkflow:
                     content = markdown_file.read().decode('utf-8')
 
                     # Initialize learning objectives tracker with the markdown content
-                    learning_objective_file = f"prompts/{folder_name}/learning_objects_pq.yaml"
+                    learning_objective_file = f"prompts/{folder_name}/learning_topics.yaml"
                     prompt_file = "prompts/learning_objectives.txt"
                     
                     # Check if files exist

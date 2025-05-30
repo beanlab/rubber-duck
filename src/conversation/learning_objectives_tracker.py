@@ -8,10 +8,10 @@ from src.utils.config_types import LearningObjectiveSettings
 from ..utils.gen_ai import GPTMessage
 from ..utils.logger import duck_logger
 
-class Topic:
+class LearningObjective:
     def __init__(self, name: str, principles: list[str]):
-        self.topic_name = name
-        self.topic_principles = principles
+        self.general_principle_name = name
+        self.list_of_sub_principles = principles
 
 class LearningObjectivesTracker:
     def __init__(self, ai_client):
@@ -45,16 +45,16 @@ class LearningObjectivesTracker:
 
     def _get_learning_objectives_from_file(self, file_path: str):
         duck_logger.debug("Attempting to read learning objectives from file: %s", file_path)
-        with open(file_path, 'r') as rubric_file:
-            objectives_dict = yaml.load(rubric_file, Loader=yaml.SafeLoader)
+        with open(file_path, 'r') as topics_file:
+            topics_list = yaml.load(topics_file, Loader=yaml.SafeLoader)
 
         learning_objectives = []
 
         def helper(item):
             if isinstance(item, dict):
-                # If the item is a dictionary with 'Question' key, it's a learning objective
-                if 'Question' in item:
-                    learning_objectives.append(item['Question'])
+                # If the item has topic_name and topic_principles, create a Topic object
+                if 'topic_name' in item and 'topic_principles' in item:
+                    learning_objectives.append(Topic(item['topic_name'], item['topic_principles']))
                 # If the item is a dictionary with a list value, process each item in the list
                 for value in item.values():
                     if isinstance(value, list):
@@ -66,7 +66,7 @@ class LearningObjectivesTracker:
                     helper(sub_item)
 
         # Process each top-level dictionary in the list
-        for item in objectives_dict:
+        for item in topics_list:
             helper(item)
 
         duck_logger.debug(f"Extracted learning objectives: {learning_objectives}")
@@ -125,7 +125,6 @@ class LearningObjectivesTracker:
         ]
 
         return "The following objectives are not met: \n" + "\n".join(missing_objectives)
-        # return self._create_partial_and_complete_lists(chat_result)
 
     async def _call_gpt(self) -> list[dict]:
         if not all([self._guild_id, self._thread_id, self._user_id, self._engine]):

@@ -1,0 +1,18 @@
+- topic_name: "Priority Queue Array Implementation"
+  topic_principles:
+    - "Understand how to insert an element into a priority queue implemented with an array."
+    - "Be able to delete the minimum element from an array-based priority queue."
+    - "Know how to check if an array-based priority queue is empty."
+    - "Explain how to update the key of an element in an array-based priority queue."
+
+- topic_name: "Priority Queue Heap Implementation"
+  topic_principles:
+    - "Understand how to insert an element into a priority queue implemented with a binary heap."
+    - "Be able to delete the minimum element from a heap-based priority queue."
+    - "Know how to check if a heap-based priority queue is empty."
+    - "Explain how to update the key of an element in a heap-based priority queue."
+
+- topic_name: "Dijkstra's Algorithm Complexity"
+  topic_principles:
+    - "Explain the overall time complexity of Dijkstra's algorithm when using an array-based priority queue."
+    - "Explain the overall time complexity of Dijkstra's algorithm when using a heap-based priority queue."

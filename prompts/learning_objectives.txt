@@ -36,13 +36,13 @@ Submission: "I like fruit, particularly purple bananas. I also like dragonfruit 
 [
     {
         "citation": "...purple bananas. I also like dragonfruit.",
-        "reason": "the submission has the word banana and dragonfruit, which are both fruit",
+        "reason": "The submission has the word banana and dragonfruit, which are both fruit",
         "met": True,
         "mentioned": True;
     },
     {
         "citation": "particularly purple bananas",
-        "reason": "the submission says purple which is a color",
+        "reason": "The submission says purple which is a color",
         "met": True,
         "mentioned": True
     },
