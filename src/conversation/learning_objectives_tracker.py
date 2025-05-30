@@ -23,22 +23,25 @@ class LearningObjectivesTracker:
         self._user_id = None
         self._engine = None
 
-    async def __call__(self, initial_message, settings: LearningObjectiveSettings):
+    async def __call__(self, thread_id, initial_message, settings: LearningObjectiveSettings):
         self._learning_objectives = self._get_learning_objectives_from_file(settings['learning_objective_file_path'])
 
         self._current_objectives_complete = [False] * len(self._learning_objectives)
         self._current_objectives_partial = [False] * len(self._learning_objectives)
+        self._thread_id = thread_id
         self._guild_id = initial_message['guild_id']
         self._parent_channel_id = initial_message['channel_id']
         self._user_id = initial_message['author_id']
         self._engine = initial_message.get('engine', 'gpt-4')  # Default to gpt-4 if not specified
 
         self._prompt = self._get_prompt(settings['prompt_file_path'])
+
         self._message_history = [
-            GPTMessage(role="assistant", content=str(self._learning_objectives)),
-            GPTMessage(role='system', content=self._prompt)
+            GPTMessage(role='system', content=self._prompt),
+            GPTMessage(role="system", content=str(self._learning_objectives))
         ]
-        return self  # Return self to allow method chaining
+
+        # we now need to analyze the code to see if we can extract any info
 
     def _get_learning_objectives_from_file(self, file_path: str):
         duck_logger.debug("Attempting to read learning objectives from file: %s", file_path)
@@ -125,15 +128,16 @@ class LearningObjectivesTracker:
         # return self._create_partial_and_complete_lists(chat_result)
 
     async def _call_gpt(self) -> list[dict]:
-        if not all([self.guild_id, self.thread_id, self.user_id, self.engine]):
+        if not all([self._guild_id, self._thread_id, self._user_id, self._engine]):
+            duck_logger.debug("Missing required parameters for AI client call.")
             return []
 
         response = await self._ai_client.get_completion(
-            self.guild_id,
-            self.parent_channel_id,
-            self.thread_id,
-            self.user_id,
-            self.engine,
+            self._guild_id,
+            self._parent_channel_id,
+            self._thread_id,
+            self._user_id,
+            self._engine,
             self._message_history,
             tools=[]
         )

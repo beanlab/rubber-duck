@@ -101,10 +101,7 @@ class DesignExperienceWorkflow:
                     }
                     
                     # Initialize the tracker with the current context
-                    await self._learning_objective_tracker(
-                        initial_message,
-                        settings
-                    )
+                    await self._learning_objective_tracker(thread_id, initial_message, settings)
 
                     # Send the markdown content to the tracker
                     missing_objectives = await self._learning_objective_tracker.get_missing_objectives(content)
