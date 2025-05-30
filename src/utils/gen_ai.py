@@ -1,14 +1,15 @@
 import asyncio
+import json
 import logging
 from io import BytesIO
-from typing import Callable, TypedDict, Protocol
+from typing import TypedDict, Protocol
 
-from agents import FunctionTool
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
@@ -65,11 +66,11 @@ class RecordUsage(Protocol):
 class OpenAI:
     def __init__(self,
                  openai_api_key: str,
-                 get_tool: Callable[[str], FunctionTool],
+                 armory: Armory,
                  record_usage: RecordUsage,
                  ):
         self._client = AsyncOpenAI(api_key=openai_api_key)
-        self._get_tool = get_tool
+        self._armory = armory
         self._record_usage = step(record_usage)
 
     async def _get_completion_with_usage(
@@ -82,7 +83,6 @@ class OpenAI:
             message_history,
             functions
     ):
-
         if not functions:
             functions = None
 
@@ -116,7 +116,7 @@ class OpenAI:
             message_history: list[GPTMessage],
             tools: list[str]
     ) -> list[Sendable]:
-        tools_to_use = {tool: self._get_tool(tool) for tool in tools}
+        tools_to_use = {tool: self._armory.get_specific_tool_metadata(tool) for tool in tools}
 
         functions = [
             {
@@ -136,9 +136,14 @@ class OpenAI:
             message = completion.choices[0].message
 
             if message.function_call:
+
                 function_name = message.function_call.name
-                tool = tools_to_use[function_name]
-                tool_result = await tool.on_invoke_tool(None, message.function_call.arguments)
+                tool = self._armory.get_specific_tool(function_name)
+                arguments = json.loads(message.function_call.arguments)
+                try:
+                    tool_result = tool(**arguments)
+                except Exception as ex:
+                    tool_result = f"Error when calling function {tool.__name__}, with arguments {arguments}. The error message was of type {ex.__class__.__name__} with the message: {str(ex)}"
 
                 message_history.append({"role": "assistant", "function_call": message.function_call})
                 message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
