@@ -40,7 +40,7 @@ class FeedbackNotifier:
         while True:
             # Calculate time until next 9:00 AM
             now = datetime.now()
-            next_run = now.replace(hour=16, minute=14, second=0, microsecond=0)
+            next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
             if now >= next_run:
                 next_run = next_run + timedelta(days=1)
             

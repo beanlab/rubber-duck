@@ -9,7 +9,6 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.utils.feedback_notifier import FeedbackNotifier
 from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -24,6 +23,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .utils.feedback_notifier import FeedbackNotifier
 from .utils.config_types import Config
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.logger import duck_logger
@@ -192,7 +192,6 @@ async def main(config: Config):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            # Initialize and start the feedback notifier
             ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
