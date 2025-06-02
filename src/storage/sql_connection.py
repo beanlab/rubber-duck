@@ -10,7 +10,7 @@ from ..utils.logger import duck_logger
 
 def _create_sqlite_session(db_name: str) -> Session:
     duck_logger.info(f'Creating SQLite session with name: {db_name}')
-    db_url = f"sqlite:///{db_name}"
+    db_url = f"sqlite://{db_name}"
     engine = create_engine(db_url)
     return sessionmaker(bind=engine)()
 

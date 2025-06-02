@@ -1,7 +1,7 @@
 {
   "sql": {
     "db_type": "sqlite",
-    "database": "env:DB_NAME"
+    "database": "/rubber-duck.db"
   },
   "reporting": {
     "1058490579799003187": "BeanLab",
