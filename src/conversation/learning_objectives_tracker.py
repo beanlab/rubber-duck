@@ -13,6 +13,10 @@ class LearningObjective:
         self.general_principle_name = name
         self.list_of_sub_principles = principles
 
+    def __str__(self):
+        principles_str = "\n  - " + "\n  - ".join(self.list_of_sub_principles)
+        return f"{self.general_principle_name}:{principles_str}"
+
 class LearningObjectivesTracker:
     def __init__(self, ai_client):
         self._ai_client = ai_client
@@ -35,10 +39,17 @@ class LearningObjectivesTracker:
         self._engine = initial_message.get('engine', 'gpt-4')  # Default to gpt-4 if not specified
 
         self._prompt = self._get_prompt(settings['prompt_file_path'])
-
+        
+        # Format learning objectives as a flat list for the AI
+        objectives_list = []
+        for obj in self._learning_objectives:
+            for principle in obj.list_of_sub_principles:
+                objectives_list.append(f"{obj.general_principle_name.lower()}: {principle.lower()}")
+        
+        objectives_str = "\n".join(f"- {obj}" for obj in objectives_list)
         self._message_history = [
             GPTMessage(role='system', content=self._prompt),
-            GPTMessage(role="system", content=str(self._learning_objectives))
+            GPTMessage(role="system", content=f"Learning Objectives:\n{objectives_str}")
         ]
 
         # we now need to analyze the code to see if we can extract any info
@@ -52,9 +63,12 @@ class LearningObjectivesTracker:
 
         def helper(item):
             if isinstance(item, dict):
-                # If the item has topic_name and topic_principles, create a Topic object
+                # If the item has topic_name and topic_principles, create a LearningObjective object
                 if 'topic_name' in item and 'topic_principles' in item:
-                    learning_objectives.append(Topic(item['topic_name'], item['topic_principles']))
+                    learning_objectives.append(LearningObjective(
+                        name=item['topic_name'],
+                        principles=item['topic_principles']
+                    ))
                 # If the item is a dictionary with a list value, process each item in the list
                 for value in item.values():
                     if isinstance(value, list):
