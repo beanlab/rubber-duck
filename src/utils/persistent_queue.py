@@ -2,8 +2,6 @@ from typing import TypeVar, Generic
 
 from quest.persistence import BlobStorage
 
-from ..utils.logger import duck_logger
-
 T = TypeVar('T')
 
 
