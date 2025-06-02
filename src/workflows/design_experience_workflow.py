@@ -106,7 +106,7 @@ class DesignExperienceWorkflow:
                     # Send the markdown content to the tracker
                     missing_objectives = await self._learning_objective_tracker.get_missing_objectives(content)
                     if missing_objectives:
-                        await self._send_message(thread_id, f"Here are the objectives that need more attention:\n{missing_objectives}")
+                        await self._send_message(thread_id, f"\n{missing_objectives}")
                     else:
                         await self._send_message(thread_id, "Great job! You've covered all the learning objectives.")
                     

@@ -9,13 +9,11 @@ from ..utils.gen_ai import GPTMessage
 from ..utils.logger import duck_logger
 
 class LearningObjective:
-    def __init__(self, name: str, principles: list[str]):
-        self.general_principle_name = name
-        self.list_of_sub_principles = principles
+    def __init__(self, principles: list[str]):
+        self.principles = principles
 
     def __str__(self):
-        principles_str = "\n  - " + "\n  - ".join(self.list_of_sub_principles)
-        return f"{self.general_principle_name}:{principles_str}"
+        return "\n  - " + "\n  - ".join(self.principles)
 
 class LearningObjectivesTracker:
     def __init__(self, ai_client):
@@ -28,10 +26,7 @@ class LearningObjectivesTracker:
         self._engine = None
 
     async def __call__(self, thread_id, initial_message, settings: LearningObjectiveSettings):
-        self._learning_objectives = self._get_learning_objectives_from_file(settings['learning_objective_file_path'])
-
-        self._current_objectives_complete = [False] * len(self._learning_objectives)
-        self._current_objectives_partial = [False] * len(self._learning_objectives)
+        self._learning_objective = self._get_learning_objectives_from_file(settings['learning_objective_file_path'])
         self._thread_id = thread_id
         self._guild_id = initial_message['guild_id']
         self._parent_channel_id = initial_message['channel_id']
@@ -41,34 +36,25 @@ class LearningObjectivesTracker:
         self._prompt = self._get_prompt(settings['prompt_file_path'])
         
         # Format learning objectives as a flat list for the AI
-        objectives_list = []
-        for obj in self._learning_objectives:
-            for principle in obj.list_of_sub_principles:
-                objectives_list.append(f"{obj.general_principle_name.lower()}: {principle.lower()}")
-        
+        objectives_list = [principle.lower() for principle in self._learning_objective.principles]
         objectives_str = "\n".join(f"- {obj}" for obj in objectives_list)
         self._message_history = [
             GPTMessage(role='system', content=self._prompt),
             GPTMessage(role="system", content=f"Learning Objectives:\n{objectives_str}")
         ]
 
-        # we now need to analyze the code to see if we can extract any info
-
     def _get_learning_objectives_from_file(self, file_path: str):
         duck_logger.debug("Attempting to read learning objectives from file: %s", file_path)
         with open(file_path, 'r') as topics_file:
             topics_list = yaml.load(topics_file, Loader=yaml.SafeLoader)
 
-        learning_objectives = []
+        all_principles = []
 
         def helper(item):
             if isinstance(item, dict):
-                # If the item has topic_name and topic_principles, create a LearningObjective object
-                if 'topic_name' in item and 'topic_principles' in item:
-                    learning_objectives.append(LearningObjective(
-                        name=item['topic_name'],
-                        principles=item['topic_principles']
-                    ))
+                # If the item has topic_principles, add them to our list
+                if 'topic_principles' in item:
+                    all_principles.extend(item['topic_principles'])
                 # If the item is a dictionary with a list value, process each item in the list
                 for value in item.values():
                     if isinstance(value, list):
@@ -83,66 +69,55 @@ class LearningObjectivesTracker:
         for item in topics_list:
             helper(item)
 
-        duck_logger.debug(f"Extracted learning objectives: {learning_objectives}")
-        return learning_objectives
+        # Create a single LearningObjective with all principles
+        learning_objective = LearningObjective(principles=all_principles)
+        duck_logger.debug(f"Extracted learning objectives: {learning_objective}")
+        return learning_objective
 
     def _get_prompt(self, prompt_file_path):
         return Path(prompt_file_path).read_text(encoding="utf-8")
 
-    def _update_current_objectives_complete(self, chat_result):
-        self._current_objectives_complete = [
-            objective_already_complete or chat_response_objective.get('met', False)
-            for objective_already_complete, chat_response_objective
-            in zip(self._current_objectives_complete, chat_result)
-        ]
-
-    def _update_learning_objectives_partial(self, chat_result):
-        self._current_objectives_partial = [
-            objective_partial or chat_response_partial.get('mentioned', False)
-            for objective_partial, chat_response_partial
-            in zip(self._current_objectives_partial, chat_result)
-        ]
-
-    def all_objectives_complete(self):
-        return all(self._current_objectives_complete)
-
-    def _create_partial_and_complete_lists(self, chat_results: list[dict]):
+    def _create_partial_and_complete_lists(self, chat_results: list[dict]) -> None | str:
         missing_objectives = [
-            lo
-            for lo, partial, bot_result in zip(self._learning_objectives, self._current_objectives_partial, chat_results)
-            if not partial
+            (principle, result.get('reason', 'No reason provided'))
+            for principle, result in zip(self._learning_objective.principles, chat_results)
+            if not result.get('mentioned', False)
         ]
 
         partial_objectives = [
-            (lo, bot_result['reason'])
-            for lo, is_complete, bot_result in zip(self._learning_objectives, self._current_objectives_complete, chat_results)
-            if not is_complete
+            (principle, result.get('reason', 'No reason provided'))
+            for principle, result in zip(self._learning_objective.principles, chat_results)
+            if result.get('mentioned', False) and not result.get('met', False)
         ]
 
-        missing_str = f"The following objectives are not mentioned: {((' - ' + obj) for obj in missing_objectives)}"
-        partial_str = f"The following objectives are not fully understood: {((' - ' + objective + ' because ' + reason) for objective, reason in partial_objectives)}"
+        if missing_objectives:
+            duck_logger.debug(f"Missing objectives: {missing_objectives}")
+            missing_str = "Objectives that need to be addressed:\n" + "\n".join(f"- {obj}\n  Reason: {reason}" for obj, reason in missing_objectives)
+        if partial_objectives:
+            duck_logger.debug(f"Partial objectives: {partial_objectives}")
+            partial_str = "Objectives that need more understanding:\n" + "\n".join(f"- {obj}\n  Reason: {reason}" for obj, reason in partial_objectives)
+        if not missing_objectives and not partial_objectives:
+            duck_logger.debug("All objectives have been met.")
+            return None
+        
+        # Combine the messages with clear separation
+        messages = []
+        if missing_objectives:
+            messages.append(missing_str)
+        if partial_objectives:
+            messages.append(partial_str)
+        
+        return  "\n\n".join(messages)
 
-        return missing_str + '\n\n' + partial_str
-
-    async def get_missing_objectives(self, most_recent_user_message: str) -> bool:
+    async def get_missing_objectives(self, most_recent_user_message: str) -> str:
         self._message_history.append(GPTMessage(role='user', content=most_recent_user_message))
 
         chat_result = await self._call_gpt()
-
-        self._update_current_objectives_complete(chat_result)
-        self._update_learning_objectives_partial(chat_result)
-
-        missing_objectives = [
-            (lo + " because " + bot_result['reason'])
-            for lo, bot_result in zip(self._learning_objectives, chat_result)
-            if not bot_result['met']
-        ]
-
-        return "The following objectives are not met: \n" + "\n".join(missing_objectives)
+        return self._create_partial_and_complete_lists(chat_result)
 
     async def _call_gpt(self) -> list[dict]:
         if not all([self._guild_id, self._thread_id, self._user_id, self._engine]):
-            duck_logger.debug("Missing required parameters for AI client call.")
+            duck_logger.error("Missing required parameters for AI client call.")
             return []
 
         response = await self._ai_client.get_completion(

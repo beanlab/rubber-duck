@@ -47,7 +47,7 @@ IDK
 We will use Dijkstra’s Algorithm
 ```
 **If you are using multiple versions (variants) of the algorithm:**  
-_Describe the alternate steps between them. Use numbered steps._
+_Describe t
 ```
 the steps the same.
 ```
