@@ -225,11 +225,10 @@ async def main(config: Config):
 
                 # Set up the notifier thread.
                 notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values())
-                tasks = [
+                await asyncio.gather(
                     bot.start(os.environ['DISCORD_TOKEN']),
-                    notifier.start(),
-                ]
-                await asyncio.gather(*tasks)
+                    notifier.start()
+                )
 
 
 if __name__ == '__main__':

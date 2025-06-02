@@ -1,16 +1,11 @@
-import schedule
-import time
-import threading
 from typing import Protocol, Callable
 import asyncio
 from datetime import datetime, timedelta
 
 from .config_types import ServerConfig
+from .protocols import SendMessage
 from ..metrics.feedback_manager import FeedbackManager
 from ..utils.logger import duck_logger
-
-class SendMessage(Protocol):
-    async def __call__(self, channel_id: int, message: str) -> None: ...
 
 class FeedbackNotifier:
     """
@@ -24,7 +19,7 @@ class FeedbackNotifier:
         self._feedback_manager = feedback_manager
         self._send_message: SendMessage = send_message
         self._server_config = server_config
-        self._feedback_mapping = None
+        self._feedback_mapping = self._build_feedback_mapping()
 
     async def start(self):
         """
@@ -32,7 +27,6 @@ class FeedbackNotifier:
         Checks feedback daily at 9:00 AM.
         """
         duck_logger.info("Starting feedback notifier")
-        self._build_feedback_mapping()
         
         # Run the initial check
         await self._check_feedback()
@@ -98,3 +92,4 @@ class FeedbackNotifier:
                         self._feedback_mapping[ta_channel_id] = target_channels
                         duck_logger.debug(f"Mapped TA channel {ta_channel_id} to {len(target_channels)} target channels")
 
+        return self._feedback_mapping
