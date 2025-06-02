@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.utils.feedback_notifier import FeedbackNotifier
 from .armory.tools import get_tool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -222,7 +223,14 @@ async def main(config: Config):
                     workflow_manager
                 )
                 bot.set_duck_app(rubber_duck, admin_channel_id)
-                await bot.start(os.environ['DISCORD_TOKEN'])
+
+                # Set up the notifier thread.
+                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values())
+                tasks = [
+                    bot.start(os.environ['DISCORD_TOKEN']),
+                    notifier.start(),
+                ]
+                await asyncio.gather(*tasks)
 
 
 if __name__ == '__main__':
