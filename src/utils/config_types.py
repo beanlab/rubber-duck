@@ -1,5 +1,9 @@
 from typing import TypedDict
 
+class FeedbackNotifierSettings(TypedDict):
+    feedback_check_hour: int
+    feedback_check_minute: int
+
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None
@@ -79,3 +83,4 @@ class Config(TypedDict):
     ai_completion_retry_protocol: RetryProtocol
     default_duck_settings: dict[str, dict]
     sender_email: str
+    feedback_notifier_settings: FeedbackNotifierSettings

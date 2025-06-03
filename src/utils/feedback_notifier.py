@@ -2,7 +2,7 @@ from typing import Protocol, Callable
 import asyncio
 from datetime import datetime, timedelta
 
-from .config_types import ServerConfig
+from .config_types import FeedbackNotifierSettings, ServerConfig
 from .protocols import SendMessage
 from ..metrics.feedback_manager import FeedbackManager
 from ..utils.logger import duck_logger
@@ -14,12 +14,16 @@ class FeedbackNotifier:
     def __init__(self, 
                  feedback_manager: FeedbackManager,
                  send_message,
-                 server_config: ServerConfig
+                 server_config: ServerConfig,
+                 feedback_notifier_settings: FeedbackNotifierSettings
                  ):
         self._feedback_manager = feedback_manager
         self._send_message: SendMessage = send_message
         self._server_config = server_config
         self._feedback_mapping = self._build_feedback_mapping()
+        self._feedback_check_hour = feedback_notifier_settings['feedback_check_hour']
+        self._feedback_check_minute = feedback_notifier_settings['feedback_check_minute']
+
 
     async def start(self):
         """
@@ -28,13 +32,10 @@ class FeedbackNotifier:
         """
         duck_logger.info("Starting feedback notifier")
         
-        # Run the initial check
-        await self._check_feedback()
-        
         while True:
             # Calculate time until next 9:00 AM
             now = datetime.now()
-            next_run = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            next_run = now.replace(hour=self._feedback_check_hour, minute=self._feedback_check_minute, second=0, microsecond=0)
             if now >= next_run:
                 next_run = next_run + timedelta(days=1)
             

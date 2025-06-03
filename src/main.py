@@ -239,7 +239,7 @@ async def main(config: Config):
                 bot.set_duck_app(rubber_duck, admin_channel_id)
 
                 # Set up the notifier thread.
-                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values())
+                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(), config['feedback_notifier_settings'])
                 await asyncio.gather(
                     bot.start(os.environ['DISCORD_TOKEN']),
                     notifier.start()
