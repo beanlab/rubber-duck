@@ -25,8 +25,8 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.config_types import (
-    Config, )
+from .utils.feedback_notifier import FeedbackNotifier
+from .utils.config_types import Config
 from .utils.data_store import DataStore
 from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.logger import duck_logger
@@ -260,7 +260,13 @@ async def main(config: Config):
                     workflow_manager
                 )
                 bot.set_duck_app(rubber_duck, admin_channel_id)
-                await bot.start(os.environ['DISCORD_TOKEN'])
+
+                # Set up the notifier thread.
+                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(), config['feedback_notifier_settings'])
+                await asyncio.gather(
+                    bot.start(os.environ['DISCORD_TOKEN']),
+                    notifier.start()
+                )
 
 
 if __name__ == '__main__':
