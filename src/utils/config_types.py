@@ -1,6 +1,20 @@
 from typing import TypedDict
 
 
+class ReasoningConfig(TypedDict):
+    prompt_file: str
+    reasoning: {str: str}
+    """
+    reasoning: {
+      effort: "medium", // unchanged
+      summary: "auto" // auto gives you the best available summary (detailed > auto > None)
+    }
+    """
+    engine: str
+    "These are the best engines for reasoning o4-mini, o3, o3-mini and o1."
+    timeout: int
+    max_output_tokens: int
+
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
     reviewer_role_id: int | None

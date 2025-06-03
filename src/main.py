@@ -32,6 +32,7 @@ from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
+from .workflows.reasoning_workflow import ReasoningWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -111,6 +112,9 @@ def _has_workflow_of_type(config: Config, wtype: str):
 
 def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
     ducks = {}
+    setup_conversation = BasicSetupConversation(
+        metrics_handler.record_message,
+    )
     if _has_workflow_of_type(config, 'basic_prompt_conversation'):
         armory = Armory()
         if 'dataset_folder_locations' in config:
@@ -131,10 +135,6 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             bot.report_error,
             bot.typing,
             ai_completion_retry_protocol
-        )
-
-        setup_conversation = BasicSetupConversation(
-            metrics_handler.record_message,
         )
 
         have_conversation = BasicPromptConversation(
@@ -168,6 +168,16 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             email_confirmation
         )
         ducks['registration'] = registration_workflow
+
+    if _has_workflow_of_type(config, 'reasoning'):
+        reasoning = ReasoningWorkflow(
+            bot.send_message,
+            bot.get_channel,
+            bot.fetch_guild,
+            setup_conversation,
+            metrics_handler.record_message,
+        )
+        ducks['reasoning'] = reasoning
 
     if not ducks:
         raise ValueError('No ducks were requested in the config')
