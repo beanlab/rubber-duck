@@ -14,7 +14,8 @@ from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
+from .conversation.conversation import BasicSetupConversation, BasicPromptConversation, BasicAgentConversation, \
+    AgentSetupConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
 from .metrics.feedback import HaveTAGradingConversation
@@ -147,6 +148,28 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             setup_conversation
         )
         ducks['basic_prompt_conversation'] = have_conversation
+
+    if _has_workflow_of_type(config, 'agent_conversation'):
+        armory = Armory()
+        if 'dataset_folder_locations' in config:
+            data_store = DataStore(config['dataset_folder_locations'])
+            stat_tools = StatsTools(data_store)
+            armory.scrub_tools(stat_tools)
+
+
+        setup_conversation = AgentSetupConversation(
+            metrics_handler.record_message,
+        )
+
+        have_conversation = BasicAgentConversation(
+            metrics_handler.record_message,
+            metrics_handler.record_usage,
+            bot.send_message,
+            setup_conversation,
+            bot.typing,
+            armory
+        )
+        ducks['agent_conversation'] = have_conversation
 
     if _has_workflow_of_type(config, 'conversation_review'):
         have_ta_conversation = HaveTAGradingConversation(

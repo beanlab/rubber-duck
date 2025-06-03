@@ -41,10 +41,39 @@
             {
               "name": "standard-rubber-duck",
               "workflow_type": "basic_prompt_conversation",
+              "weight" : 1,
               "settings": {
                 "prompt_file": "prompts/standard-rubber-duck.txt",
                 "engine": "gpt-4.1",
                 "timeout": 600
+              }
+            },
+            {
+              "name": "agent-rubber-duck",
+              "workflow_type": "agent_conversation",
+              "weight": 0,
+              "settings": {
+                "head_agent": {
+                  "name": "dispatch-agent",
+                  "prompt": "prompts/agent/socratic-agent.txt",
+                  "handoff_prompt": "When the user asks for an example, a visual, or more understanding about a specific concept, hand off to the Example agent.",
+                  "tools": [
+                    "talk_to_user"
+                  ],
+                  "engine": "gpt-4.1"
+                },
+                "spoke_agents": [
+                  {
+                    "name": "example-agent",
+                    "prompt": "prompts/agent/example-agent.txt",
+                    "handoff_prompt": "When the user mentions that they now understand a concept or don't have anymore questions, hand off to the Socratic agent.",
+                    "tools": [
+                      "talk_to_user"
+                    ],
+                    "engine": "gpt-4.1"
+                  }
+                ],
+                "timeout": 300
               }
             }
           ]

@@ -1,6 +1,6 @@
 import asyncio
 from agents import Agent, Runner, function_tool, handoff, RunContextWrapper, ModelSettings
-
+import ast
 
 async def main():
 
@@ -8,7 +8,10 @@ async def main():
     async def talk_to_user(query: str) -> str:
         print(f"Agent: {query}")
         inpt = await asyncio.to_thread(input, "You: ")
+        if inpt.lower() == "exit":
+            inpt = "The user has exited the conversation."
         return inpt
+
 
     def make_on_handoff(target_agent: Agent):
         async def _on_handoff(ctx: RunContextWrapper[None]):
@@ -16,7 +19,6 @@ async def main():
 
         return _on_handoff
 
-    # Final agents without handoffs yet
     cat_agent = Agent(
         name="Cat Agent",
         handoff_description="If the user asks a question that does not relate to cats, hand off to the dispatch agent.",
@@ -48,19 +50,48 @@ async def main():
     cat_handoff = handoff(agent=cat_agent, on_handoff=make_on_handoff(cat_agent))
     dispatch_handoff = handoff(agent=dispatch_agent, on_handoff=make_on_handoff(dispatch_agent))
 
-
     dispatch_agent.handoffs = [dog_handoff, cat_handoff]
     cat_agent.handoffs = [dispatch_handoff]
     dog_agent.handoffs = [dispatch_handoff]
 
+    def find_last_agent_conversation(logs):
+        for entry in reversed(logs):
+            if entry.get("type") == "function_call_output":
+                output_str = entry.get("output", "")
+                try:
+                    output_dict = ast.literal_eval(output_str)
+                    if "assistant" in output_dict:
+                        last_agent_name = output_dict["assistant"].lower().replace(" ", "_")
+                        return last_agent_name
+                except Exception:
+                    continue
+        return "unknown_agent"
+
+    agents = {
+        "cat_agent": cat_agent,
+        "dog_agent": dog_agent,
+        "dispatch_agent": dispatch_agent,
+    }
 
     message_history = [
         {"role": "system", "content": "Introduce yourself and what you can do to the user using the talk_to_user tool"},
         {"role": "user", "content": "Hi"},
     ]
 
-    # Run the loop
-    await Runner.run(dispatch_agent, message_history, max_turns=100)
+    # Have a regular conversation starting with the dispatch agent
+    result = await Runner.run(dispatch_agent, message_history, max_turns=100)
+
+    print("\n--- Conversation Finished ---\n")
+
+    # Get the message history from the conversation
+    message_history_2 = result.to_input_list()
+
+    # Find the last agent that handled the conversation
+    last_agent = find_last_agent_conversation(message_history_2)
+
+    # Run again with the last agent, and trim the last 3 messages to avoid using the ending of the conversation
+    await Runner.run(agents[last_agent], message_history_2[:-3], max_turns=100)
+
 
 
 if __name__ == "__main__":

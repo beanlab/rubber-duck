@@ -239,6 +239,7 @@ class StatsTools:
 
         return self._save_plot(name)
 
+
     @register_tool
     @cache_result
     def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:

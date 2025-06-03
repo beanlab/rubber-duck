@@ -25,12 +25,6 @@ class Armory:
         tool = function_tool(tool_function)
         self._tools[tool_function.__name__] = tool, tool_function
 
-    def get_tools(self) -> dict[str, Callable]:
-        return {name: method for name, (meta, method) in self._tools.items()}
-
-    def get_tool_metadata(self) -> dict[str, FunctionTool]:
-        return {name: meta for name, (meta, method) in self._tools.items()}
-
     def get_specific_tool_metadata(self, tool_name: str) -> FunctionTool:
         if tool_name in self._tools:
             return self._tools[tool_name][0]
@@ -40,3 +34,8 @@ class Armory:
         if tool_name in self._tools:
             return self._tools[tool_name][1]
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
+
+    def get_all_tool_names(self):
+        return list(self._tools.keys())
+
+

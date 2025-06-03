@@ -97,7 +97,8 @@ class OpenAI:
         await self._record_usage(
             guild_id,
             parent_channel_id,
-            thread_id, user_id,
+            thread_id,
+            user_id,
             engine,
             completion_dict['usage']['prompt_tokens'],
             completion_dict['usage']['completion_tokens'],
