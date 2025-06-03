@@ -9,10 +9,10 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
-from src.conversation.learning_objectives_tracker import LearningObjectivesTracker
-from src.workflows.confirm_topic import ConfirmTopicWorkflow
-from src.workflows.design_experience_workflow import DesignExperienceWorkflow
-from src.workflows.dog_cat_bird_game import DogCatBirdGame
+from .conversation.learning_objectives_tracker import LearningObjectivesTracker
+from .workflows.confirm_topic import ConfirmTopicWorkflow
+from .workflows.design_experience_workflow import DesignExperienceWorkflow
+from .workflows.dog_cat_bird_game import DogCatBirdGame
 from .utils.send_email import EmailSender
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
