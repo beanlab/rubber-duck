@@ -52,9 +52,6 @@ class FeedbackNotifier:
         :return: None
         """
         duck_logger.debug("Checking feedback")
-        if self._feedback_mapping is None:
-            duck_logger.error("Feedback mapping is not initialized.")
-            return
         
         for ta_channel_id, target_channels in self._feedback_mapping.items():
             total_pending = 0
@@ -75,7 +72,7 @@ class FeedbackNotifier:
         - Key: TA review channel ID
         - Value: List of target channel IDs that feed into this TA review channel
         """
-        self._feedback_mapping = {}
+        feedback_mapping = {}
         
         for server in self._server_config:
             for channel in server['channels']:
@@ -89,7 +86,7 @@ class FeedbackNotifier:
                             target_channels.extend(duck['settings']['target_channel_ids'])
                     
                     if target_channels:
-                        self._feedback_mapping[ta_channel_id] = target_channels
+                        feedback_mapping[ta_channel_id] = target_channels
                         duck_logger.debug(f"Mapped TA channel {ta_channel_id} to {len(target_channels)} target channels")
 
-        return self._feedback_mapping
+        return feedback_mapping
