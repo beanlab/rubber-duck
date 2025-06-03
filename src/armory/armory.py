@@ -22,7 +22,10 @@ class Armory:
             self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
-        tool = function_tool(tool_function)
+        if tool_function.__name__ == "talk_to_user":
+            tool = function_tool(tool_function, failure_error_function=None)
+        else:
+            tool = function_tool(tool_function)
         self._tools[tool_function.__name__] = tool, tool_function
 
     def get_specific_tool_metadata(self, tool_name: str) -> FunctionTool:

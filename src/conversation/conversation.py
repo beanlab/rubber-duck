@@ -166,6 +166,7 @@ class BasicAgentConversation:
         self._setup_conversation = step(setup_conversation)
         self._typing = typing
         self._armory = armory
+        self._current_agent = None
 
     def find_last_agent_conversation(self, logs: list[dict], agents_dict: dict[str, Agent], head_agent: str) -> Agent:
         if logs is None or len(logs) <= 2:
@@ -192,7 +193,7 @@ class BasicAgentConversation:
         head_agent_name = head_agent["name"]
         head_agent_prompt = Path(head_agent["prompt"]).read_text(encoding="utf-8")
         head_agent_handoff_prompt = head_agent["handoff_prompt"]
-        head_agent_tools = [self._armory.get_specific_tool(tool) for tool in head_agent["tools"] if tool in self._armory.get_all_tool_names()]
+        head_agent_tools = [self._armory.get_specific_tool_metadata(tool) for tool in head_agent["tools"] if tool in self._armory.get_all_tool_names()]
         head_agent_engine = head_agent["engine"]
 
         spoke_agents = settings["spoke_agents"]
@@ -210,6 +211,8 @@ class BasicAgentConversation:
             model_settings=ModelSettings(tool_choice="required"),
         )
 
+        self._current_agent = dispatch_agent
+
         for agent in spoke_agents:
             agent_name = agent["name"]
             agent_prompt = Path(agent["prompt"]).read_text(encoding="utf-8")
@@ -226,9 +229,21 @@ class BasicAgentConversation:
                 model_settings=ModelSettings(tool_choice="required"),
             )
 
+
         def make_on_handoff(target_agent: Agent):
             async def _on_handoff(ctx: RunContextWrapper[None]):
-                await self._send_message(thread_id, f"\n--- You are now talking with the {target_agent.name} ---\n")
+                await self._record_usage(
+                    initial_message['guild_id'],
+                    initial_message['channel_id'],
+                    thread_id,
+                    initial_message['author_id'],
+                    self._current_agent.model,
+                    ctx.usage.__dict__['input_tokens'],
+                    ctx.usage.__dict__['output_tokens'],
+                    ctx.usage.__dict__.get('cached_tokens', 0),
+                    ctx.usage.__dict__.get('reasoning_tokens', 0)
+                )
+                self._current_agent = target_agent
             return _on_handoff
 
         dispatch_handoff = handoff(
@@ -241,14 +256,13 @@ class BasicAgentConversation:
             dispatch_agent.handoffs.append(handoff(agent=agent, on_handoff=make_on_handoff(agent)))
 
         agent_dict[head_agent_name] = dispatch_agent
+        try:
+            await Runner.run(self.find_last_agent_conversation(message_history, agent_dict, head_agent_name),
+                                  message_history,
+                                  max_turns=100)
+        except Exception as e:
+            return
 
-        result = await Runner.run(self.find_last_agent_conversation(message_history, agent_dict, head_agent_name), message_history, max_turns=100)
-        usage_dict = result.context_wrapper.usage.__dict__
-        await self._record_usage(
-            initial_message['guild_id'],
-            thread_id,
-            usage_dict['input_tokens'],
-            usage_dict['output_tokens'],
-            usage_dict['cached_tokens'],
-            usage_dict['reasoning_tokens'],
-        )
+
+
+
