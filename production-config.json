@@ -301,6 +301,10 @@
       ]
     }
   },
+  "feedback_notifier_settings": {
+    "feedback_check_hour": 9,
+    "feedback_check_minute": 0
+  },
   "admin_settings": {
     "admin_channel_id": 1192895746672951340,
     "admin_role_id": 933123843038535741

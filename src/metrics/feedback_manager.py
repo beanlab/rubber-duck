@@ -38,3 +38,12 @@ class FeedbackManager:
 
         duck_logger.warning(f"No queue found for channel {channel_id} (could be empty)")
         return None
+
+    def get_length(self, channel_id: CHANNEL_ID) -> int:
+        queue = self._queues.get(channel_id)
+        if queue:
+            length = len(queue._queue)
+            duck_logger.info(f"Queue length for channel {channel_id}: {length}")
+            return length
+        duck_logger.warning(f"No queue found for channel {channel_id}")
+        return 0
