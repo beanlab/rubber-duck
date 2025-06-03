@@ -1,3 +1,5 @@
+import io
+
 import discord
 
 from ..utils.logger import duck_logger
@@ -132,7 +134,7 @@ class DiscordBot(discord.Client):
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(file[1], file[0])
+            return discord.File(io.BytesIO(file[1]), file[0])
         raise NotImplementedError(f"Unsupported file type: {file}")
 
     async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
@@ -174,8 +176,21 @@ class DiscordBot(discord.Client):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    class ChannelTyping:
+        def __init__(self, fetch_channel, channel_id):
+            self._fetch_channel = fetch_channel
+            self._channel_id = channel_id
+
+        async def __aenter__(self):
+            channel = await self._fetch_channel(self._channel_id)
+            self._typing = channel.typing()
+            return await self._typing.__aenter__()
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
+
     def typing(self, channel_id: int):
-        return self.get_channel(channel_id).typing()
+        return self.ChannelTyping(self.fetch_channel, channel_id)
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread

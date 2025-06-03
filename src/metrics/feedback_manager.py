@@ -28,13 +28,15 @@ class FeedbackManager:
         else:
             duck_logger.warning(f"No queue found for channel {feedback_data['parent_channel_id']}")
 
-    def get_conversation(self, channel_id) -> FeedbackData | None:
+    async def get_conversation(self, channel_id) -> FeedbackData | None:
+        # Must be async to work with quest.step
         queue = self._queues.get(channel_id)
         if queue:
             data = queue.pop()
             duck_logger.info(f"Retrieved conversation for channel {channel_id}: {data}")
             return data
-        duck_logger.warning(f"No queue found for channel {channel_id}")
+
+        duck_logger.warning(f"No queue found for channel {channel_id} (could be empty)")
         return None
 
     def get_length(self, channel_id: CHANNEL_ID) -> int:

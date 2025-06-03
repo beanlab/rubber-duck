@@ -12,7 +12,7 @@ class RecordFeedback(Protocol):
     async def __call__(self,
                        workflow_type: str, guild_id: int, parent_channel_id: int,
                        thread_id: int, user_id: int, reviewer_id: int,
-                       feedback_score: int): ...
+                       feedback_score: int, written_feedback: str): ...
 
 
 class ConversationReviewSettings(TypedDict):
@@ -29,9 +29,7 @@ class HaveTAGradingConversation:
                  report_error: ReportError,
                  ):
         self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
-
         self._record_feedback: RecordFeedback = step(record_feedback)
-
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
         self._report_error = step(report_error)
@@ -47,7 +45,7 @@ class HaveTAGradingConversation:
 
     async def _flush_conversations_for_channel(self, thread_id, target_channel_id, timeout):
         duck_logger.info(f"Flushing conversations for channel {target_channel_id}")
-        while (data := self._feedback_manager.get_conversation(target_channel_id)) is not None:
+        while (data := await self._feedback_manager.get_conversation(target_channel_id)) is not None:
             duck_logger.info(f"Processing conversation: {data}")
 
             student_convo_link = f"<#{data['conversation_thread_id']}>"
@@ -70,6 +68,27 @@ class HaveTAGradingConversation:
                     feedback_score = self._reactions.get(feedback_emoji, 'nan')
                     await self._add_reaction(thread_id, message_id, '✅')
 
+
+                    if feedback_score != 'nan':
+                        await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
+                        try:
+                            async with queue('messages', None) as messages:
+                                        message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                                        message_content = message['content']
+                            if message_content == '-':
+                                await self._send_message(thread_id, "No feedback provided, skipping.")
+                            else:
+                                await self._send_message(thread_id, f"Feedback recorded, thank you.")
+                        except asyncio.TimeoutError:
+                            message_content = '-'
+                            await self._send_message(thread_id, "No feedback provided, skipping.")
+                    else:
+                        message_content = '-'
+
+
+
+
+
                     duck_logger.info(f"Recording feedback: {feedback_score} from reviewer {reviewer_id}")
                     await self._record_feedback(
                         data['duck_type'],
@@ -78,7 +97,8 @@ class HaveTAGradingConversation:
                         data['conversation_thread_id'],
                         data['user_id'],
                         reviewer_id,
-                        feedback_score
+                        feedback_score,
+                        message_content
                     )
 
                 except asyncio.TimeoutError:
