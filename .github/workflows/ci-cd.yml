@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - 174-json-to-yaml
   workflow_dispatch:
     inputs:
       local_config:
