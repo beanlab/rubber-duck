@@ -300,21 +300,6 @@
           ]
         },
         {
-          "channel_id": 1379919490686648550,
-          "channel_name": "agentic-duck-review",
-          "ducks": [
-            {
-              "name": "review",
-              "workflow_type": "conversation_review",
-              "settings": {
-                "target_channel_ids": [
-                  1379919434914726020
-                ]
-              }
-            }
-          ]
-        },
-        {
           "channel_id": 1379919434914726020,
           "channel_name": "agentic-duck",
           "ducks": [
