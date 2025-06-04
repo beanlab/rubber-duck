@@ -75,11 +75,13 @@ def load_yaml_config(config_path):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
+def load_json_config(config_path):
+    with open(config_path, 'r') as f:
+        return json.load(f)
 
 def load_local_config(config_path):
     if config_path.suffix == '.json':
-        with open(config_path, 'r') as f:
-            return json.load(f)
+        return load_json_config(config_path)
     elif config_path.suffix == '.yaml':
         return load_yaml_config(config_path)
     else:
