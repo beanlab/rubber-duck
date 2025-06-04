@@ -14,7 +14,7 @@ reporting:
   "1354902266246598928": Phys 430
 
 servers:
-  "927616651409649675":
+  927616651409649675:
     server_name: CS 110
     channels:
 
@@ -38,7 +38,7 @@ servers:
               engine: gpt-4.1
               timeout: 600
 
-  "747510855536738336":
+  747510855536738336:
     server_name: CS 235
     channels:
 
@@ -62,7 +62,7 @@ servers:
               engine: gpt-4.1
               timeout: 600
 
-  "1235303213796691998":
+  1235303213796691998:
     server_name: CS 111
     channels:
 
@@ -86,7 +86,7 @@ servers:
               engine: gpt-4.1
               timeout: 600
 
-  "1371951485629370458":
+  1371951485629370458:
     server_name: Stats
     channels:
 
@@ -143,7 +143,7 @@ servers:
               engine: gpt-4.1
               timeout: 60
 
-  "1354902266246598928":
+  1354902266246598928:
     server_name: Physics
     channels:
 
@@ -187,7 +187,7 @@ servers:
               engine: gpt-4.1
               timeout: 600
 
-  "1338616224858374287":
+  1338616224858374287:
     server_name: Duck Demo
     channels:
 
