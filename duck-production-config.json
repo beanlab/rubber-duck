@@ -68,6 +68,35 @@
           ]
         },
         {
+          "channel_id": 1379959992110546995,
+          "channel_name": "registration-duck",
+          "ducks": [
+            {
+              "name": "Registration-Workflow",
+              "workflow_type": "registration",
+              "weight": 1,
+              "settings": {
+                "cache_timeout": 60800,
+                "authenticated_user_role_name": "I-passed-registration",
+                "roles": {
+                  "patterns": [
+                    {
+                      "name": "Teacher Sections",
+                      "pattern": "-section-\\d{3}$",
+                      "description": "Teacher name followed by section number (e.g. smith-section-001)"
+                    },
+                    {
+                      "name": "Lab Sections",
+                      "pattern": "^lab-section-\\d{3}$",
+                      "description": "Lab section number (e.g. lab-section-002)"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
           "channel_id": 1379955387587104829,
           "channel_name": "stats-tool",
           "ducks": [
@@ -113,8 +142,8 @@
     "feedback_check_minute": 0
   },
   "admin_settings": {
-    "admin_channel_id": 1192895746672951340,
-    "admin_role_id": 933123843038535741
+    "admin_channel_id": 1329477109659336754,
+    "admin_role_id": 1063181148425048195
   },
   "sender_email": "byu-cs-course-ops@cs.byu.edu",
   "dataset_folder_locations": [
