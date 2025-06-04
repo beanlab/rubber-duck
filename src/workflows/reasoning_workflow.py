@@ -1,4 +1,6 @@
 import asyncio
+
+import httpx
 from openai import OpenAI as OpenAIClient
 from openai.types.responses import ResponseReasoningItem
 
@@ -57,17 +59,41 @@ class ReasoningWorkflow:
                 print(f"Unexpected sendable type: {type(sendable)}")
                 continue
 
-    def _extract_summary_text(self, response_output: ResponseReasoningItem):
-        summaries = []
-
-        if isinstance(response_output, ResponseReasoningItem):
-            for summary in response_output.summary:
-                if hasattr(summary, 'text'):
-                    summaries.append(summary.text)
-        duck_logger.debug(f"Summaries: {summaries}")
+    def _extract_summary_text(self, response_output: dict):
+        duck_logger.debug(response_output['text'])
 
     def _extract_text(self, response_output) -> str:
         pass
+
+    async def _async_create_response(self, model, reasoning, max_output_tokens, input):
+        url = "https://api.openai.com/v1/responses"
+        headers = {
+            "Authorization": f"Bearer {self._client.api_key}",  # assumes OpenAIClient was initialized with key
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": model,
+            "reasoning": reasoning,
+            "max_output_tokens": max_output_tokens,
+            "input": input,  # assuming input is a list of dictionaries
+        }
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
+
+    async def _async_retrieve_response(self, response_id: str):
+        url = f"https://api.openai.com/v1/responses/{response_id}"
+        headers = {
+            "Authorization": f"Bearer {self._client.api_key}"
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
 
     async def __call__(self, thread_id: int, settings: ReasoningConfig, initial_message):
         prompt = settings['prompt_file']
@@ -75,7 +101,7 @@ class ReasoningWorkflow:
         model = settings['engine']
         reasoning = settings['reasoning']
         max_output_tokens = settings["max_output_tokens"]
-        introduction = "Welcome to Reasoning Duck!"
+        introduction = "Welcome to Reasoning Duck! Ask a question to get started."
 
         message_history = await self._setup_conversation(thread_id, prompt, initial_message)
 
@@ -109,38 +135,34 @@ class ReasoningWorkflow:
                     )
 
                     # To get around the blocking nature of the API, we use asyncio.to_thread
-                    sendables = await asyncio.to_thread(
-                        self._client.responses.create,
+                    sendables = await self._async_create_response(
                         model=model,
                         reasoning=reasoning,
                         max_output_tokens=max_output_tokens,
-                        input=message_history,
+                        input=message_history
                     )
 
                     # First output is the reasoning object
-                    reasoning_obj = sendables.output[0]
+                    reasoning_obj = sendables['output'][0]
                     self._extract_summary_text(reasoning_obj)
 
                     # Second output is the response content
-                    response_content = sendables.output[1]
+                    response_content = sendables['output'][1]
                     
                     # Wait for complete response if status is incomplete
-                    if response_content.status == 'incomplete':
+                    if response_content['status'] == 'incomplete':
                         # Get the complete response
-                        complete_response = await asyncio.to_thread(
-                            self._client.responses.retrieve,
-                            response_content.id
-                        )
+                        complete_response = await self._async_retrieve_response(response_content['id'])
                         response_content = complete_response
 
                     # Send the response content
-                    if hasattr(response_content, 'content'):
-                        for content_item in response_content.content:
-                            if hasattr(content_item, 'text'):
+                    if 'content' in response_content:
+                        for content_item in response_content['content']:
+                            if 'text' in content_item:
                                 await self._record_message(
-                                    guild_id, thread_id, user_id, 'assistant', content_item.text)
-                                await self._send_message(thread_id, message=content_item.text)
-                                message_history.append(GPTMessage(role='assistant', content=content_item.text))
+                                    guild_id, thread_id, user_id, 'assistant', content_item['text'])
+                                await self._send_message(thread_id, message=content_item['text'])
+                                message_history.append(GPTMessage(role='assistant', content=content_item['text']))
 
                 except GenAIException:
                     await self._send_message(thread_id,
