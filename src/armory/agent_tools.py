@@ -1,7 +1,6 @@
 import asyncio
 
-from agents import AgentsException
-from quest import queue, step
+from quest import queue
 
 from ..armory.tools import register_tool
 from ..utils.gen_ai import RecordMessage
@@ -26,8 +25,7 @@ class AgentTools:
         self._user_id = user_id
         self._timeout = timeout
 
-
-    @register_tool
+    @register_tool(send_error_to_llm=True)
     async def talk_to_user(self, query: str) -> str:
         try:
             async with self._typing(self._thread_id):
@@ -41,4 +39,3 @@ class AgentTools:
             return message['content']
         except asyncio.TimeoutError:
             raise asyncio.TimeoutError("Timeout while waiting for user response")
-

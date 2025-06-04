@@ -9,6 +9,7 @@ import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.utils.feedback_notifier import FeedbackNotifier
 from .armory.armory import Armory
 from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
@@ -25,7 +26,6 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.feedback_notifier import FeedbackNotifier
 from .utils.config_types import Config
 from .utils.data_store import DataStore
 from .utils.gen_ai import OpenAI, RetryableGenAI

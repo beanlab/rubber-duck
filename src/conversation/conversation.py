@@ -1,8 +1,7 @@
 import ast
 import asyncio
-
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, List
 
 from agents import Agent, ModelSettings, Runner, RunContextWrapper, handoff
 from quest import step, queue, wrap_steps
@@ -30,12 +29,15 @@ class BasicSetupConversation:
             guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
         return message_history
 
+
 class AgentSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
 
     async def __call__(self, thread_id: int, initial_message: Message) -> list[GPTMessage]:
-        message_history = [GPTMessage(role='system', content="Introduce yourself and what you can do to the user using the talk_to_user tool"), GPTMessage(role='user', content="Hi")]
+        message_history = [GPTMessage(role='system',
+                                      content="Introduce yourself and what you can do to the user using the talk_to_user tool"),
+                           GPTMessage(role='user', content="Hi")]
         user_id = initial_message['author_id']
         guild_id = initial_message['guild_id']
 
@@ -44,6 +46,7 @@ class AgentSetupConversation:
         await self._record_message(
             guild_id, thread_id, user_id, message_history[1]['role'], message_history[1]['content'])
         return message_history
+
 
 class BasicPromptConversation:
     def __init__(self,
@@ -66,7 +69,8 @@ class BasicPromptConversation:
 
         self._setup_conversation = step(setup_conversation)
 
-    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int, message_history: list[GPTMessage]):
+    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
+                                    message_history: list[GPTMessage]):
         for sendable in sendables:
             if isinstance(sendable, str):
                 await self._record_message(
@@ -150,6 +154,69 @@ class BasicPromptConversation:
                     raise
 
 
+class RunAgents:
+    def __init__(self, spoke_agents: List[Agent], head_agent: Agent, message_history: list[GPTMessage],
+                 initial_message: Message, thread_id: int, record_usage: RecordUsage):
+        self._spoke_agents = spoke_agents
+        self._head_agent = head_agent
+        self._message_history = message_history
+        self._initial_message = initial_message
+        self._thread_id = thread_id
+        self._record_usage = record_usage
+        self._current_agent = head_agent
+
+    def _find_last_agent_conversation(self) -> Agent:
+        if self._message_history is None or len(self._message_history) <= 2:
+            return self._head_agent
+        for entry in reversed(self._message_history):
+            if entry.get("type") == "function_call_output":
+                output_str = entry.get("output", "")
+                try:
+                    output_dict = ast.literal_eval(output_str)
+                    if "assistant" in output_dict:
+                        last_agent_name = output_dict["assistant"].lower().replace(" ", "_")
+                        return next((a for a in self._spoke_agents if a.name == last_agent_name))
+                except Exception:
+                    continue
+        return self._head_agent
+
+    def _make_on_handoff(self, target_agent: Agent):
+        async def _on_handoff(ctx: RunContextWrapper[None]):
+            await self._record_usage(
+                self._initial_message['guild_id'],
+                self._initial_message['channel_id'],
+                self._thread_id,
+                self._initial_message['author_id'],
+                self._current_agent.model,
+                ctx.usage.__dict__['input_tokens'],
+                ctx.usage.__dict__['output_tokens'],
+                ctx.usage.__dict__.get('cached_tokens', 0),
+                ctx.usage.__dict__.get('reasoning_tokens', 0)
+            )
+            self._current_agent = target_agent
+
+        return _on_handoff
+
+    def _create_handoffs(self):
+        dispatch_handoff = handoff(
+            agent=self._head_agent,
+            on_handoff=self._make_on_handoff(self._head_agent)
+        )
+
+        for agent in self._spoke_agents:
+            agent.handoffs.append(dispatch_handoff)
+            self._head_agent.handoffs.append(handoff(agent=agent, on_handoff=self._make_on_handoff(agent)))
+
+    async def run(self):
+        self._create_handoffs()
+        try:
+            await Runner.run(self._find_last_agent_conversation(),
+                             self._message_history,
+                             max_turns=100)
+        except Exception as e:
+            return
+
+
 class BasicAgentConversation:
 
     def __init__(self,
@@ -168,101 +235,36 @@ class BasicAgentConversation:
         self._armory = armory
         self._current_agent = None
 
-    def find_last_agent_conversation(self, logs: list[dict], agents_dict: dict[str, Agent], head_agent: str) -> Agent:
-        if logs is None or len(logs) <= 2:
-            return agents_dict[head_agent]
-        for entry in reversed(logs):
-            if entry.get("type") == "function_call_output":
-                output_str = entry.get("output", "")
-                try:
-                    output_dict = ast.literal_eval(output_str)
-                    if "assistant" in output_dict:
-                        last_agent_name = output_dict["assistant"].lower().replace(" ", "_")
-                        return agents_dict[last_agent_name]
-                except Exception:
-                    continue
-        return agents_dict[head_agent]
-
-    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
-
-        agent_tools = AgentTools(self._record_message, self._send_message, self._typing, initial_message['guild_id'], thread_id, initial_message['author_id'], settings["timeout"])
-
-        self._armory.scrub_tools(agent_tools)
-
-        head_agent = settings["head_agent"]
-        head_agent_name = head_agent["name"]
-        head_agent_prompt = Path(head_agent["prompt"]).read_text(encoding="utf-8")
-        head_agent_handoff_prompt = head_agent["handoff_prompt"]
-        head_agent_tools = [self._armory.get_specific_tool_metadata(tool) for tool in head_agent["tools"] if tool in self._armory.get_all_tool_names()]
-        head_agent_engine = head_agent["engine"]
-
-        spoke_agents = settings["spoke_agents"]
-
-        message_history = await self._setup_conversation(thread_id, initial_message)
-
-        agent_dict = {}
-
-        dispatch_agent = Agent(
-            name=head_agent_name,
-            handoff_description=head_agent_handoff_prompt,
-            instructions=head_agent_prompt,
-            tools=head_agent_tools,
-            model=head_agent_engine,
-            model_settings=ModelSettings(tool_choice="required"),
-        )
-
-        self._current_agent = dispatch_agent
-
-        for agent in spoke_agents:
-            agent_name = agent["name"]
-            agent_prompt = Path(agent["prompt"]).read_text(encoding="utf-8")
-            agent_handoff_prompt = agent["handoff_prompt"]
-            agent_tools = [self._armory.get_specific_tool_metadata(tool) for tool in agent["tools"] if tool in self._armory.get_all_tool_names()]
-            agent_engine = agent["engine"]
-
-            agent_dict[agent_name] = Agent(
-                name=agent_name,
-                handoff_description=agent_handoff_prompt,
-                instructions=agent_prompt,
-                tools=agent_tools,
-                model=agent_engine,
+    def create_agents(self, settings: dict) -> tuple[Agent, List[Agent]]:
+        def build_agent(config: dict) -> Agent:
+            return Agent(
+                name=config["name"],
+                handoff_description=config["handoff_prompt"],
+                instructions=Path(config["prompt"]).read_text(encoding="utf-8"),
+                tools=[
+                    self._armory.get_specific_tool_metadata(tool)
+                    for tool in config["tools"]
+                    if tool in self._armory.get_all_tool_names()
+                ],
+                model=config["engine"],
                 model_settings=ModelSettings(tool_choice="required"),
             )
 
+        return build_agent(settings["head_agent"]), [
+            build_agent(agent) for agent in settings.get("spoke_agents", [])
+        ]
 
-        def make_on_handoff(target_agent: Agent):
-            async def _on_handoff(ctx: RunContextWrapper[None]):
-                await self._record_usage(
-                    initial_message['guild_id'],
-                    initial_message['channel_id'],
-                    thread_id,
-                    initial_message['author_id'],
-                    self._current_agent.model,
-                    ctx.usage.__dict__['input_tokens'],
-                    ctx.usage.__dict__['output_tokens'],
-                    ctx.usage.__dict__.get('cached_tokens', 0),
-                    ctx.usage.__dict__.get('reasoning_tokens', 0)
-                )
-                self._current_agent = target_agent
-            return _on_handoff
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+        agent_tools = AgentTools(self._record_message, self._send_message, self._typing, initial_message['guild_id'],
+                                 thread_id, initial_message['author_id'], settings["timeout"])
 
-        dispatch_handoff = handoff(
-            agent=dispatch_agent,
-            on_handoff=make_on_handoff(dispatch_agent)
-        )
+        self._armory.scrub_tools(agent_tools)
 
-        for agent in agent_dict.values():
-            agent.handoffs.append(dispatch_handoff)
-            dispatch_agent.handoffs.append(handoff(agent=agent, on_handoff=make_on_handoff(agent)))
+        message_history = await self._setup_conversation(thread_id, initial_message)
 
-        agent_dict[head_agent_name] = dispatch_agent
-        try:
-            await Runner.run(self.find_last_agent_conversation(message_history, agent_dict, head_agent_name),
-                                  message_history,
-                                  max_turns=100)
-        except Exception as e:
-            return
+        head_agent, spoke_agents = self.create_agents(settings)
 
+        run_agents = RunAgents(spoke_agents, head_agent, message_history, initial_message, thread_id,
+                               self._record_usage)
 
-
-
+        await run_agents.run()

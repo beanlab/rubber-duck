@@ -22,7 +22,7 @@ class Armory:
             self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
-        if tool_function.__name__ == "talk_to_user":
+        if tool_function.send_error_to_llm:
             tool = function_tool(tool_function, failure_error_function=None)
         else:
             tool = function_tool(tool_function)
@@ -40,5 +40,3 @@ class Armory:
 
     def get_all_tool_names(self):
         return list(self._tools.keys())
-
-

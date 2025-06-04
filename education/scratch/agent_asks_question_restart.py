@@ -1,9 +1,10 @@
-import asyncio
-from agents import Agent, Runner, function_tool, handoff, RunContextWrapper, ModelSettings
 import ast
+import asyncio
+
+from agents import Agent, Runner, function_tool, handoff, RunContextWrapper, ModelSettings
+
 
 async def main():
-
     @function_tool
     async def talk_to_user(query: str) -> str:
         print(f"Agent: {query}")
@@ -11,7 +12,6 @@ async def main():
         if inpt.lower() == "exit":
             inpt = "The user has exited the conversation."
         return inpt
-
 
     def make_on_handoff(target_agent: Agent):
         async def _on_handoff(ctx: RunContextWrapper[None]):
@@ -91,7 +91,6 @@ async def main():
 
     # Run again with the last agent, and trim the last 3 messages to avoid using the ending of the conversation
     await Runner.run(agents[last_agent], message_history_2[:-3], max_turns=100)
-
 
 
 if __name__ == "__main__":
