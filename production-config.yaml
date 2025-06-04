@@ -17,7 +17,6 @@ servers:
   927616651409649675:
     server_name: CS 110
     channels:
-
       - channel_id: 1296158078017736725
         channel_name: review-cs-110
         ducks:
@@ -41,7 +40,6 @@ servers:
   747510855536738336:
     server_name: CS 235
     channels:
-
       - channel_id: 1327385245036838912
         channel_name: review-cs-235
         ducks:
@@ -65,7 +63,6 @@ servers:
   1235303213796691998:
     server_name: CS 111
     channels:
-
       - channel_id: 1329934513333338244
         channel_name: review-cs-111
         ducks:
@@ -89,7 +86,6 @@ servers:
   1371951485629370458:
     server_name: Stats
     channels:
-
       - channel_id: 1371951756149260298
         channel_name: ta-review
         ducks:
@@ -119,7 +115,14 @@ servers:
             weight: 1
             settings:
               prompt_file: prompts/stats.txt
-              introduction: "I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data."
+              introduction: |
+                I'm an exploratory data analysis assistant. I can help you with:
+                - Basic statistics and data visualization
+                - Statistical calculations
+                - Creating visualizations
+                - Providing insights based on your data
+
+                Feel free to ask me about any of these capabilities!
               tools:
                 - explain_capabilities
                 - describe_dataset
@@ -146,7 +149,6 @@ servers:
   1354902266246598928:
     server_name: Physics
     channels:
-
       - channel_id: 1363949553102880869
         channel_name: review-phys-230
         ducks:
@@ -190,7 +192,6 @@ servers:
   1338616224858374287:
     server_name: Duck Demo
     channels:
-
       - channel_id: 1338619665789751337
         channel_name: review-duck-pond
         ducks:
