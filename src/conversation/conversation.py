@@ -1,4 +1,3 @@
-import ast
 import asyncio
 import json
 from pathlib import Path
@@ -9,7 +8,7 @@ from quest import step, queue, wrap_steps
 
 from ..armory.agent_tools import AgentTools
 from ..armory.armory import Armory
-from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable
+from ..utils.gen_ai import GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable, GenAIClient
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
 
@@ -49,26 +48,24 @@ class AgentSetupConversation:
         return message_history
 
 
-class BasicPromptConversation:
+class AgentConversation:
     def __init__(self,
-                 ai_client: RetryableGenAI,
+                 ai_agent: GenAIClient,
                  record_message: RecordMessage,
-                 record_usage: RecordUsage,
                  send_message: SendMessage,
                  report_error: ReportError,
                  add_reaction: AddReaction,
-                 setup_conversation: BasicSetupConversation,
+                 wait_for_user_timeout
                  ):
-        self._ai_client = wrap_steps(ai_client, ['get_completion'])
+        self._ai_client = wrap_steps(ai_agent, ['get_completion'])
 
         self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
 
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
 
-        self._setup_conversation = step(setup_conversation)
+        self._wait_for_user_timeout = wait_for_user_timeout
 
     async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
                                     message_history: list[GPTMessage]):
@@ -85,36 +82,34 @@ class BasicPromptConversation:
                 await self._send_message(thread_id, file=sendable)
                 message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
 
-    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+    async def __call__(self, thread_id: int, initial_message: Message):
 
-        prompt_file = settings["prompt_file"]
-        if prompt_file:
-            prompt = Path(prompt_file).read_text(encoding="utf-8")
-        else:
-            prompt = initial_message['content']
-
-        # Get engine and timeout from duck settings, falling back to defaults if not set
-        engine = settings["engine"]
-        timeout = settings["timeout"]
-        tools = settings.get('tools', [])
-        introduction = settings.get("introduction", "Hi, how can I help you?")
+        # prompt_file = settings["prompt_file"]
+        # if prompt_file:
+        #     prompt = Path(prompt_file).read_text(encoding="utf-8")
+        # else:
+        #     prompt = initial_message['content']
+        #
+        # # Get engine and timeout from duck settings, falling back to defaults if not set
+        # engine = settings["engine"]
+        # timeout = settings["timeout"]
+        # tools = settings.get('tools', [])
+        # introduction = settings.get("introduction", "Hi, how can I help you?")
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
 
-        message_history = await self._setup_conversation(thread_id, prompt, initial_message)
+        message_history = []
 
+        introduction = self._ai_client.introduction or "Hi, how can I help you?"
         await self._send_message(thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
-                # TODO - if the conversation is getting long, and the user changes the subject
-                #  prompt them to start a new conversation (and close this one)
-
                 try:  # catch all errors
                     try:
                         # Waiting for a response from the user
-                        message: Message = await asyncio.wait_for(messages.get(), timeout)
+                        message: Message = await asyncio.wait_for(messages.get(), self._wait_for_user_timeout)
 
                     except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                         break
@@ -175,7 +170,7 @@ class RunAgents:
                 try:
                     output = next(it, None)
                     name_dict = json.loads(output.get("output", ""))
-                    last_agent =  self._spoke_agents.get(name_dict['assistant'], self._head_agent)
+                    last_agent = self._spoke_agents.get(name_dict['assistant'], self._head_agent)
                 except StopIteration:
                     return self._head_agent
         return last_agent

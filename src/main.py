@@ -15,7 +15,7 @@ from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, BasicPromptConversation, BasicAgentConversation, \
+from .conversation.conversation import BasicSetupConversation, AgentConversation, BasicAgentConversation, \
     AgentSetupConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
@@ -138,7 +138,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             metrics_handler.record_message,
         )
 
-        have_conversation = BasicPromptConversation(
+        have_conversation = AgentConversation(
             retryable_ai_client,
             metrics_handler.record_message,
             metrics_handler.record_usage,

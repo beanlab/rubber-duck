@@ -21,15 +21,15 @@ class GPTMessage(TypedDict):
 
 
 class GenAIClient(Protocol):
+    introduction: str | None
+
     async def get_completion(
             self,
             guild_id: int,
             parent_channel_id: int,
             thread_id: int,
             user_id: int,
-            engine: str,
             message_history: list[GPTMessage],
-            tools: [str]
     ) -> list[Sendable]: ...
 
 
@@ -204,14 +204,14 @@ class RetryableGenAI:
         self._retry_config = retry_config
         self._genai = genai
 
-    async def get_completion(self,
-                             guild_id: int,
-                             parent_channel_id: int,
-                             thread_id: int,
-                             user_id: int,
-                             engine: str,
-                             message_history: list[GPTMessage],
-                             tools: [str]):
+    async def get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            message_history: list[GPTMessage],
+    ):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
         backoff = self._retry_config['backoff']
@@ -219,9 +219,10 @@ class RetryableGenAI:
         while True:
             try:
                 async with self._typing(thread_id):
-                    return await self._genai.get_completion(guild_id, parent_channel_id, thread_id, user_id, engine,
-                                                            message_history,
-                                                            tools)
+                    return await self._genai.get_completion(
+                        guild_id, parent_channel_id, thread_id, user_id,
+                        message_history,
+                    )
 
             except RetryableException as ex:
                 if retries == 0:
