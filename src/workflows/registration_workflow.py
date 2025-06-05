@@ -49,7 +49,8 @@ class RegistrationWorkflow:
         try:
             # Create and send the registration view
             netid_view = GetNetIDView()
-            await self._send_message(thread_id, WELCOME_MESSAGE, view=netid_view)
+            await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
+            await self._send_message(thread_id,"",view=netid_view)
 
             # Wait for the view to be completed
             await netid_view.wait()
