@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import yaml  # Added import for YAML support
 
 import boto3
 from quest import these
@@ -70,10 +71,21 @@ def fetch_config_from_s3() -> Config | None:
         return None
 
 
-# Function to load the configuration from a local file (if needed)
-def load_local_config(file_path: Path) -> Config:
-    duck_logger.info(f"Loading local config from {file_path}")
-    return json.loads(file_path.read_text())
+def load_yaml_config(config_path):
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+def load_json_config(config_path):
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+def load_local_config(config_path):
+    if config_path.suffix == '.json':
+        return load_json_config(config_path)
+    elif config_path.suffix == '.yaml':
+        return load_yaml_config(config_path)
+    else:
+        raise ValueError("Config file must be either .json or .yaml")
 
 
 def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
@@ -248,7 +260,7 @@ async def main(config: Config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='config.json', help='Path to config file (.json or .yaml)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
 
@@ -256,7 +268,6 @@ if __name__ == '__main__':
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
         from quest.utils import quest_logger
-
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
