@@ -4,14 +4,14 @@ from quest import queue
 
 from ..armory.tools import register_tool
 from ..utils.gen_ai import RecordMessage
-from ..utils.protocols import SendMessage, Message, IndicateTyping
+from ..utils.protocols import SendMessage, Message
 
 
 class AgentTools:
     def __init__(self,
                  record_message: RecordMessage,
                  send_message: SendMessage,
-                 typing: IndicateTyping,
+                 typing,
                  guild_id: int,
                  thread_id: int,
                  user_id: int,
@@ -27,15 +27,16 @@ class AgentTools:
 
     @register_tool(send_error_to_llm=True)
     async def talk_to_user(self, query: str) -> str:
+
         try:
-            async with self._typing(self._thread_id):
-                await self._send_message(self._thread_id, query)
+            await self._typing.__aexit__(None, None, None)
+            await self._send_message(self._thread_id, query)
             await self._record_message(
                 self._guild_id, self._thread_id, self._user_id, 'assistant', query)
             async with queue('messages', None) as messages:
-
                 message: Message = await asyncio.wait_for(messages.get(), self._timeout)
                 await self._record_message(self._guild_id, self._thread_id, self._user_id, 'user', message['content'])
+            await self._typing.__aenter__()
             return message['content']
         except asyncio.TimeoutError:
             raise asyncio.TimeoutError("Timeout while waiting for user response")

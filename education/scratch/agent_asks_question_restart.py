@@ -67,6 +67,25 @@ async def main():
                     continue
         return "unknown_agent"
 
+    def find_last_agent_from_transfers(logs, start_agent, agents):
+        last_agent = start_agent
+        for entry in logs:
+            if entry.get("type") == "function_call":
+                function_name = entry.get("name", "")
+                if function_name.startswith("transfer_to_"):
+                    agent_name = function_name.replace("transfer_to_", "")
+                    agent = next((a for a in agents if a.name == agent_name), None)
+                    if agent:
+                        last_agent = agent
+                    else:
+                        continue
+        return last_agent
+
+
+
+
+
+
     agents = {
         "cat_agent": cat_agent,
         "dog_agent": dog_agent,
@@ -86,8 +105,12 @@ async def main():
     # Get the message history from the conversation
     message_history_2 = result.to_input_list()
 
+    print(f"Message History:\n{message_history_2}\n")
     # Find the last agent that handled the conversation
     last_agent = find_last_agent_conversation(message_history_2)
+
+    last_agent2 = find_last_agent_from_transfers(message_history_2, dispatch_agent, agents.values())
+    print(last_agent2)
 
     # Run again with the last agent, and trim the last 3 messages to avoid using the ending of the conversation
     await Runner.run(agents[last_agent], message_history_2[:-3], max_turns=100)

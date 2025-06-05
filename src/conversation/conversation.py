@@ -1,5 +1,6 @@
 import ast
 import asyncio
+import json
 from pathlib import Path
 from typing import Protocol, List
 
@@ -155,30 +156,29 @@ class BasicPromptConversation:
 
 
 class RunAgents:
-    def __init__(self, spoke_agents: List[Agent], head_agent: Agent, message_history: list[GPTMessage],
-                 initial_message: Message, thread_id: int, record_usage: RecordUsage):
+    def __init__(self, spoke_agents: dict[str, Agent], head_agent: Agent, message_history: list,
+                 initial_message: Message, thread_id: int, record_usage: RecordUsage, typing):
         self._spoke_agents = spoke_agents
         self._head_agent = head_agent
         self._message_history = message_history
         self._initial_message = initial_message
         self._thread_id = thread_id
         self._record_usage = record_usage
+        self._typing = typing
         self._current_agent = head_agent
 
     def _find_last_agent_conversation(self) -> Agent:
-        if self._message_history is None or len(self._message_history) <= 2:
-            return self._head_agent
-        for entry in reversed(self._message_history):
-            if entry.get("type") == "function_call_output":
-                output_str = entry.get("output", "")
+        last_agent = self._head_agent
+        it = iter(self._message_history)
+        for entry in it:
+            if entry.get("type") == "function_call" and entry.get("name", "").startswith("transfer_to_"):
                 try:
-                    output_dict = ast.literal_eval(output_str)
-                    if "assistant" in output_dict:
-                        last_agent_name = output_dict["assistant"].lower().replace(" ", "_")
-                        return next((a for a in self._spoke_agents if a.name == last_agent_name))
-                except Exception:
-                    continue
-        return self._head_agent
+                    output = next(it, None)
+                    name_dict = json.loads(output.get("output", ""))
+                    last_agent =  self._spoke_agents.get(name_dict['assistant'], self._head_agent)
+                except StopIteration:
+                    return self._head_agent
+        return last_agent
 
     def _make_on_handoff(self, target_agent: Agent):
         async def _on_handoff(ctx: RunContextWrapper[None]):
@@ -203,13 +203,15 @@ class RunAgents:
             on_handoff=self._make_on_handoff(self._head_agent)
         )
 
-        for agent in self._spoke_agents:
+        for agent in self._spoke_agents.values():
             agent.handoffs.append(dispatch_handoff)
             self._head_agent.handoffs.append(handoff(agent=agent, on_handoff=self._make_on_handoff(agent)))
 
     async def run(self):
         self._create_handoffs()
         try:
+
+            await self._typing.__aenter__()
             await Runner.run(self._find_last_agent_conversation(),
                              self._message_history,
                              max_turns=100)
@@ -255,7 +257,8 @@ class BasicAgentConversation:
         ]
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
-        agent_tools = AgentTools(self._record_message, self._send_message, self._typing, initial_message['guild_id'],
+        typing = self._typing(thread_id)
+        agent_tools = AgentTools(self._record_message, self._send_message, typing, initial_message['guild_id'],
                                  thread_id, initial_message['author_id'], settings["timeout"])
 
         self._armory.scrub_tools(agent_tools)
@@ -264,7 +267,11 @@ class BasicAgentConversation:
 
         head_agent, spoke_agents = self.create_agents(settings)
 
+        spoke_agents = {
+            agent.name: agent for agent in spoke_agents
+        }
+
         run_agents = RunAgents(spoke_agents, head_agent, message_history, initial_message, thread_id,
-                               self._record_usage)
+                               self._record_usage, typing)
 
         await run_agents.run()
