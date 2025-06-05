@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 176-rubber-duck-demo
   workflow_dispatch:
     inputs:
       local_config:
@@ -183,7 +184,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Upload Production Config
-        run: bash .github/scripts/upload-config.sh ${{secrets.S3_BUCKET_NAME}} ${{secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH}} ${{secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH_YAML}}
+        run: bash .github/scripts/upload-config.sh ${{secrets.S3_BUCKET_NAME}} ${{secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH_YAML}}
 
       - name: Send notification to Discord
         run: |
