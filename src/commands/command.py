@@ -7,6 +7,7 @@ import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..utils.zip_utils import zip_data_file
 
@@ -106,18 +107,23 @@ class ReportCommand(Command):
 
     @step
     async def execute(self, message: Message):
-        content = message['content']
-        channel_id = message['channel_id']
-        img_name, img = self.reporter.get_report(content)
-        if img is None:
-            await self.send_message(channel_id, img_name)
-
-        elif isinstance(img, list):
-            imgs = [discord.File(fp=image, filename=image_name) for image, image_name in zip(img, img_name)]
-            await self.send_message(channel_id, img_name, files=imgs)
-
-        else:
-            await self.send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
+        try:
+            content = message['content']
+            channel_id = message['channel_id']
+            img_name, img = self.reporter.get_report(content)
+            
+            if img is None:
+                await self.send_message(channel_id, img_name)
+            elif isinstance(img, list):
+                imgs = [discord.File(fp=image, filename=image_name) for image, image_name in zip(img, img_name)]
+                await self.send_message(channel_id, img_name, files=imgs)
+            else:
+                await self.send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
+        except Exception as e:
+            # Log the error and send a user-friendly message
+            duck_logger.exception(f"Error executing report command: {str(e)}")
+            await self.send_message(message['channel_id'], f"Error generating report: {str(e)}")
+            raise  # Re-raise to ensure the step is marked as failed
 
 
 class BashExecuteCommand():

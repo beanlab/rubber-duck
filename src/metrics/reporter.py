@@ -17,6 +17,8 @@ from src.storage.sql_metrics import SQLMetricsHandler
 from src.storage.sql_connection import create_sql_session
 
 def fancy_preproccesing(df, guilds):
+    if df == [['No data available']]:
+        raise Exception('No data available')
     df['guild_name'] = df['guild_id'].map(guilds)  # TODO: Lets use channel ids instead of guild ids.
     df = df.drop(columns=['guild_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
@@ -81,7 +83,7 @@ class Reporter:
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
-        # 'all': (None, 'All of the following charts.'),
+        # 'all': (None, 'All the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
@@ -294,25 +296,30 @@ class Reporter:
         return imgs, titles
 
     def get_report(self, arg_string):
-        # if arg_string == '!report all': #TODO: get working
-        #     return self.get_all_prebaked()
-        if arg_string == '!report help' or arg_string == '!report h':
-            return self.help_menu(), None
+        try:
+            # if arg_string == '!report all': #TODO: get working
+            #     return self.get_all_prebaked()
+            if arg_string == '!report help' or arg_string == '!report h':
+                return self.help_menu(), None
 
-        if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+            if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
+                return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
 
-        args = self.parse_args(arg_string)
+            args = self.parse_args(arg_string)
 
-        df = self.select_dataframe(args.dataframe)
+            df = self.select_dataframe(args.dataframe)
 
-        df_limited = self.prepare_df(df, args)
-        if len(df_limited) == 0:
-            return "No data available for this plot.", None
+            df_limited = self.prepare_df(df, args)
+            if len(df_limited) == 0:
+                return "No data available for this plot.", None
 
-        graph_name, graph = self.make_graph(df_limited, args)
+            graph_name, graph = self.make_graph(df_limited, args)
 
-        return graph_name, graph
+            return graph_name, graph
+        except Exception as e:
+            # Ensure any matplotlib figures are closed
+            plt.close('all')
+            raise  # Re-raise the exception to be handled by the caller
 
 
     def interactive_report(self):
