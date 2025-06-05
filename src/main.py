@@ -1,27 +1,37 @@
 import argparse
+import asyncio
 import json
 import logging
 import os
 from pathlib import Path
+
 import boto3
-from .utils.config_types import (
-    Config, FeedbackConfig,
-)
+from quest import these
+from quest.extras.sql import SqlBlobStorage
+
+from .armory.armory import Armory
+from .armory.stat_tools import StatsTools
+from .bot.discord_bot import DiscordBot
+from .commands.bot_commands import BotCommands
+from .commands.command import create_commands
+from .conversation.conversation import BasicPromptConversation, BasicSetupConversation
+from .conversation.threads import SetupPrivateThread
+from .duck_orchestrator import DuckOrchestrator
+from .metrics.feedback import HaveTAGradingConversation
+from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
-from .metrics.feedback import GetTAFeedback, GetConvoFeedback
-from .bot.discord_bot import DiscordBot, create_commands
-from .commands.bot_commands import BotCommands
-from .conversation.conversation import BasicSetupConversation, HaveStandardGptConversation
-from .utils.gen_ai import OpenAI, RetryableGenAI
-from .workflows.basic_prompt_workflow import BasicPromptWorkflow
 from .storage.sql_quest import create_sql_manager
-from .conversation.threads import SetupPrivateThread
-
-logging.basicConfig(level=logging.INFO)
-LOG_FILE = Path('/tmp/duck.log')  # TODO - put a timestamp on this. Is this really needed?
+from .utils.feedback_notifier import FeedbackNotifier
+from .utils.config_types import Config
+from .utils.data_store import DataStore
+from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.logger import duck_logger
+from .utils.persistent_queue import PersistentQueue
+from .utils.send_email import EmailSender
+from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -31,124 +41,50 @@ def fetch_config_from_s3() -> Config | None:
     # Add a section to your env file to allow for local and production environment
     environment = os.environ.get('ENVIRONMENT')
     if not environment or environment == 'LOCAL':
+        duck_logger.info("Using local environment")
         return None
 
     # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
     s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
 
     if not s3_path:
+        duck_logger.warning("No S3 path configured")
         return None
 
     # Parse bucket name and key from the S3 path (s3://bucket-name/key)
     bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    logging.info(bucket_name)
-    logging.info(key)
+    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.info(f"Config key: {key}")
+
     try:
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
         # Read the content of the file and parse it as JSON
         config = json.loads(response['Body'].read().decode('utf-8'))
+        duck_logger.info("Successfully loaded config from S3")
         return config
 
     except Exception as e:
-        print(f"Failed to fetch config from S3: {e}")
+        duck_logger.error(f"Failed to fetch config from S3: {e}")
         return None
 
 
 # Function to load the configuration from a local file (if needed)
 def load_local_config(file_path: Path) -> Config:
+    duck_logger.info(f"Loading local config from {file_path}")
     return json.loads(file_path.read_text())
 
 
-def setup_workflow_manager(config: Config, bot: DiscordBot):
-    # admin settings
-    admin_settings = config['admin_settings']
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
+    reporter = Reporter(metrics_handler, config['reporting'])
 
-    # Command channel feature
-    command_channel = admin_settings['admin_channel_id']
-
-    # Convert config to typed dictionaries
-    server_config = config['servers']
-    default_duck_workflow_config = config['default_duck_settings']
-
-    # SQLMetricsHandler initialization
-    sql_session = create_sql_session(config['sql'])
-    metrics_handler = SQLMetricsHandler(sql_session)
-
-    reporter = Reporter(metrics_handler, config['reporting'])  # TODO get the config to work with this
-
-    # Feedback
-    get_ta_feedback = GetTAFeedback(
-        bot.send_message,
-        bot.add_reaction,
-        metrics_handler.record_feedback,
-    )
-
-    feedback_config: dict[int, FeedbackConfig] = {
-        channel["channel_id"]: channel["feedback"]
-        for server in server_config.values()
-        for channel in server["channels"]
-    }
-
-    get_feedback = GetConvoFeedback(
-        feedback_config,
-        get_ta_feedback
-    )
-    # TODO: remove weights from config
-    setup_thread = SetupPrivateThread(
-        bot.create_thread,
-        bot.send_message
-    )
-
-    setup_conversation = BasicSetupConversation(
-        metrics_handler.record_message,
-    )
-
-    ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY'],
-    )
-
-    async def report_error(msg: str, notify_admins: bool = False):
-        if notify_admins:
-            user_ids_to_mention = [admin_settings["admin_role_id"]]
-            mentions = ' '.join([f'<@{user_id}>' for user_id in user_ids_to_mention])
-            msg = mentions + '\n' + msg
-            try:
-                await bot.send_message(command_channel, msg)
-            except:
-                logging.exception(f'Unable to message channel {command_channel}')
-
-    retryable_ai_client = RetryableGenAI(
-        ai_client,
-        bot.send_message,
-        report_error,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
-
-    have_conversation = HaveStandardGptConversation(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.send_message,
-        report_error,
-        bot.typing,
-        ai_completion_retry_protocol,
-    )
-
-    duck_workflow = BasicPromptWorkflow(
-        server_config,
-        default_duck_workflow_config,
-        setup_thread,
-        setup_conversation,
-        have_conversation,
-        get_feedback,
-    )
+    commands = create_commands(send_message, metrics_handler, reporter)
+    commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
-        'duck': duck_workflow
+        'duck-orchestrator': duck_orchestrator,
+        'command': commands_workflow
     }
 
     def create_workflow(wtype: str):
@@ -158,43 +94,172 @@ def setup_workflow_manager(config: Config, bot: DiscordBot):
         raise NotImplementedError(f'No workflow of type {wtype}')
 
     namespace = 'rubber-duck'  # TODO - move to config.
+
     workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
-
-    commands = create_commands(bot.send_message, metrics_handler, reporter,
-                               workflow_manager.get_workflow_metrics)
-    commands_workflow = BotCommands(commands, bot.send_message)
-
-    workflows['command'] = commands_workflow
 
     return workflow_manager
 
 
-async def main(config):
-    async with DiscordBot() as bot, \
-            setup_workflow_manager(config, bot) as workflow_manager:
-        rubber_duck = RubberDuckApp(config['servers'], config['admin_settings']['admin_channel_id'], workflow_manager)
-        bot.set_duck_app(rubber_duck)
-        await bot.start(os.environ['DISCORD_TOKEN'])
+def _has_workflow_of_type(config: Config, wtype: str):
+    return any(
+        duck['workflow_type'] == wtype
+        for server_id, server_config in config['servers'].items()
+        for channel_config in server_config['channels']
+        for duck in channel_config['ducks']
+    )
+
+
+def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
+    ducks = {}
+    if _has_workflow_of_type(config, 'basic_prompt_conversation'):
+        armory = Armory()
+        if 'dataset_folder_locations' in config:
+            data_store = DataStore(config['dataset_folder_locations'])
+            stat_tools = StatsTools(data_store)
+            armory.scrub_tools(stat_tools)
+
+        ai_client = OpenAI(
+            os.environ['OPENAI_API_KEY'],
+            armory,
+            metrics_handler.record_usage
+        )
+
+        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+        retryable_ai_client = RetryableGenAI(
+            ai_client,
+            bot.send_message,
+            bot.report_error,
+            bot.typing,
+            ai_completion_retry_protocol
+        )
+
+        setup_conversation = BasicSetupConversation(
+            metrics_handler.record_message,
+        )
+
+        have_conversation = BasicPromptConversation(
+            retryable_ai_client,
+            metrics_handler.record_message,
+            metrics_handler.record_usage,
+            bot.send_message,
+            bot.report_error,
+            bot.add_reaction,
+            setup_conversation
+        )
+        ducks['basic_prompt_conversation'] = have_conversation
+
+    if _has_workflow_of_type(config, 'conversation_review'):
+        have_ta_conversation = HaveTAGradingConversation(
+            feedback_manager,
+            metrics_handler.record_feedback,
+            bot.send_message,
+            bot.add_reaction,
+            bot.report_error
+        )
+        ducks['conversation_review'] = have_ta_conversation
+
+    if _has_workflow_of_type(config, 'registration'):
+        email_confirmation = EmailSender(config['sender_email'])
+
+        registration_workflow = RegistrationWorkflow(
+            bot.send_message,
+            bot.get_channel,
+            bot.fetch_guild,
+            email_confirmation
+        )
+        ducks['registration'] = registration_workflow
+
+    if not ducks:
+        raise ValueError('No ducks were requested in the config')
+
+    return ducks
+
+
+async def main(config: Config):
+    sql_session = create_sql_session(config['sql'])
+
+    async with DiscordBot() as bot:
+        setup_thread = SetupPrivateThread(
+            bot.create_thread,
+            bot.send_message
+        )
+
+        queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
+
+        convo_review_ducks = (
+            duck
+            for server_config in config['servers'].values()
+            for channel_config in server_config['channels']
+            for duck in channel_config['ducks']
+            if duck['workflow_type'] == 'conversation_review'
+        )
+
+        target_channel_ids = (
+            target_id
+            for duck in convo_review_ducks
+            for target_id in duck['settings']['target_channel_ids']
+        )
+
+        with these({
+            target_id: PersistentQueue(str(target_id), queue_blob_storage)
+            for target_id in target_channel_ids
+        }) as persistent_queues:
+            feedback_manager = FeedbackManager(persistent_queues)
+            metrics_handler = SQLMetricsHandler(sql_session)
+
+            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
+
+            duck_orchestrator = DuckOrchestrator(
+                setup_thread,
+                bot.send_message,
+                bot.report_error,
+                ducks,
+                feedback_manager.remember_conversation
+            )
+
+            channel_configs = {
+                channel_config['channel_id']: channel_config
+                for server_config in config['servers'].values()
+                for channel_config in server_config['channels']
+            }
+
+            async with setup_workflow_manager(
+                    config,
+                    duck_orchestrator,
+                    sql_session,
+                    metrics_handler,
+                    bot.send_message
+            ) as workflow_manager:
+                admin_channel_id = config['admin_settings']['admin_channel_id']
+                rubber_duck = RubberDuckApp(
+                    admin_channel_id,
+                    channel_configs,
+                    workflow_manager
+                )
+                bot.set_duck_app(rubber_duck, admin_channel_id)
+
+                # Set up the notifier thread.
+                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(), config['feedback_notifier_settings'])
+                await asyncio.gather(
+                    bot.start(os.environ['DISCORD_TOKEN']),
+                    notifier.start()
+                )
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json')
-    parser.add_argument('--log-console', action='store_true')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     args = parser.parse_args()
 
-    # Set up logging based on user preference
-    if args.log_console:
-        logging.basicConfig(
-            level=logging.WARNING,
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
+    # Set debug environment variable if debug flag is set
+    if args.debug:
+        duck_logger.setLevel(logging.DEBUG)
+        from quest.utils import quest_logger
+
+        quest_logger.setLevel(logging.DEBUG)
     else:
-        logging.basicConfig(
-            level=logging.WARNING,
-            filename='logfile.log',  # Replace LOG_FILE with the actual log file path
-            format='%(asctime)s %(levelname)s %(filename)s:%(lineno)s - %(message)s'
-        )
+        duck_logger.setLevel(logging.INFO)
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
@@ -202,6 +267,5 @@ if __name__ == '__main__':
     if config is None:
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
-    
-    import asyncio
+
     asyncio.run(main(config))

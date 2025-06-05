@@ -1,43 +1,41 @@
 import asyncio
-from typing import Protocol
+from typing import Protocol, TypedDict
 
-from quest import queue, step, alias
+from quest import step, alias, queue, wrap_steps
 
-from ..utils.config_types import FeedbackConfig
-from ..utils.protocols import AddReaction, SendMessage
+from .feedback_manager import FeedbackManager
+from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
+from ..utils.logger import duck_logger
 
 
 class RecordFeedback(Protocol):
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, reviewer_id: int,
-                       feedback_score: int): ...
+    async def __call__(self,
+                       workflow_type: str, guild_id: int, parent_channel_id: int,
+                       thread_id: int, user_id: int, reviewer_id: int,
+                       feedback_score: int, written_feedback: str): ...
 
 
-class GetFeedback(Protocol):
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int,
-                       feedback_config: FeedbackConfig): ...
+class ConversationReviewSettings(TypedDict):
+    target_channel_ids: list[int]
+    timeout: int
 
 
-class GetConvoFeedback:
-    def __init__(self, feedback_configs: dict[int, FeedbackConfig], get_feedback: GetFeedback):
-        self._feedback_configs = feedback_configs
-        self._get_feedback = get_feedback
-
-    async def __call__(self, workflow_type: str, guild_id: int, thread_id: int, user_id: int, channel_id: int):
-        if (config := self._feedback_configs.get(channel_id)) is not None:
-            await self._get_feedback(workflow_type, guild_id, thread_id, user_id, config)
-
-
-class GetTAFeedback:
+class HaveTAGradingConversation:
     def __init__(self,
+                 feedback_manager: FeedbackManager,
+                 record_feedback: RecordFeedback,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
-                 record_feedback: RecordFeedback
+                 report_error: ReportError,
                  ):
+        self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
+        self._record_feedback: RecordFeedback = step(record_feedback)
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
-        self._record_feedback = record_feedback
+        self._report_error = step(report_error)
 
         self._reactions = {
+            '⏭️': 'nan',
             '1️⃣': 1,
             '2️⃣': 2,
             '3️⃣': 3,
@@ -45,59 +43,91 @@ class GetTAFeedback:
             '5️⃣': 5
         }
 
-    # Implements GetFeedback Protocol
-    async def __call__(self, workflow_type, guild_id, thread_id, user_id, feedback_config: FeedbackConfig):
-        review_message_content = (
-            f"How effective was this conversation: "
-            f"https://discord.com/channels/{guild_id}/{thread_id}/{user_id}"
+    async def _flush_conversations_for_channel(self, thread_id, target_channel_id, timeout):
+        duck_logger.info(f"Flushing conversations for channel {target_channel_id}")
+        while (data := await self._feedback_manager.get_conversation(target_channel_id)) is not None:
+            duck_logger.info(f"Processing conversation: {data}")
+
+            student_convo_link = f"<#{data['conversation_thread_id']}>"
+            ta_convo_link = f"<#{thread_id}>"
+
+            message_id = await self._send_message(thread_id, "Student Conversation: " + student_convo_link)
+            await self._send_message(data['conversation_thread_id'], "Back to Grading: " + ta_convo_link)
+
+            # Add emojis to message
+            async with alias(str(message_id)), queue("feedback", None) as feedback_queue:
+                for reaction in self._reactions:
+                    await self._add_reaction(thread_id, message_id, reaction)
+
+                try:
+                    # TODO - perhaps run the reactions in parallel to the feedback get
+                    feedback_emoji, reviewer_id = await asyncio.wait_for(
+                        feedback_queue.get(),
+                        timeout=timeout
+                    )
+                    feedback_score = self._reactions.get(feedback_emoji, 'nan')
+                    await self._add_reaction(thread_id, message_id, '✅')
+
+
+                    if feedback_score != 'nan':
+                        await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
+                        try:
+                            async with queue('messages', None) as messages:
+                                        message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                                        message_content = message['content']
+                            if message_content == '-':
+                                await self._send_message(thread_id, "No feedback provided, skipping.")
+                            else:
+                                await self._send_message(thread_id, f"Feedback recorded, thank you.")
+                        except asyncio.TimeoutError:
+                            message_content = '-'
+                            await self._send_message(thread_id, "No feedback provided, skipping.")
+                    else:
+                        message_content = '-'
+
+
+
+
+
+                    duck_logger.info(f"Recording feedback: {feedback_score} from reviewer {reviewer_id}")
+                    await self._record_feedback(
+                        data['duck_type'],
+                        data['guild_id'],
+                        data['parent_channel_id'],
+                        data['conversation_thread_id'],
+                        data['user_id'],
+                        reviewer_id,
+                        feedback_score,
+                        message_content
+                    )
+
+                except asyncio.TimeoutError:
+                    duck_logger.warning(f"Feedback timeout for conversation {data}")
+                    self._feedback_manager.remember_conversation(data)
+                    await self._add_reaction(thread_id, message_id, '❌')
+                    raise
+
+    async def _serve_messages(self, thread_id, settings: ConversationReviewSettings):
+        target_channel_ids = settings['target_channel_ids']
+        duck_logger.info(f"Serving messages for channels: {target_channel_ids}")
+
+        for target_channel_id in target_channel_ids:
+            await self._flush_conversations_for_channel(thread_id, target_channel_id, settings.get('timeout', 60 * 5))
+
+        await self._send_message(thread_id, "No more conversations to review.")
+
+    async def __call__(self, thread_id: int, settings: ConversationReviewSettings, initial_message: Message):
+        duck_logger.info(f"Starting TA review session in thread {thread_id}")
+
+        await self._send_message(
+            thread_id,
+            'After you provide feedback on a conversation, another will be served.\n'
+            'If you do not respond for five minutes, this session will end.\n'
         )
-        feedback_message_content = (
-            f"On a scale of 1 to 5, "
-            f"how effective was this conversation: "
-        )
 
-        if 'reviewer_role_id' in feedback_config:
-            review_message_content = f"<@{feedback_config['reviewer_role_id']}> {review_message_content}"
+        try:
+            await self._serve_messages(thread_id, settings)
 
-        feedback_message_id = await self._send_message(thread_id, feedback_message_content)
-
-        async with alias(str(feedback_message_id)), queue("feedback", None) as feedback_queue:
-            for reaction in self._reactions:
-                await self._add_reaction(thread_id, feedback_message_id, reaction)
-                await asyncio.sleep(0.5)  # per discord policy, we wait
-
-            reviewer_channel_id = feedback_config['ta_review_channel_id']
-            review_message_id = await self._send_message(reviewer_channel_id, review_message_content)
-
-            try:
-                feedback_emoji, reviewer_id = await self._get_reviewer_feedback(
-                    user_id, feedback_queue,
-                    feedback_config.get('allow_self_feedback', False),
-                    feedback_config.get('feedback_timeout', 604800)
-                )
-                feedback_score = self._reactions[feedback_emoji]
-                await self._add_reaction(thread_id, feedback_message_id, '✅')
-                await self._add_reaction(reviewer_channel_id, review_message_id, '✅')
-
-            except asyncio.TimeoutError:
-                await self._add_reaction(reviewer_channel_id, review_message_id, '❌')
-                feedback_score = 'nan'
-                reviewer_id = 'nan'
-
-            # Record score
-
-            await self._record_feedback(workflow_type, guild_id, thread_id, user_id, reviewer_id, feedback_score)
-
-            # Done
-
-    @staticmethod
-    async def _get_reviewer_feedback(user_id, feedback_queue, allow_self_feedback, feedback_timeout):
-        while True:
-            # Wait for feedback to be given
-            feedback_emoji, reviewer_id = await asyncio.wait_for(
-                feedback_queue.get(),
-                timeout=feedback_timeout
-            )
-            # Verify that the feedback came from someone other than the student
-            if allow_self_feedback or reviewer_id != user_id:
-                return feedback_emoji, reviewer_id
+        except asyncio.TimeoutError:
+            duck_logger.warning(f"TA review session timed out in thread {thread_id}")
+            await self._send_message(thread_id, "*This conversation has timed out.*")

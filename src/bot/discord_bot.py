@@ -1,11 +1,9 @@
-import logging
+import io
 
 import discord
 
-from ..commands.command import UsageMetricsCommand, MessagesMetricsCommand, FeedbackMetricsCommand, MetricsCommand, \
-    StatusCommand, \
-    ReportCommand, BashExecuteCommand, LogCommand, Command, ActiveWorkflowsCommand
-from ..utils.protocols import Attachment, Message
+from ..utils.logger import duck_logger
+from ..utils.protocols import Attachment, Message, SendableFile
 
 
 def as_message(message: discord.Message) -> Message:
@@ -28,20 +26,6 @@ def as_attachment(attachment):
         description=attachment.description,
         filename=attachment.filename
     )
-
-
-def create_commands(send_message, metrics_handler, reporter, active_workflow_function) -> list[Command]:
-    # Create and return the list of commands
-    return [
-        messages := MessagesMetricsCommand(send_message, metrics_handler),
-        usage := UsageMetricsCommand(send_message, metrics_handler),
-        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
-        MetricsCommand(messages, usage, feedback),
-        StatusCommand(send_message),
-        ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message)),
-        ActiveWorkflowsCommand(send_message, active_workflow_function)
-    ]
 
 
 def _parse_blocks(text: str, limit=1990):
@@ -87,11 +71,11 @@ class DiscordBot(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
         self._rubber_duck = None
-        self._command_channel = None  # Will be set when rubber duck app is set
+        self._admin_channel = None  # Will be set when rubber duck app is set
 
-    def set_duck_app(self, rubber_duck):
+    def set_duck_app(self, rubber_duck, admin_channel_id: int):
         self._rubber_duck = rubber_duck
-        self._command_channel = rubber_duck._command_channel
+        self._admin_channel = admin_channel_id
 
     async def __aenter__(self):
         return self
@@ -101,20 +85,20 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         # print out information when the bot wakes up
-        logging.info('Logged in as')
-        logging.info(self.user.name)
-        logging.info(self.user.id)
-        logging.info('Starting workflow manager')
+        duck_logger.info('Logged in as')
+        duck_logger.info(self.user.name)
+        duck_logger.info(self.user.id)
+        duck_logger.info('Starting workflow manager')
 
         try:
-            await self.send_message(self._command_channel, 'Duck online')
+            await self.send_message(self._admin_channel, 'Duck online')
         except:
-            logging.exception(f'Unable to message channel {self._command_channel}')
+            duck_logger.error(f'Unable to message channel {self._admin_channel}')
 
-        logging.info('------')
+        duck_logger.info('------')
 
     async def close(self):
-        logging.warning("-- Suspending --")
+        duck_logger.warning("-- Suspending --")
         await super().close()
 
     async def on_message(self, message: discord.Message):
@@ -146,31 +130,39 @@ class DiscordBot(discord.Client):
     # Methods for message-handling protocols
     #
 
-    async def send_message(self, channel_id, message: str, file=None, view=None) -> int:
+    def _make_discord_file(self, file) -> discord.File:
+        if isinstance(file, discord.File):
+            return file
+        if isinstance(file, tuple):
+            return discord.File(io.BytesIO(file[1]), file[0])
+        raise NotImplementedError(f"Unsupported file type: {file}")
+
+    async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
         channel = self.get_channel(channel_id)
         if channel is None:
-            await self.report_error(f'Tried to send message on {channel_id}, but no channel found.')
+            duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
-        curr_message = None
-
-        for block in _parse_blocks(message):
-            curr_message = await channel.send(block)
+        if message:
+            for block in _parse_blocks(message):
+                curr_message = await channel.send(block)
+            return curr_message.id
 
         if file is not None:
-            if isinstance(file, list):
-                curr_message = await channel.send("", files=file)
-                # TODO: check that all instances are discord.File objects.
-            elif not isinstance(file, discord.File):
-                file = discord.File(file)
-                curr_message = await channel.send("", file=file)
+            files_to_send = []
+            if not isinstance(file, list):
+                files_to_send.append(file)
             else:
-                curr_message = await channel.send("", file=file)
+                files_to_send = file
+
+            file_to_send = [self._make_discord_file(file) for file in files_to_send]
+            curr_message = await channel.send(files=file_to_send)
+            return curr_message.id
 
         if view is not None:
-            await channel.send("", view=view)
+            return (await channel.send(view=view)).id
 
-        return curr_message.id
+        raise Exception('Must send message, file, or view')
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str):
         channel = self.get_channel(channel_id)
@@ -178,14 +170,27 @@ class DiscordBot(discord.Client):
             msg = await channel.fetch_message(message_id)
             await msg.edit(content=new_content)
         except Exception as e:
-            logging.exception(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+            duck_logger.error(f"Could not edit message {message_id} in channel {channel_id}: {e}")
 
     async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    class ChannelTyping:
+        def __init__(self, fetch_channel, channel_id):
+            self._fetch_channel = fetch_channel
+            self._channel_id = channel_id
+
+        async def __aenter__(self):
+            channel = await self._fetch_channel(self._channel_id)
+            self._typing = channel.typing()
+            return await self._typing.__aenter__()
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
+
     def typing(self, channel_id: int):
-        return self.get_channel(channel_id).typing()
+        return self.ChannelTyping(self.fetch_channel, channel_id)
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread
@@ -195,3 +200,10 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
+
+    async def report_error(self, msg: str, notify_admins: bool = False):
+        if notify_admins:
+            try:
+                await self.send_message(self._admin_channel, msg)
+            except:
+                duck_logger.exception(f'Unable to message channel {self._admin_channel}')

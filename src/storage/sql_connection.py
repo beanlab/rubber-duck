@@ -5,9 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql import text
+from ..utils.logger import duck_logger
 
 
 def _create_sqlite_session(db_name: str) -> Session:
+    duck_logger.info(f'Creating SQLite session with name: {db_name}')
     db_url = f"sqlite:///{db_name}"
     engine = create_engine(db_url)
     return sessionmaker(bind=engine)()
@@ -18,11 +20,12 @@ def _create_sql_session(db_type: str, username: str, password: str, host: str, p
     db_url = f"{server_url}/{database}"
 
     engine = create_engine(server_url)
-
     with engine.connect() as conn:
         try:
+            duck_logger.info(f"Creating a local database: {database}")
             conn.execute(text(f"CREATE DATABASE {database}"))
         except ProgrammingError:
+            duck_logger.info(f"Database: {database} already exists")
             pass  # Database likely already exists
 
     # Now connect to the newly created database
