@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - 176-rubber-duck-demo
   workflow_dispatch:
     inputs:
       local_config:
