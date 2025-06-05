@@ -1,8 +1,12 @@
 from typing import TypedDict
 
+from agents import FunctionTool
+
+
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
     feedback_check_minute: int
+
 
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
@@ -25,12 +29,27 @@ class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
     roles: RolesSettings
+    sender_email: str
 
 
-class DuckWorkflowSettings(TypedDict):
+class AgentConversationSettings(TypedDict):
+    agent_type: str
+    agent_settings: dict
+    timeout: int
+
+
+class SingleAgentSettings(TypedDict):
     prompt_file: str
     engine: str
-    timeout: int
+    name: str
+    handoff_prompt: str
+    tools: list[FunctionTool]
+    max_iterations: int
+
+
+class HubSpokesAgentSettings(TypedDict):
+    hub_agent_settings: SingleAgentSettings
+    spoke_agent: list[SingleAgentSettings]
 
 
 class DuckConfig(TypedDict):
@@ -82,5 +101,4 @@ class Config(TypedDict):
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     default_duck_settings: dict[str, dict]
-    sender_email: str
     feedback_notifier_settings: FeedbackNotifierSettings

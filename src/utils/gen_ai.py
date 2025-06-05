@@ -4,6 +4,7 @@ import logging
 from io import BytesIO
 from typing import TypedDict, Protocol
 
+from agents import Agent, Runner, RunResult
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
@@ -61,6 +62,78 @@ class RecordUsage(Protocol):
     async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str,
                        input_tokens: int,
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
+
+
+class HubSpokeAgentClient:
+    pass
+
+
+@step
+async def run_agent(*args, **kwargs) -> RunResult:
+    return await Runner.run(*args, **kwargs)
+
+
+class AgentClient:
+    def __init__(self, agent: Agent, record_usage: RecordUsage, typing):
+        self._agent = agent
+        self._record_usage = record_usage
+        self._typing = typing
+
+    async def get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            message_history: list,
+    ):
+        try:
+            return await self._get_completion(
+                guild_id, parent_channel_id, thread_id, user_id, message_history,
+            )
+        except (
+                APITimeoutError, InternalServerError,
+                UnprocessableEntityError) as ex:
+            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
+                                         'please open up a separate conversation and try again') from ex
+        except (APIConnectionError, BadRequestError,
+                AuthenticationError, ConflictError, NotFoundError,
+                RateLimitError) as ex:
+            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                     "for more details on how to resolve this error") from ex
+
+    async def _get_completion(
+            self,
+            guild_id: int,
+            parent_channel_id: int,
+            thread_id: int,
+            user_id: int,
+            message_history: list,
+    ) -> str:
+        try:
+            async with self._typing():
+                result = await run_agent(
+                    self._agent,
+                    message_history,
+                    max_turns=100
+                )
+                # TODO - record usage
+
+                return result.final_output_as(str)
+            await self._record_usage(
+                guild_id,
+                parent_channel_id,
+                thread_id,
+                user_id,
+                engine,
+                result.['usage']['prompt_tokens'],
+                completion_dict['usage']['completion_tokens'],
+                completion_dict['usage'].get('cached_tokens', 0),
+                completion_dict['usage'].get('reasoning_tokens', 0)
+            )
+
+        except Exception as e:
+            return
 
 
 class OpenAI:

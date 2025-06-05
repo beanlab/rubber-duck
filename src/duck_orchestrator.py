@@ -16,8 +16,8 @@ class SetupThread(Protocol):
     async def __call__(self, initial_message: Message) -> int: ...
 
 
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, settings: dict, initial_message: Message): ...
+class DuckConversation(Protocol):
+    async def __call__(self, thread_id: int, initial_message: Message): ...
 
 
 def generate_error_message(thread_id, ex):
@@ -37,7 +37,7 @@ class DuckOrchestrator:
                  setup_thread: SetupThread,
                  send_message,
                  report_error,
-                 ducks: dict[str, HaveConversation],
+                 ducks: dict[str, DuckConversation],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
@@ -84,7 +84,7 @@ class DuckOrchestrator:
 
         async with alias(str(thread_id)):
             try:
-                await duck(thread_id, settings, initial_message)
+                await duck(thread_id, initial_message)
 
             except Exception as ex:
                 error_message, error_code = generate_error_message(thread_id, ex)

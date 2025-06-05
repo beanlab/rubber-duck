@@ -35,7 +35,6 @@ servers:
             settings:
               prompt_file: prompts/standard-rubber-duck.txt
               engine: gpt-4.1
-              timeout: 600
 
   747510855536738336:
     server_name: CS 235
@@ -55,7 +54,7 @@ servers:
         ducks:
           - name: standard-rubber-duck
             workflow_type: basic_prompt_conversation
-            settings:
+            settings: # What is configurable for the agent sdk goes here.
               prompt_file: prompts/standard-rubber-duck.txt
               engine: gpt-4.1
               timeout: 600

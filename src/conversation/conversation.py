@@ -111,7 +111,7 @@ class AgentConversation:
                         # Waiting for a response from the user
                         message: Message = await asyncio.wait_for(messages.get(), self._wait_for_user_timeout)
 
-                    except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                    except asyncio.TimeoutError:
                         break
 
                     if len(message['file']) > 0:
@@ -136,9 +136,7 @@ class AgentConversation:
                         initial_message['channel_id'],
                         thread_id,
                         user_id,
-                        engine,
                         message_history,
-                        tools
                     )
 
                     await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
@@ -231,25 +229,6 @@ class BasicAgentConversation:
         self._typing = typing
         self._armory = armory
         self._current_agent = None
-
-    def create_agents(self, settings: dict) -> tuple[Agent, List[Agent]]:
-        def build_agent(config: dict) -> Agent:
-            return Agent(
-                name=config["name"],
-                handoff_description=config["handoff_prompt"],
-                instructions=Path(config["prompt"]).read_text(encoding="utf-8"),
-                tools=[
-                    self._armory.get_specific_tool_metadata(tool)
-                    for tool in config["tools"]
-                    if tool in self._armory.get_all_tool_names()
-                ],
-                model=config["engine"],
-                model_settings=ModelSettings(tool_choice="required"),
-            )
-
-        return build_agent(settings["head_agent"]), [
-            build_agent(agent) for agent in settings.get("spoke_agents", [])
-        ]
 
     async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
         typing = self._typing(thread_id)
