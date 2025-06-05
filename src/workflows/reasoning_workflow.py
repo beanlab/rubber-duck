@@ -2,7 +2,6 @@ import asyncio
 
 import httpx
 from openai import OpenAI as OpenAIClient
-from openai.types.responses import ResponseReasoningItem
 
 from quest import step, queue
 
@@ -28,7 +27,8 @@ class ReasoningWorkflow:
         self._setup_conversation = step(setup_conversation)
         self._client = OpenAIClient()
 
-    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int, message_history: list[GPTMessage]):
+    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
+                                    message_history: list[GPTMessage]):
         for sendable in sendables:
             if isinstance(sendable, str):
                 await self._record_message(
@@ -148,7 +148,7 @@ class ReasoningWorkflow:
 
                     # Second output is the response content
                     response_content = sendables['output'][1]
-                    
+
                     # Wait for complete response if status is incomplete
                     if response_content['status'] == 'incomplete':
                         # Get the complete response
