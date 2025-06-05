@@ -160,8 +160,6 @@ class DiscordBot(discord.Client):
             return curr_message.id
 
         if view is not None:
-            if message:
-                return (await channel.send(content=message, view=view)).id
             return (await channel.send(view=view)).id
 
         raise Exception('Must send message, file, or view')
