@@ -13,16 +13,26 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
-from src.storage.sql_metrics import SQLMetricsHandler
-from src.storage.sql_connection import create_sql_session
+from ..storage.sql_metrics import SQLMetricsHandler
+from ..utils.config_types import ServerConfig
+from ..utils.logger import duck_logger
 
-def fancy_preproccesing(df, guilds):
+
+def fancy_preproccesing(df, channels):
     if df == [['No data available']]:
         raise Exception('No data available')
-    df['guild_name'] = df['guild_id'].map(guilds)  # TODO: Lets use channel ids instead of guild ids.
-    df = df.drop(columns=['guild_id'])
+
+    if isinstance(df, list):
+        # Use first row as column names
+        columns = df[0]
+        df = pd.DataFrame(df[1:], columns=columns)
+
+    duck_logger.debug("Starting fancy preprocessing of feedback data")
+
+    df['channel_name'] = df['parent_channel_id'].map(channels)  # Map parent_channel_id to channel names
+    df = df.drop(columns=['parent_channel_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
-            .groupby('guild_name')
+            .groupby('channel_name')
             .resample('W')
             .agg(
         avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
@@ -32,14 +42,14 @@ def fancy_preproccesing(df, guilds):
             )
 
 
-def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
+def feed_fancy_graph(channels, df_feedback, arg_string, show_fig):
     specific_str = arg_string.split()[2]
-    df = fancy_preproccesing(df_feedback, guilds)
+    df = fancy_preproccesing(df_feedback, channels)
 
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
     if specific_str == 'percent':
-        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='guild_name')
+        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='channel_name')
         plt.gca().yaxis.set_major_formatter(PercentFormatter())
 
     else:
@@ -102,12 +112,29 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
+    def __init__(self, SQLMetricsHandler, server_config:ServerConfig, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
         wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
 
         self.show_fig = show_fig
-        self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
+        self._reporting_config = self._make_reporting_config(server_config)
+        # Create a flat mapping of channel IDs to channel names
+        self._channels = {}
+        for server_channels in self._reporting_config.values():
+            self._channels.update({int(channel_id): channel_name for channel_id, channel_name in server_channels.items()})
+
+    def _make_reporting_config(self, server_config:ServerConfig) -> dict:
+        """This function converts the server_config into a dictionary that maps server names to their channels."""
+        reporting_config = {}
+        for server in server_config.values():
+            server_name = server['server_name']
+            channel_dict = {}
+            for channel in server['channels']:
+                channel_id = channel['channel_id']
+                channel_name = channel['channel_name']
+                channel_dict[channel_id] = channel_name
+            reporting_config[server_name] = channel_dict
+        return reporting_config
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
@@ -149,12 +176,12 @@ class Reporter:
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
         if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            df['guild_name'] = df['guild_id'].map(self._guilds)
+            df['channel_name'] = df['guild_id'].map(self._channels)
             df = df.drop(columns=['guild_id'])
             if args.exp_var == 'guild_id':
-                args.exp_var = 'guild_name'
+                args.exp_var = 'channel_name'
             else:
-                args.exp_var_2 = 'guild_name'
+                args.exp_var_2 = 'channel_name'
 
         return df
 
@@ -303,7 +330,7 @@ class Reporter:
                 return self.help_menu(), None
 
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-                return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+                return feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
 
             args = self.parse_args(arg_string)
 
@@ -356,6 +383,7 @@ class Reporter:
             
             print(f"Running command: {command}")  # Debug print
             self.get_report(command)
+
 
 
 if __name__ == '__main__':

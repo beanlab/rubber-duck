@@ -77,7 +77,7 @@ def load_local_config(file_path: Path) -> Config:
 
 
 def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
-    reporter = Reporter(metrics_handler, config['reporting'])
+    reporter = Reporter(metrics_handler, config['servers'], True)
 
     commands = create_commands(send_message, metrics_handler, reporter)
     commands_workflow = BotCommands(commands, send_message)
