@@ -70,7 +70,8 @@ def feed_fancy_graph(channels, df_feedback, arg_string, show_fig):
     if show_fig:
         plt.show()
     plt.close()
-    return img_name, buffer
+    
+    return img_name, buffer.getvalue()
 
 
 class Reporter:
@@ -331,6 +332,7 @@ class Reporter:
 
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
                 return feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+
 
             args = self.parse_args(arg_string)
 
