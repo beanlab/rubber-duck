@@ -42,7 +42,7 @@ def fancy_preproccesing(df, channels):
             )
 
 
-def feed_fancy_graph(channels, df_feedback, arg_string, show_fig):
+def feed_fancy_graph(channels, df_feedback, arg_string, show_fig) -> tuple[str, io.BytesIO]:
     specific_str = arg_string.split()[2]
     df = fancy_preproccesing(df_feedback, channels)
 
@@ -70,8 +70,8 @@ def feed_fancy_graph(channels, df_feedback, arg_string, show_fig):
     if show_fig:
         plt.show()
     plt.close()
-    
-    return img_name, buffer.getvalue()
+    return img_name, buffer
+
 
 
 class Reporter:
@@ -177,7 +177,10 @@ class Reporter:
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
         if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            df['channel_name'] = df['guild_id'].map(self._channels)
+            duck_logger.debug(f"Available channel_ids in data: {df['parent_channel_id'].unique()}")
+            duck_logger.debug(f"Available channel mappings: {self._channels}")
+            df['channel_name'] = df['parent_channel_id'].map(self._channels)
+            duck_logger.debug(f"Channel names after mapping: {df['channel_name'].unique()}")
             df = df.drop(columns=['guild_id'])
             if args.exp_var == 'guild_id':
                 args.exp_var = 'channel_name'
@@ -216,7 +219,7 @@ class Reporter:
 
         elif args.exp_var:
             try:
-                df[args.ind_var] = pd.to_numeric(df[args.ind_var])
+                df[args.ind_var] = pd.to_numeric(df[args.ind_var], errors='coerce')
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
                 elif args.count:
@@ -227,6 +230,7 @@ class Reporter:
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             except ValueError as e:
+                duck_logger.error(f"Error converting {args.ind_var} to numeric: {e}")
                 df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
 
         else:
@@ -265,15 +269,23 @@ class Reporter:
     def make_graph(self, df, args):
         self.prettify_graph(df, args)
 
+        # Get the current figure
+        fig = plt.gcf()
+        
+        # Ensure the plot is rendered
+        fig.canvas.draw()
+        
+        # Save to buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        
+        # Show the plot if requested
         if self.show_fig:
             plt.show()
-
-        graph_name = f"{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
+        
         plt.close()
-        return graph_name, buffer
+        return f"{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png", buffer
 
     def parse_args(self, arg_string):
         """Parse command-line arguments using argparse."""
@@ -323,7 +335,7 @@ class Reporter:
                 titles.append(title)
         return imgs, titles
 
-    def get_report(self, arg_string):
+    def get_report(self, arg_string) -> tuple[str, io.BytesIO]:
         try:
             # if arg_string == '!report all': #TODO: get working
             #     return self.get_all_prebaked()
@@ -333,18 +345,16 @@ class Reporter:
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
                 return feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
 
-
             args = self.parse_args(arg_string)
 
             df = self.select_dataframe(args.dataframe)
-
             df_limited = self.prepare_df(df, args)
+            
             if len(df_limited) == 0:
                 return "No data available for this plot.", None
 
-            graph_name, graph = self.make_graph(df_limited, args)
+            return self.make_graph(df_limited, args)
 
-            return graph_name, graph
         except Exception as e:
             # Ensure any matplotlib figures are closed
             plt.close('all')

@@ -108,6 +108,7 @@ class ReportCommand(Command):
 
     @step
     async def execute(self, message: Message):
+        """ Execute the report command to generate and send a report based on the message content."""
         try:
             content = message['content']
             channel_id = message['channel_id']
@@ -117,18 +118,17 @@ class ReportCommand(Command):
                 await self.send_message(channel_id, img_name)
             elif isinstance(img, list):
                 imgs = [discord.File(fp=io.BytesIO(image), filename=image_name) for image, image_name in zip(img, img_name)]
-                await self.send_message(channel_id, img_name, files=imgs)
+                for img in imgs:
+                    await self.send_message(channel_id, "", file=img)
             else:
-                # Create a BytesIO object from the raw bytes
-                img_buffer = io.BytesIO(img)
-                img_buffer.seek(0)
-                discord_file = discord.File(img_buffer, filename=img_name)
-                await self.send_message(channel_id, "", file=discord_file)  # Send empty message with file
+                # Send only the image file without any text
+                file = discord.File(fp=img, filename=img_name)
+                await self.send_message(channel_id, "", file=file)
         except Exception as e:
-            # Log the error and send a user-friendly message
-            duck_logger.exception(f"Error executing report command: {str(e)}")
-            await self.send_message(message['channel_id'], f"Error generating report: {str(e)}")
-            raise  # Re-raise to ensure the step is marked as failed
+            duck_logger.error(f"Error executing report command: {e}")
+            channel_id = message['channel_id']
+            await self.send_message(channel_id, f"An error occurred while generating the report: {e}")
+            raise
 
 
 class BashExecuteCommand():
