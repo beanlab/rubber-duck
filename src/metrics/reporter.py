@@ -19,8 +19,6 @@ from ..utils.logger import duck_logger
 
 
 def fancy_preproccesing(df, channels):
-    if df == [['No data available']]:
-        raise Exception('No data available')
 
     if isinstance(df, list):
         # Use first row as column names
@@ -181,7 +179,7 @@ class Reporter:
         duck_logger.debug(f"Preprocessing input - Content: {df}")
         
         # Check if df is empty or has no data
-        if df is None or (isinstance(df, list) and df == [['No data available']]):
+        if df is None or (isinstance(df, list)):
             duck_logger.debug("No data available in preprocessing")
             return pd.DataFrame()  # Return empty DataFrame
             
