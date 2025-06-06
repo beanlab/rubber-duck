@@ -122,6 +122,7 @@ class HaveTAGradingConversation:
         await self._send_message(
             thread_id,
             'After you provide feedback on a conversation, another will be served.\n'
+            '**You can skip giving written feedback to a conversation by clicking "-" then "enter".**\n'
             'If you do not respond for five minutes, this session will end.\n'
         )
 
