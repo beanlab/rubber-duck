@@ -112,18 +112,20 @@ class ReportCommand(Command):
         try:
             content = message['content']
             channel_id = message['channel_id']
-            img_name, img = self.reporter.get_report(content)
-            
-            if img is None:
-                await self.send_message(channel_id, img_name)
-            elif isinstance(img, list):
-                imgs = [discord.File(fp=io.BytesIO(image), filename=image_name) for image, image_name in zip(img, img_name)]
-                for img in imgs:
-                    await self.send_message(channel_id, "", file=img)
+            if content == '!report help' or content == '!report h':
+                help_text = self.reporter.help_menu()
+                await self.send_message(channel_id, help_text)
             else:
-                # Send only the image file without any text
-                file = discord.File(fp=img, filename=img_name)
-                await self.send_message(channel_id, "", file=file)
+                result = self.reporter.get_report(content)
+                
+                if result is None:
+                    await self.send_message(channel_id, "No data available")
+                elif isinstance(result, str):  # Help text or error message
+                    await self.send_message(channel_id, result)
+                else:  # List of (title, image) tuples
+                    for title, image in result:
+                        file = discord.File(fp=image, filename=title)
+                        await self.send_message(channel_id, "", file=file)
         except Exception as e:
             duck_logger.error(f"Error executing report command: {e}")
             channel_id = message['channel_id']

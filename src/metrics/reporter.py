@@ -51,12 +51,11 @@ def feed_fancy_graph(channels, df_feedback, arg_string, show_fig) -> tuple[str, 
     if specific_str == 'percent':
         sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='channel_name')
         plt.gca().yaxis.set_major_formatter(PercentFormatter())
-
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
 
     main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week"
-    plt.title(main_string + ".png")
+    plt.title(main_string)
     plt.xlabel('Week')
     plt.ylabel(f'Valid Scores {specific_str.title()}')
     plt.xticks(rotation=45)
@@ -65,13 +64,14 @@ def feed_fancy_graph(channels, df_feedback, arg_string, show_fig) -> tuple[str, 
 
     img_name = f"{main_string}.png"
     buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
+    plt.savefig(buffer, format='png', bbox_inches='tight')
     buffer.seek(0)
+    
     if show_fig:
         plt.show()
     plt.close()
-    return img_name, buffer
-
+    
+    return f"{main_string}.png", buffer
 
 
 class Reporter:
@@ -147,40 +147,70 @@ class Reporter:
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
         
+        duck_logger.debug(f"Raw data from SQLMetricsHandler: {data}")
+        
         # Convert list to DataFrame if necessary
         if isinstance(data, list):
             # Use first row as column names
             columns = data[0]
-            data = pd.DataFrame(data[1:], columns=columns)
+            df = pd.DataFrame(data[1:], columns=columns)
+            duck_logger.debug(f"Converted to DataFrame - Shape: {df.shape}")
+            duck_logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+            duck_logger.debug(f"Sample data:\n{df.head()}")
+            return df
         return data
 
     def compute_cost(self, row):
         engine = row.get('engine', 'gpt-4')
         ip, op = self.pricing.get(engine, (0, 0))
         duck_logger.debug(f"Computing cost for engine {engine} with pricing {ip}/{op}")
+        duck_logger.debug(f"Raw row data: {row}")
         
         input_tokens = pd.to_numeric(row['input_tokens'], errors='coerce')
         output_tokens = pd.to_numeric(row['output_tokens'], errors='coerce')
         
         duck_logger.debug(f"Tokens - Input: {input_tokens}, Output: {output_tokens}")
+        duck_logger.debug(f"Input cost: {input_tokens / 1000 * ip}")
+        duck_logger.debug(f"Output cost: {output_tokens / 1000 * op}")
         cost = input_tokens / 1000 * ip + output_tokens / 1000 * op
-        duck_logger.debug(f"Computed cost: {cost}")
+        duck_logger.debug(f"Total computed cost: {cost}")
         return cost
 
     def preprocessing(self, df, args):
+        duck_logger.debug(f"Preprocessing input - Type: {type(df)}")
+        duck_logger.debug(f"Preprocessing input - Content: {df}")
+        
+        # Check if df is empty or has no data
+        if df is None or (isinstance(df, list) and df == [['No data available']]):
+            duck_logger.debug("No data available in preprocessing")
+            return pd.DataFrame()  # Return empty DataFrame
+            
+        # Convert list to DataFrame if necessary
+        if isinstance(df, list):
+            # Use first row as column names
+            columns = df[0]
+            df = pd.DataFrame(df[1:], columns=columns)
+            duck_logger.debug(f"Converted list to DataFrame - Shape: {df.shape}")
+            duck_logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+            duck_logger.debug(f"Sample data:\n{df.head()}")
+            
+        # Check if DataFrame is empty
+        if df.empty:
+            duck_logger.debug("Empty DataFrame in preprocessing")
+            return df
+
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-            df["hour_of_day"] = (df[
-                                     'timestamp'].dt.hour - 7) % 24  # TODO: adjust both the timestamp and hour_of_day by the right time
+            df["hour_of_day"] = (df['timestamp'].dt.hour - 7) % 24  # TODO: adjust both the timestamp and hour_of_day by the right time
 
-        if args.period:
-            now = datetime.now(ZoneInfo('US/Mountain'))
-            if args.ind_var == 'timestamp':
-                cutoff = self.trend_period[self.time_periods[args.period]]
-            else:
-                cutoff = now - timedelta(days=self.time_periods[args.period])
+            if args.period:
+                now = datetime.now(ZoneInfo('US/Mountain'))
+                if args.ind_var == 'timestamp':
+                    cutoff = self.trend_period[self.time_periods[args.period]]
+                else:
+                    cutoff = now - timedelta(days=self.time_periods[args.period])
 
-                df = df[df['timestamp'] >= cutoff]
+                    df = df[df['timestamp'] >= cutoff]
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
@@ -209,8 +239,16 @@ class Reporter:
             raise ArgumentError(None, f"Invalid time period: {args.period}")
 
     def prepare_df(self, df, args):
+        if isinstance(df, list):
+            columns = df[0]
+            df = pd.DataFrame(df[1:], columns=columns)
+            
         df = self.preprocessing(df, args)
-
+        
+        # Check if DataFrame is empty or has no data
+        if df.empty or (len(df.columns) == 1 and df.columns[0] == 'No data available'):
+            return pd.DataFrame()  # Return empty DataFrame
+            
         self.catch_known_issues(df, args)
 
         duck_logger.debug(f"Data before grouping - Shape: {df.shape}")
@@ -251,8 +289,6 @@ class Reporter:
         else:
             df_grouped = df[args.ind_var].reset_index()
 
-        duck_logger.debug(f"Data after grouping - Shape: {df_grouped.shape}")
-        duck_logger.debug(f"Grouped data:\n{df_grouped.head()}")
         return df_grouped
 
     def prettify_graph(self, df, args):
@@ -340,27 +376,30 @@ class Reporter:
         return "\n\n".join(lines)
 
     def get_all_prebaked(self):
-        imgs = []
-        titles = []
-        for key in self.pre_baked:
-            if len(imgs) == 10:  # Discord's limit of number of images you can send at once
-                break
-            if key != 'all':
-                sys_string = '!report ' + key
-                title, image = self.get_report(sys_string)
-                imgs.append(image)
-                titles.append(title)
-        return imgs, titles
+        results = []
+        for key, (command, description) in self.pre_baked.items():
+            if key != 'all':  # Skip the 'all' command itself
+                try:
+                    result = self.get_report(f"!report {key}")
+                    if isinstance(result, list):  # Only add if we got a valid image result
+                        results.extend(result)
+                    else:
+                        duck_logger.warning(f"Skipping {key} - {result}")
+                except Exception as e:
+                    duck_logger.error(f"Error generating report for {key}: {e}")
+                    continue
+        return results
 
-    def get_report(self, arg_string) -> tuple[str, io.BytesIO]:
+    def get_report(self, arg_string) -> list[tuple[str, io.BytesIO]] | str:
         try:
-            # if arg_string == '!report all': #TODO: get working
-            #     return self.get_all_prebaked()
+            if arg_string == '!report all':
+                return self.get_all_prebaked()
             if arg_string == '!report help' or arg_string == '!report h':
-                return self.help_menu(), None
+                return self.help_menu()
 
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-                return feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+                title, image = feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+                return [(title, image)]
 
             args = self.parse_args(arg_string)
 
@@ -368,9 +407,10 @@ class Reporter:
             df_limited = self.prepare_df(df, args)
             
             if len(df_limited) == 0:
-                return "No data available for this plot.", None
+                return "No data available for this plot."
 
-            return self.make_graph(df_limited, args)
+            title, image = self.make_graph(df_limited, args)
+            return [(title, image)]
 
         except Exception as e:
             # Ensure any matplotlib figures are closed
