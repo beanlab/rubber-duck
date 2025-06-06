@@ -4,20 +4,22 @@ import json
 import logging
 import os
 from pathlib import Path
-import yaml  # Added import for YAML support
 
 import boto3
+import yaml  # Added import for YAML support
+from agents import Agent, ModelSettings
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.utils.feedback_notifier import FeedbackNotifier
 from .armory.armory import Armory
 from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicPromptConversation, BasicSetupConversation
+from .conversation.conversation import BasicSetupConversation, AgentConversation
 from .conversation.threads import SetupPrivateThread
-from .duck_orchestrator import DuckOrchestrator
+from .duck_orchestrator import DuckOrchestrator, DuckConversation
 from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
@@ -25,10 +27,10 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.feedback_notifier import FeedbackNotifier
-from .utils.config_types import Config
+from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
+    SingleAgentSettings, HubSpokesAgentSettings
 from .utils.data_store import DataStore
-from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.gen_ai import OpenAI, RetryableGenAI, AgentClient
 from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
@@ -75,9 +77,11 @@ def load_yaml_config(config_path):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
+
 def load_json_config(config_path):
     with open(config_path, 'r') as f:
         return json.load(f)
+
 
 def load_local_config(config_path):
     if config_path.suffix == '.json':
@@ -121,65 +125,130 @@ def _has_workflow_of_type(config: Config, wtype: str):
     )
 
 
-def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
-    ducks = {}
-    if _has_workflow_of_type(config, 'basic_prompt_conversation'):
-        armory = Armory()
-        if 'dataset_folder_locations' in config:
-            data_store = DataStore(config['dataset_folder_locations'])
-            stat_tools = StatsTools(data_store)
-            armory.scrub_tools(stat_tools)
+def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager) -> dict[
+    int, list[tuple[float, DuckConversation]]]:
+    """
+    Return a dictionary of channel ID to list of weighted ducks
+    """
+    channel_ducks = {}
 
-        ai_client = OpenAI(
-            os.environ['OPENAI_API_KEY'],
-            armory,
-            metrics_handler.record_usage
-        )
+    for server_config in config['servers'].items():
+        for channel_config in server_config['channels']:
+            channel_ducks[channel_config['channel_id']] = build_ducks(channel_config, bot, metrics_handler,
+                                                                      feedback_manager)
 
-        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-        retryable_ai_client = RetryableGenAI(
-            ai_client,
-            bot.send_message,
-            bot.report_error,
-            bot.typing,
-            ai_completion_retry_protocol
-        )
+    return channel_ducks
 
-        setup_conversation = BasicSetupConversation(
-            metrics_handler.record_message,
-        )
 
-        have_conversation = BasicPromptConversation(
-            retryable_ai_client,
-            metrics_handler.record_message,
-            metrics_handler.record_usage,
-            bot.send_message,
-            bot.report_error,
-            bot.add_reaction,
-            setup_conversation
-        )
-        ducks['basic_prompt_conversation'] = have_conversation
+def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
+    return Agent(
+        name=config["name"],
+        handoff_description=config["handoff_prompt"],
+        instructions=Path(config["prompt_file"]).read_text(encoding="utf-8"),
+        tools=[
+            armory.get_specific_tool_metadata(tool)
+            for tool in config["tools"]
+            if tool in armory.get_all_tool_names()
+        ],
+        model=config["engine"],
+        model_settings=ModelSettings(tool_choice="required"),
+    )
 
-    if _has_workflow_of_type(config, 'conversation_review'):
-        have_ta_conversation = HaveTAGradingConversation(
-            feedback_manager,
-            metrics_handler.record_feedback,
-            bot.send_message,
-            bot.add_reaction,
-            bot.report_error
-        )
-        ducks['conversation_review'] = have_ta_conversation
+def create_agents(armory: Armory, settings: HubSpokesAgentSettings) -> tuple[Agent, list[Agent]]:
 
-    if _has_workflow_of_type(config, 'registration'):
-        email_confirmation = EmailSender(config['sender_email'])
+    return build_agent(armory, settings["hub_agent_settings"]), [
+        build_agent(armory, agent) for agent in settings.get("spoke_agents_settings", [])
+    ]
 
-        registration_workflow = RegistrationWorkflow(
-            bot.send_message,
-            bot.get_channel,
-            bot.fetch_guild,
-            email_confirmation
-        )
-        ducks['registration'] = registration_workflow
+
+def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversationSettings):
+    armory = Armory()
+    if 'dataset_folder_locations' in config:
+        data_store = DataStore(config['dataset_folder_locations'])
+        stat_tools = StatsTools(data_store)
+        armory.add_toolbox(stat_tools)
+
+    agent_type = settings['agent_type']
+
+    match(agent_type):
+        case 'single-agent':
+            agent = build_agent(armory, settings['agent_settings'])
+        case 'hub-spokes':
+            agent, spoke_agents = create_agents(armory, settings['agent_settings'])
+        case _:
+            agent = build_agent(armory, settings['agent_settings'])
+
+    agent_client = AgentClient(
+        agent,
+        metrics_handler.record_usage,
+        bot.typing
+    )
+
+    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+    retryable_ai_client = RetryableGenAI(
+        agent_client,
+        bot.send_message,
+        bot.report_error,
+        bot.typing,
+        ai_completion_retry_protocol
+    )
+
+    agent_conversation = AgentConversation(
+        retryable_ai_client,
+        metrics_handler.record_message,
+        bot.send_message,
+        bot.report_error,
+        bot.add_reaction,
+        settings['timeout'],
+        armory
+    )
+
+    return agent_conversation
+
+
+def build_conversation_review_duck(bot: DiscordBot, metrics_handler, feedback_manager):
+    have_ta_conversation = HaveTAGradingConversation(
+        feedback_manager,
+        metrics_handler.record_feedback,
+        bot.send_message,
+        bot.add_reaction,
+        bot.report_error
+    )
+    return have_ta_conversation
+
+
+def build_registration_duck(bot: DiscordBot, settings: RegistrationSettings):
+    email_confirmation = EmailSender(settings['sender_email'])
+
+    registration_workflow = RegistrationWorkflow(
+        bot.send_message,
+        bot.get_channel,
+        bot.fetch_guild,
+        email_confirmation,
+        settings
+    )
+    return registration_workflow
+
+
+def build_ducks(channel_config: ChannelConfig, bot: DiscordBot, metrics_handler, feedback_manager) -> list[
+    tuple[float, DuckConversation]]:
+    ducks = []
+    for duck_config in channel_config['ducks']:
+        duck_type = duck_config['workflow_type']
+        settings = duck_config['settings']
+        weight = duck_config.get('weight', 1)
+
+        if duck_type == 'basic_prompt_conversation':
+            ducks.append((weight, build_agent_conversation_duck(metrics_handler, bot, settings)))
+
+        elif duck_type == 'conversation-review':
+            ducks.append((weight, build_conversation_review_duck(bot, metrics_handler, feedback_manager)))
+
+        elif duck_type == 'registration':
+            ducks.append((weight, build_registration_duck(settings)))
+
+        else:
+            raise NotImplementedError(f'Duck of type {duck_type} not implemented')
 
     if not ducks:
         raise ValueError('No ducks were requested in the config')
@@ -251,7 +320,8 @@ async def main(config: Config):
                 bot.set_duck_app(rubber_duck, admin_channel_id)
 
                 # Set up the notifier thread.
-                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(), config['feedback_notifier_settings'])
+                notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
+                                            config['feedback_notifier_settings'])
                 await asyncio.gather(
                     bot.start(os.environ['DISCORD_TOKEN']),
                     notifier.start()
@@ -268,6 +338,7 @@ if __name__ == '__main__':
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
         from quest.utils import quest_logger
+
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)

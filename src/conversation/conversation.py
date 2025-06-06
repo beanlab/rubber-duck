@@ -1,11 +1,14 @@
 import asyncio
-
+import json
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, List
 
+from agents import Agent, Runner, RunContextWrapper, handoff
 from quest import step, queue, wrap_steps
 
-from ..utils.gen_ai import RetryableGenAI, GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable
+from ..armory.agent_tools import AgentTools
+from ..armory.armory import Armory
+from ..utils.gen_ai import GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable, GenAIClient
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
 
@@ -27,28 +30,47 @@ class BasicSetupConversation:
         return message_history
 
 
-class BasicPromptConversation:
+class AgentSetupConversation:
+    def __init__(self, record_message):
+        self._record_message = step(record_message)
+
+    async def __call__(self, thread_id: int, initial_message: Message) -> list[GPTMessage]:
+        message_history = [GPTMessage(role='system',
+                                      content="Introduce yourself and what you can do to the user using the talk_to_user tool"),
+                           GPTMessage(role='user', content="Hi")]
+        user_id = initial_message['author_id']
+        guild_id = initial_message['guild_id']
+
+        await self._record_message(
+            guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
+        await self._record_message(
+            guild_id, thread_id, user_id, message_history[1]['role'], message_history[1]['content'])
+        return message_history
+
+
+class AgentConversation:
     def __init__(self,
-                 ai_client: RetryableGenAI,
+                 ai_agent: GenAIClient,
                  record_message: RecordMessage,
-                 record_usage: RecordUsage,
                  send_message: SendMessage,
                  report_error: ReportError,
                  add_reaction: AddReaction,
-                 setup_conversation: BasicSetupConversation,
+                 wait_for_user_timeout,
+                 armory: Armory
                  ):
-        self._ai_client = wrap_steps(ai_client, ['get_completion'])
+        self._ai_client = wrap_steps(ai_agent, ['get_completion'])
 
         self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
 
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
 
-        self._setup_conversation = step(setup_conversation)
+        self._wait_for_user_timeout = wait_for_user_timeout
+        self._armory = armory
 
-    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int, message_history: list[GPTMessage]):
+    async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
+                                    message_history: list[GPTMessage]):
         for sendable in sendables:
             if isinstance(sendable, str):
                 await self._record_message(
@@ -62,38 +84,39 @@ class BasicPromptConversation:
                 await self._send_message(thread_id, file=sendable)
                 message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
 
-    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+    async def __call__(self, thread_id: int, initial_message: Message):
 
-        prompt_file = settings["prompt_file"]
-        if prompt_file:
-            prompt = Path(prompt_file).read_text(encoding="utf-8")
-        else:
-            prompt = initial_message['content']
+        # prompt_file = settings["prompt_file"]
+        # if prompt_file:
+        #     prompt = Path(prompt_file).read_text(encoding="utf-8")
+        # else:
+        #     prompt = initial_message['content']
+        #
+        # # Get engine and timeout from duck settings, falling back to defaults if not set
+        # engine = settings["engine"]
+        # timeout = settings["timeout"]
+        # tools = settings.get('tools', [])
+        # introduction = settings.get("introduction", "Hi, how can I help you?")
 
-        # Get engine and timeout from duck settings, falling back to defaults if not set
-        engine = settings["engine"]
-        timeout = settings["timeout"]
-        tools = settings.get('tools', [])
-        introduction = settings.get("introduction", "Hi, how can I help you?")
+        self._armory.add_message_info_to_toolboxes(thread_id, self._send_message)
+        self._armory.scrub_toolboxes()
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
 
-        message_history = await self._setup_conversation(thread_id, prompt, initial_message)
+        message_history = []
 
+        introduction = self._ai_client.introduction or "Hi, how can I help you?"
         await self._send_message(thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
-                # TODO - if the conversation is getting long, and the user changes the subject
-                #  prompt them to start a new conversation (and close this one)
-
                 try:  # catch all errors
                     try:
                         # Waiting for a response from the user
-                        message: Message = await asyncio.wait_for(messages.get(), timeout)
+                        message: Message = await asyncio.wait_for(messages.get(), self._wait_for_user_timeout)
 
-                    except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                    except asyncio.TimeoutError:
                         break
 
                     if len(message['file']) > 0:
@@ -118,9 +141,7 @@ class BasicPromptConversation:
                         initial_message['channel_id'],
                         thread_id,
                         user_id,
-                        engine,
                         message_history,
-                        tools
                     )
 
                     await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
@@ -131,3 +152,105 @@ class BasicPromptConversation:
                                              'The admins are aware. Please try again later.')
                     raise
 
+
+class RunAgents:
+    def __init__(self, spoke_agents: dict[str, Agent], head_agent: Agent, message_history: list,
+                 initial_message: Message, thread_id: int, record_usage: RecordUsage, typing):
+        self._spoke_agents = spoke_agents
+        self._head_agent = head_agent
+        self._message_history = message_history
+        self._initial_message = initial_message
+        self._thread_id = thread_id
+        self._record_usage = record_usage
+        self._typing = typing
+        self._current_agent = head_agent
+
+    def _find_last_agent_conversation(self) -> Agent:
+        last_agent = self._head_agent
+        it = iter(self._message_history)
+        for entry in it:
+            if entry.get("type") == "function_call" and entry.get("name", "").startswith("transfer_to_"):
+                try:
+                    output = next(it, None)
+                    name_dict = json.loads(output.get("output", ""))
+                    last_agent = self._spoke_agents.get(name_dict['assistant'], self._head_agent)
+                except StopIteration:
+                    return self._head_agent
+        return last_agent
+
+    def _make_on_handoff(self, target_agent: Agent):
+        async def _on_handoff(ctx: RunContextWrapper[None]):
+            await self._record_usage(
+                self._initial_message['guild_id'],
+                self._initial_message['channel_id'],
+                self._thread_id,
+                self._initial_message['author_id'],
+                self._current_agent.model,
+                ctx.usage.__dict__['input_tokens'],
+                ctx.usage.__dict__['output_tokens'],
+                ctx.usage.__dict__.get('cached_tokens', 0),
+                ctx.usage.__dict__.get('reasoning_tokens', 0)
+            )
+            self._current_agent = target_agent
+
+        return _on_handoff
+
+    def _create_handoffs(self):
+        dispatch_handoff = handoff(
+            agent=self._head_agent,
+            on_handoff=self._make_on_handoff(self._head_agent)
+        )
+
+        for agent in self._spoke_agents.values():
+            agent.handoffs.append(dispatch_handoff)
+            self._head_agent.handoffs.append(handoff(agent=agent, on_handoff=self._make_on_handoff(agent)))
+
+    async def run(self):
+        self._create_handoffs()
+        try:
+
+            await self._typing.__aenter__()
+            await Runner.run(self._find_last_agent_conversation(),
+                             self._message_history,
+                             max_turns=100)
+        except Exception as e:
+            return
+
+
+class BasicAgentConversation:
+
+    def __init__(self,
+                 record_message: RecordMessage,
+                 record_usage: RecordUsage,
+                 send_message: SendMessage,
+                 setup_conversation: AgentSetupConversation,
+                 typing: IndicateTyping,
+                 armory: Armory
+                 ):
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
+        self._send_message = step(send_message)
+        self._setup_conversation = step(setup_conversation)
+        self._typing = typing
+        self._armory = armory
+        self._current_agent = None
+
+    async def __call__(self, thread_id: int, settings: dict, initial_message: Message):
+        typing = self._typing(thread_id)
+        agent_tools = AgentTools(self._record_message, self._send_message, typing, initial_message['guild_id'],
+                                 thread_id, initial_message['author_id'], settings["timeout"])
+
+        self._armory.scrub_tools(agent_tools)
+
+        message_history = await self._setup_conversation(thread_id, initial_message)
+
+        head_agent, spoke_agents = self.create_agents(settings)
+
+        spoke_agents = {
+            agent.name: agent for agent in spoke_agents
+        }
+
+        run_agents = RunAgents(spoke_agents, head_agent, message_history, initial_message, thread_id,
+                               self._record_usage, typing)
+
+        await run_agents.run()
