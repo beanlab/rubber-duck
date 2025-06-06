@@ -76,7 +76,6 @@ class AdminSettings(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
-    reporting: dict[str, str]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
