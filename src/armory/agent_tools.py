@@ -27,7 +27,6 @@ class AgentTools:
 
     @register_tool(send_error_to_llm=True)
     async def talk_to_user(self, query: str) -> str:
-
         try:
             await self._typing.__aexit__(None, None, None)
             await self._send_message(self._thread_id, query)

@@ -166,8 +166,8 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
     armory = Armory()
     if 'dataset_folder_locations' in config:
         data_store = DataStore(config['dataset_folder_locations'])
-        stat_tools = StatsTools(data_store)
-        armory.scrub_tools(stat_tools)
+        stat_tools = StatsTools(data_store, bot.send_message)
+        armory.add_toolbox(stat_tools)
 
 
     ai_client = OpenAI(
@@ -192,11 +192,11 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
     agent_conversation = AgentConversation(
         retryable_ai_client,
         metrics_handler.record_message,
-        metrics_handler.record_usage,
         bot.send_message,
         bot.report_error,
         bot.add_reaction,
-        setup_conversation
+        settings['timeout'],
+        armory
     )
 
     return agent_conversation

@@ -55,7 +55,8 @@ class AgentConversation:
                  send_message: SendMessage,
                  report_error: ReportError,
                  add_reaction: AddReaction,
-                 wait_for_user_timeout
+                 wait_for_user_timeout,
+                 armory: Armory
                  ):
         self._ai_client = wrap_steps(ai_agent, ['get_completion'])
 
@@ -66,6 +67,7 @@ class AgentConversation:
         self._add_reaction: AddReaction = step(add_reaction)
 
         self._wait_for_user_timeout = wait_for_user_timeout
+        self._armory = armory
 
     async def _orchestrate_messages(self, sendables: [Sendable], guild_id: int, thread_id: int, user_id: int,
                                     message_history: list[GPTMessage]):
@@ -95,6 +97,9 @@ class AgentConversation:
         # timeout = settings["timeout"]
         # tools = settings.get('tools', [])
         # introduction = settings.get("introduction", "Hi, how can I help you?")
+
+        self._armory.add_message_info_to_toolboxes(thread_id, self._send_message)
+        self._armory.scrub_toolboxes()
 
         if 'duck' in initial_message['content']:
             await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
