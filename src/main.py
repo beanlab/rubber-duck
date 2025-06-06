@@ -167,8 +167,10 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
         data_store = DataStore(config['dataset_folder_locations'])
         stat_tools = StatsTools(data_store)
         armory.add_toolbox(stat_tools)
+
     agent_type = settings['agent_type']
-    match( agent_type):
+
+    match(agent_type):
         case 'single-agent':
             agent = build_agent(armory, settings['agent_settings'])
         case 'hub-spokes':
@@ -181,15 +183,10 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
         metrics_handler.record_usage,
         bot.typing
     )
-    ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY'],
-        armory,
-        metrics_handler.record_usage
-    )
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
     retryable_ai_client = RetryableGenAI(
-        ai_client,
+        agent_client,
         bot.send_message,
         bot.report_error,
         bot.typing,
