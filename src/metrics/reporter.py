@@ -83,7 +83,7 @@ class Reporter:
         'gpt-4o': [0.0025, 0.01],
         'gpt-4-1106-preview': [0.01, 0.03],
         'gpt-4-0125-preview': [0.01, 0.03],
-        'gpt-4o-mini': [.000150, .0006],
+        'o4-mini': [0.000150, 0.0006],
         'gpt-4-turbo': [0.01, 0.03],
         'gpt-4-turbo-preview': [0.01, 0.03],
         'gpt-3.5-turbo-1106': [0.001, 0.002],
@@ -155,8 +155,17 @@ class Reporter:
         return data
 
     def compute_cost(self, row):
-        ip, op = self.pricing.get(row.get('engine', 'gpt-4'), (0, 0))
-        return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
+        engine = row.get('engine', 'gpt-4')
+        ip, op = self.pricing.get(engine, (0, 0))
+        duck_logger.debug(f"Computing cost for engine {engine} with pricing {ip}/{op}")
+        
+        input_tokens = pd.to_numeric(row['input_tokens'], errors='coerce')
+        output_tokens = pd.to_numeric(row['output_tokens'], errors='coerce')
+        
+        duck_logger.debug(f"Tokens - Input: {input_tokens}, Output: {output_tokens}")
+        cost = input_tokens / 1000 * ip + output_tokens / 1000 * op
+        duck_logger.debug(f"Computed cost: {cost}")
+        return cost
 
     def preprocessing(self, df, args):
         if 'timestamp' in df.columns:
@@ -204,6 +213,12 @@ class Reporter:
 
         self.catch_known_issues(df, args)
 
+        duck_logger.debug(f"Data before grouping - Shape: {df.shape}")
+        duck_logger.debug(f"Columns: {df.columns.tolist()}")
+        duck_logger.debug(f"Sample data:\n{df.head()}")
+        duck_logger.debug(f"Unique values in hour_of_day: {df['hour_of_day'].unique() if 'hour_of_day' in df.columns else 'No hour_of_day column'}")
+        duck_logger.debug(f"Unique values in cost: {df['cost'].unique() if 'cost' in df.columns else 'No cost column'}")
+
         if args.exp_var_2:
             if not pd.api.types.is_numeric_dtype(df[args.ind_var]):
                 df_grouped = df.groupby([args.exp_var, args.exp_var_2])[args.ind_var].count().reset_index()
@@ -236,6 +251,8 @@ class Reporter:
         else:
             df_grouped = df[args.ind_var].reset_index()
 
+        duck_logger.debug(f"Data after grouping - Shape: {df_grouped.shape}")
+        duck_logger.debug(f"Grouped data:\n{df_grouped.head()}")
         return df_grouped
 
     def prettify_graph(self, df, args):
