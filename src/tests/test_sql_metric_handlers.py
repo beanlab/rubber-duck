@@ -1,6 +1,7 @@
 import pytest
-from rubber_duck.sql_metrics import SQLMetricsHandler
-from rubber_duck.sqlite import create_sqlite_session
+
+from ..storage.sql_metrics import SQLMetricsHandler
+
 
 class TestSQLMetrics:
     @classmethod
@@ -19,7 +20,7 @@ class TestSQLMetrics:
             "reviewer_role_id": 987654,
             "feedback_score": 4
         }
-        cls.session = create_sqlite_session('sqlite:///:memory:')
+        # cls.session = create_sqlite_session('sqlite:///:memory:')
         cls.sql_handler = SQLMetricsHandler(cls.session)
 
     @pytest.mark.asyncio
