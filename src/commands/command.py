@@ -1,7 +1,6 @@
 import subprocess
 from datetime import datetime
 from pathlib import Path
-import io
 
 import discord
 import pytz
