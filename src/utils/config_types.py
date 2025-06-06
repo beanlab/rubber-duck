@@ -32,11 +32,6 @@ class RegistrationSettings(TypedDict):
     sender_email: str
 
 
-class AgentConversationSettings(TypedDict):
-    agent_type: str
-    agent_settings: dict
-    timeout: int
-
 
 class SingleAgentSettings(TypedDict):
     prompt_file: str
@@ -49,8 +44,12 @@ class SingleAgentSettings(TypedDict):
 
 class HubSpokesAgentSettings(TypedDict):
     hub_agent_settings: SingleAgentSettings
-    spoke_agent: list[SingleAgentSettings]
+    spoke_agents_settings: list[SingleAgentSettings]
 
+class AgentConversationSettings(TypedDict):
+    agent_type: str
+    agent_settings: SingleAgentSettings | HubSpokesAgentSettings
+    timeout: int
 
 class DuckConfig(TypedDict):
     name: str

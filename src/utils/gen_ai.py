@@ -117,20 +117,20 @@ class AgentClient:
                     message_history,
                     max_turns=100
                 )
-                # TODO - record usage
-
+                usage = result.context_wrapper.usage
+                await self._record_usage(
+                    guild_id,
+                    parent_channel_id,
+                    thread_id,
+                    user_id,
+                    self._agent.model,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                    usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+                )
                 return result.final_output_as(str)
-            await self._record_usage(
-                guild_id,
-                parent_channel_id,
-                thread_id,
-                user_id,
-                engine,
-                result.['usage']['prompt_tokens'],
-                completion_dict['usage']['completion_tokens'],
-                completion_dict['usage'].get('cached_tokens', 0),
-                completion_dict['usage'].get('reasoning_tokens', 0)
-            )
+
 
         except Exception as e:
             return

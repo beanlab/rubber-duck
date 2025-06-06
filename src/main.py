@@ -28,9 +28,9 @@ from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
-    SingleAgentSettings
+    SingleAgentSettings, HubSpokesAgentSettings
 from .utils.data_store import DataStore
-from .utils.gen_ai import OpenAI, RetryableGenAI
+from .utils.gen_ai import OpenAI, RetryableGenAI, AgentClient
 from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
@@ -154,11 +154,10 @@ def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
         model_settings=ModelSettings(tool_choice="required"),
     )
 
-def create_agents(settings: dict) -> tuple[Agent, list[Agent]]:
+def create_agents(armory: Armory, settings: HubSpokesAgentSettings) -> tuple[Agent, list[Agent]]:
 
-
-    return build_agent(settings["head_agent"]), [
-        build_agent(agent) for agent in settings.get("spoke_agents", [])
+    return build_agent(armory, settings["hub_agent_settings"]), [
+        build_agent(armory, agent) for agent in settings.get("spoke_agents_settings", [])
     ]
 
 
@@ -166,10 +165,22 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
     armory = Armory()
     if 'dataset_folder_locations' in config:
         data_store = DataStore(config['dataset_folder_locations'])
-        stat_tools = StatsTools(data_store, bot.send_message)
+        stat_tools = StatsTools(data_store)
         armory.add_toolbox(stat_tools)
+    agent_type = settings['agent_type']
+    match( agent_type):
+        case 'single-agent':
+            agent = build_agent(armory, settings['agent_settings'])
+        case 'hub-spokes':
+            agent, spoke_agents = create_agents(armory, settings['agent_settings'])
+        case _:
+            agent = build_agent(armory, settings['agent_settings'])
 
-
+    agent_client = AgentClient(
+        agent,
+        metrics_handler.record_usage,
+        bot.typing
+    )
     ai_client = OpenAI(
         os.environ['OPENAI_API_KEY'],
         armory,
@@ -183,10 +194,6 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
         bot.report_error,
         bot.typing,
         ai_completion_retry_protocol
-    )
-
-    setup_conversation = BasicSetupConversation(
-        metrics_handler.record_message,
     )
 
     agent_conversation = AgentConversation(

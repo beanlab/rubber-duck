@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Protocol, List
 
-from agents import Agent, ModelSettings, Runner, RunContextWrapper, handoff
+from agents import Agent, Runner, RunContextWrapper, handoff
 from quest import step, queue, wrap_steps
 
 from ..armory.agent_tools import AgentTools
