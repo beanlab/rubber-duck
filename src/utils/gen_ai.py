@@ -30,7 +30,7 @@ class GenAIClient(Protocol):
             self,
             context: DuckContext,
             message_history: list[GPTMessage],
-    ) -> list[Sendable]: ...
+    ) -> str: ...
 
 
 class GenAIException(Exception):
@@ -67,22 +67,24 @@ class HubSpokeAgentClient:
     pass
 
 
-@step
 async def run_agent(*args, **kwargs) -> RunResult:
     return await Runner.run(*args, **kwargs)
 
 
 class AgentClient:
-    def __init__(self, agent: Agent, record_usage: RecordUsage, typing):
+    def __init__(self, introduction: str, agent: Agent, record_usage: RecordUsage, typing: IndicateTyping):
+        self.introduction = introduction
+
         self._agent = agent
         self._record_usage = record_usage
         self._typing = typing
 
+    @step
     async def get_completion(
             self,
             context: DuckContext,
             message_history: list,
-    ):
+    ) -> str:
         try:
             return await self._get_completion(
                 context,
@@ -105,7 +107,7 @@ class AgentClient:
             context: DuckContext,
             message_history: list
     ) -> str:
-        async with self._typing():
+        async with self._typing(context.thread_id):
             result = await run_agent(
                 self._agent,
                 message_history,
@@ -114,10 +116,10 @@ class AgentClient:
             )
             usage = result.context_wrapper.usage
             await self._record_usage(
-                context['guild_id'],
-                context['channel_id'],
-                context['thread_id'],
-                context['author_id'],
+                context.guild_id,
+                context.channel_id,
+                context.thread_id,
+                context.author_id,
                 self._agent.model,
                 usage.input_tokens,
                 usage.output_tokens,
@@ -181,7 +183,7 @@ class OpenAI:
             message_history: list[GPTMessage],
             tools: list[str]
     ) -> list[Sendable]:
-        tools_to_use = {tool: self._armory.get_specific_tool_metadata(tool) for tool in tools}
+        tools_to_use = {tool: self._armory.get_specific_tool(tool) for tool in tools}
 
         functions = [
             {
@@ -262,6 +264,8 @@ class RetryableGenAI:
                  typing: IndicateTyping,
                  retry_config: RetryConfig
                  ):
+        self.introduction = genai.introduction
+
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._typing = typing
@@ -279,14 +283,14 @@ class RetryableGenAI:
         retries = 0
         while True:
             try:
-                async with self._typing(context['thread_id']):
+                async with self._typing(context.thread_id):
                     return await self._genai.get_completion(
                         context, message_history
                     )
 
             except RetryableException as ex:
                 if retries == 0:
-                    await self._send_message(context['thread_id'], 'Trying to contact servers...')
+                    await self._send_message(context.thread_id, 'Trying to contact servers...')
                 retries += 1
                 if retries > max_retries:
                     raise GenAIException(ex, 'Retry limit exceeded')

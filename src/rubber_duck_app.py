@@ -11,17 +11,6 @@ class RubberDuckApp:
         self._workflow_manager: WorkflowManager = workflow_manager
         self._channel_configs = channel_configs
 
-    def _make_context(self, message: Message) -> DuckContext:
-        return DuckContext(
-            guild_id=message['guild_id'],
-            channel_id=message['channel_id'],
-            author_id=message['author_id'],
-            author_mention=message['author_mention'],
-            content=message['content'],
-            message_id=message['message_id'],
-            thread_id=None
-        )
-
     async def route_message(self, message: Message):
         if message['channel_id'] == self._admin_channel:
             self._workflow_manager.start_workflow(
@@ -34,12 +23,12 @@ class RubberDuckApp:
         # Duck channel
         if message['channel_id'] in self._channel_configs:
             # Call DuckOrchestrator
-            context = self._make_context(message)
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
             self._workflow_manager.start_workflow(
                 'duck-orchestrator',
                 workflow_id,
-                context
+                self._channel_configs[message['channel_id']],
+                message
             )
             return
 

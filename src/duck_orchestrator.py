@@ -6,17 +6,19 @@ from typing import Protocol, Callable
 
 from quest import step, alias
 
+from .conversation.conversation import HaveConversation
 from .metrics.feedback_manager import FeedbackData
-from .utils.config_types import ChannelConfig, DuckConfig, DuckContext
+from .utils.config_types import ChannelConfig, DuckConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
 from .utils.logger import duck_logger
 from .utils.protocols import Message
 
 
 class SetupThread(Protocol):
-    async def __call__(self, initial_message: Message) -> int: ...
+    async def __call__(self, parent_channel_id: int, author_mention: str, title: str) -> int: ...
 
 
 class DuckConversation(Protocol):
+    name: str
     async def __call__(self, context: DuckContext): ...
 
 
@@ -37,52 +39,50 @@ class DuckOrchestrator:
                  setup_thread: SetupThread,
                  send_message,
                  report_error,
-                 ducks: dict[str, DuckConversation],
+                 ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
-        self._setup_thread = step(setup_thread)
+        self._setup_thread: SetupThread = step(setup_thread)
         self._send_message = step(send_message)
         self._report_error = step(report_error)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
-    def _get_duck_config(self, possible_ducks, message_content: str) -> DuckConfig | None:
-        """
-        Duck selection rules:
-        - Go through ducks -> find the first one with a matching regex. Return it.
-        - If no regex matched, look at all ducks without a regex configured, and choose among weights.
-        """
-
-        for duck_config in possible_ducks:
-            if (regex := duck_config.get('regex')) and re.match(regex, message_content):
-                return duck_config
-
-        possible_ducks = [duck_config for duck_config in possible_ducks if 'regex' not in duck_config]
+    def _get_duck(self, channel_id: int) -> DuckConversation:
+        possible_ducks = self._ducks.get(channel_id)
 
         if not possible_ducks:
-            return None
+            raise ValueError(f'No duck configured for channel {channel_id}')
 
         if len(possible_ducks) == 1:
-            return possible_ducks[0]
+            return possible_ducks[0][1]
 
-        weights = [dc.get('weight', 1) for dc in possible_ducks]
-        return random.choices(possible_ducks, weights=weights, k=1)[0]
+        weights = [w for w, dk in possible_ducks]
+        return random.choices(possible_ducks, weights=weights, k=1)[1]
 
-    async def __call__(self, channel_config: ChannelConfig, context: DuckContext):
+    async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
+
         # Select the duck
-        duck_config = self._get_duck_config(channel_config['ducks'], context.content)
-        if duck_config is None:
-            return
-
-        duck_type = duck_config['workflow_type']
-        duck = self._ducks[duck_type]
-        settings = duck_config['settings']
+        duck = self._get_duck(initial_message['channel_id'])
 
         # Create a thread
-        thread_id = await self._setup_thread(context)
-        context.thread_id = thread_id
-        context.send_message = self._send_message
+        thread_id = await self._setup_thread(
+            initial_message['channel_id'],
+            initial_message['author_mention'],
+            initial_message['content']
+        )
+
+        context = DuckContext(
+            guild_id=initial_message['guild_id'],
+            channel_id=initial_message['channel_id'],
+            author_id=initial_message['author_id'],
+            author_mention=initial_message['author_mention'],
+            content=initial_message['content'],
+            message_id=initial_message['message_id'],
+            thread_id=thread_id,
+            send_message=self._send_message
+        )
 
         async with alias(str(thread_id)):
             try:
@@ -97,9 +97,9 @@ class DuckOrchestrator:
 
         # Remember conversation
         self._remember_conversation(FeedbackData(
-            duck_type=duck_type,
-            guild_id=context.guild_id,
+            duck_type=duck.name,
+            guild_id=initial_message['guild_id'],
             parent_channel_id=channel_config['channel_id'],
-            user_id=context.author_id,
+            user_id=initial_message['author_id'],
             conversation_thread_id=thread_id
         ))

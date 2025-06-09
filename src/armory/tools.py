@@ -23,16 +23,24 @@ def register_tool(_func=None, *, send_error_to_llm=False):
 
 def direct_send_message(func):
     sig = inspect.signature(func)
-    is_class_method = 'self' in sig
+    is_class_method = 'self' in str(sig)
 
-    new_sig = str(sig)[1:-1]  # remove parens
+    tokens = str(sig).split('->')
+    if len(tokens) == 1:
+        base_sig = tokens[0]
+        return_type = ''
+    else:
+        base_sig, return_type = tokens
+        return_type = f' ->' + return_type
+
+    new_sig = base_sig.strip()[1:-1]  # remove parens
     args = new_sig.split(',')
 
     if is_class_method:
         args = args[1:]  # remove self
 
     args = [f'context: RunContextWrapper[{DuckContext.__name__}]'] + args
-    full_sig = f'({",".join(args)})'
+    full_sig = f'({",".join(args)}){return_type}'
 
     @with_signature(full_sig)
     @wraps(func)

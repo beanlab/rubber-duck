@@ -7,19 +7,19 @@ class SetupPrivateThread:
         self._create_thread = create_thread
         self._send_message = send_message
 
-    async def __call__(self, context: DuckContext) -> int:
+    async def __call__(self, parent_channel_id: int, author_mention: str, title: str) -> int:
         thread_id = await self._create_thread(
-            context.channel_id,
-            context.content[:20]
+            parent_channel_id,
+            title[:20]
         )
 
         # Send welcome message to add the user to the thread
-        await self._send_message(thread_id, f'{context.author_mention}')
+        await self._send_message(thread_id, f'{author_mention}')
 
         # Notify the user in the original channel of the new thread
         await self._send_message(
-            context.channel_id,
-            f"<@{context.author_id}> Click here to join the conversation: <#{thread_id}>"
+            parent_channel_id,
+            f"{author_mention} Click here to join the conversation: <#{thread_id}>"
         )
 
         return thread_id

@@ -17,12 +17,15 @@ FAILED_EMAIL_MESSAGE = 'Unable to validate your email. Please talk to a TA or yo
 
 class RegistrationWorkflow:
     def __init__(self,
+                 name: str,
                  send_message,
                  get_channel,
                  fetch_guild,
                  email_sender: EmailSender,
                  settings: RegistrationSettings
                  ):
+        self.name = name
+
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild

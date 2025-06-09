@@ -1,9 +1,12 @@
 from dataclasses import dataclass
-from typing import TypedDict, Optional
+from typing import TypedDict
 
 from agents import FunctionTool
 
-from src.utils.protocols import SendMessage
+from ..utils.protocols import SendMessage
+
+CHANNEL_ID = int
+DUCK_WEIGHT = float
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -40,7 +43,7 @@ class SingleAgentSettings(TypedDict):
     engine: str
     name: str
     handoff_prompt: str
-    tools: list[FunctionTool]
+    tools: list[str]
     max_iterations: int
 
 
@@ -50,6 +53,7 @@ class HubSpokesAgentSettings(TypedDict):
 
 
 class AgentConversationSettings(TypedDict):
+    introduction: str
     agent_type: str
     agent_settings: SingleAgentSettings | HubSpokesAgentSettings
     timeout: int
@@ -63,8 +67,8 @@ class DuckContext:
     author_mention: str
     content: str
     message_id: int
-    thread_id: Optional[int] = None
-    send_message: Optional[SendMessage] = None
+    thread_id: int
+    send_message: SendMessage
 
 
 class DuckConfig(TypedDict):
