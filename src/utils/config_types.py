@@ -1,8 +1,10 @@
 from typing import TypedDict
 
+
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
     feedback_check_minute: int
+
 
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
