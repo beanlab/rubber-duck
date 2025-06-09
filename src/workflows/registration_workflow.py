@@ -28,7 +28,7 @@ class RegistrationWorkflow:
         net_id = await self._get_net_id(thread_id)
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, settings['email_domain_name']):
+        if not await self._confirm_registration_via_email(net_id, thread_id):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return

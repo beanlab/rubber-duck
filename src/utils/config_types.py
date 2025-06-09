@@ -76,6 +76,10 @@ class AdminSettings(TypedDict):
     admin_role_id: int
 
 
+class ReporterConfig(TypedDict):
+    gpt_pricing: dict[str, list]
+
+
 class Config(TypedDict):
     sql: SQLConfig
     servers: dict[str, ServerConfig]
@@ -85,3 +89,4 @@ class Config(TypedDict):
     default_duck_settings: dict[str, dict]
     sender_email: str
     feedback_notifier_settings: FeedbackNotifierSettings
+    reporter_settings: ReporterConfig

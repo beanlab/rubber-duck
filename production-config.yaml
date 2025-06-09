@@ -277,3 +277,15 @@ ai_completion_retry_protocol:
   max_retries: 2
   delay: 2
   backoff: 2
+
+reporter_settings:
+  gpt_pricing:
+    "gpt-4": [0.03, 0.06]
+    "gpt-4o": [0.0025, 0.01]
+    "gpt-4-1106-preview": [0.01, 0.03]
+    "gpt-4-0125-preview": [0.01, 0.03]
+    "o4-mini": [0.000150, 0.0006]
+    "gpt-4-turbo": [0.01, 0.03]
+    "gpt-4-turbo-preview": [0.01, 0.03]
+    "gpt-3.5-turbo-1106": [0.001, 0.002]
+    "gpt-3.5-turbo": [0.001, 0.003]
