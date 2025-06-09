@@ -10,12 +10,6 @@ from ..utils.send_email import EmailSender
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
-WELCOME_MESSAGE = "Hello, welcome to the registration process! Please click the button below to begin."
-CONFIRM_MESSAGE = "We sent a code to your BYU email.\nEnter the code below and send it in the chat, or type *resend* to get a new code."
-FAILED_EMAIL_MESSAGE = 'Unable to validate your email. Please talk to a TA or your instructor.'
-NETID_PROMPT = "Please enter your BYU Net ID to begin the registration process."
-ROLE_SELECTION_PROMPT = "Please select your lecture section (and if applicable, select your lab section).\nYou can find your lab and lecture sections in BYU MyMap.\nEnter the numbers of your roles separated by commas (e.g., '1,3,4' for multiple roles):"
-
 
 class RegistrationWorkflow:
     def __init__(self,
@@ -35,7 +29,7 @@ class RegistrationWorkflow:
 
         # Get and verify the email
         if not await self._confirm_registration_via_email(net_id, thread_id):
-            await self._send_message(thread_id, FAILED_EMAIL_MESSAGE)
+            await self._send_message(thread_id, 'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
@@ -57,7 +51,7 @@ class RegistrationWorkflow:
     @step
     async def _get_net_id(self, thread_id):
         try:
-            await self._send_message(thread_id, NETID_PROMPT)
+            await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
             net_id = await self._wait_for_message()
@@ -83,7 +77,11 @@ class RegistrationWorkflow:
         attempts = 0
 
         while attempts < max_attempts:
-            await self._send_message(thread_id, CONFIRM_MESSAGE)
+            await self._send_message(thread_id, 
+                "Email Verification:\n"
+                "We sent a verification code to your BYU email\n"
+                "Enter the code in the chat\n"
+                "or type *resend* to get a new code")
 
             # Wait for user response
             response = await self._wait_for_message()
@@ -117,7 +115,12 @@ class RegistrationWorkflow:
         # Display available roles
         role_list = "\n".join([f"{i + 1}. {role['name']}"
                                for i, role in enumerate(available_roles)])
-        await self._send_message(thread_id, f"{ROLE_SELECTION_PROMPT}\n\nAvailable roles:\n{role_list}")
+        await self._send_message(thread_id, 
+            "Please select your roles:\n\n"
+            "1. Find your lecture section and lab section in BYU MyMap\n"
+            "2. Enter the numbers of your roles separated by commas\n"
+            "   Example: '1,3,4'\n\n"
+            f"Available roles:\n{role_list}")
 
         # Wait for user response
         response = await self._wait_for_message()
