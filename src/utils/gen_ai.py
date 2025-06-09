@@ -10,6 +10,7 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from .logger import duck_logger
 from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
@@ -99,6 +100,7 @@ class AgentClient:
         except (APIConnectionError, BadRequestError,
                 AuthenticationError, ConflictError, NotFoundError,
                 RateLimitError) as ex:
+            duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
             raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                      "for more details on how to resolve this error") from ex
 
@@ -110,30 +112,25 @@ class AgentClient:
             user_id: int,
             message_history: list,
     ) -> str:
-        try:
-            async with self._typing():
-                result = await run_agent(
-                    self._agent,
-                    message_history,
-                    max_turns=100
-                )
-                usage = result.context_wrapper.usage
-                await self._record_usage(
-                    guild_id,
-                    parent_channel_id,
-                    thread_id,
-                    user_id,
-                    self._agent.model,
-                    usage.input_tokens,
-                    usage.output_tokens,
-                    usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                    usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-                )
-                return result.final_output_as(str)
-
-
-        except Exception as e:
-            return
+        async with self._typing():
+            result = await run_agent(
+                self._agent,
+                message_history,
+                max_turns=100
+            )
+            usage = result.context_wrapper.usage
+            await self._record_usage(
+                guild_id,
+                parent_channel_id,
+                thread_id,
+                user_id,
+                self._agent.model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+            )
+            return result.final_output_as(str)
 
 
 class OpenAI:

@@ -2,7 +2,7 @@ from typing import Callable
 
 from agents import FunctionTool, function_tool
 
-from src.utils.protocols import SendMessage
+from ..utils.protocols import SendMessage
 
 
 class Armory:
@@ -12,8 +12,8 @@ class Armory:
 
     def add_message_info_to_toolboxes(self, thread_id: int, send_message: SendMessage):
         for toolbox in self._toolboxes.values():
-                toolbox.thread_id = thread_id
-                toolbox.send_message = send_message
+            toolbox.thread_id = thread_id
+            toolbox.send_message = send_message
 
     def add_toolbox(self, toolbox: object):
         self._toolboxes[toolbox.__class__.__name__] = toolbox
