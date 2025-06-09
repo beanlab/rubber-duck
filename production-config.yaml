@@ -227,7 +227,6 @@ servers:
                   - name: Lab Sections
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
-                email_domain_name: "@byu.edu"
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool

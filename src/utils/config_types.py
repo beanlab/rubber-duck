@@ -25,8 +25,7 @@ class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
     roles: RolesSettings
-    email_domain_name: str
-    "Make sure to start the email domain name with '@' symbol, e.g. '@example.com'."
+
 
 
 class DuckWorkflowSettings(TypedDict):

@@ -67,8 +67,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id:str, thread_id, domain: str):
-        email = net_id + domain
+    async def _confirm_registration_via_email(self, net_id:str, thread_id):
+        email = f"{net_id}@byu.edu"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
             return False
