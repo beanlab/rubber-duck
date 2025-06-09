@@ -47,15 +47,10 @@ class RegistrationWorkflow:
 
     async def _wait_for_message(self, timeout=300) -> str | None:
         async with queue('messages', None) as messages:
-            while True:
-                try:  # catch all errors
-                    try:
+                try:
                         message: Message = await asyncio.wait_for(messages.get(), timeout)
                         return message['content']
-                    except asyncio.TimeoutError:  # Close the thread if the conversation has closed
-                        break
-                except Exception as e:
-                    duck_logger.error(f"Error waiting for message: {e}")
+                except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                     return None
 
     @step
