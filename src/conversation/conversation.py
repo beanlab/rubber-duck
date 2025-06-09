@@ -87,7 +87,7 @@ class AgentConversation:
 
     async def __call__(self, context: DuckContext):
 
-        if 'duck' in context['content']:
+        if 'duck' in context.content:
             await self._add_reaction(context['channel_id'], context['message_id'], "🦆")
 
         message_history = []

@@ -109,7 +109,8 @@ class AgentClient:
             result = await run_agent(
                 self._agent,
                 message_history,
-                context=context,max_turns=100
+                context=context,
+                max_turns=100
             )
             usage = result.context_wrapper.usage
             await self._record_usage(

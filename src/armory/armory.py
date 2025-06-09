@@ -2,8 +2,6 @@ from typing import Callable
 
 from agents import FunctionTool, function_tool
 
-from ..utils.protocols import SendMessage
-
 
 class Armory:
     def __init__(self):
@@ -22,7 +20,6 @@ class Armory:
                 continue
 
             self.add_tool(method)
-
 
     def add_tool(self, tool_function: Callable):
         if tool_function.send_error_to_llm:
@@ -43,4 +40,3 @@ class Armory:
 
     def get_all_tool_names(self):
         return list(self._tools.keys())
-
