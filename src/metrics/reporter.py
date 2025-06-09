@@ -14,7 +14,7 @@ from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
 from ..storage.sql_metrics import SQLMetricsHandler
-from ..utils.config_types import ServerConfig
+from ..utils.config_types import ServerConfig, ReporterConfig
 from ..utils.logger import duck_logger
 
 
@@ -76,18 +76,6 @@ class Reporter:
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
     trend_period = {1: "W", 7: "M", 30: "Y"}
 
-    pricing = {
-        'gpt-4': [0.03, 0.06],
-        'gpt-4o': [0.0025, 0.01],
-        'gpt-4-1106-preview': [0.01, 0.03],
-        'gpt-4-0125-preview': [0.01, 0.03],
-        'o4-mini': [0.000150, 0.0006],
-        'gpt-4-turbo': [0.01, 0.03],
-        'gpt-4-turbo-preview': [0.01, 0.03],
-        'gpt-3.5-turbo-1106': [0.001, 0.002],
-        'gpt-3.5-turbo': [0.001, 0.003]
-    }
-
     # key: what to type after '!report' to display the graph
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
@@ -111,10 +99,10 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, SQLMetricsHandler, server_config:ServerConfig, show_fig=False):
+    def __init__(self, SQLMetricsHandler, server_config: ServerConfig, reporting_config: ReporterConfig, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
         wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
-
+        self._pricing = reporting_config['gpt_pricing']
         self.show_fig = show_fig
         self._reporting_config = self._make_reporting_config(server_config)
         # Create a flat mapping of channel IDs to channel names
@@ -160,7 +148,7 @@ class Reporter:
 
     def compute_cost(self, row):
         engine = row.get('engine', 'gpt-4')
-        ip, op = self.pricing.get(engine, (0, 0))
+        ip, op = self._pricing.get(engine, (0, 0))
         duck_logger.debug(f"Computing cost for engine {engine} with pricing {ip}/{op}")
         duck_logger.debug(f"Raw row data: {row}")
         
