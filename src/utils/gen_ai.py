@@ -10,6 +10,7 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
+from .config_types import DuckContext
 from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
@@ -26,10 +27,7 @@ class GenAIClient(Protocol):
 
     async def get_completion(
             self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
+            context: DuckContext,
             message_history: list[GPTMessage],
     ) -> list[Sendable]: ...
 
@@ -81,15 +79,13 @@ class AgentClient:
 
     async def get_completion(
             self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
+            context: DuckContext,
             message_history: list,
     ):
         try:
             return await self._get_completion(
-                guild_id, parent_channel_id, thread_id, user_id, message_history,
+                context,
+                message_history
             )
         except (
                 APITimeoutError, InternalServerError,
@@ -104,25 +100,23 @@ class AgentClient:
 
     async def _get_completion(
             self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            message_history: list,
+            context: DuckContext,
+            message_history: list
     ) -> str:
         try:
             async with self._typing():
                 result = await run_agent(
                     self._agent,
                     message_history,
+                    context=context,
                     max_turns=100
                 )
                 usage = result.context_wrapper.usage
                 await self._record_usage(
-                    guild_id,
-                    parent_channel_id,
-                    thread_id,
-                    user_id,
+                    context['guild_id'],
+                    context['channel_id'],
+                    context['thread_id'],
+                    context['author_id'],
                     self._agent.model,
                     usage.input_tokens,
                     usage.output_tokens,
@@ -279,10 +273,7 @@ class RetryableGenAI:
 
     async def get_completion(
             self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
+            context: DuckContext,
             message_history: list[GPTMessage],
     ):
         max_retries = self._retry_config['max_retries']
@@ -291,15 +282,14 @@ class RetryableGenAI:
         retries = 0
         while True:
             try:
-                async with self._typing(thread_id):
+                async with self._typing(context['thread_id']):
                     return await self._genai.get_completion(
-                        guild_id, parent_channel_id, thread_id, user_id,
-                        message_history,
+                        context, message_history
                     )
 
             except RetryableException as ex:
                 if retries == 0:
-                    await self._send_message(thread_id, 'Trying to contact servers...')
+                    await self._send_message(context['thread_id'], 'Trying to contact servers...')
                 retries += 1
                 if retries > max_retries:
                     raise GenAIException(ex, 'Retry limit exceeded')

@@ -8,6 +8,7 @@ from quest import step, queue, wrap_steps
 
 from ..armory.agent_tools import AgentTools
 from ..armory.armory import Armory
+from ..utils.config_types import DuckContext
 from ..utils.gen_ai import GPTMessage, RecordMessage, RecordUsage, GenAIException, Sendable, GenAIClient
 from ..utils.protocols import Message, SendMessage, ReportError, IndicateTyping, AddReaction
 
@@ -84,30 +85,15 @@ class AgentConversation:
                 await self._send_message(thread_id, file=sendable)
                 message_history.append(GPTMessage(role='assistant', content=f'<image {sendable[0]}>'))
 
-    async def __call__(self, thread_id: int, initial_message: Message):
+    async def __call__(self, context: DuckContext):
 
-        # prompt_file = settings["prompt_file"]
-        # if prompt_file:
-        #     prompt = Path(prompt_file).read_text(encoding="utf-8")
-        # else:
-        #     prompt = initial_message['content']
-        #
-        # # Get engine and timeout from duck settings, falling back to defaults if not set
-        # engine = settings["engine"]
-        # timeout = settings["timeout"]
-        # tools = settings.get('tools', [])
-        # introduction = settings.get("introduction", "Hi, how can I help you?")
-
-        self._armory.add_message_info_to_toolboxes(thread_id, self._send_message)
-        self._armory.scrub_toolboxes()
-
-        if 'duck' in initial_message['content']:
-            await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
+        if 'duck' in context['content']:
+            await self._add_reaction(context['channel_id'], context['message_id'], "🦆")
 
         message_history = []
 
         introduction = self._ai_client.introduction or "Hi, how can I help you?"
-        await self._send_message(thread_id, introduction)
+        await self._send_message(context['thread_id'], introduction)
 
         async with queue('messages', None) as messages:
             while True:
@@ -121,7 +107,7 @@ class AgentConversation:
 
                     if len(message['file']) > 0:
                         await self._send_message(
-                            thread_id,
+                            context['thread_id'],
                             "I'm sorry, I can't read file attachments. "
                             "Please resend your message with the relevant parts of your file included in the message."
                         )
@@ -129,25 +115,19 @@ class AgentConversation:
 
                     message_history.append(GPTMessage(role='user', content=message['content']))
 
-                    user_id = message['author_id']
-                    guild_id = message['guild_id']
-
                     await self._record_message(
-                        guild_id, thread_id, user_id, message_history[-1]['role'], message_history[-1]['content']
+                        context['guild_id'], context['thread_id'], context['author_id'], message_history[-1]['role'], message_history[-1]['content']
                     )
 
                     sendables = await self._ai_client.get_completion(
-                        guild_id,
-                        initial_message['channel_id'],
-                        thread_id,
-                        user_id,
+                        context,
                         message_history,
                     )
 
-                    await self._orchestrate_messages(sendables, guild_id, thread_id, user_id, message_history)
+                    await self._orchestrate_messages(sendables, context['guild_id'], context['thread_id'], context['author_id'], message_history)
 
                 except GenAIException:
-                    await self._send_message(thread_id,
+                    await self._send_message(context['thread_id'],
                                              'I\'m having trouble processing your request.'
                                              'The admins are aware. Please try again later.')
                     raise

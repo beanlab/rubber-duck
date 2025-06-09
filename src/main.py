@@ -132,7 +132,7 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
     """
     channel_ducks = {}
 
-    for server_config in config['servers'].items():
+    for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
             channel_ducks[channel_config['channel_id']] = build_ducks(channel_config, bot, metrics_handler,
                                                                       feedback_manager)
@@ -166,7 +166,7 @@ def build_agent_conversation_duck(metrics_handler, bot, settings: AgentConversat
     if 'dataset_folder_locations' in config:
         data_store = DataStore(config['dataset_folder_locations'])
         stat_tools = StatsTools(data_store)
-        armory.add_toolbox(stat_tools)
+        armory.scrub_tools(stat_tools)
 
     agent_type = settings['agent_type']
 
@@ -241,7 +241,7 @@ def build_ducks(channel_config: ChannelConfig, bot: DiscordBot, metrics_handler,
         if duck_type == 'basic_prompt_conversation':
             ducks.append((weight, build_agent_conversation_duck(metrics_handler, bot, settings)))
 
-        elif duck_type == 'conversation-review':
+        elif duck_type == 'conversation_review':
             ducks.append((weight, build_conversation_review_duck(bot, metrics_handler, feedback_manager)))
 
         elif duck_type == 'registration':
