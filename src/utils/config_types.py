@@ -1,6 +1,9 @@
-from typing import TypedDict
+from dataclasses import dataclass
+from typing import TypedDict, Optional
 
 from agents import FunctionTool
+
+from src.utils.protocols import SendMessage
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -32,7 +35,6 @@ class RegistrationSettings(TypedDict):
     sender_email: str
 
 
-
 class SingleAgentSettings(TypedDict):
     prompt_file: str
     engine: str
@@ -46,10 +48,24 @@ class HubSpokesAgentSettings(TypedDict):
     hub_agent_settings: SingleAgentSettings
     spoke_agents_settings: list[SingleAgentSettings]
 
+
 class AgentConversationSettings(TypedDict):
     agent_type: str
     agent_settings: SingleAgentSettings | HubSpokesAgentSettings
     timeout: int
+
+
+@dataclass
+class DuckContext:
+    guild_id: int
+    channel_id: int
+    author_id: int
+    author_mention: str
+    content: str
+    message_id: int
+    thread_id: Optional[int] = None
+    send_message: Optional[SendMessage] = None
+
 
 class DuckConfig(TypedDict):
     name: str
