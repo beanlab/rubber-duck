@@ -16,6 +16,7 @@ FAILED_EMAIL_MESSAGE = 'Unable to validate your email. Please talk to a TA or yo
 NETID_PROMPT = "Please enter your BYU Net ID to begin the registration process."
 ROLE_SELECTION_PROMPT = "Please select your lecture section (and if applicable, select your lab section).\nYou can find your lab and lecture sections in BYU MyMap.\nEnter the numbers of your roles separated by commas (e.g., '1,3,4' for multiple roles):"
 
+
 class RegistrationWorkflow:
     def __init__(self,
                  send_message,
@@ -47,24 +48,19 @@ class RegistrationWorkflow:
 
     async def _wait_for_message(self, timeout=300) -> str | None:
         async with queue('messages', None) as messages:
-                try:
-                        message: Message = await asyncio.wait_for(messages.get(), timeout)
-                        return message['content']
-                except asyncio.TimeoutError:  # Close the thread if the conversation has closed
-                    return None
+            try:
+                message: Message = await asyncio.wait_for(messages.get(), timeout)
+                return message['content']
+            except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                return None
 
     @step
     async def _get_net_id(self, thread_id):
         try:
             await self._send_message(thread_id, NETID_PROMPT)
-            
+
             # Wait for user response
-            response = await self._wait_for_message()
-            if not response:
-                await self._send_message(thread_id, "Registration failed: No response received. Please start over.")
-                raise ValueError("No response received")
-            
-            net_id = response
+            net_id = await self._wait_for_message()
             if not net_id:
                 await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
                 raise ValueError("No Net ID provided")
@@ -78,7 +74,7 @@ class RegistrationWorkflow:
 
     @step
     async def _confirm_registration_via_email(self, net_id, thread_id):
-        email = f'{net_id}@byu.edu'
+        email = f'{net_id}@byu.edu' # TODO Make this allow for custom domains
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
             return False
@@ -88,14 +84,12 @@ class RegistrationWorkflow:
 
         while attempts < max_attempts:
             await self._send_message(thread_id, CONFIRM_MESSAGE)
-            await self._send_message(thread_id, "Type 'resend' to get a new code, or enter the code you received:")
 
             # Wait for user response
             response = await self._wait_for_message()
             if not response:
                 await self._send_message(thread_id, "No response received. Please try again.")
-                attempts += 1
-                continue
+                raise TimeoutError("Timeout, please start a new chat.")
 
             if response == 'resend':
                 token = self._email_sender.send_email(email, token)
@@ -110,9 +104,10 @@ class RegistrationWorkflow:
                 attempts += 1
                 duck_logger.error(f"Token mismatch: {response} != {token}")
                 if attempts < max_attempts:
-                    await self._send_message(thread_id, f"Invalid token. Please try again. ({attempts}/{max_attempts})")
+                    await self._send_message(thread_id, f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
                 else:
-                    await self._send_message(thread_id, "Too many invalid attempts. Please exit the thread and start again.")
+                    await self._send_message(thread_id,
+                                             "Too many invalid attempts. Please exit the thread and start again.")
                     return False
 
         return False
@@ -120,8 +115,8 @@ class RegistrationWorkflow:
     @step
     async def _select_roles(self, thread_id, available_roles, settings):
         # Display available roles
-        role_list = "\n".join([f"{i+1}. {role['name']}" 
-                              for i, role in enumerate(available_roles)])
+        role_list = "\n".join([f"{i + 1}. {role['name']}"
+                               for i, role in enumerate(available_roles)])
         await self._send_message(thread_id, f"{ROLE_SELECTION_PROMPT}\n\nAvailable roles:\n{role_list}")
 
         # Wait for user response
@@ -139,7 +134,7 @@ class RegistrationWorkflow:
                     selected_indices.append(num - 1)
             except ValueError:
                 continue
-        
+
         selected_roles = []
         for idx in selected_indices:
             selected_roles.append(available_roles[idx]['id'])
@@ -223,7 +218,7 @@ class RegistrationWorkflow:
             # Assign roles
             new_roles = [role for role in selected_roles if role not in member.roles]
             if new_roles:
-               await member.add_roles(*new_roles, reason="User registration")
+                await member.add_roles(*new_roles, reason="User registration")
 
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)
