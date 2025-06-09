@@ -1,8 +1,10 @@
 from typing import TypedDict
 
+
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
     feedback_check_minute: int
+
 
 class FeedbackConfig(TypedDict):
     ta_review_channel_id: int
@@ -25,7 +27,6 @@ class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
     roles: RolesSettings
-
 
 
 class DuckWorkflowSettings(TypedDict):

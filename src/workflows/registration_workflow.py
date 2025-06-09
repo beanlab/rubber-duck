@@ -1,14 +1,14 @@
+import asyncio
 import re
 import uuid
-import asyncio
 
 from discord import Guild
 from quest import step, queue
 
 from ..utils.config_types import RegistrationSettings
-from ..utils.send_email import EmailSender
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
+from ..utils.send_email import EmailSender
 
 
 class RegistrationWorkflow:
@@ -29,7 +29,8 @@ class RegistrationWorkflow:
 
         # Get and verify the email
         if not await self._confirm_registration_via_email(net_id, thread_id, settings['email_domain_name']):
-            await self._send_message(thread_id, 'Unable to validate your email. Please talk to a TA or your instructor.')
+            await self._send_message(thread_id,
+                                     'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
@@ -67,7 +68,7 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id:str, thread_id):
+    async def _confirm_registration_via_email(self, net_id: str, thread_id):
         email = f"{net_id}@byu.edu"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
@@ -77,11 +78,11 @@ class RegistrationWorkflow:
         attempts = 0
 
         while attempts < max_attempts:
-            await self._send_message(thread_id, 
-                "Email Verification:\n"
-                "We sent a verification code to your BYU email\n"
-                "Enter the code in the chat\n"
-                "or type *resend* to get a new code")
+            await self._send_message(thread_id,
+                                     "Email Verification:\n"
+                                     "We sent a verification code to your BYU email\n"
+                                     "Enter the code in the chat\n"
+                                     "or type *resend* to get a new code")
 
             # Wait for user response
             response = await self._wait_for_message()
@@ -102,7 +103,8 @@ class RegistrationWorkflow:
                 attempts += 1
                 duck_logger.error(f"Token mismatch: {response} != {token}")
                 if attempts < max_attempts:
-                    await self._send_message(thread_id, f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
+                    await self._send_message(thread_id,
+                                             f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
                 else:
                     await self._send_message(thread_id,
                                              "Too many invalid attempts. Please exit the thread and start again.")
@@ -115,12 +117,12 @@ class RegistrationWorkflow:
         # Display available roles
         role_list = "\n".join([f"{i + 1}. {role['name']}"
                                for i, role in enumerate(available_roles)])
-        await self._send_message(thread_id, 
-            "Please select your roles:\n\n"
-            "1. Find your lecture section and lab section in BYU MyMap\n"
-            "2. Enter the numbers of your roles separated by commas\n"
-            "   Example: '1,3,4'\n\n"
-            f"Available roles:\n{role_list}")
+        await self._send_message(thread_id,
+                                 "Please select your roles:\n\n"
+                                 "1. Find your lecture section and lab section in BYU MyMap\n"
+                                 "2. Enter the numbers of your roles separated by commas\n"
+                                 "   Example: '1,3,4'\n\n"
+                                 f"Available roles:\n{role_list}")
 
         # Wait for user response
         response = await self._wait_for_message()
