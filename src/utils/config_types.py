@@ -26,6 +26,8 @@ class RolesSettings(TypedDict):
 class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
+    email_domain: str
+    "This is the domain used for email verification. For example, 'byu.edu'."
     roles: RolesSettings
 
 
