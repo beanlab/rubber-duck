@@ -27,7 +27,7 @@ from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
-    SingleAgentSettings, HubSpokesAgentSettings, DUCK_WEIGHT
+    SingleAgentSettings, HubSpokesAgentSettings, DUCK_WEIGHT, DuckContext
 from .utils.data_store import DataStore
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.gen_ai import RetryableGenAI, AgentClient
@@ -146,7 +146,7 @@ def setup_ducks(
 
 
 def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
-    return Agent(
+    return Agent[DuckContext](
         name=config["name"],
         handoff_description=config.get("handoff_prompt", ""),
         instructions=Path(config["prompt_file"]).read_text(encoding="utf-8"),

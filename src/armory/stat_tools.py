@@ -413,3 +413,5 @@ class StatsTools:
         proportions = (series.value_counts(normalize=True, dropna=True).round(4).reset_index())
         proportions.columns = ["Category", "Proportion"]
         return proportions.to_dict(orient="records")
+
+

@@ -4,7 +4,7 @@ import logging
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, RunResult
+from agents import Agent, Runner, RunResult, UserError
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
@@ -13,6 +13,7 @@ from quest import step
 from .config_types import DuckContext
 from .logger import duck_logger
 from ..armory.armory import Armory
+from ..armory.tools import ExitSilently
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
@@ -108,25 +109,47 @@ class AgentClient:
             message_history: list
     ) -> str:
         async with self._typing(context.thread_id):
-            result = await run_agent(
-                self._agent,
-                message_history,
-                context=context,
-                max_turns=100
-            )
-            usage = result.context_wrapper.usage
-            await self._record_usage(
-                context.guild_id,
-                context.channel_id,
-                context.thread_id,
-                context.author_id,
-                self._agent.model,
-                usage.input_tokens,
-                usage.output_tokens,
-                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-            )
-            return result.final_output_as(str)
+            try:
+                result = await run_agent(
+                    self._agent,
+                    message_history,
+                    context=context,
+                    max_turns=100
+                )
+                # duck_logger.debug(f"Full History: {result.to_input_list()}")
+                usage = result.context_wrapper.usage
+                await self._record_usage(
+                    context.guild_id,
+                    context.channel_id,
+                    context.thread_id,
+                    context.author_id,
+                    self._agent.model,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                    usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+                )
+                message_history = result.to_input_list()
+                return result.final_output_as(str)
+            except UserError as ex:
+                if isinstance(ex.__cause__, ExitSilently):
+                    usage = ex.__cause__.usage
+                    response = ex.__cause__.message
+                    await self._record_usage(
+                        context.guild_id,
+                        context.channel_id,
+                        context.thread_id,
+                        context.author_id,
+                        self._agent.model,
+                        usage.input_tokens,
+                        usage.output_tokens,
+                        usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                        usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+                    )
+                    message_history.append({"role": "system", "content": response})
+                    return ""
+                else:
+                    raise
 
 
 class OpenAI:

@@ -2,6 +2,8 @@ from typing import Callable
 
 from agents import FunctionTool, function_tool
 
+from ..armory.tools import selective_error_handler
+
 
 class Armory:
     def __init__(self):
@@ -22,10 +24,7 @@ class Armory:
             self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
-        if tool_function.send_error_to_llm:
-            tool = function_tool(tool_function, failure_error_function=None)
-        else:
-            tool = function_tool(tool_function)
+        tool = function_tool(tool_function, failure_error_function=selective_error_handler)
         self._tools[tool_function.__name__] = tool
 
     def get_specific_tool(self, tool_name: str):
