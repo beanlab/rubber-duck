@@ -113,7 +113,13 @@ servers:
             workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              introduction: I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.
+              introduction: |
+                I'm an exploratory data analysis assistant. 
+                I can help you with basic statistics and data visualization. 
+                You can ask me to perform:
+                1. Various statistical calculations. 
+                2. Create visualizations.
+                3. Provide insights based on your data.
               agent_type: single-agent
               agent_settings:
                 name: Standard_Rubber_Duck
@@ -243,7 +249,13 @@ servers:
             workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              introduction: I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.
+              introduction: |
+                I'm an exploratory data analysis assistant. 
+                I can help you with basic statistics and data visualization. 
+                You can ask me to perform:
+                1. Various statistical calculations. 
+                2. Create visualizations.
+                3. Provide insights based on your data.
               agent_type: single-agent
               agent_settings:
                 name: Standard_Rubber_Duck
