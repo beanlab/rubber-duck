@@ -9,6 +9,7 @@ from ..utils.config_types import DuckContext
 
 _tools: dict[str, FunctionTool] = {}
 
+
 class ExitSilently(Exception):
     def __init__(self, usage: Usage, message: str):
         self.usage = usage
@@ -26,15 +27,18 @@ def register_tool(_func=None, *, send_error_to_llm=True):
 
     return decorator
 
+
 def register_tools(func):
     func.is_tool = True
     return func
+
 
 def selective_error_handler(ctx, error) -> str:
     if isinstance(error, ExitSilently):
         raise error
     else:
         return f"An error occurred: {str(error)}"
+
 
 def direct_send_message(func):
     sig = inspect.signature(func)
@@ -72,5 +76,3 @@ def direct_send_message(func):
             raise ExitSilently(wrapper.usage, result[0])
 
     return new_func
-
-

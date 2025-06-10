@@ -1,5 +1,4 @@
-from ..utils.config_types import DuckContext
-from ..utils.protocols import Message, CreateThread, SendMessage
+from ..utils.protocols import CreateThread, SendMessage
 
 
 class SetupPrivateThread:

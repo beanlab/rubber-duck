@@ -7,7 +7,7 @@ from pathlib import Path
 
 import boto3
 import yaml  # Added import for YAML support
-from agents import Agent, ModelSettings
+from agents import Agent
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
@@ -335,7 +335,6 @@ async def main(config: Config):
                     metrics_handler,
                     bot.send_message
             ) as workflow_manager:
-
                 tasks = []
 
                 admin_channel_id = config['admin_settings']['admin_channel_id']

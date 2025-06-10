@@ -5,7 +5,7 @@ from quest import step, queue, wrap_steps
 
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext
-from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, Sendable, GenAIClient
+from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..utils.protocols import Message, SendMessage, ReportError, AddReaction
 
 

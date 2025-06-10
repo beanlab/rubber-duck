@@ -1,6 +1,6 @@
 from quest import WorkflowManager
 
-from .utils.config_types import ChannelConfig, DuckContext
+from .utils.config_types import ChannelConfig
 from .utils.logger import duck_logger
 from .utils.protocols import Message
 

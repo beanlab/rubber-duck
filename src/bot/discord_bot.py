@@ -210,5 +210,3 @@ class DiscordBot(discord.Client):
                 await self.send_message(self._admin_channel, msg)
             except:
                 duck_logger.exception(f'Unable to message channel {self._admin_channel}')
-
-

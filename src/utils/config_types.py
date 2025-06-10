@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import TypedDict
 
-from agents import FunctionTool
-
 from ..utils.protocols import SendMessage
 
 CHANNEL_ID = int

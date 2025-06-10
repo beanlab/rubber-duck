@@ -1,14 +1,12 @@
 import random
-import re
 import traceback as tb
 import uuid
 from typing import Protocol, Callable
 
 from quest import step, alias
 
-from .conversation.conversation import HaveConversation
 from .metrics.feedback_manager import FeedbackData
-from .utils.config_types import ChannelConfig, DuckConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
+from .utils.config_types import ChannelConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
 from .utils.logger import duck_logger
 from .utils.protocols import Message
 
@@ -19,6 +17,7 @@ class SetupThread(Protocol):
 
 class DuckConversation(Protocol):
     name: str
+
     async def __call__(self, context: DuckContext): ...
 
 
