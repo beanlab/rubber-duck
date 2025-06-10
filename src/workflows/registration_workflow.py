@@ -1,18 +1,14 @@
+import asyncio
 import re
 import uuid
 
 from discord import Guild
-from quest import step
+from quest import step, queue
 
 from ..utils.config_types import RegistrationSettings
-from ..utils.send_email import EmailSender
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
-from ..views.registration_views import GetNetIDView, RoleSelectionView, EmailConfirmationView
-
-WELCOME_MESSAGE = "Hello, welcome to the registration process! Please click the button below to begin."
-CONFIRM_MESSAGE = "We sent a code to your BYU email.\nEnter the code below and click Submit, or click Resend to get a new code."
-FAILED_EMAIL_MESSAGE = 'Unable to validate your email. Please talk to a TA or your instructor.'
+from ..utils.send_email import EmailSender
 
 
 class RegistrationWorkflow:
@@ -38,7 +34,8 @@ class RegistrationWorkflow:
 
         # Get and verify the email
         if not await self._confirm_registration_via_email(net_id, thread_id):
-            await self._send_message(thread_id, FAILED_EMAIL_MESSAGE)
+            await self._send_message(thread_id,
+                                     'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
@@ -49,22 +46,26 @@ class RegistrationWorkflow:
         code = str(uuid.uuid4().int)[:6]
         return code
 
+    async def _wait_for_message(self, timeout=300) -> str | None:
+        async with queue('messages', None) as messages:
+            try:
+                message: Message = await asyncio.wait_for(messages.get(), timeout)
+                return message['content']
+            except asyncio.TimeoutError:  # Close the thread if the conversation has closed
+                return None
+
     @step
     async def _get_net_id(self, thread_id):
         try:
-            # Create and send the registration view
-            netid_view = GetNetIDView()
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
-            await self._send_message(thread_id,view=netid_view)
 
-            # Wait for the view to be completed
-            await netid_view.wait()
-
-            if not netid_view.net_id:
+            # Wait for user response
+            net_id = await self._wait_for_message()
+            if not net_id:
                 await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
                 raise ValueError("No Net ID provided")
 
-            return netid_view.net_id
+            return net_id
 
         except Exception as e:
             duck_logger.error(f"Setup failed: {e}")
@@ -72,8 +73,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id, thread_id):
-        email = f'{net_id}@byu.edu'  # You might want to collect the email address first
+    async def _confirm_registration_via_email(self, net_id: str, thread_id):
+        email = f"{net_id}@byu.edu"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
             return False
@@ -82,27 +83,33 @@ class RegistrationWorkflow:
         attempts = 0
 
         while attempts < max_attempts:
-            view = EmailConfirmationView()
-            await self._send_message(thread_id, CONFIRM_MESSAGE, view=view)
+            await self._send_message(thread_id,
+                                     "Email Verification:\n"
+                                     "We sent a verification code to your BYU email\n"
+                                     "Enter the code in the chat\n"
+                                     "or type *resend* to get a new code")
 
-            # Wait for the view to be completed
-            await view.wait()
+            # Wait for user response
+            response = await self._wait_for_message()
+            if not response:
+                await self._send_message(thread_id, "No response received. Please try again.")
+                raise TimeoutError("Timeout, please start a new chat.")
 
-            if hasattr(view, 'resend') and view.resend:
+            if response == 'resend':
                 token = self._email_sender.send_email(email, token)
                 if not token:
                     return False
                 continue
 
-            if view.confirmation_code == token:
+            if response == token:
                 await self._send_message(thread_id, "Successfully verified your email!")
                 return True
-
             else:
                 attempts += 1
-                duck_logger.error(f"Token mismatch: {view.confirmation_code} != {token}")
+                duck_logger.error(f"Token mismatch: {response} != {token}")
                 if attempts < max_attempts:
-                    await self._send_message(thread_id, f"Invalid token. Please try again. ({attempts}/{max_attempts})")
+                    await self._send_message(thread_id,
+                                             f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
                 else:
                     await self._send_message(thread_id,
                                              "Too many invalid attempts. Please exit the thread and start again.")
@@ -111,24 +118,42 @@ class RegistrationWorkflow:
         return False
 
     @step
-    async def _select_roles(self, thread_id, available_roles):
-        # Create and show role selection view
-        view = RoleSelectionView(available_roles)
-        await self._send_message(
-            thread_id,
-            "Please select your lecture section (and if applicable, select your lab section).\n"
-            "You can find your lab and lecture sections in BYU MyMap.\n",
-            view=view
-        )
+    async def _select_roles(self, thread_id, available_roles, settings):
+        # Display available roles
+        role_list = "\n".join([f"{i + 1}. {role['name']}"
+                               for i, role in enumerate(available_roles)])
+        await self._send_message(thread_id,
+                                 "Please select your roles:\n\n"
+                                 "1. Find your lecture section and lab section in BYU MyMap\n"
+                                 "2. Enter the numbers of your roles separated by commas\n"
+                                 "   Example: '1,3,4'\n\n"
+                                 f"Available roles:\n{role_list}")
 
-        # Wait for role selection
-        await view.wait()
-
-        if not view.selected_roles:
-            await self._send_message(thread_id, "No roles selected. Please try again.")
+        # Wait for user response
+        response = await self._wait_for_message()
+        if not response:
+            await self._send_message(thread_id, "No response received. Please try again.")
             return []
 
-        return view.selected_roles
+        # Split by comma and convert to integers
+        selected_indices = []
+        for idx in response.split(','):
+            try:
+                num = int(idx.strip())
+                if 1 <= num <= len(available_roles):
+                    selected_indices.append(num - 1)
+            except ValueError:
+                continue
+
+        selected_roles = []
+        for idx in selected_indices:
+            selected_roles.append(available_roles[idx]['id'])
+
+        if not selected_roles:
+            await self._send_message(thread_id, "No valid roles selected. Please try again.")
+            return []
+
+        return selected_roles
 
     @step
     async def _get_available_roles(
@@ -158,8 +183,7 @@ class RegistrationWorkflow:
                     if re.search(pattern_info["pattern"], role.name):
                         available_roles.append({
                             "id": role.id,
-                            "name": role.name,
-                            "description": pattern_info["description"]
+                            "name": role.name
                         })
                         break
 
@@ -181,7 +205,7 @@ class RegistrationWorkflow:
             # Get roles and selection
             available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
             if available_roles:
-                selected_role_ids = await self._select_roles(thread_id, available_roles)
+                selected_role_ids = await self._select_roles(thread_id, available_roles, settings)
             else:
                 selected_role_ids = []
 
@@ -204,7 +228,7 @@ class RegistrationWorkflow:
             # Assign roles
             new_roles = [role for role in selected_roles if role not in member.roles]
             if new_roles:
-               await member.add_roles(*new_roles, reason="User registration")
+                await member.add_roles(*new_roles, reason="User registration")
 
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)

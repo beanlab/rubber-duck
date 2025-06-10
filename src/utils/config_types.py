@@ -7,6 +7,7 @@ CHANNEL_ID = int
 DUCK_WEIGHT = float
 
 
+
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
     feedback_check_minute: int
@@ -110,12 +111,16 @@ class AdminSettings(TypedDict):
     admin_role_id: int
 
 
+class ReporterConfig(TypedDict):
+    gpt_pricing: dict[str, list]
+
+
 class Config(TypedDict):
     sql: SQLConfig
-    reporting: dict[str, str]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     default_duck_settings: dict[str, dict]
     feedback_notifier_settings: FeedbackNotifierSettings
+    reporter_settings: ReporterConfig

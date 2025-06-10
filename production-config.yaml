@@ -2,17 +2,6 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
-reporting:
-  "1058490579799003187": BeanLab
-  "927616651409649675": CS 110
-  "1008806488384483338": CS 111
-  "1235303213796691998": CS 111
-  "747510855536738336": CS 235
-  "748656649287368704": CS 260
-  "1128355484039123065": CS 312
-  "1354902457368576401": Phys 230
-  "1354902266246598928": Phys 430
-
 servers:
   927616651409649675:
     server_name: CS 110
@@ -302,3 +291,15 @@ ai_completion_retry_protocol:
   max_retries: 2
   delay: 2
   backoff: 2
+
+reporter_settings:
+  gpt_pricing:
+    "gpt-4": [0.03, 0.06]
+    "gpt-4o": [0.0025, 0.01]
+    "gpt-4-1106-preview": [0.01, 0.03]
+    "gpt-4-0125-preview": [0.01, 0.03]
+    "o4-mini": [0.000150, 0.0006]
+    "gpt-4-turbo": [0.01, 0.03]
+    "gpt-4-turbo-preview": [0.01, 0.03]
+    "gpt-3.5-turbo-1106": [0.001, 0.002]
+    "gpt-3.5-turbo": [0.001, 0.003]
