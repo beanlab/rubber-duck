@@ -54,7 +54,7 @@ servers:
         ducks:
           - name: standard-rubber-duck
             workflow_type: basic_prompt_conversation
-            settings: # What is configurable for the agent sdk goes here.
+            settings:
               prompt_file: prompts/standard-rubber-duck.txt
               engine: gpt-4.1
               timeout: 600
@@ -113,36 +113,34 @@ servers:
             workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              prompt_file: prompts/stats.txt
-              introduction: |
-                I'm an exploratory data analysis assistant. I can help you with:
-                - Basic statistics and data visualization
-                - Statistical calculations
-                - Creating visualizations
-                - Providing insights based on your data
-
-                Feel free to ask me about any of these capabilities!
-              tools:
-                - explain_capabilities
-                - describe_dataset
-                - get_dataset_names
-                - get_variable_names
-                - plot_barplot
-                - plot_histogram
-                - plot_boxplot
-                - plot_dotplot
-                - plot_pie_chart
-                - plot_proportion_barplot
-                - calculate_mean
-                - calculate_skewness
-                - calculate_std
-                - calculate_median
-                - calculate_mode
-                - calculate_five_number_summary
-                - calculate_table_of_counts
-                - calculate_proportions
-                - show_dataset_head
-              engine: gpt-4.1
+              introduction: I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/stats.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                tools:
+                  - explain_capabilities
+                  - describe_dataset
+                  - get_dataset_names
+                  - get_variable_names
+                  - plot_barplot
+                  - plot_histogram
+                  - plot_boxplot
+                  - plot_dotplot
+                  - plot_pie_chart
+                  - plot_proportion_barplot
+                  - calculate_mean
+                  - calculate_skewness
+                  - calculate_std
+                  - calculate_median
+                  - calculate_mode
+                  - calculate_five_number_summary
+                  - calculate_table_of_counts
+                  - calculate_proportions
+                  - show_dataset_head
+                max_iterations: 5
               timeout: 60
 
   1354902266246598928:
@@ -241,17 +239,17 @@ servers:
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
-          - name: "standard-rubber-duck"
-            workflow_type: "basic_prompt_conversation"
+          - name: standard-rubber-duck
+            workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              introduction: "I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data."
-              agent_type: "single-agent"
+              introduction: I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.
+              agent_type: single-agent
               agent_settings:
-                name: "Standard_Rubber_Duck"
-                prompt_file: "prompts/stats.txt"
-                engine: "gpt-4.1"
-                handoff_prompt: ""
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/stats.txt
+                engine: gpt-4.1
+                handoff_prompt:
                 tools:
                   - explain_capabilities
                   - describe_dataset
