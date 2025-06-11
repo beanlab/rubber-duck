@@ -1,8 +1,8 @@
 from typing import TypedDict
+
+from ..utils.config_types import CHANNEL_ID
 from ..utils.logger import duck_logger
 from ..utils.persistent_queue import PersistentQueue
-
-CHANNEL_ID = int
 
 
 class FeedbackData(TypedDict):
@@ -23,7 +23,8 @@ class FeedbackManager:
     def remember_conversation(self, feedback_data: FeedbackData):
         queue = self._queues.get(feedback_data['parent_channel_id'])
         if queue is not None:
-            duck_logger.info(f"Remembering conversation for channel {feedback_data['parent_channel_id']}: {feedback_data}")
+            duck_logger.info(
+                f"Remembering conversation for channel {feedback_data['parent_channel_id']}: {feedback_data}")
             queue.put(feedback_data)
         else:
             duck_logger.warning(f"No queue found for channel {feedback_data['parent_channel_id']}")

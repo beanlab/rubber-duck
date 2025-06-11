@@ -46,7 +46,6 @@ class DataStore:
             else:
                 yield self._load_md_from_s3_csv(bucket, key)
 
-
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
         if not prefix.endswith('/'):
@@ -62,7 +61,6 @@ class DataStore:
                 yield self._load_md_from_local_json(metadata_file)
             else:
                 yield self._load_md_from_local_csv(file)
-
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():

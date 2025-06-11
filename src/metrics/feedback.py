@@ -22,12 +22,15 @@ class ConversationReviewSettings(TypedDict):
 
 class HaveTAGradingConversation:
     def __init__(self,
+                 name: str,
                  feedback_manager: FeedbackManager,
                  record_feedback: RecordFeedback,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
                  report_error: ReportError,
                  ):
+        self.name = name
+
         self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
         self._record_feedback: RecordFeedback = step(record_feedback)
         self._send_message = step(send_message)

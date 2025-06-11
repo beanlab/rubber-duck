@@ -6,7 +6,6 @@ _cache: dict = {}
 
 
 def cache_result(func):
-
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         key = (func.__name__, *args, tuple(sorted(kwargs.items())))

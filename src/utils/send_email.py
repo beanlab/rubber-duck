@@ -1,6 +1,6 @@
-import boto3
-import uuid
 import os
+
+import boto3
 
 from ..utils.logger import duck_logger
 
@@ -24,7 +24,6 @@ class EmailSender:
             aws_secret_access_key=aws_secret_access_key,
             region_name=aws_region,
         )
-
 
     def _send_email(self, email, subject, body) -> bool:
         try:
