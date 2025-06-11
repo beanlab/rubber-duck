@@ -1,11 +1,4 @@
-import asyncio
-import inspect
-from functools import wraps
-
-from agents import FunctionTool, RunContextWrapper, Usage
-from makefun import with_signature
-
-from ..utils.config_types import DuckContext
+from agents import FunctionTool
 
 _tools: dict[str, FunctionTool] = {}
 
@@ -20,7 +13,6 @@ def register_tool(_func=None, *, send_error_to_llm=True):
         return decorator(_func)
 
     return decorator
-
 
 
 def direct_send_message(func):

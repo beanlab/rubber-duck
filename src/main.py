@@ -161,17 +161,19 @@ def tools_to_final_output_handler(run_context, tool_results):
         final_output=None
     )
 
-def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
+
+def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContext]:
+    tools = [
+        armory.get_specific_tool(tool)
+        for tool in config.get("tools", [])
+        if tool in armory.get_all_tool_names()
+    ]
     return Agent[DuckContext](
         name=config["name"],
         handoff_description=config.get("handoff_prompt", ""),
         instructions=Path(config["prompt_file"]).read_text(encoding="utf-8"),
-        tools=[
-            armory.get_specific_tool(tool)
-            for tool in config.get("tools", [])
-            if tool in armory.get_all_tool_names()
-        ],
-        tool_use_behavior=tools_to_final_output_handler,
+        tools=tools,
+        tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
         model=config["engine"],
     )
 
