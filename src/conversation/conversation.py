@@ -73,8 +73,6 @@ class AgentConversation:
         if 'duck' in context.content:
             await self._add_reaction(context.channel_id, context.message_id, "🦆")
 
-        message_history = []
-
         introduction = self._ai_client.introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
 
@@ -96,21 +94,21 @@ class AgentConversation:
                         )
                         continue
 
-                    message_history.append(GPTMessage(role='user', content=message['content']))
+                    context.message_history.append(GPTMessage(role='user', content=message['content']))
 
                     await self._record_message(
-                        context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
-                        message_history[-1]['content']
+                        context.guild_id, context.thread_id, context.author_id, context.message_history[-1]['role'],
+                        context.message_history[-1]['content']
                     )
 
                     response = await self._ai_client.get_completion(
                         context,
-                        message_history,
+                        context.message_history,
                     )
 
-                    if response is not None and response != "":
+                    if response != 'None':
 
-                        message_history.append(GPTMessage(role='assistant', content=response))
+                        context.message_history.append(GPTMessage(role='assistant', content=response))
 
                         await self._send_message(context.thread_id, response)
 

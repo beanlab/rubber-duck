@@ -10,7 +10,7 @@ from openai import AsyncOpenAI, APITimeoutError, InternalServerError, Unprocessa
 from openai.types.chat import ChatCompletion
 from quest import step
 
-from .config_types import DuckContext
+from .config_types import DuckContext, GPTMessage
 from .logger import duck_logger
 from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
@@ -18,9 +18,7 @@ from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 Sendable = str | tuple[str, BytesIO]
 
 
-class GPTMessage(TypedDict):
-    role: str
-    content: str
+
 
 
 class GenAIClient(Protocol):

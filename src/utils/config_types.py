@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 from typing import TypedDict
 
+
 from ..utils.protocols import SendMessage
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
 
 
+class GPTMessage(TypedDict):
+    role: str
+    content: str
 
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
@@ -67,6 +71,7 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
+    message_history: list[GPTMessage]
     send_message: SendMessage
 
 

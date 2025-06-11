@@ -6,6 +6,7 @@ from agents import FunctionTool, RunContextWrapper, Usage
 from makefun import with_signature
 
 from ..utils.config_types import DuckContext
+from ..utils.gen_ai import GPTMessage
 
 _tools: dict[str, FunctionTool] = {}
 
@@ -53,8 +54,10 @@ def direct_send_message(func):
             result = func(*args, **kwargs)
         if isinstance(result, str):
             await wrapper.context.send_message(wrapper.context.thread_id, result)
+            wrapper.context.message_history.append(GPTMessage(role="assistant", content=result))
         elif isinstance(result, tuple):
             await wrapper.context.send_message(wrapper.context.thread_id, file=result)
+            wrapper.context.message_history.append(GPTMessage(role="assistant", content=result[0]))
 
 
 

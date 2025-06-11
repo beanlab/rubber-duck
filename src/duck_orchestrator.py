@@ -80,6 +80,7 @@ class DuckOrchestrator:
             content=initial_message['content'],
             message_id=initial_message['message_id'],
             thread_id=thread_id,
+            message_history=[],
             send_message=self._send_message
         )
 
