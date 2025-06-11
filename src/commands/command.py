@@ -7,6 +7,7 @@ import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..storage.sql_metrics import SQLMetricsHandler
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..utils.zip_utils import zip_data_file
@@ -235,6 +236,57 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
+class AddColumnCommand(Command):
+    name = "!addcolumn"
+    help_msg = "add a column to a table if it doesn't exist. Usage: !addcolumn <table_name> <column_name> <column_type> [default_value]"
+
+    def __init__(self, send_message, metrics_handler):
+        self.send_message = send_message
+        self.metrics_handler = metrics_handler
+
+    @step
+    async def execute(self, message: Message):
+        try:
+            content = message['content'].split()
+            if len(content) < 4:
+                help_text = "Usage: !addcolumn <table_name> <column_name> <column_type> [default_value]"
+                await self.send_message(message['channel_id'], help_text)
+                return
+
+            table_name = content[1]
+            column_name = content[2]
+            column_type = content[3]
+            
+            # Handle default value differently for SQLite
+            default_value = None
+            if len(content) > 4:
+                # For string values, wrap in quotes
+                if content[4].startswith("'") or content[4].startswith('"'):
+                    default_value = content[4]
+                else:
+                    # For numeric values, use as is
+                    default_value = content[4]
+
+            # Validate table name
+            valid_tables = ['messages', 'usage', 'feedback']
+            if table_name not in valid_tables:
+                await self.send_message(message['channel_id'], f"Invalid table name. Must be one of: {', '.join(valid_tables)}")
+                return
+
+            # Call the static method
+            SQLMetricsHandler.add_column_if_not_exists(
+                self.metrics_handler.session,
+                table_name,
+                column_name,
+                column_type,
+                default_value
+            )
+            
+            await self.send_message(message['channel_id'], f"Successfully added column '{column_name}' to table '{table_name}'")
+        except Exception as e:
+            await self.send_message(message['channel_id'], f"Error: {str(e)}")
+
+
 def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
@@ -248,5 +300,6 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
         LogCommand(send_message, BashExecuteCommand(send_message)),
-        ActiveWorkflowsCommand(send_message, get_workflow_metrics)
+        ActiveWorkflowsCommand(send_message, get_workflow_metrics),
+        AddColumnCommand(send_message, metrics_handler)
     ]

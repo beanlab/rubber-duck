@@ -1,8 +1,10 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String, BigInteger
+from sqlalchemy import Column, Integer, String, BigInteger, text
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import declarative_base, Session
+from sqlalchemy.inspection import inspect
 
 from ..utils.logger import duck_logger
 
@@ -80,7 +82,7 @@ class SQLMetricsHandler:
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         try:
@@ -97,7 +99,7 @@ class SQLMetricsHandler:
             self.session.add(new_usage_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
                               user_id: int, reviewer_id: int,
@@ -113,7 +115,7 @@ class SQLMetricsHandler:
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     def sql_model_to_data_list(self, table_model):
         try:
@@ -128,8 +130,33 @@ class SQLMetricsHandler:
 
             return data
         except Exception as e:
-            duck_logger.exception(f"An error occured: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
             raise
+
+    @staticmethod
+    def add_column_if_not_exists(session, table_name: str, column_name: str, column_type: str, default: str = None):
+        """Function to add a column to a table if it does not already exist."""
+        # Check if column exists using SQLAlchemy's inspect
+        inspector = inspect(session.get_bind())
+        columns = [col['name'] for col in inspector.get_columns(table_name)]
+
+        if column_name not in columns:
+            # For SQLite, we need to handle DEFAULT values differently
+            ddl = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            if default is not None:
+                # If default is already quoted, use it as is
+                if default.startswith("'") or default.startswith('"'):
+                    ddl += f" DEFAULT {default}"
+                else:
+                    # For numeric values, use as is
+                    ddl += f" DEFAULT {default}"
+            try:
+                session.execute(text(ddl))
+                session.commit()
+                duck_logger.info(f"Added column '{column_name}' to '{table_name}'")
+            except Exception as e:
+                duck_logger.exception(f"Error adding column '{column_name}' to '{table_name}': {e}")
+                raise DatabaseError(f"Failed to add column '{column_name}' to '{table_name}': {e}")
 
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)
