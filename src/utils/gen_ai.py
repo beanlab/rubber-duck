@@ -2,9 +2,9 @@ import asyncio
 import json
 import logging
 from io import BytesIO
-from typing import TypedDict, Protocol
+from typing import TypedDict, Protocol, Any
 
-from agents import Agent, Runner, RunResult, UserError, RunContextWrapper, FunctionToolResult, ToolsToFinalOutputResult
+from agents import Agent, Runner, RunResult, ToolCallOutputItem
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
@@ -78,7 +78,6 @@ class AgentClient:
         self._record_usage = record_usage
         self._typing = typing
 
-    @step
     async def get_completion(
             self,
             context: DuckContext,
@@ -105,7 +104,7 @@ class AgentClient:
             self,
             context: DuckContext,
             message_history: list
-    ) -> str:
+    ) -> Any:
         async with self._typing(context.thread_id):
             duck_logger.debug("New Agent Request")
             result = await run_agent(
@@ -126,7 +125,11 @@ class AgentClient:
                 usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
                 usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
             )
-            return result.final_output
+            last_item = result.new_items[-1]
+            if isinstance(last_item, ToolCallOutputItem):
+                return result.new_items[-1].output
+            else:
+                return result.final_output
 
 
 class OpenAI:
