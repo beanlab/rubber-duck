@@ -13,17 +13,22 @@ from ..utils.send_email import EmailSender
 
 class RegistrationWorkflow:
     def __init__(self,
+                 name: str,
                  send_message,
                  get_channel,
                  fetch_guild,
                  email_sender: EmailSender,
+                 settings: RegistrationSettings
                  ):
+        self.name = name
+
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild
         self._email_sender = email_sender
+        self._settings = settings
 
-    async def __call__(self, thread_id: int, settings: RegistrationSettings, initial_message: Message):
+    async def __call__(self, thread_id: int, initial_message: Message):
         # Start the registration process
         net_id = await self._get_net_id(thread_id)
 
@@ -35,7 +40,7 @@ class RegistrationWorkflow:
 
         # Assign Discord roles
         server_id = initial_message['guild_id']
-        await self._assign_roles(server_id, thread_id, initial_message['author_id'], settings)
+        await self._assign_roles(server_id, thread_id, initial_message['author_id'], self._settings)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]

@@ -10,7 +10,6 @@ formatter = logging.Formatter(
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 
-
 # Set up the logger
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.WARNING)

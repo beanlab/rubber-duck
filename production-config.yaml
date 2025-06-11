@@ -24,7 +24,6 @@ servers:
             settings:
               prompt_file: prompts/standard-rubber-duck.txt
               engine: gpt-4.1
-              timeout: 600
 
   747510855536738336:
     server_name: CS 235
@@ -103,36 +102,40 @@ servers:
             workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              prompt_file: prompts/stats.txt
               introduction: |
-                I'm an exploratory data analysis assistant. I can help you with:
-                - Basic statistics and data visualization
-                - Statistical calculations
-                - Creating visualizations
-                - Providing insights based on your data
-
-                Feel free to ask me about any of these capabilities!
-              tools:
-                - explain_capabilities
-                - describe_dataset
-                - get_dataset_names
-                - get_variable_names
-                - plot_barplot
-                - plot_histogram
-                - plot_boxplot
-                - plot_dotplot
-                - plot_pie_chart
-                - plot_proportion_barplot
-                - calculate_mean
-                - calculate_skewness
-                - calculate_std
-                - calculate_median
-                - calculate_mode
-                - calculate_five_number_summary
-                - calculate_table_of_counts
-                - calculate_proportions
-                - show_dataset_head
-              engine: gpt-4.1
+                I'm an exploratory data analysis assistant. 
+                I can help you with basic statistics and data visualization. 
+                You can ask me to perform:
+                1. Various statistical calculations. 
+                2. Create visualizations.
+                3. Provide insights based on your data.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/stats.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                tools:
+                  - explain_capabilities
+                  - describe_dataset
+                  - get_dataset_names
+                  - get_variable_names
+                  - plot_barplot
+                  - plot_histogram
+                  - plot_boxplot
+                  - plot_dotplot
+                  - plot_pie_chart
+                  - plot_proportion_barplot
+                  - calculate_mean
+                  - calculate_skewness
+                  - calculate_std
+                  - calculate_median
+                  - calculate_mode
+                  - calculate_five_number_summary
+                  - calculate_table_of_counts
+                  - calculate_proportions
+                  - show_dataset_head
+                max_iterations: 5
               timeout: 60
 
   1354902266246598928:
@@ -235,29 +238,40 @@ servers:
             workflow_type: basic_prompt_conversation
             weight: 1
             settings:
-              prompt_file: prompts/stats.txt
-              introduction: I'm an exploratory data analysis assistant. I can help you with basic statistics and data visualization. You can ask me to perform various statistical calculations, create visualizations, or provide insights based on your data.
-              tools:
-                - explain_capabilities
-                - describe_dataset
-                - get_dataset_names
-                - get_variable_names
-                - plot_barplot
-                - plot_histogram
-                - plot_boxplot
-                - plot_dotplot
-                - plot_pie_chart
-                - plot_proportion_barplot
-                - calculate_mean
-                - calculate_skewness
-                - calculate_std
-                - calculate_median
-                - calculate_mode
-                - calculate_five_number_summary
-                - calculate_table_of_counts
-                - calculate_proportions
-                - show_dataset_head
-              engine: gpt-4.1
+              introduction: |
+                I'm an exploratory data analysis assistant. 
+                I can help you with basic statistics and data visualization. 
+                You can ask me to perform:
+                1. Various statistical calculations. 
+                2. Create visualizations.
+                3. Provide insights based on your data.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/stats.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                tools:
+                  - explain_capabilities
+                  - describe_dataset
+                  - get_dataset_names
+                  - get_variable_names
+                  - plot_barplot
+                  - plot_histogram
+                  - plot_boxplot
+                  - plot_dotplot
+                  - plot_pie_chart
+                  - plot_proportion_barplot
+                  - calculate_mean
+                  - calculate_skewness
+                  - calculate_std
+                  - calculate_median
+                  - calculate_mode
+                  - calculate_five_number_summary
+                  - calculate_table_of_counts
+                  - calculate_proportions
+                  - show_dataset_head
+                max_iterations: 5
               timeout: 60
 
 feedback_notifier_settings:
