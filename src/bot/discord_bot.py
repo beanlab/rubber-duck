@@ -139,9 +139,13 @@ class DiscordBot(discord.Client):
 
     async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
         channel = self.get_channel(channel_id)
+        # try catch it and fetch the channel if it is not found
         if channel is None:
-            duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
-            raise Exception(f'No channel id {channel_id}')
+            try:
+                channel = await self.fetch_channel(channel_id)
+            except Exception as e:
+                duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
+                raise Exception(f'No channel id {channel_id}')
 
         if message:
             for block in _parse_blocks(message):

@@ -30,7 +30,7 @@ from .utils.feedback_notifier import FeedbackNotifier
 from .utils.config_types import Config
 from .utils.data_store import DataStore
 from .utils.gen_ai import OpenAI, RetryableGenAI
-from .utils.logger import duck_logger
+from .utils.logger import duck_logger, filter_logs
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
@@ -190,14 +190,14 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
 
 async def main(config: Config):
     sql_session = create_sql_session(config['sql'])
-
     async with DiscordBot() as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
             bot.send_message
         )
-
         queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
+
+        filter_logs(bot.send_message, config['admin_settings'])
 
         convo_review_ducks = (
             duck
