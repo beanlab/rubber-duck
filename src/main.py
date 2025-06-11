@@ -146,10 +146,6 @@ def setup_ducks(
 
 
 def tools_to_final_output_handler(run_context, tool_results):
-    """
-    Custom handler to determine if tool results should be final output.
-    This function is called after tools are executed.
-    """
     for tool_result in tool_results:
         if tool_result.tool.direct_send_message:
             return ToolsToFinalOutputResult(
