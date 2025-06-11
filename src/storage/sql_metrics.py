@@ -1,10 +1,12 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import Type
 
-from sqlalchemy import Column, Integer, String, BigInteger, text
+from sqlalchemy import Column, Integer, String, BigInteger, text, MetaData, Table
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import declarative_base, Session
 from sqlalchemy.inspection import inspect
+from sqlalchemy.ext.declarative import DeclarativeMeta
 
 from ..utils.logger import duck_logger
 
@@ -71,9 +73,91 @@ class FeedbackModel(MetricsBase):
 
 
 class SQLMetricsHandler:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, renamed_columns: dict):
         MetricsBase.metadata.create_all(session.connection())
         self.session = session
+        self.renamed_columns = renamed_columns
+        self.migrate_or_rebuild_table(session, MessagesModel)
+        self.migrate_or_rebuild_table(session, UsageModel)
+        self.migrate_or_rebuild_table(session, FeedbackModel)
+
+    def migrate_or_rebuild_table(self, session, model: Type[DeclarativeMeta])->None:
+        """
+        When given a model, this function will check if the tables needs to be migrated or rebuilt.
+        """
+        table_name = model.__tablename__
+        rename_map = self.renamed_columns.get(table_name, {})
+        
+        # Return None if no renamed columns are specified
+        if not self.renamed_columns or not rename_map:
+            return None
+            
+        logger = duck_logger
+
+        # Step 1: Get current DB column names/types
+        try:
+            db_columns = session.execute(text(f"PRAGMA table_info({table_name});")).fetchall()
+            db_column_names = {col[1]: col for col in db_columns}
+            db_column_set = set(db_column_names.keys())
+        except Exception:
+            db_column_names = {}
+            db_column_set = set()
+
+        # Step 2: Model columns
+        model_column_names = [c.name for c in model.__table__.columns]
+        model_column_set = set(model_column_names)
+
+        # Step 3: Detect missing and incompatible columns
+        missing_columns = model_column_set - db_column_set
+        incompatible_columns = []
+
+        for col in model_column_names:
+            if col in db_column_names:
+                db_type = db_column_names[col][2].upper()
+                model_type = str(model.__table__.columns[col].type).upper()
+                if db_type != model_type:
+                    incompatible_columns.append((col, db_type, model_type))
+
+        # Step 4: Safe add missing columns
+        if missing_columns and not incompatible_columns:
+            for col in missing_columns:
+                col_type = str(model.__table__.columns[col].type).upper()
+                try:
+                    session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col} {col_type}"))
+                    logger.info(f"Added column '{col}' to '{table_name}'")
+                except Exception as e:
+                    logger.exception(f"Error adding column '{col}': {e}")
+            session.commit()
+            return
+
+        # Step 5: Rebuild required
+        logger.warning(f"Rebuilding table '{table_name}' to match model schema.")
+
+        metadata = MetaData()
+        temp_table_name = f"{table_name}_temp"
+        new_table = Table(temp_table_name, metadata, *model.__table__.columns)
+        new_table.create(bind=session.get_bind())
+
+        # Step 6: Build shared columns (handle renames)
+        shared_columns = []
+        for model_col in model_column_names:
+            # Try to find source in DB
+            db_col = next((old for old, new in rename_map.items() if new == model_col), model_col)
+            if db_col in db_column_names:
+                shared_columns.append((model_col, db_col))
+
+        # Step 7: Copy data from old table to temp table
+        if shared_columns:
+            target_cols = ", ".join(col for col, _ in shared_columns)
+            source_cols = ", ".join(src for _, src in shared_columns)
+            insert_sql = f"INSERT INTO {temp_table_name} ({target_cols}) SELECT {source_cols} FROM {table_name}"
+            session.execute(text(insert_sql))
+
+        # Step 8: Replace old table
+        session.execute(text(f"DROP TABLE {table_name}"))
+        session.execute(text(f"ALTER TABLE {temp_table_name} RENAME TO {table_name}"))
+        session.commit()
+        logger.info(f"Table '{table_name}' successfully rebuilt.")
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:

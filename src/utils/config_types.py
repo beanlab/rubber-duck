@@ -63,6 +63,7 @@ class SQLConfig(TypedDict):
     host: str
     port: str
     database: str
+    renamed_columns: dict[str, str] | None
 
 
 class RetryProtocol(TypedDict):
