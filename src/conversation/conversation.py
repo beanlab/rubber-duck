@@ -108,7 +108,11 @@ class AgentConversation:
                         message_history,
                     )
 
-                    await self._send_message(context.thread_id, response)
+                    if response is not None and response != "":
+
+                        message_history.append(GPTMessage(role='assistant', content=response))
+
+                        await self._send_message(context.thread_id, response)
 
                 except GenAIException:
                     await self._send_message(context.thread_id,

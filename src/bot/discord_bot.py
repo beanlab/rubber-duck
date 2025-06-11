@@ -143,9 +143,6 @@ class DiscordBot(discord.Client):
             duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
             raise Exception(f'No channel id {channel_id}')
 
-        if message == "":
-            return 0
-
         if message:
             for block in _parse_blocks(message):
                 curr_message = await channel.send(block)

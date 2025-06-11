@@ -10,12 +10,6 @@ from ..utils.config_types import DuckContext
 _tools: dict[str, FunctionTool] = {}
 
 
-class ExitSilently(Exception):
-    def __init__(self, usage: Usage, message: str):
-        self.usage = usage
-        self.message = message
-
-
 def register_tool(_func=None, *, send_error_to_llm=True):
     def decorator(func):
         setattr(func, "is_tool", True)
@@ -27,17 +21,6 @@ def register_tool(_func=None, *, send_error_to_llm=True):
 
     return decorator
 
-
-def register_tools(func):
-    func.is_tool = True
-    return func
-
-
-def selective_error_handler(ctx, error) -> str:
-    if isinstance(error, ExitSilently):
-        raise error
-    else:
-        return f"An error occurred: {str(error)}"
 
 
 def direct_send_message(func):
@@ -70,9 +53,10 @@ def direct_send_message(func):
             result = func(*args, **kwargs)
         if isinstance(result, str):
             await wrapper.context.send_message(wrapper.context.thread_id, result)
-            raise ExitSilently(wrapper.usage, result)
         elif isinstance(result, tuple):
             await wrapper.context.send_message(wrapper.context.thread_id, file=result)
-            raise ExitSilently(wrapper.usage, result[0])
 
+
+
+    new_func.direct_send_message = True
     return new_func

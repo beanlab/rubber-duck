@@ -7,7 +7,7 @@ from pathlib import Path
 
 import boto3
 import yaml  # Added import for YAML support
-from agents import Agent
+from agents import Agent, ToolsToFinalOutputResult
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
@@ -145,6 +145,22 @@ def setup_ducks(
     return channel_ducks
 
 
+def tools_to_final_output_handler(run_context, tool_results):
+    """
+    Custom handler to determine if tool results should be final output.
+    This function is called after tools are executed.
+    """
+    for tool_result in tool_results:
+        if tool_result.tool.direct_send_message:
+            return ToolsToFinalOutputResult(
+                is_final_output=True,
+                final_output=tool_result.output
+            )
+    return ToolsToFinalOutputResult(
+        is_final_output=False,
+        final_output=None
+    )
+
 def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
     return Agent[DuckContext](
         name=config["name"],
@@ -155,6 +171,7 @@ def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
             for tool in config.get("tools", [])
             if tool in armory.get_all_tool_names()
         ],
+        tool_use_behavior=tools_to_final_output_handler,
         model=config["engine"],
     )
 
