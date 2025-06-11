@@ -110,6 +110,7 @@ class AgentClient:
     ) -> str:
         async with self._typing(context.thread_id):
             try:
+                duck_logger.debug("New Agent Request")
                 result = await run_agent(
                     self._agent,
                     message_history,
