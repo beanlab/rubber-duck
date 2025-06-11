@@ -4,7 +4,7 @@ import logging
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, RunResult, UserError, RunContextWrapper, FunctionToolResult, ToolsToFinalOutputResult
+from agents import Agent, Runner, RunResult
 from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.chat import ChatCompletion
@@ -16,9 +16,6 @@ from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
-
-
-
 
 
 class GenAIClient(Protocol):

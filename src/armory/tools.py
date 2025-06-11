@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from functools import wraps
 
-from agents import FunctionTool, RunContextWrapper, Usage
+from agents import FunctionTool, RunContextWrapper
 from makefun import with_signature
 
 from ..utils.config_types import DuckContext
@@ -21,7 +21,6 @@ def register_tool(_func=None, *, send_error_to_llm=True):
         return decorator(_func)
 
     return decorator
-
 
 
 def direct_send_message(func):
@@ -58,8 +57,6 @@ def direct_send_message(func):
         elif isinstance(result, tuple):
             await wrapper.context.send_message(wrapper.context.thread_id, file=result)
             wrapper.context.message_history.append(GPTMessage(role="assistant", content=result[0]))
-
-
 
     new_func.direct_send_message = True
     return new_func

@@ -161,6 +161,7 @@ def tools_to_final_output_handler(run_context, tool_results):
         final_output=None
     )
 
+
 def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent:
     return Agent[DuckContext](
         name=config["name"],
