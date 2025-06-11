@@ -9,6 +9,7 @@ import yaml  # Added import for YAML support
 import boto3
 from quest import these
 from quest.extras.sql import SqlBlobStorage
+from quest.utils import quest_logger
 
 from .armory.armory import Armory
 from .armory.stat_tools import StatsTools
@@ -267,10 +268,10 @@ if __name__ == '__main__':
     # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        from quest.utils import quest_logger
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
+        quest_logger.setLevel(logging.INFO)
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
