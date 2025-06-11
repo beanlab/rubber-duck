@@ -1,6 +1,8 @@
 import subprocess
 from datetime import datetime
 from pathlib import Path
+import zipfile
+import io
 
 import discord
 import pytz
@@ -162,18 +164,56 @@ class BashExecuteCommand():
 
 
 class LogCommand(Command):
+    """
+    This command is used to get the log file.
+    It will zip all the log files and send them to the channel.
+    """
     name = "!log"
     help_msg = "get the log file"
 
     def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
         self.send_message = send_message
+        self.bash_execute_command = bash_execute_command
+        self.log_dir = Path('logs')
 
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        await self.send_message(channel_id, 'The log command has been temporarily disabled.')
-        # await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
-        # await self._send_message(channel_id, 'log zip', file='log.zip')
+
+        # Check if logs directory exists
+        if not self.log_dir.exists():
+            await self.send_message(channel_id, 'No logs directory found.')
+            return
+
+        # Get the .log files in the logs directory
+        log_files = list(self.log_dir.glob('*.log*'))
+        if not log_files:
+            await self.send_message(channel_id, 'No log files found.')
+            return
+
+        # Create in-memory zip buffer
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file in log_files:
+                zipf.write(file, arcname=file.name)
+
+        # Move the buffer pointer to the start
+        zip_buffer.seek(0)
+
+        try:
+            # Create Discord file from the zip buffer
+            filename = f'logs_{datetime.now().strftime("%Y_%m_%d_%H_%M")}.zip'
+            discord_file = discord.File(zip_buffer, filename=filename)
+
+            # Send the zip file to the specified channel
+            await self.send_message(channel_id, 'Here are the log files:')
+            await self.send_message(channel_id, "", file=discord_file)
+
+        except Exception as e:
+            await self.send_message(channel_id, f'Error sending log files: {str(e)}')
+
+        finally:
+            zip_buffer.close()
 
 
 class ActiveWorkflowsCommand(Command):
