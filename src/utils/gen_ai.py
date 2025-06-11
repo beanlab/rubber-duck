@@ -126,8 +126,7 @@ class AgentClient:
                 usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
                 usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
             )
-
-            return result.final_output_as(str)
+            return result.final_output
 
 
 class OpenAI:

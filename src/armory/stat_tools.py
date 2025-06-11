@@ -88,7 +88,6 @@ class StatsTools:
         return f"{dataset}_{column}_{kind}.png"
 
     @register_tool
-    @direct_send_message
     def describe_dataset(self, dataset: str) -> str:
         """Returns a description of the dataset."""
         duck_logger.debug(f"Used describe_dataset on dataset={dataset}")
@@ -99,7 +98,6 @@ class StatsTools:
         return " ".join(data_expanded) if data_expanded else "No columns found in dataset."
 
     @register_tool
-    @direct_send_message
     def explain_capabilities(self):
         """Returns a description of the bots capabilites."""
         duck_logger.debug("Used explain_capabilities")
@@ -114,7 +112,6 @@ class StatsTools:
         )
 
     @register_tool
-    @direct_send_message
     def get_dataset_names(self) -> str:
         """Returns a list of all available datasets."""
         duck_logger.debug("Used get_available_datasets")
@@ -122,7 +119,6 @@ class StatsTools:
         return f"Available datasets: {', '.join(datasets)}"
 
     @register_tool
-    @direct_send_message
     def get_variable_names(self, dataset: str) -> str:
         """Returns a list of all variable names in the dataset."""
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
@@ -310,7 +306,6 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
     def calculate_mean(self, dataset: str, column: str) -> str:
         """Calculates the mean of a numeric column in the dataset, if not categorical."""
         duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
@@ -321,7 +316,6 @@ class StatsTools:
         return f"Mean = {round(series.dropna().mean(), 4)}"
 
     @register_tool
-    @direct_send_message
     def calculate_skewness(self, dataset: str, column: str) -> str:
         """Calculates the skewness (asymmetry) of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating skewness for: {column} in dataset: {dataset}")
@@ -332,7 +326,6 @@ class StatsTools:
         return f"Skewness = {round(skew(series.dropna()), 4)}"
 
     @register_tool
-    @direct_send_message
     def calculate_std(self, dataset: str, column: str) -> str:
         """Calculates the standard deviation of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating standard deviation for: {column} in dataset: {dataset}")
@@ -343,7 +336,6 @@ class StatsTools:
         return f"Standard Deviation = {round(series.dropna().std(), 4)}"
 
     @register_tool
-    @direct_send_message
     def calculate_median(self, dataset: str, column: str) -> str:
         """Calculates the median (middle value) of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating median for: {column} in dataset: {dataset}")
@@ -354,7 +346,6 @@ class StatsTools:
         return f"Median = {round(series.dropna().median(), 4)}"
 
     @register_tool
-    @direct_send_message
     def calculate_mode(self, dataset: str, column: str) -> str:
         """Estimates the mode of a numeric column using the peak of a KDE (kernel density estimate)."""
         duck_logger.debug(f"Calculating approximate mode (KDE) for: {column} in dataset: {dataset}")
@@ -376,7 +367,6 @@ class StatsTools:
             return "Error calculating mode"
 
     @register_tool
-    @direct_send_message
     def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
@@ -389,7 +379,6 @@ class StatsTools:
         return "; ".join(f"{label}={round(val, 4)}" for label, val in zip(labels, summary))
 
     @register_tool
-    @direct_send_message
     def calculate_table_of_counts(self, dataset: str, column: str) -> dict | str:
         """Returns a frequency table (category counts) for a categorical column in the dataset."""
         duck_logger.debug(f"Calculating table of counts for: {column} in dataset: {dataset}")
@@ -402,7 +391,6 @@ class StatsTools:
         return counts.to_dict(orient="records")
 
     @register_tool
-    @direct_send_message
     def calculate_proportions(self, dataset: str, column: str) -> dict | str:
         """Returns the relative proportions of each category in a categorical column of the dataset."""
         duck_logger.debug(f"Calculating proportions for: {column} in dataset: {dataset}")
