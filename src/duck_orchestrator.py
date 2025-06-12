@@ -81,7 +81,7 @@ class DuckOrchestrator:
             content=initial_message['content'],
             message_id=initial_message['message_id'],
             thread_id=thread_id,
-            send_message=self._send_message
+            current_agent_name=None
         )
 
         async with alias(str(thread_id)):

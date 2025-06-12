@@ -81,7 +81,7 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
-    current_agent_name: str
+    current_agent_name: str | None
 
 
 class DuckConfig(TypedDict):

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Callable
 
 import boto3
 import yaml  # Added import for YAML support
@@ -212,7 +213,7 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
     match agent_type:
         case 'single-agent':
             agent = build_agent(armory, settings['agent_settings'])
-            agent_client = AgentClient(
+            return AgentClient(
                 agent,
                 settings.get('introduction', 'Hello. How can I help you?'),
                 metrics_handler.record_usage,
@@ -297,7 +298,7 @@ def build_ducks(
         metrics_handler,
         feedback_manager,
         sql_session
-) -> list[tuple[DUCK_WEIGHT, DuckConversation]]:
+) -> list[tuple[DUCK_WEIGHT, Callable[[DuckContext], DuckConversation]]]:
     ducks = []
     for duck_config in channel_config['ducks']:
         duck_type = duck_config['workflow_type']
@@ -306,7 +307,7 @@ def build_ducks(
         weight: float = duck_config.get('weight', 1.0)
 
         if duck_type == 'agent_conversation':
-            ducks.append((weight, build_agent_conversation_duck(name, metrics_handler, bot, settings, sql_session)))
+            ducks.append((weight, lambda ctx: build_agent_conversation_duck(ctx, name, metrics_handler, bot, settings, sql_session)))
 
         elif duck_type == 'conversation_review':
             ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager)))
