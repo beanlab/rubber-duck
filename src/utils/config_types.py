@@ -99,7 +99,6 @@ class SQLConfig(TypedDict):
     port: str
     database: str
 
-
 class RetryProtocol(TypedDict):
     max_retries: int
     delay: int
@@ -109,6 +108,8 @@ class RetryProtocol(TypedDict):
 class AdminSettings(TypedDict):
     admin_channel_id: int
     admin_role_id: int
+    log_level: str
+    "This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'."
 
 
 class ReporterConfig(TypedDict):

@@ -281,6 +281,7 @@ feedback_notifier_settings:
 admin_settings:
   admin_channel_id: 1192895746672951340
   admin_role_id: 933123843038535741
+  log_level: WARNING
 
 sender_email: byu-cs-course-ops@cs.byu.edu
 

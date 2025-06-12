@@ -6,7 +6,7 @@ from quest import step, queue, wrap_steps
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext
 from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
-from ..utils.protocols import Message, SendMessage, ReportError, AddReaction
+from ..utils.protocols import Message, SendMessage, AddReaction
 
 
 class HaveConversation(Protocol):
@@ -51,7 +51,6 @@ class AgentConversation:
                  ai_agent: GenAIClient,
                  record_message: RecordMessage,
                  send_message: SendMessage,
-                 report_error: ReportError,
                  add_reaction: AddReaction,
                  wait_for_user_timeout,
                  armory: Armory
@@ -62,7 +61,6 @@ class AgentConversation:
         self._record_message = step(record_message)
 
         self._send_message = step(send_message)
-        self._report_error = step(report_error)
         self._add_reaction: AddReaction = step(add_reaction)
 
         self._wait_for_user_timeout = wait_for_user_timeout
