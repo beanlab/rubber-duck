@@ -32,7 +32,7 @@ from .utils.config_types import Config, ChannelConfig, RegistrationSettings, Age
 from .utils.data_store import DataStore
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.gen_ai import RetryableGenAI, AgentClient
-from .utils.logger import duck_logger
+from .utils.logger import duck_logger, filter_logs
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
@@ -327,6 +327,8 @@ async def main(config: Config):
             bot.create_thread,
             bot.send_message
         )
+
+        filter_logs(bot.send_message, config['admin_settings'])
 
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
