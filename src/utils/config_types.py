@@ -16,6 +16,7 @@ class GPTMessage(TypedDict):
     role: str
     content: str
 
+
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
     feedback_check_minute: int

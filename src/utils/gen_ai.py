@@ -135,9 +135,9 @@ class MultiAgentClient:
         self._record_usage = record_usage
         self._typing = typing
 
-    def _find_last_agent(self) -> Agent:
+    def _find_last_agent(self, storage) -> Agent:
 
-        last_agent_name = self._last_agent_storage.get()
+        last_agent_name = storage.get()
 
         if last_agent_name and last_agent_name in self._agents.keys():
             return self._agents[last_agent_name]
@@ -171,9 +171,9 @@ class MultiAgentClient:
             context: DuckContext,
             message_history: list
     ) -> AgentMessage:
-        current_agent = self._find_last_agent()
+
         with self._last_agent_storage as storage:
-            storage.set(current_agent.name)
+            current_agent = self._find_last_agent(storage)
             async with self._typing(context.thread_id):
                 result = await run_agent(
                     current_agent,

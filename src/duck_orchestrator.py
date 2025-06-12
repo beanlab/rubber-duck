@@ -95,7 +95,7 @@ class DuckOrchestrator:
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
-        # Remember conversation
+        # Remember the conversation
         self._remember_conversation(FeedbackData(
             duck_type=duck.name,
             guild_id=initial_message['guild_id'],
