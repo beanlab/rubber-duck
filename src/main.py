@@ -167,9 +167,8 @@ def build_agents(armory: Armory, settings: MultiAgentSettings, last_agent_storag
 
     def make_on_handoff(target_agent: Agent, last_agent_storage: LastAgentStorage):
         async def _on_handoff(ctx: RunContextWrapper[None]):
-            with last_agent_storage as storage:
-                storage.set(target_agent.name)
-                duck_logger.info(f"Handoff to {target_agent.name} recorded in storage.")
+            last_agent_storage.set(target_agent.name)
+            duck_logger.info(f"Handoff to {target_agent.name} recorded in storage.")
         return _on_handoff
 
     agents = {}

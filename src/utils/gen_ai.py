@@ -71,7 +71,6 @@ class AgentClient:
         self._record_usage = record_usage
         self._typing = typing
 
-
     async def get_completion(
             self,
             context: DuckContext,
@@ -125,8 +124,10 @@ class AgentClient:
             else:
                 return AgentMessage(content=result.final_output, file=None)
 
+
 class MultiAgentClient:
-    def __init__(self, agents: dict[str, Agent], last_agent_storage: LastAgentStorage, starting_agent: str, introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
+    def __init__(self, agents: dict[str, Agent], last_agent_storage: LastAgentStorage, starting_agent: str,
+                 introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
         self._agents = agents
         self._last_agent_storage = last_agent_storage
         self._starting_agent = starting_agent
@@ -135,11 +136,11 @@ class MultiAgentClient:
         self._typing = typing
 
     def _find_last_agent(self) -> Agent:
-        with self._last_agent_storage as storage:
-            last_agent_name = storage.get()
 
-            if last_agent_name and last_agent_name in self._agents.keys():
-                return self._agents[last_agent_name]
+        last_agent_name = self._last_agent_storage.get()
+
+        if last_agent_name and last_agent_name in self._agents.keys():
+            return self._agents[last_agent_name]
 
         return self._agents[self._starting_agent]
 
@@ -170,35 +171,36 @@ class MultiAgentClient:
             context: DuckContext,
             message_history: list
     ) -> AgentMessage:
-
         current_agent = self._find_last_agent()
+        with self._last_agent_storage as storage:
+            storage.set(current_agent.name)
+            async with self._typing(context.thread_id):
+                result = await run_agent(
+                    current_agent,
+                    message_history,
+                    context=context,
+                    max_turns=5
+                )
+                usage = result.context_wrapper.usage
+                await self._record_usage(
+                    context.guild_id,
+                    context.channel_id,
+                    context.thread_id,
+                    context.author_id,
+                    self._agents[current_agent.name].model,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                    usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+                )
 
-        async with self._typing(context.thread_id):
-            result = await run_agent(
-                current_agent,
-                message_history,
-                context=context,
-                max_turns=5
-            )
-            usage = result.context_wrapper.usage
-            await self._record_usage(
-                context.guild_id,
-                context.channel_id,
-                context.thread_id,
-                context.author_id,
-                self._agents[current_agent.name].model,
-                usage.input_tokens,
-                usage.output_tokens,
-                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-            )
-            with self._last_agent_storage as storage:
                 storage.set(result.last_agent.name)
             last_item = result.new_items[-1]
             if isinstance(last_item, ToolCallOutputItem):
                 return AgentMessage(content=last_item.output[0], file=last_item.output[1])
             else:
                 return AgentMessage(content=result.final_output, file=None)
+
 
 class RetryableGenAI:
     def __init__(self,

@@ -3,7 +3,6 @@ from quest import BlobStorage
 
 class LastAgentStorage:
     def __init__(self, storage_key: str, blob_storage: BlobStorage):
-        # Use the provided SQL session
         self._storage = blob_storage
         self._storage_key = storage_key
 
