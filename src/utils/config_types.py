@@ -7,6 +7,14 @@ CHANNEL_ID = int
 DUCK_WEIGHT = float
 
 
+class AgentMessage(TypedDict):
+    content: str
+    file: bytes | None
+
+
+class GPTMessage(TypedDict):
+    role: str
+    content: str
 
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
@@ -43,18 +51,18 @@ class SingleAgentSettings(TypedDict):
     name: str
     handoff_prompt: str
     tools: list[str]
-    max_iterations: int
+    handoffs: list[str]
 
 
-class HubSpokesAgentSettings(TypedDict):
-    hub_agent_settings: SingleAgentSettings
-    spoke_agents_settings: list[SingleAgentSettings]
+class MultiAgentSettings(TypedDict):
+    starting_agent: str
+    individual_agent_settings: list[SingleAgentSettings]
 
 
 class AgentConversationSettings(TypedDict):
     introduction: str
     agent_type: str
-    agent_settings: SingleAgentSettings | HubSpokesAgentSettings
+    agent_settings: SingleAgentSettings | MultiAgentSettings
     timeout: int
 
 

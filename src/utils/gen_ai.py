@@ -1,26 +1,19 @@
 import asyncio
-import json
 import logging
 from io import BytesIO
-from typing import TypedDict, Protocol, Any
+from typing import TypedDict, Protocol
 
 from agents import Agent, Runner, RunResult, ToolCallOutputItem
-from openai import AsyncOpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
-from openai.types.chat import ChatCompletion
 from quest import step
 
-from .config_types import DuckContext
+from .agent_storage import LastAgentStorage
+from .config_types import DuckContext, AgentMessage, GPTMessage
 from .logger import duck_logger
-from ..armory.armory import Armory
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
-
-
-class GPTMessage(TypedDict):
-    role: str
-    content: str
 
 
 class GenAIClient(Protocol):
@@ -30,7 +23,7 @@ class GenAIClient(Protocol):
             self,
             context: DuckContext,
             message_history: list[GPTMessage],
-    ) -> str: ...
+    ) -> AgentMessage: ...
 
 
 class GenAIException(Exception):
@@ -72,17 +65,18 @@ async def run_agent(*args, **kwargs) -> RunResult:
 
 
 class AgentClient:
-    def __init__(self, introduction: str, agent: Agent, record_usage: RecordUsage, typing: IndicateTyping):
-        self.introduction = introduction
+    def __init__(self, agent: Agent, introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
         self._agent = agent
+        self.introduction = introduction
         self._record_usage = record_usage
         self._typing = typing
+
 
     async def get_completion(
             self,
             context: DuckContext,
             message_history: list,
-    ) -> str:
+    ) -> AgentMessage:
         try:
             return await self._get_completion(
                 context,
@@ -104,7 +98,7 @@ class AgentClient:
             self,
             context: DuckContext,
             message_history: list
-    ) -> Any:
+    ) -> AgentMessage:
         async with self._typing(context.thread_id):
             duck_logger.debug("New Agent Request")
             result = await run_agent(
@@ -127,126 +121,38 @@ class AgentClient:
             )
             last_item = result.new_items[-1]
             if isinstance(last_item, ToolCallOutputItem):
-                return result.new_items[-1].output
+                return AgentMessage(content=last_item.output[0], file=last_item.output[1])
             else:
-                return result.final_output
+                return AgentMessage(content=result.final_output, file=None)
 
+class MultiAgentClient:
+    def __init__(self, agents: dict[str, Agent], last_agent_storage: LastAgentStorage, starting_agent: str, introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
+        self._agents = agents
+        self._last_agent_storage = last_agent_storage
+        self._starting_agent = starting_agent
+        self.introduction = introduction
+        self._record_usage = record_usage
+        self._typing = typing
 
-class OpenAI:
-    def __init__(self,
-                 openai_api_key: str,
-                 armory: Armory,
-                 record_usage: RecordUsage,
-                 ):
-        self._client = AsyncOpenAI(api_key=openai_api_key)
-        self._armory = armory
-        self._record_usage = step(record_usage)
+    def _find_last_agent(self) -> Agent:
+        with self._last_agent_storage as storage:
+            last_agent_name = storage.get()
 
-    async def _get_completion_with_usage(
-            self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            engine: str,
-            message_history,
-            functions
-    ):
-        if not functions:
-            functions = None
+            if last_agent_name and last_agent_name in self._agents.keys():
+                return self._agents[last_agent_name]
 
-        completion: ChatCompletion = await self._client.chat.completions.create(
-            model=engine,
-            messages=message_history,
-            functions=functions
-        )
-
-        completion_dict = completion.model_dump()
-
-        await self._record_usage(
-            guild_id,
-            parent_channel_id,
-            thread_id,
-            user_id,
-            engine,
-            completion_dict['usage']['prompt_tokens'],
-            completion_dict['usage']['completion_tokens'],
-            completion_dict['usage'].get('cached_tokens', 0),
-            completion_dict['usage'].get('reasoning_tokens', 0)
-        )
-        return completion
-
-    async def _get_completion(
-            self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            engine: str,
-            message_history: list[GPTMessage],
-            tools: list[str]
-    ) -> list[Sendable]:
-        tools_to_use = {tool: self._armory.get_specific_tool(tool) for tool in tools}
-
-        functions = [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.params_json_schema
-            }
-            for tool in tools_to_use.values()
-        ]
-
-        result: list[Sendable] = []
-
-        while True:
-            completion = await self._get_completion_with_usage(
-                guild_id, parent_channel_id, thread_id, user_id, engine, message_history, functions
-            )
-            message = completion.choices[0].message
-
-            if message.function_call:
-
-                function_name = message.function_call.name
-                tool = self._armory.get_specific_tool(function_name)
-                arguments = json.loads(message.function_call.arguments)
-                try:
-                    tool_result = tool(**arguments)
-                except Exception as ex:
-                    tool_result = f"Error when calling function {tool.__name__}, with arguments {arguments}. The error message was of type {ex.__class__.__name__} with the message: {str(ex)}"
-
-                message_history.append({"role": "assistant", "function_call": message.function_call})
-                message_history.append({"role": "function", "name": function_name, "content": str(tool_result)})
-
-                if isinstance(tool_result, tuple):
-                    result.append(tool_result)
-
-                continue  # i.e. allow the bot to call another tool or add a message
-
-            else:
-                message_history.append({
-                    "role": "assistant",
-                    "content": message.content
-                })
-
-                result.append(message.content)
-                break  # i.e. the bot is done responding
-
-        return result
+        return self._agents[self._starting_agent]
 
     async def get_completion(
             self,
-            guild_id: int,
-            parent_channel_id: int,
-            thread_id: int,
-            user_id: int,
-            engine: str,
-            message_history: list[GPTMessage],
-            tools: list[str]
-    ) -> list[Sendable]:
+            context: DuckContext,
+            message_history: list
+    ) -> AgentMessage:
         try:
-            return await self._get_completion(guild_id, parent_channel_id, thread_id, user_id, engine, message_history,
-                                              tools)
+            return await self._get_completion(
+                context,
+                message_history
+            )
         except (
                 APITimeoutError, InternalServerError,
                 UnprocessableEntityError) as ex:
@@ -255,9 +161,44 @@ class OpenAI:
         except (APIConnectionError, BadRequestError,
                 AuthenticationError, ConflictError, NotFoundError,
                 RateLimitError) as ex:
+            duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
             raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                      "for more details on how to resolve this error") from ex
 
+    async def _get_completion(
+            self,
+            context: DuckContext,
+            message_history: list
+    ) -> AgentMessage:
+
+        current_agent = self._find_last_agent()
+
+        async with self._typing(context.thread_id):
+            result = await run_agent(
+                current_agent,
+                message_history,
+                context=context,
+                max_turns=5
+            )
+            usage = result.context_wrapper.usage
+            await self._record_usage(
+                context.guild_id,
+                context.channel_id,
+                context.thread_id,
+                context.author_id,
+                self._agents[current_agent.name].model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+            )
+            with self._last_agent_storage as storage:
+                storage.set(result.last_agent.name)
+            last_item = result.new_items[-1]
+            if isinstance(last_item, ToolCallOutputItem):
+                return AgentMessage(content=last_item.output[0], file=last_item.output[1])
+            else:
+                return AgentMessage(content=result.final_output, file=None)
 
 class RetryableGenAI:
     def __init__(self,

@@ -7,10 +7,11 @@ from pathlib import Path
 
 import boto3
 import yaml  # Added import for YAML support
-from agents import Agent, ToolsToFinalOutputResult
+from agents import Agent, ToolsToFinalOutputResult, handoff, RunContextWrapper
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 
+from src.utils.agent_storage import LastAgentStorage
 from .armory.armory import Armory
 from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
@@ -27,10 +28,10 @@ from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
-    SingleAgentSettings, HubSpokesAgentSettings, DUCK_WEIGHT, DuckContext
+    SingleAgentSettings, DUCK_WEIGHT, DuckContext, MultiAgentSettings
 from .utils.data_store import DataStore
 from .utils.feedback_notifier import FeedbackNotifier
-from .utils.gen_ai import RetryableGenAI, AgentClient
+from .utils.gen_ai import RetryableGenAI, AgentClient, MultiAgentClient
 from .utils.logger import duck_logger
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
@@ -129,7 +130,8 @@ def setup_ducks(
         config: Config,
         bot: DiscordBot,
         metrics_handler,
-        feedback_manager
+        feedback_manager,
+        sql_session
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
@@ -139,28 +141,10 @@ def setup_ducks(
     for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
             channel_ducks[channel_config['channel_id']] = build_ducks(
-                channel_config, bot, metrics_handler, feedback_manager
+                channel_config, bot, metrics_handler, feedback_manager, sql_session
             )
 
     return channel_ducks
-
-
-def tools_to_final_output_handler(run_context, tool_results):
-    """
-    Custom handler to determine if tool results should be final output.
-    This function is called after tools are executed.
-    """
-    for tool_result in tool_results:
-        if tool_result.tool.direct_send_message:
-            return ToolsToFinalOutputResult(
-                is_final_output=True,
-                final_output=tool_result.output
-            )
-    return ToolsToFinalOutputResult(
-        is_final_output=False,
-        final_output=None
-    )
-
 
 def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContext]:
     tools = [
@@ -175,16 +159,46 @@ def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContex
         tools=tools,
         tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
         model=config["engine"],
+        handoffs=[]
     )
 
 
-def create_agents(armory: Armory, settings: HubSpokesAgentSettings) -> tuple[Agent, list[Agent]]:
-    return build_agent(armory, settings["hub_agent_settings"]), [
-        build_agent(armory, agent) for agent in settings.get("spoke_agents_settings", [])
-    ]
+def build_agents(armory: Armory, settings: MultiAgentSettings, last_agent_storage: LastAgentStorage) -> dict[str, Agent[DuckContext]]:
+
+    def make_on_handoff(target_agent: Agent, last_agent_storage: LastAgentStorage):
+        async def _on_handoff(ctx: RunContextWrapper[None]):
+            with last_agent_storage as storage:
+                storage.set(target_agent.name)
+                duck_logger.info(f"Handoff to {target_agent.name} recorded in storage.")
+        return _on_handoff
+
+    agents = {}
+
+    for agent_settings in settings['individual_agent_settings']:
+        agent = build_agent(armory, agent_settings)
+        agents[agent_settings['name']] = agent
+
+    for agent_settings in settings['individual_agent_settings']:
+        agent_name = agent_settings['name']
+        agent = agents[agent_name]
+        handoff_targets = agent_settings.get('handoffs', [])
+
+        handoffs = []
+        for target_name in handoff_targets:
+            if target_name in agents.keys():
+                target_agent = agents[target_name]
+                handoff_obj = handoff(
+                    agent=target_agent,
+                    on_handoff=make_on_handoff(target_agent, last_agent_storage),
+                )
+                handoffs.append(handoff_obj)
+
+        agent.handoffs = handoffs
+
+    return agents
 
 
-def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: AgentConversationSettings):
+def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: AgentConversationSettings, sql_session):
     armory = Armory()
     if 'dataset_folder_locations' in config:
         data_store = DataStore(config['dataset_folder_locations'])
@@ -196,19 +210,30 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
     match agent_type:
         case 'single-agent':
             agent = build_agent(armory, settings['agent_settings'])
+            agent_client = AgentClient(
+                agent,
+                settings.get('introduction', 'Hello. How can I help you?'),
+                metrics_handler.record_usage,
+                bot.typing
+            )
 
-        case 'hub-spokes':
-            agent, spoke_agents = create_agents(armory, settings['agent_settings'])
+        case 'multi-agent':
+            last_agent_blob_storage = SqlBlobStorage('last_agent_state', sql_session)
+            last_agent_storage = LastAgentStorage("last_running_agent", last_agent_blob_storage)
+            agents = build_agents(armory, settings['agent_settings'], last_agent_storage)
+            agent_client = MultiAgentClient(
+                agents,
+                last_agent_storage,
+                settings['agent_settings']['starting_agent'],
+                settings.get('introduction', 'Hello. How can I help you?'),
+                metrics_handler.record_usage,
+                bot.typing
+            )
 
         case _:
             raise NotImplementedError(f'Agent type {agent_type} not implemented.')
 
-    agent_client = AgentClient(
-        settings.get('introduction', 'Hello. How can I help you?'),
-        agent,
-        metrics_handler.record_usage,
-        bot.typing
-    )
+
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
     retryable_ai_client = RetryableGenAI(
@@ -268,7 +293,8 @@ def build_ducks(
         channel_config: ChannelConfig,
         bot: DiscordBot,
         metrics_handler,
-        feedback_manager
+        feedback_manager,
+        sql_session
 ) -> list[tuple[DUCK_WEIGHT, DuckConversation]]:
     ducks = []
     for duck_config in channel_config['ducks']:
@@ -277,8 +303,8 @@ def build_ducks(
         name = duck_config['name']
         weight: float = duck_config.get('weight', 1.0)
 
-        if duck_type == 'basic_prompt_conversation':
-            ducks.append((weight, build_agent_conversation_duck(name, metrics_handler, bot, settings)))
+        if duck_type == 'agent_conversation':
+            ducks.append((weight, build_agent_conversation_duck(name, metrics_handler, bot, settings, sql_session)))
 
         elif duck_type == 'conversation_review':
             ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager)))
@@ -331,7 +357,7 @@ async def main(config: Config):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
+            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,

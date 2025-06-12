@@ -20,10 +20,19 @@ servers:
         channel_name: general/duck-pond
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
+              timeout: 600
 
   747510855536738336:
     server_name: CS 235
@@ -42,10 +51,18 @@ servers:
         channel_name: student-text-channels/duck-pond
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
   1235303213796691998:
@@ -64,11 +81,19 @@ servers:
       - channel_id: 1365456542287269919
         channel_name: Student Text Channels/duck-pond
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
+          - name: standard-rubber-duck
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
   1371951485629370458:
@@ -88,18 +113,26 @@ servers:
       - channel_id: 1371951696061661215
         channel_name: duck-pond
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
+          - name: standard-rubber-duck
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
       - channel_id: 1374066971523678279
         channel_name: stats-tool
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             weight: 1
             settings:
               introduction: |
@@ -154,11 +187,19 @@ servers:
       - channel_id: 1363949528201564170
         channel_name: physics-230-phys230
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
+          - name: standard-rubber-duck
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
       - channel_id: 1359587713749094700
@@ -175,10 +216,18 @@ servers:
         channel_name: physics-430-phys430
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
   1338616224858374287:
@@ -197,20 +246,36 @@ servers:
         channel_name: vintage-duck
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a general-purpose rubber duck. 
+                I can help you with any topic you want to discuss.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/standard-rubber-duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
         ducks:
-          - name: socratic-rubber-duck
-            workflow_type: basic_prompt_conversation
+          - name: standard-rubber-duck
+            workflow_type: agent_conversation
             settings:
-              prompt_file: prompts/socratic-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a Socratic-style rubber duck. 
+                I can help you think through your problems by asking questions.
+              agent_type: single-agent
+              agent_settings:
+                name: Standard_Rubber_Duck
+                prompt_file: prompts/socratic_duck.txt
+                engine: gpt-4.1
+                handoff_prompt:
+                max_iterations: 5
               timeout: 600
 
       - channel_id: 1379959992110546995
@@ -235,7 +300,7 @@ servers:
         channel_name: stats-tool
         ducks:
           - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+            workflow_type: agent_conversation
             weight: 1
             settings:
               introduction: |

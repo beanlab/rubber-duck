@@ -1,10 +1,10 @@
 import asyncio
 from typing import Protocol
 
-from quest import step, queue, wrap_steps
+from quest import step, queue
 
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext
+from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..utils.protocols import Message, SendMessage, ReportError, AddReaction
 
@@ -71,21 +71,18 @@ class AgentConversation:
     @step
     async def _get_and_send_ai_response(self, context: DuckContext, message_history: list[GPTMessage]) -> str:
 
-        response = await self._ai_client.get_completion(
+        response: AgentMessage = await self._ai_client.get_completion(
             context,
             message_history,
         )
 
-        if isinstance(response, str):
-            await self._send_message(context.thread_id, response)
-            return response
-
-        elif isinstance(response, tuple):
-            await self._send_message(context.thread_id, file=response)
-            return response[0]
+        if response['file'] is None:
+            await self._send_message(context.thread_id, response['content'])
 
         else:
-            raise NotImplementedError("Unsupported response type from AI client: {}".format(type(response)))
+            await self._send_message(context.thread_id, file=(response['content'], response['file']))
+
+        return response['content']
 
     async def __call__(self, context: DuckContext):
 

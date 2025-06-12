@@ -58,7 +58,8 @@ class DuckOrchestrator:
             return possible_ducks[0][1]
 
         weights = [w for w, dk in possible_ducks]
-        return random.choices(possible_ducks, weights=weights, k=1)[1]
+        return random.choices(possible_ducks, weights=weights, k=1)[0][1]
+
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
 
