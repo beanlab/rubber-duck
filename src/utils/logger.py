@@ -10,17 +10,18 @@ formatter = logging.Formatter(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Console Handler
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
-duck_logger.addHandler(console_handler)
-
 quest_logger.setLevel(logging.DEBUG)
-quest_logger.addHandler(console_handler)
+
+def add_console_handler():
+    """Add a console handler to the duck logger."""
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    duck_logger.addHandler(console_handler)
+    quest_logger.addHandler(console_handler)
 
 
 def add_file_handler(file_path: str):

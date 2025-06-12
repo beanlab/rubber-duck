@@ -33,7 +33,7 @@ from .utils.config_types import Config, ChannelConfig, RegistrationSettings, Age
 from .utils.data_store import DataStore
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.gen_ai import RetryableGenAI, AgentClient
-from .utils.logger import duck_logger, filter_logs
+from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
@@ -403,6 +403,8 @@ if __name__ == '__main__':
         duck_logger.error("No log path provided. Logging to console only.")
         raise ValueError("Log path must be provided for logging.")
 
+    # Add console handler to the duck logger
+    add_console_handler()
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
