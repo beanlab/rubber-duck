@@ -7,7 +7,9 @@ from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import declarative_base, Session
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.declarative import DeclarativeMeta
+from sqlalchemy.schema import CreateTable
 
+from ..metrics.feedback_manager import FeedbackData
 from ..utils.logger import duck_logger
 
 MetricsBase = declarative_base()
@@ -73,91 +75,93 @@ class FeedbackModel(MetricsBase):
 
 
 class SQLMetricsHandler:
-    def __init__(self, session: Session, renamed_columns: dict):
+    def __init__(self, session: Session):
         MetricsBase.metadata.create_all(session.connection())
         self.session = session
-        self.renamed_columns = renamed_columns
-        self.migrate_or_rebuild_table(session, MessagesModel)
-        self.migrate_or_rebuild_table(session, UsageModel)
-        self.migrate_or_rebuild_table(session, FeedbackModel)
 
-    def migrate_or_rebuild_table(self, session, model: Type[DeclarativeMeta])->None:
+    @staticmethod
+    def alter_table(
+            session: Session,
+            model: Type[DeclarativeMeta],
+            renamed_columns: dict[str, str] = None
+    ) -> None:
         """
-        When given a model, this function will check if the tables needs to be migrated or rebuilt.
+        Rebuilds a table with a new schema while preserving data.
+
+        renamed_columns format: {old_column_name: new_column_name}
         """
-        table_name = model.__tablename__
-        rename_map = self.renamed_columns.get(table_name, {})
-        
-        # Return None if no renamed columns are specified
-        if not self.renamed_columns or not rename_map:
-            return None
-            
-        logger = duck_logger
+        renamed_columns = renamed_columns or {}
+        duck_logger.info(f"Starting table migration for {model.__tablename__}")
+        duck_logger.info(f"Renamed columns mapping (old → new): {renamed_columns}")
 
-        # Step 1: Get current DB column names/types
-        try:
-            db_columns = session.execute(text(f"PRAGMA table_info({table_name});")).fetchall()
-            db_column_names = {col[1]: col for col in db_columns}
-            db_column_set = set(db_column_names.keys())
-        except Exception:
-            db_column_names = {}
-            db_column_set = set()
-
-        # Step 2: Model columns
-        model_column_names = [c.name for c in model.__table__.columns]
-        model_column_set = set(model_column_names)
-
-        # Step 3: Detect missing and incompatible columns
-        missing_columns = model_column_set - db_column_set
-        incompatible_columns = []
-
-        for col in model_column_names:
-            if col in db_column_names:
-                db_type = db_column_names[col][2].upper()
-                model_type = str(model.__table__.columns[col].type).upper()
-                if db_type != model_type:
-                    incompatible_columns.append((col, db_type, model_type))
-
-        # Step 4: Safe add missing columns
-        if missing_columns and not incompatible_columns:
-            for col in missing_columns:
-                col_type = str(model.__table__.columns[col].type).upper()
-                try:
-                    session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col} {col_type}"))
-                    logger.info(f"Added column '{col}' to '{table_name}'")
-                except Exception as e:
-                    logger.exception(f"Error adding column '{col}': {e}")
-            session.commit()
-            return
-
-        # Step 5: Rebuild required
-        logger.warning(f"Rebuilding table '{table_name}' to match model schema.")
-
+        engine = session.get_bind()
         metadata = MetaData()
-        temp_table_name = f"{table_name}_temp"
-        new_table = Table(temp_table_name, metadata, *model.__table__.columns)
-        new_table.create(bind=session.get_bind())
+        metadata.reflect(bind=engine, only=[model.__tablename__])
 
-        # Step 6: Build shared columns (handle renames)
-        shared_columns = []
-        for model_col in model_column_names:
-            # Try to find source in DB
-            db_col = next((old for old, new in rename_map.items() if new == model_col), model_col)
-            if db_col in db_column_names:
-                shared_columns.append((model_col, db_col))
+        old_table = metadata.tables[model.__tablename__]
+        temp_table_name = f"{model.__tablename__}_new"
 
-        # Step 7: Copy data from old table to temp table
-        if shared_columns:
-            target_cols = ", ".join(col for col, _ in shared_columns)
-            source_cols = ", ".join(src for _, src in shared_columns)
-            insert_sql = f"INSERT INTO {temp_table_name} ({target_cols}) SELECT {source_cols} FROM {table_name}"
-            session.execute(text(insert_sql))
+        # Create new table schema from SQLAlchemy model
+        new_columns = []
+        for col in model.__table__.columns:
+            new_col = Column(
+                col.name,
+                col.type,
+                primary_key=col.primary_key,
+                nullable=col.nullable,
+                default=col.default,
+                server_default=col.server_default,
+                unique=col.unique,
+                index=col.index
+            )
+            new_columns.append(new_col)
 
-        # Step 8: Replace old table
-        session.execute(text(f"DROP TABLE {table_name}"))
-        session.execute(text(f"ALTER TABLE {temp_table_name} RENAME TO {table_name}"))
+        new_table = Table(temp_table_name, MetaData(), *new_columns)
+        new_table_sql = str(CreateTable(new_table).compile(engine))
+        session.execute(text(new_table_sql))
+
+        old_columns = [c.name for c in old_table.columns]
+        new_columns = [c.name for c in new_table.columns]
+
+        duck_logger.info(f"Old columns: {old_columns}")
+        duck_logger.info(f"New columns: {new_columns}")
+
+        # Invert renamed_columns to be: {new: old}
+        inverted_map = {v: k for k, v in renamed_columns.items()}
+
+        # Map columns from new table to old table
+        column_map = {}
+        for new_col in new_columns:
+            if new_col in inverted_map and inverted_map[new_col] in old_columns:
+                old_col = inverted_map[new_col]
+                column_map[new_col] = old_col
+                duck_logger.info(f"Mapping renamed column: {old_col} -> {new_col}")
+            elif new_col in old_columns:
+                column_map[new_col] = new_col
+                duck_logger.info(f"Mapping unchanged column: {new_col}")
+            else:
+                duck_logger.warning(f"Column '{new_col}' not found in old table and not mapped.")
+
+        duck_logger.info(f"Final column map: {column_map}")
+
+        if not column_map:
+            raise Exception("No columns to migrate — check renamed_columns mapping")
+
+        cols_new = ", ".join(column_map.keys())
+        cols_old = ", ".join(column_map.values())
+
+        copy_stmt = text(f"""
+            INSERT INTO {temp_table_name} ({cols_new})
+            SELECT {cols_old} FROM {model.__tablename__}
+        """)
+        session.execute(copy_stmt)
+
+        session.execute(text(f"DROP TABLE {model.__tablename__}"))
+        session.execute(text(f"ALTER TABLE {temp_table_name} RENAME TO {model.__tablename__}"))
+
         session.commit()
-        logger.info(f"Table '{table_name}' successfully rebuilt.")
+        duck_logger.info(
+            f"Successfully altered table '{model.__tablename__}' with the following changes: {renamed_columns}")
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
@@ -216,31 +220,6 @@ class SQLMetricsHandler:
         except Exception as e:
             duck_logger.exception(f"An error occurred: {e}")
             raise
-
-    @staticmethod
-    def add_column_if_not_exists(session, table_name: str, column_name: str, column_type: str, default: str = None):
-        """Function to add a column to a table if it does not already exist."""
-        # Check if column exists using SQLAlchemy's inspect
-        inspector = inspect(session.get_bind())
-        columns = [col['name'] for col in inspector.get_columns(table_name)]
-
-        if column_name not in columns:
-            # For SQLite, we need to handle DEFAULT values differently
-            ddl = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
-            if default is not None:
-                # If default is already quoted, use it as is
-                if default.startswith("'") or default.startswith('"'):
-                    ddl += f" DEFAULT {default}"
-                else:
-                    # For numeric values, use as is
-                    ddl += f" DEFAULT {default}"
-            try:
-                session.execute(text(ddl))
-                session.commit()
-                duck_logger.info(f"Added column '{column_name}' to '{table_name}'")
-            except Exception as e:
-                duck_logger.exception(f"Error adding column '{column_name}' to '{table_name}': {e}")
-                raise DatabaseError(f"Failed to add column '{column_name}' to '{table_name}': {e}")
 
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)

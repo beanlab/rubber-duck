@@ -217,7 +217,7 @@ async def main(config: Config):
             for target_id in target_channel_ids
         }) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
-            metrics_handler = SQLMetricsHandler(sql_session,config['sql']['renamed_columns'])
+            metrics_handler = SQLMetricsHandler(sql_session)
 
             ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
 

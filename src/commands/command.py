@@ -7,7 +7,7 @@ import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
-from ..storage.sql_metrics import SQLMetricsHandler
+from ..storage.sql_metrics import SQLMetricsHandler, MessagesModel, UsageModel, FeedbackModel
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..utils.zip_utils import zip_data_file
@@ -236,9 +236,10 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-class AddColumnCommand(Command):
-    name = "!addcolumn"
-    help_msg = "add a column to a table if it doesn't exist. Usage: !addcolumn <table_name> <column_name> <column_type> [default_value]"
+class MigrateTableCommand(Command):
+    """Command to migrate a table to a new schema by renaming columns."""
+    name = "!migrate"
+    help_msg = "migrate a table to a new schema. Usage: !migrate <table_name> [old_col=new_col ...]"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -248,43 +249,53 @@ class AddColumnCommand(Command):
     async def execute(self, message: Message):
         try:
             content = message['content'].split()
-            if len(content) < 4:
-                help_text = "Usage: !addcolumn <table_name> <column_name> <column_type> [default_value]"
+            if len(content) < 3:
+                help_text = "Usage: !migrate <table_name> [old_col=new_col ...]"
                 await self.send_message(message['channel_id'], help_text)
+                duck_logger.warning(f"Usage: !migrate <table_name> [old_col=new_col ...]")
                 return
 
             table_name = content[1]
-            column_name = content[2]
-            column_type = content[3]
             
-            # Handle default value differently for SQLite
-            default_value = None
-            if len(content) > 4:
-                # For string values, wrap in quotes
-                if content[4].startswith("'") or content[4].startswith('"'):
-                    default_value = content[4]
-                else:
-                    # For numeric values, use as is
-                    default_value = content[4]
+            # Parse renamed columns from arguments
+            renamed_columns = {}
+            for arg in content[2:]:
+                if '=' in arg:
+                    old_col, new_col = arg.split('=')
+                    renamed_columns[new_col] = old_col
 
-            # Validate table name
-            valid_tables = ['messages', 'usage', 'feedback']
-            if table_name not in valid_tables:
-                await self.send_message(message['channel_id'], f"Invalid table name. Must be one of: {', '.join(valid_tables)}")
+            # Map table name to model
+            model_map = {
+                'messages': MessagesModel,
+                'usage': UsageModel,
+                'feedback': FeedbackModel
+            }
+
+            if table_name not in model_map:
+                await self.send_message(
+                    message['channel_id'], 
+                    f"Invalid table name. Must be one of: {', '.join(model_map.keys())}"
+                )
                 return
 
-            # Call the static method
-            SQLMetricsHandler.add_column_if_not_exists(
+            # Perform migration
+            SQLMetricsHandler.alter_table(
                 self.metrics_handler.session,
-                table_name,
-                column_name,
-                column_type,
-                default_value
+                model_map[table_name],
+                renamed_columns
             )
             
-            await self.send_message(message['channel_id'], f"Successfully added column '{column_name}' to table '{table_name}'")
+            await self.send_message(
+                message['channel_id'], 
+                f"Successfully altered table '{table_name}' with the following changes: {renamed_columns}"
+            )
+
+            duck_logger.info(
+                f"Successfully altered table '{table_name}' with the following changes: {renamed_columns}"
+            )
         except Exception as e:
             await self.send_message(message['channel_id'], f"Error: {str(e)}")
+            duck_logger.error(f"Error migrating table '{table_name}': {str(e)}")
 
 
 def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
@@ -301,5 +312,5 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         ReportCommand(send_message, reporter),
         LogCommand(send_message, BashExecuteCommand(send_message)),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics),
-        AddColumnCommand(send_message, metrics_handler)
+        MigrateTableCommand(send_message, metrics_handler)
     ]
