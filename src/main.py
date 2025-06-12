@@ -8,7 +8,6 @@ from pathlib import Path
 import boto3
 import yaml  # Added import for YAML support
 from agents import Agent, ToolsToFinalOutputResult
-from cleo.events.console_error_event import ConsoleErrorEvent
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
@@ -216,7 +215,6 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
     retryable_ai_client = RetryableGenAI(
         agent_client,
         bot.send_message,
-        bot.report_error,
         bot.typing,
         ai_completion_retry_protocol
     )
@@ -226,7 +224,6 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
         retryable_ai_client,
         metrics_handler.record_message,
         bot.send_message,
-        bot.report_error,
         bot.add_reaction,
         settings['timeout'],
         armory
@@ -245,7 +242,6 @@ def build_conversation_review_duck(
         metrics_handler.record_feedback,
         bot.send_message,
         bot.add_reaction,
-        bot.report_error
     )
     return have_ta_conversation
 
@@ -340,7 +336,6 @@ async def main(config: Config, log_dir: Path):
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 bot.send_message,
-                bot.report_error,
                 ducks,
                 feedback_manager.remember_conversation
             )

@@ -13,7 +13,7 @@ from quest import step
 from .config_types import DuckContext
 from .logger import duck_logger
 from ..armory.armory import Armory
-from ..utils.protocols import IndicateTyping, ReportError, SendMessage
+from ..utils.protocols import IndicateTyping, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
 
@@ -263,14 +263,12 @@ class RetryableGenAI:
     def __init__(self,
                  genai: GenAIClient,
                  send_message: SendMessage,
-                 report_error: ReportError,
                  typing: IndicateTyping,
                  retry_config: RetryConfig
                  ):
         self.introduction = genai.introduction
 
         self._send_message = step(send_message)
-        self._report_error = step(report_error)
         self._typing = typing
         self._retry_config = retry_config
         self._genai = genai
