@@ -76,18 +76,20 @@ class AgentConversation:
             message_history,
         )
 
-        if response['file'] is None:
-            await self._send_message(context.thread_id, response['content'])
+        if file := response.get('file'):
+            await self._send_message(context.thread_id, file=file)
+            return file['filename']
 
-        else:
-            await self._send_message(context.thread_id, file=(response['content'], response['file']))
+        if content := response.get('content'):
+            await self._send_message(context.thread_id, content)
+            return content
 
-        return response['content']
+        raise NotImplementedError(f'AI completion had neither content nor file.')
 
     async def __call__(self, context: DuckContext):
 
         if 'duck' in context.content:
-            await self._add_reaction(context.channel_id, context.message_id, "🦆")
+            await self._add_reaction(context.parent_channel_id, context.message_id, "🦆")
 
         message_history = []
 

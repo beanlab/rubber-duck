@@ -75,7 +75,7 @@ class DuckOrchestrator:
 
         context = DuckContext(
             guild_id=initial_message['guild_id'],
-            channel_id=initial_message['channel_id'],
+            parent_channel_id=initial_message['channel_id'],
             author_id=initial_message['author_id'],
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],

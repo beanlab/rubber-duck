@@ -2,8 +2,9 @@ import io
 
 import discord
 
+from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
-from ..utils.protocols import Attachment, Message, SendableFile
+from ..utils.protocols import Attachment, Message
 
 
 def as_message(message: discord.Message) -> Message:
@@ -130,14 +131,17 @@ class DiscordBot(discord.Client):
     # Methods for message-handling protocols
     #
 
-    def _make_discord_file(self, file) -> discord.File:
+    def _make_discord_file(self, file: FileData | discord.File) -> discord.File:
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
             return discord.File(io.BytesIO(file[1]), file[0])
+        if isinstance(file, dict):
+            return discord.File(file['bytes'], file['filename'])
+
         raise NotImplementedError(f"Unsupported file type: {file}")
 
-    async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
+    async def send_message(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
         channel = self.get_channel(channel_id)
         if channel is None:
             duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
@@ -146,6 +150,7 @@ class DiscordBot(discord.Client):
         if message:
             for block in _parse_blocks(message):
                 curr_message = await channel.send(block)
+            # noinspection PyUnboundLocalVariable
             return curr_message.id
 
         if file is not None:

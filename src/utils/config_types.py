@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, NotRequired
 
 from ..utils.protocols import SendMessage
 
@@ -7,9 +7,14 @@ CHANNEL_ID = int
 DUCK_WEIGHT = float
 
 
+class FileData(TypedDict):
+    filename: str
+    bytes: bytes
+
+
 class AgentMessage(TypedDict):
-    content: str
-    file: bytes | None
+    content: NotRequired[str]
+    file: NotRequired[FileData]
 
 
 class GPTMessage(TypedDict):
@@ -70,13 +75,13 @@ class AgentConversationSettings(TypedDict):
 @dataclass
 class DuckContext:
     guild_id: int
-    channel_id: int
+    parent_channel_id: int
     author_id: int
     author_mention: str
     content: str
     message_id: int
     thread_id: int
-    send_message: SendMessage
+    current_agent_name: str
 
 
 class DuckConfig(TypedDict):

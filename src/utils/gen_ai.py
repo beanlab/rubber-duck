@@ -6,10 +6,11 @@ from typing import TypedDict, Protocol
 from agents import Agent, Runner, RunResult, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
-from quest import step
+from quest import step, BlobStorage, suspendable
+import quest
 
 from .agent_storage import LastAgentStorage
-from .config_types import DuckContext, AgentMessage, GPTMessage
+from .config_types import DuckContext, AgentMessage, GPTMessage, FileData
 from .logger import duck_logger
 from ..utils.protocols import IndicateTyping, ReportError, SendMessage
 
@@ -24,6 +25,12 @@ class GenAIClient(Protocol):
             context: DuckContext,
             message_history: list[GPTMessage],
     ) -> AgentMessage: ...
+
+    async def __aenter__(self):
+        ...
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        ...
 
 
 class GenAIException(Exception):
@@ -56,10 +63,6 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
-class HubSpokeAgentClient:
-    pass
-
-
 async def run_agent(*args, **kwargs) -> RunResult:
     return await Runner.run(*args, **kwargs)
 
@@ -70,6 +73,12 @@ class AgentClient:
         self.introduction = introduction
         self._record_usage = record_usage
         self._typing = typing
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        ...
 
     async def get_completion(
             self,
@@ -109,7 +118,7 @@ class AgentClient:
             usage = result.context_wrapper.usage
             await self._record_usage(
                 context.guild_id,
-                context.channel_id,
+                context.parent_channel_id,
                 context.thread_id,
                 context.author_id,
                 self._agent.model,
@@ -120,29 +129,38 @@ class AgentClient:
             )
             last_item = result.new_items[-1]
             if isinstance(last_item, ToolCallOutputItem):
-                return AgentMessage(content=last_item.output[0], file=last_item.output[1])
+                return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
             else:
-                return AgentMessage(content=result.final_output, file=None)
+                return AgentMessage(content=result.final_output)
 
 
 class MultiAgentClient:
-    def __init__(self, agents: dict[str, Agent], last_agent_storage: LastAgentStorage, starting_agent: str,
-                 introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
-        self._agents = agents
-        self._last_agent_storage = last_agent_storage
-        self._starting_agent = starting_agent
+    def __init__(self,
+                 thread_id: int,
+                 agents: dict[str, Agent],
+                 starting_agent: str,
+                 introduction: str,
+                 record_usage: RecordUsage,
+                 typing: IndicateTyping,
+                 blob_storage: BlobStorage
+                 ):
         self.introduction = introduction
+
+        self._storage_key = f'multi-agent-{thread_id}'
+        self._agents = agents
+        self._name_of_last_agent = starting_agent
         self._record_usage = record_usage
         self._typing = typing
+        self._blob_storage = blob_storage
 
-    def _find_last_agent(self, storage) -> Agent:
+    async def __aenter__(self):
+        if self._blob_storage.has_blob(self._storage_key):
+            self._name_of_last_agent = self._blob_storage.read_blob(self._storage_key)
 
-        last_agent_name = storage.get()
-
-        if last_agent_name and last_agent_name in self._agents.keys():
-            return self._agents[last_agent_name]
-
-        return self._agents[self._starting_agent]
+    @suspendable
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._blob_storage.has_blob(self._storage_key):
+            self._blob_storage.delete_blob(self._storage_key)
 
     async def get_completion(
             self,
@@ -172,34 +190,36 @@ class MultiAgentClient:
             message_history: list
     ) -> AgentMessage:
 
-        with self._last_agent_storage as storage:
-            current_agent = self._find_last_agent(storage)
-            async with self._typing(context.thread_id):
-                result = await run_agent(
-                    current_agent,
-                    message_history,
-                    context=context,
-                    max_turns=5
-                )
-                usage = result.context_wrapper.usage
-                await self._record_usage(
-                    context.guild_id,
-                    context.channel_id,
-                    context.thread_id,
-                    context.author_id,
-                    self._agents[current_agent.name].model,
-                    usage.input_tokens,
-                    usage.output_tokens,
-                    usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                    usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-                )
+        async with self._typing(context.thread_id):
+            context.current_agent_name = self._name_of_last_agent
+            result = await run_agent(
+                self._agents[self._name_of_last_agent],
+                message_history,
+                context=context,
+                max_turns=5
+            )
 
-                storage.set(result.last_agent.name)
-            last_item = result.new_items[-1]
-            if isinstance(last_item, ToolCallOutputItem):
-                return AgentMessage(content=last_item.output[0], file=last_item.output[1])
-            else:
-                return AgentMessage(content=result.final_output, file=None)
+            usage = result.context_wrapper.usage
+            await self._record_usage(
+                context.guild_id,
+                context.parent_channel_id,
+                context.thread_id,
+                context.author_id,
+                self._agents[self._name_of_last_agent].model,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
+                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
+            )
+
+            self._name_of_last_agent = result.last_agent.name
+            self._blob_storage.write_blob(self._storage_key, self._name_of_last_agent)
+
+        last_item = result.new_items[-1]
+        if isinstance(last_item, ToolCallOutputItem):
+            return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
+        else:
+            return AgentMessage(content=result.final_output)
 
 
 class RetryableGenAI:

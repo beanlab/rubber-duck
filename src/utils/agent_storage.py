@@ -23,3 +23,5 @@ class LastAgentStorage:
     def get(self, thread_id: int) -> str:
         return self._last_agent[thread_id]
 
+    def delete(self, thread_id: int):
+        del self._last_agent[thread_id]

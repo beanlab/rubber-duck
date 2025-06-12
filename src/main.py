@@ -163,12 +163,15 @@ def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContex
     )
 
 
-def build_agents(armory: Armory, settings: MultiAgentSettings, last_agent_storage: LastAgentStorage) -> dict[str, Agent[DuckContext]]:
+def build_agents(armory: Armory, settings: MultiAgentSettings) -> dict[str, Agent[DuckContext]]:
 
-    def make_on_handoff(target_agent: Agent, last_agent_storage: LastAgentStorage):
-        async def _on_handoff(ctx: RunContextWrapper[None]):
-            last_agent_storage.set(target_agent.name)
-            duck_logger.info(f"Handoff to {target_agent.name} recorded in storage.")
+    def make_on_handoff(target_agent: Agent[DuckContext]):
+        async def _on_handoff(ctx: RunContextWrapper[DuckContext]):
+            duck_logger.debug(f"Handoff to {target_agent.name}.")
+            # TODO record usage
+
+            ctx.context.current_agent_name = target_agent.name
+
         return _on_handoff
 
     agents = {}
@@ -188,7 +191,7 @@ def build_agents(armory: Armory, settings: MultiAgentSettings, last_agent_storag
                 target_agent = agents[target_name]
                 handoff_obj = handoff(
                     agent=target_agent,
-                    on_handoff=make_on_handoff(target_agent, last_agent_storage),
+                    on_handoff=make_on_handoff(target_agent, ...),
                 )
                 handoffs.append(handoff_obj)
 
