@@ -93,10 +93,10 @@ def load_local_config(config_path):
         raise ValueError("Config file must be either .json or .yaml")
 
 
-def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
+def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message,log_dir: Path):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
 
-    commands = create_commands(send_message, metrics_handler, reporter)
+    commands = create_commands(send_message, metrics_handler, reporter, log_dir)
     commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
@@ -319,7 +319,7 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-async def main(config: Config):
+async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -355,7 +355,8 @@ async def main(config: Config):
                     duck_orchestrator,
                     sql_session,
                     metrics_handler,
-                    bot.send_message
+                    bot.send_message,
+                    log_dir
             ) as workflow_manager:
                 tasks = []
 
@@ -396,7 +397,7 @@ if __name__ == '__main__':
     if args.log_path:
         # Add a file handler to the duck logger if log path is provided
         from .utils.logger import add_file_handler
-        add_file_handler(args.log_path)
+        log_dir = add_file_handler(args.log_path)
 
 
     # Try fetching the config from S3 first
@@ -406,4 +407,4 @@ if __name__ == '__main__':
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
 
-    asyncio.run(main(config))
+    asyncio.run(main(config,args.log_path))

@@ -118,7 +118,7 @@ class ReportCommand(Command):
                 await self.send_message(channel_id, help_text)
             else:
                 result = self.reporter.get_report(content)
-                
+
                 if result is None:
                     await self.send_message(channel_id, "No data available")
                 elif isinstance(result, str):  # Help text or error message
@@ -171,10 +171,9 @@ class LogCommand(Command):
     name = "!log"
     help_msg = "get the log file"
 
-    def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
+    def __init__(self, send_message, log_dir: Path = None):
         self.send_message = send_message
-        self.bash_execute_command = bash_execute_command
-        self.log_dir = Path('logs')
+        self.log_dir = log_dir
 
     @step
     async def execute(self, message: Message):
@@ -275,7 +274,7 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
+def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
@@ -287,6 +286,6 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message)),
+        LogCommand(send_message,log_dir),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics)
     ]
