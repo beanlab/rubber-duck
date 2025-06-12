@@ -3,10 +3,8 @@ import asyncio
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from queue import Queue
 from quest.utils import quest_logger
+from ..utils.config_types import AdminSettings
 
-from src.utils.config_types import AdminSettings
-
-log_queue = Queue()
 formatter = logging.Formatter(
     fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -36,9 +34,11 @@ quest_logger.setLevel(logging.DEBUG)
 quest_logger.addHandler(console_handler)
 quest_logger.addHandler(file_handler)
 
+
 # Function to start reporting error logs to Discord
 def filter_logs(send_message, config: AdminSettings):
     """Filter logs to send them to Discord."""
+    log_queue = Queue()
     level_name = config["log_level"].upper()
     log_level = getattr(logging, level_name, logging.ERROR)
 
@@ -49,9 +49,10 @@ def filter_logs(send_message, config: AdminSettings):
     duck_logger.addHandler(q_handler)
     quest_logger.addHandler(q_handler)
 
-    asyncio.create_task(log_queue_watcher(send_message, config['admin_channel_id']))
+    asyncio.create_task(log_queue_watcher(send_message, config['admin_channel_id'], log_queue))
 
-async def log_queue_watcher(send_message, channel_id):
+
+async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
     loop = asyncio.get_running_loop()
 
     def _blocking_get():
