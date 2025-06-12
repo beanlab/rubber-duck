@@ -239,7 +239,7 @@ class ActiveWorkflowsCommand(Command):
 class MigrateTableCommand(Command):
     """Command to migrate a table to a new schema by renaming columns."""
     name = "!migrate"
-    help_msg = "migrate a table to a new schema. Usage: !migrate <table_name> [old_col=new_col ...]"
+    help_msg = "migrate a table to a new schema. Usage: !migrate <table_name> [new_col=old_column ...]"
 
     def __init__(self, send_message, metrics_handler):
         self.send_message = send_message
@@ -272,11 +272,8 @@ class MigrateTableCommand(Command):
             }
 
             if table_name not in model_map:
-                await self.send_message(
-                    message['channel_id'], 
-                    f"Invalid table name. Must be one of: {', '.join(model_map.keys())}"
-                )
-                return
+                duck_logger.exception("Invalid table name provided for migration.")
+                raise ValueError(f"Invalid table name: {table_name}")
 
             # Perform migration
             SQLMetricsHandler.alter_table(
