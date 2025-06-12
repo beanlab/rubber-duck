@@ -140,7 +140,6 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
         retryable_ai_client = RetryableGenAI(
             ai_client,
             bot.send_message,
-            bot.report_error,
             bot.typing,
             ai_completion_retry_protocol
         )
@@ -154,7 +153,6 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             metrics_handler.record_message,
             metrics_handler.record_usage,
             bot.send_message,
-            bot.report_error,
             bot.add_reaction,
             setup_conversation
         )
@@ -166,7 +164,6 @@ def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manag
             metrics_handler.record_feedback,
             bot.send_message,
             bot.add_reaction,
-            bot.report_error
         )
         ducks['conversation_review'] = have_ta_conversation
 
@@ -224,7 +221,6 @@ async def main(config: Config):
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 bot.send_message,
-                bot.report_error,
                 ducks,
                 feedback_manager.remember_conversation
             )
