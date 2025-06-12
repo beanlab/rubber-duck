@@ -6,7 +6,7 @@ from quest.utils import quest_logger
 from ..utils.config_types import AdminSettings
 
 formatter = logging.Formatter(
-    fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    fmt='%(asctime)s %(levelname).4s %(name)s - %(task)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
@@ -14,26 +14,27 @@ formatter = logging.Formatter(
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 
-# Timed Rotating File Handler
-file_handler = TimedRotatingFileHandler(
-    filename='logs/duck.log',
-    when='midnight',
-    interval=1,
-    backupCount=2,
-    encoding='utf-8'
-)
-file_handler.setFormatter(formatter)
-
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
 duck_logger.addHandler(console_handler)
-duck_logger.addHandler(file_handler)
 
 quest_logger.setLevel(logging.DEBUG)
 quest_logger.addHandler(console_handler)
-quest_logger.addHandler(file_handler)
 
+
+def add_file_handler(file_path: str):
+    """Add a file handler to the duck logger."""
+    file_handler = TimedRotatingFileHandler(
+        filename=file_path,
+        when='midnight',
+        interval=1,
+        backupCount=2,
+        encoding='utf-8'
+    )
+    file_handler.setFormatter(formatter)
+    duck_logger.addHandler(file_handler)
+    quest_logger.addHandler(file_handler)
 
 # Function to start reporting error logs to Discord
 def filter_logs(send_message, config: AdminSettings):

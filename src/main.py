@@ -381,6 +381,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, default='config.json', help='Path to config file (.json or .yaml)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
+
     args = parser.parse_args()
 
     # Set debug environment variable if debug flag is set
@@ -390,6 +392,12 @@ if __name__ == '__main__':
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
+
+    if args.log_path:
+        # Add a file handler to the duck logger if log path is provided
+        from .utils.logger import add_file_handler
+        add_file_handler(args.log_path)
+
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
