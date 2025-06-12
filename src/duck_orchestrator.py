@@ -37,14 +37,12 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  send_message,
-                 report_error,
                  ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
         self._setup_thread: SetupThread = step(setup_thread)
         self._send_message = step(send_message)
-        self._report_error = step(report_error)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
