@@ -8,6 +8,7 @@ from pathlib import Path
 import boto3
 import yaml  # Added import for YAML support
 from agents import Agent, ToolsToFinalOutputResult
+from cleo.events.console_error_event import ConsoleErrorEvent
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
@@ -398,6 +399,9 @@ if __name__ == '__main__':
         # Add a file handler to the duck logger if log path is provided
         from .utils.logger import add_file_handler
         log_dir = add_file_handler(args.log_path)
+    else:
+        duck_logger.error("No log path provided. Logging to console only.")
+        raise ValueError("Log path must be provided for logging.")
 
 
     # Try fetching the config from S3 first
