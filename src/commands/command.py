@@ -261,7 +261,7 @@ class MigrateTableCommand(Command):
             renamed_columns = {}
             for arg in content[2:]:
                 if '=' in arg:
-                    old_col, new_col = arg.split('=')
+                    new_col, old_col = arg.split('=')
                     renamed_columns[new_col] = old_col
 
             # Map table name to model

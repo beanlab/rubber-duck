@@ -88,7 +88,7 @@ class SQLMetricsHandler:
         """
         Rebuilds a table with a new schema while preserving data.
 
-        renamed_columns format: {old_column_name: new_column_name}
+        renamed_columns format: {new_column_name: old_column_name}
         """
         renamed_columns = renamed_columns or {}
         duck_logger.info(f"Starting table migration for {model.__tablename__}")
@@ -104,8 +104,10 @@ class SQLMetricsHandler:
         # Create new table schema from SQLAlchemy model
         new_columns = []
         for col in model.__table__.columns:
+            # Use new column name if it's being renamed, otherwise use original name
+            new_name = renamed_columns.get(col.name, col.name)
             new_col = Column(
-                col.name,
+                new_name,
                 col.type,
                 primary_key=col.primary_key,
                 nullable=col.nullable,
@@ -123,22 +125,19 @@ class SQLMetricsHandler:
         old_columns = [c.name for c in old_table.columns]
         new_columns = [c.name for c in new_table.columns]
 
-        duck_logger.info(f"Old columns: {old_columns}")
-        duck_logger.info(f"New columns: {new_columns}")
-
-        # Invert renamed_columns to be: {new: old}
-        inverted_map = {v: k for k, v in renamed_columns.items()}
+        duck_logger.debug(f"Old columns: {old_columns}")
+        duck_logger.debug(f"New columns: {new_columns}")
 
         # Map columns from new table to old table
         column_map = {}
         for new_col in new_columns:
-            if new_col in inverted_map and inverted_map[new_col] in old_columns:
-                old_col = inverted_map[new_col]
+            if new_col in renamed_columns:
+                old_col = renamed_columns[new_col]
                 column_map[new_col] = old_col
-                duck_logger.info(f"Mapping renamed column: {old_col} -> {new_col}")
+                duck_logger.debug(f"Mapping renamed column: {old_col} -> {new_col}")
             elif new_col in old_columns:
                 column_map[new_col] = new_col
-                duck_logger.info(f"Mapping unchanged column: {new_col}")
+                duck_logger.debug(f"Mapping unchanged column: {new_col}")
             else:
                 duck_logger.warning(f"Column '{new_col}' not found in old table and not mapped.")
 
