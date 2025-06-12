@@ -1,4 +1,11 @@
+from dataclasses import dataclass
 from typing import TypedDict
+
+from ..utils.protocols import SendMessage
+
+CHANNEL_ID = int
+DUCK_WEIGHT = float
+
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -26,13 +33,43 @@ class RolesSettings(TypedDict):
 class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
+    email_domain: str
+    "This is the domain used for email verification. For example, 'byu.edu'."
     roles: RolesSettings
+    sender_email: str
 
 
-class DuckWorkflowSettings(TypedDict):
+class SingleAgentSettings(TypedDict):
     prompt_file: str
     engine: str
+    name: str
+    handoff_prompt: str
+    tools: list[str]
+    max_iterations: int
+
+
+class HubSpokesAgentSettings(TypedDict):
+    hub_agent_settings: SingleAgentSettings
+    spoke_agents_settings: list[SingleAgentSettings]
+
+
+class AgentConversationSettings(TypedDict):
+    introduction: str
+    agent_type: str
+    agent_settings: SingleAgentSettings | HubSpokesAgentSettings
     timeout: int
+
+
+@dataclass
+class DuckContext:
+    guild_id: int
+    channel_id: int
+    author_id: int
+    author_mention: str
+    content: str
+    message_id: int
+    thread_id: int
+    send_message: SendMessage
 
 
 class DuckConfig(TypedDict):
@@ -65,7 +102,6 @@ class SQLConfig(TypedDict):
     database: str
     renamed_columns: dict[str, str] | None
 
-
 class RetryProtocol(TypedDict):
     max_retries: int
     delay: int
@@ -75,6 +111,8 @@ class RetryProtocol(TypedDict):
 class AdminSettings(TypedDict):
     admin_channel_id: int
     admin_role_id: int
+    log_level: str
+    "This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'."
 
 
 class ReporterConfig(TypedDict):
@@ -88,6 +126,5 @@ class Config(TypedDict):
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     default_duck_settings: dict[str, dict]
-    sender_email: str
     feedback_notifier_settings: FeedbackNotifierSettings
     reporter_settings: ReporterConfig

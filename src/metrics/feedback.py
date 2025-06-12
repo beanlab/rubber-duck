@@ -4,7 +4,7 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
+from ..utils.protocols import AddReaction, SendMessage, Message
 from ..utils.logger import duck_logger
 
 
@@ -22,17 +22,18 @@ class ConversationReviewSettings(TypedDict):
 
 class HaveTAGradingConversation:
     def __init__(self,
+                 name: str,
                  feedback_manager: FeedbackManager,
                  record_feedback: RecordFeedback,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
-                 report_error: ReportError,
                  ):
+        self.name = name
+
         self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
         self._record_feedback: RecordFeedback = step(record_feedback)
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
-        self._report_error = step(report_error)
 
         self._reactions = {
             '⏭️': 'nan',

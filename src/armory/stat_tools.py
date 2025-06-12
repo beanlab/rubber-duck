@@ -8,7 +8,7 @@ from scipy.stats import skew
 from seaborn.external.kde import gaussian_kde
 
 from .cache import cache_result
-from .tools import register_tool
+from .tools import register_tool, direct_send_message
 from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
 
@@ -126,6 +126,7 @@ class StatsTools:
         return f"Variable names in {dataset}: {', '.join(data)}"
 
     @register_tool
+    @direct_send_message
     @cache_result
     def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes]:
         """Shows the first n rows of the dataset as a table image."""
@@ -176,6 +177,7 @@ class StatsTools:
         return name, buf.read()
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a histogram for the specified dataset column."""
@@ -198,6 +200,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a boxplot for the specified dataset column."""
@@ -219,6 +222,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a dotplot for the specified dataset column."""
@@ -240,6 +244,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a barplot for the specified dataset column."""
@@ -260,6 +265,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a pie chart for the specified dataset column."""
@@ -284,6 +290,7 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @direct_send_message
     @cache_result
     def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a proportion barplot for the specified dataset column."""
@@ -360,6 +367,7 @@ class StatsTools:
             return "Error calculating mode"
 
     @register_tool
+    @direct_send_message
     def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")

@@ -13,29 +13,34 @@ from ..utils.send_email import EmailSender
 
 class RegistrationWorkflow:
     def __init__(self,
+                 name: str,
                  send_message,
                  get_channel,
                  fetch_guild,
                  email_sender: EmailSender,
+                 settings: RegistrationSettings
                  ):
+        self.name = name
+
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild
         self._email_sender = email_sender
+        self._settings = settings
 
-    async def __call__(self, thread_id: int, settings: RegistrationSettings, initial_message: Message):
+    async def __call__(self, thread_id: int, initial_message: Message):
         # Start the registration process
         net_id = await self._get_net_id(thread_id)
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id):
+        if not await self._confirm_registration_via_email(net_id, thread_id, settings['email_domain']):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
         server_id = initial_message['guild_id']
-        await self._assign_roles(server_id, thread_id, initial_message['author_id'], settings)
+        await self._assign_roles(server_id, thread_id, initial_message['author_id'], self._settings)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -68,8 +73,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id: str, thread_id):
-        email = f"{net_id}@byu.edu"
+    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str):
+        email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
             return False
