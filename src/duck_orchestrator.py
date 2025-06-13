@@ -42,14 +42,12 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  send_message,
-                 report_error,
                  ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
         self._setup_thread: SetupThread = step(setup_thread)
         self._send_message = step(send_message)
-        self._report_error = step(report_error)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
@@ -95,7 +93,7 @@ class DuckOrchestrator:
             except Exception as ex:
                 error_message, error_code = generate_error_message(thread_id, ex)
                 await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵\n')
-                await self._report_error(error_message)
+                duck_logger.exception("Error in duck conversation")
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 

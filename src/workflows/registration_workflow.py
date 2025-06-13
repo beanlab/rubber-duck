@@ -33,7 +33,7 @@ class RegistrationWorkflow:
         net_id = await self._get_net_id(thread_id)
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id):
+        if not await self._confirm_registration_via_email(net_id, thread_id, settings['email_domain']):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return
@@ -73,8 +73,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id: str, thread_id):
-        email = f"{net_id}@byu.edu"
+    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str):
+        email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
             return False
