@@ -86,81 +86,80 @@ class SQLMetricsHandler:
             renamed_columns: dict[str, str] = None
     ) -> None:
         """
-        Rebuilds a table with a new schema while preserving data.
-
-        renamed_columns format: {new_column_name: old_column_name}
+            Rebuilds the table with a new schema, migrating data from the old table to the new one.
         """
-        renamed_columns = renamed_columns or {}
-        duck_logger.info(f"Starting table migration for {model.__tablename__}")
-        duck_logger.info(f"Renamed columns mapping (old → new): {renamed_columns}")
+        try:
+            renamed_columns = renamed_columns or {}
+            table_name = model.__tablename__
+            temp_table_name = f"{table_name}_new"
 
-        engine = session.get_bind()
-        metadata = MetaData()
-        metadata.reflect(bind=engine, only=[model.__tablename__])
+            duck_logger.info(f"Starting table migration for '{table_name}'")
+            duck_logger.info(f"Renamed columns mapping (old → new): {renamed_columns}")
 
-        old_table = metadata.tables[model.__tablename__]
-        temp_table_name = f"{model.__tablename__}_new"
+            engine = session.get_bind()
+            metadata = MetaData()
+            metadata.reflect(bind=engine, only=[table_name])
+            old_table = metadata.tables[table_name]
 
-        # Create new table schema from SQLAlchemy model
-        new_columns = []
-        for col in model.__table__.columns:
-            # Use new column name if it's being renamed, otherwise use original name
-            new_name = renamed_columns.get(col.name, col.name)
-            new_col = Column(
-                new_name,
-                col.type,
-                primary_key=col.primary_key,
-                nullable=col.nullable,
-                default=col.default,
-                server_default=col.server_default,
-                unique=col.unique,
-                index=col.index
-            )
-            new_columns.append(new_col)
+            # Build new table schema
+            new_columns = []
+            for col in model.__table__.columns:
+                new_col = Column(
+                    col.name,
+                    col.type,
+                    primary_key=col.primary_key,
+                    nullable=col.nullable,
+                    default=col.default,
+                    server_default=col.server_default,
+                    unique=col.unique,
+                    index=col.index
+                )
+                new_columns.append(new_col)
 
-        new_table = Table(temp_table_name, MetaData(), *new_columns)
-        new_table_sql = str(CreateTable(new_table).compile(engine))
-        session.execute(text(new_table_sql))
+            # Create the temp table to migrate the data.
+            new_table = Table(temp_table_name, MetaData(), *new_columns)
+            new_table_sql = str(CreateTable(new_table).compile(engine))
+            session.execute(text(new_table_sql))
 
-        old_columns = [c.name for c in old_table.columns]
-        new_columns = [c.name for c in new_table.columns]
+            # Detect old and new columns
+            old_columns = {col.name for col in old_table.columns}
+            new_columns_set = {col.name for col in new_table.columns}
 
-        duck_logger.debug(f"Old columns: {old_columns}")
-        duck_logger.debug(f"New columns: {new_columns}")
+            duck_logger.debug(f"Old columns: {old_columns}")
+            duck_logger.debug(f"New columns: {new_columns_set}")
 
-        # Map columns from new table to old table
-        column_map = {}
-        for new_col in new_columns:
-            if new_col in renamed_columns:
-                old_col = renamed_columns[new_col]
-                column_map[new_col] = old_col
-                duck_logger.debug(f"Mapping renamed column: {old_col} -> {new_col}")
-            elif new_col in old_columns:
-                column_map[new_col] = new_col
-                duck_logger.debug(f"Mapping unchanged column: {new_col}")
-            else:
-                duck_logger.warning(f"Column '{new_col}' not found in old table and not mapped.")
+            # Map columns changing names if needed.
+            column_map = {}
+            for new_col in new_columns_set:
+                old_col = renamed_columns.get(new_col, new_col)
+                if old_col in old_columns:
+                    column_map[new_col] = old_col
+                else:
+                    duck_logger.warning(f"Column '{new_col}' is new and will be NULL for existing rows.")
 
-        duck_logger.info(f"Final column map: {column_map}")
+            if not column_map:
+                raise Exception("No columns to migrate — check renamed_columns mapping")
 
-        if not column_map:
-            raise Exception("No columns to migrate — check renamed_columns mapping")
+            cols_new = ", ".join(column_map.keys())
+            cols_old = ", ".join(column_map.values())
 
-        cols_new = ", ".join(column_map.keys())
-        cols_old = ", ".join(column_map.values())
+            # Migrate the table   data
+            copy_stmt = text(f"""
+                INSERT INTO {temp_table_name} ({cols_new})
+                SELECT {cols_old} FROM {table_name}
+            """)
+            session.execute(copy_stmt)
 
-        copy_stmt = text(f"""
-            INSERT INTO {temp_table_name} ({cols_new})
-            SELECT {cols_old} FROM {model.__tablename__}
-        """)
-        session.execute(copy_stmt)
+            # Replace old table
+            session.execute(text(f"DROP TABLE {table_name}"))
+            session.execute(text(f"ALTER TABLE {temp_table_name} RENAME TO {table_name}"))
+            session.commit()
 
-        session.execute(text(f"DROP TABLE {model.__tablename__}"))
-        session.execute(text(f"ALTER TABLE {temp_table_name} RENAME TO {model.__tablename__}"))
-
-        session.commit()
-        duck_logger.info(
-            f"Successfully altered table '{model.__tablename__}' with the following changes: {renamed_columns}")
+            duck_logger.info(f"Successfully altered table '{table_name}'. Changes: {renamed_columns}")
+        except Exception as e:
+            session.rollback()
+            duck_logger.exception(f"An error occurred while altering table '{table_name}': {e}")
+            raise
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
@@ -169,7 +168,7 @@ class SQLMetricsHandler:
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occurred: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         try:
@@ -186,7 +185,7 @@ class SQLMetricsHandler:
             self.session.add(new_usage_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occurred: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
                               user_id: int, reviewer_id: int,
@@ -202,7 +201,7 @@ class SQLMetricsHandler:
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occurred: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
 
     def sql_model_to_data_list(self, table_model):
         try:

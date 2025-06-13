@@ -326,12 +326,11 @@ class MigrateTableCommand(Command):
                 f"Successfully altered table '{table_name}' with the following changes: {renamed_columns}"
             )
 
-            duck_logger.info(
+            duck_logger.warning(
                 f"Successfully altered table '{table_name}' with the following changes: {renamed_columns}"
             )
         except Exception as e:
-            await self.send_message(message['channel_id'], f"Error: {str(e)}")
-            duck_logger.error(f"Error migrating table '{table_name}': {str(e)}")
+            duck_logger.exception(f"Error migrating table.")
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
