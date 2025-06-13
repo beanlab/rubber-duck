@@ -1,11 +1,10 @@
 import asyncio
-from typing import Protocol
 
 from quest import step, queue
 
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
-from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from src.agents.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 

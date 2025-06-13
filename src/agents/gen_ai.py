@@ -3,15 +3,13 @@ import logging
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, RunResult, ToolCallOutputItem
+from agents import Agent, Runner, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from quest import step, BlobStorage, suspendable
-import quest
 
-from .agent_storage import LastAgentStorage
-from .config_types import DuckContext, AgentMessage, GPTMessage, FileData
-from .logger import duck_logger
+from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
+from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
@@ -26,7 +24,7 @@ class GenAIClient(Protocol):
             message_history: list[GPTMessage],
     ) -> AgentMessage: ...
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> 'GenAIClient':
         ...
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -63,15 +61,39 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
-async def run_agent(*args, **kwargs) -> RunResult:
-    return await Runner.run(*args, **kwargs)
+def _result_to_agent_message(result):
+    last_item = result.new_items[-1]
+    if isinstance(last_item, ToolCallOutputItem):
+        return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
+    else:
+        return AgentMessage(content=result.final_output)
+
+
+async def _run_with_exception_handling(coroutine):
+    try:
+        return await coroutine
+    except (
+            APITimeoutError, InternalServerError,
+            UnprocessableEntityError) as ex:
+        raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
+                                     'please open up a separate conversation and try again') from ex
+    except (APIConnectionError, BadRequestError,
+            AuthenticationError, ConflictError, NotFoundError,
+            RateLimitError) as ex:
+        duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
+        raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
+                                 "for more details on how to resolve this error") from ex
 
 
 class AgentClient:
-    def __init__(self, agent: Agent, introduction: str, record_usage: RecordUsage, typing: IndicateTyping):
+    def __init__(
+            self,
+            agent: Agent,
+            introduction: str,
+            typing: IndicateTyping
+    ):
         self._agent = agent
         self.introduction = introduction
-        self._record_usage = record_usage
         self._typing = typing
 
     async def __aenter__(self):
@@ -85,22 +107,10 @@ class AgentClient:
             context: DuckContext,
             message_history: list,
     ) -> AgentMessage:
-        try:
-            return await self._get_completion(
-                context,
-                message_history
-            )
-        except (
-                APITimeoutError, InternalServerError,
-                UnprocessableEntityError) as ex:
-            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                         'please open up a separate conversation and try again') from ex
-        except (APIConnectionError, BadRequestError,
-                AuthenticationError, ConflictError, NotFoundError,
-                RateLimitError) as ex:
-            duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
-            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                     "for more details on how to resolve this error") from ex
+        return await _run_with_exception_handling(self._get_completion(
+            context,
+            message_history
+        ))
 
     async def _get_completion(
             self,
@@ -108,40 +118,23 @@ class AgentClient:
             message_history: list
     ) -> AgentMessage:
         async with self._typing(context.thread_id):
-            duck_logger.debug("New Agent Request")
-            result = await run_agent(
+            result = await Runner.run(
                 self._agent,
                 message_history,
                 context=context,
                 max_turns=100
             )
-            usage = result.context_wrapper.usage
-            await self._record_usage(
-                context.guild_id,
-                context.parent_channel_id,
-                context.thread_id,
-                context.author_id,
-                self._agent.model,
-                usage.input_tokens,
-                usage.output_tokens,
-                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-            )
-            last_item = result.new_items[-1]
-            if isinstance(last_item, ToolCallOutputItem):
-                return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
-            else:
-                return AgentMessage(content=result.final_output)
+
+            return _result_to_agent_message(result)
 
 
 class MultiAgentClient:
     def __init__(self,
-                 thread_id: int,
                  agents: dict[str, Agent],
                  starting_agent: str,
                  introduction: str,
-                 record_usage: RecordUsage,
                  typing: IndicateTyping,
+                 thread_id: int,
                  blob_storage: BlobStorage
                  ):
         self.introduction = introduction
@@ -149,7 +142,6 @@ class MultiAgentClient:
         self._storage_key = f'multi-agent-{thread_id}'
         self._agents = agents
         self._name_of_last_agent = starting_agent
-        self._record_usage = record_usage
         self._typing = typing
         self._blob_storage = blob_storage
 
@@ -167,22 +159,10 @@ class MultiAgentClient:
             context: DuckContext,
             message_history: list
     ) -> AgentMessage:
-        try:
-            return await self._get_completion(
-                context,
-                message_history
-            )
-        except (
-                APITimeoutError, InternalServerError,
-                UnprocessableEntityError) as ex:
-            raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                         'please open up a separate conversation and try again') from ex
-        except (APIConnectionError, BadRequestError,
-                AuthenticationError, ConflictError, NotFoundError,
-                RateLimitError) as ex:
-            duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
-            raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                     "for more details on how to resolve this error") from ex
+        return await _run_with_exception_handling(self._get_completion(
+            context,
+            message_history
+        ))
 
     async def _get_completion(
             self,
@@ -191,35 +171,17 @@ class MultiAgentClient:
     ) -> AgentMessage:
 
         async with self._typing(context.thread_id):
-            context.current_agent_name = self._name_of_last_agent
-            result = await run_agent(
+            result = await Runner.run(
                 self._agents[self._name_of_last_agent],
                 message_history,
                 context=context,
                 max_turns=5
             )
 
-            usage = result.context_wrapper.usage
-            await self._record_usage(
-                context.guild_id,
-                context.parent_channel_id,
-                context.thread_id,
-                context.author_id,
-                self._agents[self._name_of_last_agent].model,
-                usage.input_tokens,
-                usage.output_tokens,
-                usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-                usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-            )
-
             self._name_of_last_agent = result.last_agent.name
             self._blob_storage.write_blob(self._storage_key, self._name_of_last_agent)
 
-        last_item = result.new_items[-1]
-        if isinstance(last_item, ToolCallOutputItem):
-            return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
-        else:
-            return AgentMessage(content=result.final_output)
+        return _result_to_agent_message(result)
 
 
 class RetryableGenAI:

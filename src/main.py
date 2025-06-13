@@ -4,24 +4,20 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Iterable
 
 import boto3
 import yaml  # Added import for YAML support
-from agents import Agent, ToolsToFinalOutputResult, handoff, RunContextWrapper
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.utils.agent_storage import LastAgentStorage
-from .armory.armory import Armory
-from .armory.stat_tools import StatsTools
+from src.agents.build import build_agent_conversation_duck
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import AgentConversation
 from .conversation.threads import SetupPrivateThread
-from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .duck_orchestrator import DuckOrchestrator, DuckConversationFactory
 from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -29,11 +25,9 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
-    SingleAgentSettings, DUCK_WEIGHT, DuckContext, MultiAgentSettings
-from .utils.data_store import DataStore
+from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
+    DUCK_NAME, DuckConfig
 from .utils.feedback_notifier import FeedbackNotifier
-from .utils.gen_ai import RetryableGenAI, AgentClient, MultiAgentClient
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
@@ -95,7 +89,14 @@ def load_local_config(config_path):
         raise ValueError("Config file must be either .json or .yaml")
 
 
-def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message,log_dir: Path):
+def setup_workflow_manager(
+        config: Config,
+        duck_orchestrator,
+        sql_session,
+        metrics_handler,
+        send_message,
+        log_dir: Path
+):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
 
     commands = create_commands(send_message, metrics_handler, reporter, log_dir)
@@ -128,138 +129,6 @@ def _has_workflow_of_type(config: Config, wtype: str):
     )
 
 
-def setup_ducks(
-        config: Config,
-        bot: DiscordBot,
-        metrics_handler,
-        feedback_manager,
-        sql_session
-) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
-    """
-    Return a dictionary of channel ID to list of weighted ducks
-    """
-    channel_ducks = {}
-
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            channel_ducks[channel_config['channel_id']] = build_ducks(
-                channel_config, bot, metrics_handler, feedback_manager, sql_session
-            )
-
-    return channel_ducks
-
-def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContext]:
-    tools = [
-        armory.get_specific_tool(tool)
-        for tool in config.get("tools", [])
-        if tool in armory.get_all_tool_names()
-    ]
-    return Agent[DuckContext](
-        name=config["name"],
-        handoff_description=config.get("handoff_prompt", ""),
-        instructions=Path(config["prompt_file"]).read_text(encoding="utf-8"),
-        tools=tools,
-        tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
-        model=config["engine"],
-        handoffs=[]
-    )
-
-
-def build_agents(armory: Armory, settings: MultiAgentSettings) -> dict[str, Agent[DuckContext]]:
-
-    def make_on_handoff(target_agent: Agent[DuckContext]):
-        async def _on_handoff(ctx: RunContextWrapper[DuckContext]):
-            duck_logger.debug(f"Handoff to {target_agent.name}.")
-            # TODO record usage
-
-            ctx.context.current_agent_name = target_agent.name
-
-        return _on_handoff
-
-    agents = {}
-
-    for agent_settings in settings['individual_agent_settings']:
-        agent = build_agent(armory, agent_settings)
-        agents[agent_settings['name']] = agent
-
-    for agent_settings in settings['individual_agent_settings']:
-        agent_name = agent_settings['name']
-        agent = agents[agent_name]
-        handoff_targets = agent_settings.get('handoffs', [])
-
-        handoffs = []
-        for target_name in handoff_targets:
-            if target_name in agents.keys():
-                target_agent = agents[target_name]
-                handoff_obj = handoff(
-                    agent=target_agent,
-                    on_handoff=make_on_handoff(target_agent, ...),
-                )
-                handoffs.append(handoff_obj)
-
-        agent.handoffs = handoffs
-
-    return agents
-
-
-def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: AgentConversationSettings, sql_session):
-    armory = Armory()
-    if 'dataset_folder_locations' in config:
-        data_store = DataStore(config['dataset_folder_locations'])
-        stat_tools = StatsTools(data_store)
-        armory.scrub_tools(stat_tools)
-
-    agent_type = settings['agent_type']
-
-    match agent_type:
-        case 'single-agent':
-            agent = build_agent(armory, settings['agent_settings'])
-            return AgentClient(
-                agent,
-                settings.get('introduction', 'Hello. How can I help you?'),
-                metrics_handler.record_usage,
-                bot.typing
-            )
-
-        case 'multi-agent':
-            last_agent_blob_storage = SqlBlobStorage('last_agent_state', sql_session)
-            last_agent_storage = LastAgentStorage("last_running_agent", last_agent_blob_storage)
-            agents = build_agents(armory, settings['agent_settings'], last_agent_storage)
-            agent_client = MultiAgentClient(
-                agents,
-                last_agent_storage,
-                settings['agent_settings']['starting_agent'],
-                settings.get('introduction', 'Hello. How can I help you?'),
-                metrics_handler.record_usage,
-                bot.typing
-            )
-
-        case _:
-            raise NotImplementedError(f'Agent type {agent_type} not implemented.')
-
-
-
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-    retryable_ai_client = RetryableGenAI(
-        agent_client,
-        bot.send_message,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
-
-    agent_conversation = AgentConversation(
-        name,
-        retryable_ai_client,
-        metrics_handler.record_message,
-        bot.send_message,
-        bot.add_reaction,
-        settings['timeout'],
-        armory
-    )
-
-    return agent_conversation
-
-
 def build_conversation_review_duck(
         name: str,
         bot: DiscordBot, metrics_handler, feedback_manager
@@ -290,28 +159,52 @@ def build_registration_duck(
     return registration_workflow
 
 
+def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
+    # Look for global configs
+    yield from config['ducks']
+
+    # Look for inline duck configs
+    for server_config in config['servers'].values():
+        for channel_config in server_config['channels']:
+            for item in channel_config['ducks']:
+                if isinstance(item, DUCK_NAME):
+                    continue
+                elif isinstance(item, dict):
+                    if 'weight' in item:
+                        duck = item['duck']
+                        if isinstance(duck, DUCK_NAME):
+                            continue
+                        yield duck
+                    else:
+                        yield item
+
+
 def build_ducks(
-        channel_config: ChannelConfig,
+        config: Config,
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
         sql_session
-) -> list[tuple[DUCK_WEIGHT, Callable[[DuckContext], DuckConversation]]]:
-    ducks = []
-    for duck_config in channel_config['ducks']:
+) -> dict[DUCK_NAME, DuckConversationFactory]:
+    ducks = {}
+
+    for duck_config in _iterate_duck_configs(config):
         duck_type = duck_config['workflow_type']
         settings = duck_config['settings']
         name = duck_config['name']
-        weight: float = duck_config.get('weight', 1.0)
 
         if duck_type == 'agent_conversation':
-            ducks.append((weight, lambda ctx: build_agent_conversation_duck(ctx, name, metrics_handler, bot, settings, sql_session)))
+            ducks[name] = lambda ctx: build_agent_conversation_duck(
+                ctx, name, metrics_handler, bot, settings, sql_session
+            )
 
         elif duck_type == 'conversation_review':
-            ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager)))
+            ducks[name] = lambda ctx: build_conversation_review_duck(
+                name, bot, metrics_handler, feedback_manager
+            )
 
         elif duck_type == 'registration':
-            ducks.append((weight, build_registration_duck(name, bot, settings)))
+            ducks[name] = lambda ctx: build_registration_duck(name, bot, settings)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -320,6 +213,42 @@ def build_ducks(
         raise ValueError('No ducks were requested in the config')
 
     return ducks
+
+
+def _setup_ducks(
+        config: Config,
+        bot: DiscordBot,
+        metrics_handler,
+        feedback_manager,
+        sql_session
+) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversationFactory]]]:
+    """
+    Return a dictionary of channel ID to list of weighted ducks
+    """
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
+
+    channel_ducks = {}
+
+    for server_config in config['servers'].values():
+        for channel_config in server_config['channels']:
+            channel_ducks[channel_config['channel_id']] = []
+            for duck_config in channel_config['ducks']:
+                if isinstance(duck_config, str):
+                    name, weight = duck_config, 1
+
+                elif isinstance(duck_config, dict) and 'weight' in duck_config:
+                    name = duck_config['name']
+                    weight = duck_config['weight']
+
+                elif isinstance(duck_config, dict):
+                    name, weight = duck_config['name'], 1
+
+                else:
+                    raise ValueError(f'Incorrect format for duck config: {channel_config["channel_id"]}')
+
+                channel_ducks[channel_config['channel_id']].append((weight, all_ducks[name]))
+
+    return channel_ducks
 
 
 def _build_feedback_queues(config: Config, sql_session):
@@ -360,7 +289,7 @@ async def main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
@@ -422,6 +351,7 @@ if __name__ == '__main__':
     if args.log_path:
         # Add a file handler to the duck logger if log path is provided
         from .utils.logger import add_file_handler
+
         log_dir = add_file_handler(args.log_path)
     else:
         duck_logger.error("No log path provided. Logging to console only.")
@@ -437,4 +367,4 @@ if __name__ == '__main__':
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
 
-    asyncio.run(main(config,args.log_path))
+    asyncio.run(main(config, args.log_path))

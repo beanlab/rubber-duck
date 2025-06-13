@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from typing import TypedDict, NotRequired
 
-from ..utils.protocols import SendMessage
-
 CHANNEL_ID = int
 DUCK_WEIGHT = float
+DUCK_NAME = str
 
 
 class FileData(TypedDict):
@@ -83,22 +82,26 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
-    current_agent_name: str | None
 
 
 class DuckConfig(TypedDict):
     name: str
     "The channel name is not used in the code. It provides a description of the duck."
     workflow_type: str
-    weight: int
     settings: dict
+
+
+class WeightedDuck(TypedDict):
+    weight: int
+    duck: DUCK_NAME | DuckConfig
 
 
 class ChannelConfig(TypedDict):
     channel_id: int
     channel_name: str
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
-    ducks: list[DuckConfig]
+    ducks: list[DUCK_NAME | DuckConfig | WeightedDuck]
+    "Either the name of the duck"
 
 
 class ServerConfig(TypedDict):
@@ -114,6 +117,7 @@ class SQLConfig(TypedDict):
     host: str
     port: str
     database: str
+
 
 class RetryProtocol(TypedDict):
     max_retries: int
@@ -134,6 +138,7 @@ class ReporterConfig(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
+    ducks: list[DuckConfig]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
