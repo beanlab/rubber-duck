@@ -21,6 +21,11 @@ class DuckConversation(Protocol):
     async def __call__(self, context: DuckContext): ...
 
 
+class DuckConversationFactory(Protocol):
+    async def __call__(self, context: DuckContext) -> DuckConversation:
+        ...
+
+
 def generate_error_message(thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
     duck_logger.exception('Error: ' + error_code)
@@ -59,7 +64,6 @@ class DuckOrchestrator:
 
         weights = [w for w, dk in possible_ducks]
         return random.choices(possible_ducks, weights=weights, k=1)[0][1]
-
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
 

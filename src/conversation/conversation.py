@@ -9,10 +9,6 @@ from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClien
 from ..utils.protocols import Message, SendMessage, ReportError, AddReaction
 
 
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
-
-
 class BasicSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
