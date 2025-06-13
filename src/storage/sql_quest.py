@@ -22,6 +22,7 @@ class RecordModel(QuestRecordBase):
         return f'<{self.__class__.__name__}: {self.name}>'
 
 
+# TODO - migrate to using Quests version
 class SqlBlobStorage(BlobStorage):
     def __init__(self, name, session):
         self._name = name

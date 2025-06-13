@@ -6,7 +6,7 @@ from typing import Protocol, Callable
 from quest import step, alias
 
 from .metrics.feedback_manager import FeedbackData
-from .utils.config_types import ChannelConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
+from .utils.config_types import ChannelConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT, DUCK_NAME
 from .utils.logger import duck_logger
 from .utils.protocols import Message
 
@@ -18,7 +18,16 @@ class SetupThread(Protocol):
 class DuckConversation(Protocol):
     name: str
 
+    async def __aenter__(self) -> 'DuckConversation': ...
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb): ...
+
     async def __call__(self, context: DuckContext): ...
+
+
+class DuckConversationFactory(Protocol):
+    def __call__(self, context: DuckContext) -> DuckConversation:
+        ...
 
 
 def generate_error_message(thread_id, ex):
@@ -37,7 +46,7 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  send_message,
-                 ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
+                 ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversationFactory]]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
@@ -46,24 +55,23 @@ class DuckOrchestrator:
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
-    def _get_duck(self, channel_id: int) -> DuckConversation:
+    def _get_duck(self, channel_id: int, context: DuckContext) -> DuckConversation:
         possible_ducks = self._ducks.get(channel_id)
 
         if not possible_ducks:
             raise ValueError(f'No duck configured for channel {channel_id}')
 
         if len(possible_ducks) == 1:
-            return possible_ducks[0][1]
+            factory = possible_ducks[0][1]
 
-        weights = [w for w, dk in possible_ducks]
-        return random.choices(possible_ducks, weights=weights, k=1)[1]
+        else:
+            weights = [w for w, dk in possible_ducks]
+            factory = random.choices(possible_ducks, weights=weights, k=1)[0][1]
+
+        return factory(context)
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
 
-        # Select the duck
-        duck = self._get_duck(initial_message['channel_id'])
-
-        # Create a thread
         thread_id = await self._setup_thread(
             initial_message['channel_id'],
             initial_message['author_mention'],
@@ -72,16 +80,17 @@ class DuckOrchestrator:
 
         context = DuckContext(
             guild_id=initial_message['guild_id'],
-            channel_id=initial_message['channel_id'],
+            parent_channel_id=initial_message['channel_id'],
             author_id=initial_message['author_id'],
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],
             message_id=initial_message['message_id'],
-            thread_id=thread_id,
-            send_message=self._send_message
+            thread_id=thread_id
         )
 
-        async with alias(str(thread_id)):
+        async with \
+                self._get_duck(initial_message['channel_id'], context) as duck, \
+                alias(str(thread_id)):
             try:
                 await duck(context)
 
@@ -92,7 +101,7 @@ class DuckOrchestrator:
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
-        # Remember conversation
+        # Remember the conversation
         self._remember_conversation(FeedbackData(
             duck_type=duck.name,
             guild_id=initial_message['guild_id'],

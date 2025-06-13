@@ -1,16 +1,11 @@
 import asyncio
-from typing import Protocol
 
-from quest import step, queue, wrap_steps
+from quest import step, queue
 
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext
-from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from ..utils.config_types import DuckContext, AgentMessage
+from src.agents.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..utils.protocols import Message, SendMessage, AddReaction
-
-
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
 class BasicSetupConversation:
@@ -69,26 +64,25 @@ class AgentConversation:
     @step
     async def _get_and_send_ai_response(self, context: DuckContext, message_history: list[GPTMessage]) -> str:
 
-        response = await self._ai_client.get_completion(
+        response: AgentMessage = await self._ai_client.get_completion(
             context,
             message_history,
         )
 
-        if isinstance(response, str):
-            await self._send_message(context.thread_id, response)
-            return response
+        if file := response.get('file'):
+            await self._send_message(context.thread_id, file=file)
+            return file['filename']
 
-        elif isinstance(response, tuple):
-            await self._send_message(context.thread_id, file=response)
-            return response[0]
+        if content := response.get('content'):
+            await self._send_message(context.thread_id, content)
+            return content
 
-        else:
-            raise NotImplementedError("Unsupported response type from AI client: {}".format(type(response)))
+        raise NotImplementedError(f'AI completion had neither content nor file.')
 
     async def __call__(self, context: DuckContext):
 
         if 'duck' in context.content:
-            await self._add_reaction(context.channel_id, context.message_id, "🦆")
+            await self._add_reaction(context.parent_channel_id, context.message_id, "🦆")
 
         message_history = []
 
