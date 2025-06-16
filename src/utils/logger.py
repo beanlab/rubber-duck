@@ -18,7 +18,6 @@ def add_console_handler():
     """Add a console handler to the duck logger."""
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    console_handler.setLevel(logging.DEBUG)
 
     duck_logger.addHandler(console_handler)
     quest_logger.addHandler(console_handler)
@@ -34,21 +33,12 @@ def add_file_handler(file_path: str):
         encoding='utf-8'
     )
     file_handler.setFormatter(formatter)
-    file_handler.setLevel(logging.DEBUG)
     duck_logger.addHandler(file_handler)
     quest_logger.addHandler(file_handler)
 
 # Function to start reporting error logs to Discord
 def filter_logs(send_message, config: AdminSettings):
     """Filter logs to send them to Discord."""
-    # Remove any existing queue handlers
-    for handler in duck_logger.handlers[:]:
-        if isinstance(handler, QueueHandler):
-            duck_logger.removeHandler(handler)
-    for handler in quest_logger.handlers[:]:
-        if isinstance(handler, QueueHandler):
-            quest_logger.removeHandler(handler)
-
     log_queue = Queue()
     level_name = config["log_level"].upper()
     log_level = getattr(logging, level_name, logging.ERROR)
