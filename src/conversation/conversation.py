@@ -1,4 +1,5 @@
 import asyncio
+import os
 
 from quest import step, queue
 
@@ -53,7 +54,9 @@ class AgentConversation:
                  send_message: SendMessage,
                  add_reaction: AddReaction,
                  wait_for_user_timeout,
-                 armory: Armory
+                 armory: Armory,
+                 file_size_limit: int,
+                 file_type_ext: list[str] = None
                  ):
         self.name = name
 
@@ -68,6 +71,53 @@ class AgentConversation:
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
+        self._file_size_limit = file_size_limit
+        self._file_type_ext = file_type_ext or []
+
+    @step
+    async def _handle_file_message(
+            self,
+            context: DuckContext,
+            file: dict,
+            message_history: list[GPTMessage]
+    ) -> bool:
+        """Handle file message processing
+        Returns:
+            bool: True if file was processed successfully, False otherwise
+        """
+        filename = file.get('filename', '')
+        ext = os.path.splitext(filename)[-1].lower()
+        size = file.get('size', 0)
+
+        if ext in self._file_type_ext and size <= self._file_size_limit:
+            try:
+                content = file.get('content')
+                if not content:
+                    await self._send_message(
+                        context.thread_id,
+                        f"File `{filename}` is supported, but I couldn't read its contents."
+                    )
+                    return False
+
+                file_message = f"(From file `{filename}`)\n\n{content}"
+                message_history.append(GPTMessage(role='user', content=file_message))
+
+                await self._record_message(
+                    context.guild_id, context.thread_id, context.author_id, "user", file_message
+                )
+                return True
+            except Exception as e:
+                await self._send_message(
+                    context.thread_id,
+                    f"Failed to read the file `{filename}`: {str(e)}"
+                )
+                return False
+        else:
+            await self._send_message(
+                context.thread_id,
+                f"Sorry, I can only process small text files (< 4KB) with extensions: {', '.join(self._file_type_ext)}."
+            )
+            return False
 
     @step
     async def _get_and_send_ai_response(
@@ -113,12 +163,8 @@ class AgentConversation:
                         break
 
                     if len(message['file']) > 0:
-                        await self._send_message(
-                            context.thread_id,
-                            "I'm sorry, I can't read file attachments. "
-                            "Please resend your message with the relevant parts of your file included in the message."
-                        )
-                        continue
+                        if not await self._handle_file_message(context, message['file'][0], message_history):
+                            continue
 
                     message_history.append(GPTMessage(role='user', content=message['content']))
 

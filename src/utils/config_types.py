@@ -67,6 +67,8 @@ class AgentConversationSettings(TypedDict):
     agents: list[SingleAgentSettings]
     starting_agent: str | None  # If not set, will use first agent listed in `agents`
     timeout: int
+    file_size_limit: int
+    file_type_ext: list[str]
 
 
 @dataclass

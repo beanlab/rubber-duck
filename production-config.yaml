@@ -14,6 +14,22 @@ ducks:
           prompt_file: prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
+      file_size_limit: 4096 # 4KB limit
+      file_type_ext:
+        [
+          ".txt",
+          ".py",
+          ".java",
+          ".cpp",
+          ".c",
+          ".h",
+          ".hpp",
+          ".js",
+          ".ts",
+          ".html",
+          ".css",
+          ".md",
+        ]
 
   - name: stats-duck
     duck_type: agent_conversation
@@ -51,6 +67,8 @@ ducks:
             - calculate_proportions
             - show_dataset_head
           max_iterations: 5
+      file_size_limit: 4096 # 4KB limit
+      file_type_ext: [ ".txt", ".csv", ".tsv", ".json", ".md" ]
 
 servers:
   927616651409649675:
@@ -196,6 +214,22 @@ servers:
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
+              file_size_limit: 4096 # 4KB limit
+              file_type_ext:
+                [
+                  ".txt",
+                  ".py",
+                  ".java",
+                  ".cpp",
+                  ".c",
+                  ".h",
+                  ".hpp",
+                  ".js",
+                  ".ts",
+                  ".html",
+                  ".css",
+                  ".md",
+                ]
 
       - channel_id: 1379959992110546995
         channel_name: registration-duck
@@ -220,7 +254,6 @@ servers:
         ducks:
           - stats-tool
 
-
 feedback_notifier_settings:
   feedback_check_hour: 9
   feedback_check_minute: 0
@@ -242,12 +275,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [0.03, 0.06]
-    "gpt-4o": [0.0025, 0.01]
-    "gpt-4-1106-preview": [0.01, 0.03]
-    "gpt-4-0125-preview": [0.01, 0.03]
-    "o4-mini": [0.000150, 0.0006]
-    "gpt-4-turbo": [0.01, 0.03]
-    "gpt-4-turbo-preview": [0.01, 0.03]
-    "gpt-3.5-turbo-1106": [0.001, 0.002]
-    "gpt-3.5-turbo": [0.001, 0.003]
+    "gpt-4": [ 0.03, 0.06 ]
+    "gpt-4o": [ 0.0025, 0.01 ]
+    "gpt-4-1106-preview": [ 0.01, 0.03 ]
+    "gpt-4-0125-preview": [ 0.01, 0.03 ]
+    "o4-mini": [ 0.000150, 0.0006 ]
+    "gpt-4-turbo": [ 0.01, 0.03 ]
+    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
+    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
+    "gpt-3.5-turbo": [ 0.001, 0.003 ]
