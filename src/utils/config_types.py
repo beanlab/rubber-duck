@@ -1,4 +1,16 @@
+from dataclasses import dataclass
 from typing import TypedDict
+
+from ..utils.protocols import SendMessage
+
+CHANNEL_ID = int
+DUCK_WEIGHT = float
+
+
+
+class FeedbackNotifierSettings(TypedDict):
+    feedback_check_hour: int
+    feedback_check_minute: int
 
 
 class FeedbackConfig(TypedDict):
@@ -21,13 +33,43 @@ class RolesSettings(TypedDict):
 class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
+    email_domain: str
+    "This is the domain used for email verification. For example, 'byu.edu'."
     roles: RolesSettings
+    sender_email: str
 
 
-class DuckWorkflowSettings(TypedDict):
+class SingleAgentSettings(TypedDict):
     prompt_file: str
     engine: str
+    name: str
+    handoff_prompt: str
+    tools: list[str]
+    max_iterations: int
+
+
+class HubSpokesAgentSettings(TypedDict):
+    hub_agent_settings: SingleAgentSettings
+    spoke_agents_settings: list[SingleAgentSettings]
+
+
+class AgentConversationSettings(TypedDict):
+    introduction: str
+    agent_type: str
+    agent_settings: SingleAgentSettings | HubSpokesAgentSettings
     timeout: int
+
+
+@dataclass
+class DuckContext:
+    guild_id: int
+    channel_id: int
+    author_id: int
+    author_mention: str
+    content: str
+    message_id: int
+    thread_id: int
+    send_message: SendMessage
 
 
 class DuckConfig(TypedDict):
@@ -59,7 +101,6 @@ class SQLConfig(TypedDict):
     port: str
     database: str
 
-
 class RetryProtocol(TypedDict):
     max_retries: int
     delay: int
@@ -69,12 +110,20 @@ class RetryProtocol(TypedDict):
 class AdminSettings(TypedDict):
     admin_channel_id: int
     admin_role_id: int
+    log_level: str
+    "This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'."
+
+
+class ReporterConfig(TypedDict):
+    gpt_pricing: dict[str, list]
 
 
 class Config(TypedDict):
     sql: SQLConfig
-    reporting: dict[str, str]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
+    dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
-    sender_email: str
+    default_duck_settings: dict[str, dict]
+    feedback_notifier_settings: FeedbackNotifierSettings
+    reporter_settings: ReporterConfig

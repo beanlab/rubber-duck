@@ -4,6 +4,8 @@ import sys
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from dotenv import load_dotenv
+import os
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -12,13 +14,23 @@ from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
 from ..storage.sql_metrics import SQLMetricsHandler
+from ..utils.config_types import ServerConfig, ReporterConfig
+from ..utils.logger import duck_logger
 
 
-def fancy_preproccesing(df, guilds):
-    df['guild_name'] = df['guild_id'].map(guilds)  # TODO: Lets use channel ids instead of guild ids.
-    df = df.drop(columns=['guild_id'])
+def fancy_preproccesing(df, channels):
+
+    if isinstance(df, list):
+        # Use first row as column names
+        columns = df[0]
+        df = pd.DataFrame(df[1:], columns=columns)
+
+    duck_logger.debug("Starting fancy preprocessing of feedback data")
+
+    df['channel_name'] = df['parent_channel_id'].map(channels)  # Map parent_channel_id to channel names
+    df = df.drop(columns=['parent_channel_id'])
     return (df.set_index(pd.DatetimeIndex(pd.to_datetime(df['timestamp'], utc=True)))
-            .groupby('guild_name')
+            .groupby('channel_name')
             .resample('W')
             .agg(
         avg_score=('feedback_score', lambda x: pd.to_numeric(x, errors='coerce').mean()),
@@ -28,21 +40,20 @@ def fancy_preproccesing(df, guilds):
             )
 
 
-def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
+def feed_fancy_graph(channels, df_feedback, arg_string, show_fig) -> tuple[str, io.BytesIO]:
     specific_str = arg_string.split()[2]
-    df = fancy_preproccesing(df_feedback, guilds)
+    df = fancy_preproccesing(df_feedback, channels)
 
     # Plot the percentage of valid scores each week
     plt.figure(figsize=(10, 6))
     if specific_str == 'percent':
-        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='guild_name')
+        sns.lineplot(data=df, x='timestamp', y='valid_scores_pct', marker='o', color='orange', hue='channel_name')
         plt.gca().yaxis.set_major_formatter(PercentFormatter())
-
     else:
         sns.lineplot(data=df, x='timestamp', y='avg_score', marker='o', color='orange')
 
     main_string = f"{specific_str.title()}_Recorded_Feedback_Scores_Per_Week"
-    plt.title(main_string + ".png")
+    plt.title(main_string)
     plt.xlabel('Week')
     plt.ylabel(f'Valid Scores {specific_str.title()}')
     plt.xticks(rotation=45)
@@ -51,35 +62,25 @@ def feed_fancy_graph(guilds, df_feedback, arg_string, show_fig):
 
     img_name = f"{main_string}.png"
     buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
+    plt.savefig(buffer, format='png', bbox_inches='tight')
     buffer.seek(0)
+    
     if show_fig:
         plt.show()
     plt.close()
-    return img_name, buffer
+    
+    return f"{main_string}.png", buffer
 
 
 class Reporter:
     time_periods = {'day': 1, 'd': 1, 'week': 7, 'w': 7, 'month': 30, 'm': 30, 'year': 365, 'y': 365}
     trend_period = {1: "W", 7: "M", 30: "Y"}
 
-    pricing = {
-        'gpt-4': [0.03, 0.06],
-        'gpt-4o': [0.0025, 0.01],
-        'gpt-4-1106-preview': [0.01, 0.03],
-        'gpt-4-0125-preview': [0.01, 0.03],
-        'gpt-4o-mini': [.000150, .0006],
-        'gpt-4-turbo': [0.01, 0.03],
-        'gpt-4-turbo-preview': [0.01, 0.03],
-        'gpt-3.5-turbo-1106': [0.001, 0.002],
-        'gpt-3.5-turbo': [0.001, 0.003]
-    }
-
     # key: what to type after '!report' to display the graph
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
-        # 'all': (None, 'All of the following charts.'),
+        # 'all': (None, 'All the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
@@ -98,12 +99,29 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, SQLMetricsHandler, report_config, show_fig=False):
+    def __init__(self, SQLMetricsHandler, server_config: ServerConfig, reporting_config: ReporterConfig, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
         wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
-
+        self._pricing = reporting_config['gpt_pricing']
         self.show_fig = show_fig
-        self._guilds = {int(guild_id): name for guild_id, name in report_config.items()}
+        self._reporting_config = self._make_reporting_config(server_config)
+        # Create a flat mapping of channel IDs to channel names
+        self._channels = {}
+        for server_channels in self._reporting_config.values():
+            self._channels.update({int(channel_id): channel_name for channel_id, channel_name in server_channels.items()})
+
+    def _make_reporting_config(self, server_config:ServerConfig) -> dict:
+        """This function converts the server_config into a dictionary that maps server names to their channels."""
+        reporting_config = {}
+        for server in server_config.values():
+            server_name = server['server_name']
+            channel_dict = {}
+            for channel in server['channels']:
+                channel_id = channel['channel_id']
+                channel_name = channel['channel_name']
+                channel_dict[channel_id] = channel_name
+            reporting_config[server_name] = channel_dict
+        return reporting_config
 
     def select_dataframe(self, desired_df):
         if desired_df == 'feedback':
@@ -114,37 +132,85 @@ class Reporter:
             data = self.SQLMetricsHandler.get_message()
         else:
             raise ArgumentError(None, f"Invalid dataframe: {desired_df}")
+        
+        duck_logger.debug(f"Raw data from SQLMetricsHandler: {data}")
+        
+        # Convert list to DataFrame if necessary
+        if isinstance(data, list):
+            # Use first row as column names
+            columns = data[0]
+            df = pd.DataFrame(data[1:], columns=columns)
+            duck_logger.debug(f"Converted to DataFrame - Shape: {df.shape}")
+            duck_logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+            duck_logger.debug(f"Sample data:\n{df.head()}")
+            return df
         return data
 
     def compute_cost(self, row):
-        ip, op = self.pricing.get(row.get('engine', 'gpt-4'), (0, 0))
-        return row['input_tokens'] / 1000 * ip + row['output_tokens'] / 1000 * op
+        engine = row.get('engine', 'gpt-4')
+        ip, op = self._pricing.get(engine, (0, 0))
+        duck_logger.debug(f"Computing cost for engine {engine} with pricing {ip}/{op}")
+        duck_logger.debug(f"Raw row data: {row}")
+        
+        input_tokens = pd.to_numeric(row['input_tokens'], errors='coerce')
+        output_tokens = pd.to_numeric(row['output_tokens'], errors='coerce')
+        
+        duck_logger.debug(f"Tokens - Input: {input_tokens}, Output: {output_tokens}")
+        duck_logger.debug(f"Input cost: {input_tokens / 1000 * ip}")
+        duck_logger.debug(f"Output cost: {output_tokens / 1000 * op}")
+        cost = input_tokens / 1000 * ip + output_tokens / 1000 * op
+        duck_logger.debug(f"Total computed cost: {cost}")
+        return cost
 
     def preprocessing(self, df, args):
+        duck_logger.debug(f"Preprocessing input - Type: {type(df)}")
+        duck_logger.debug(f"Preprocessing input - Content: {df}")
+        
+        # Check if df is empty or has no data
+        if df is None or (isinstance(df, list)):
+            duck_logger.debug("No data available in preprocessing")
+            return pd.DataFrame()  # Return empty DataFrame
+            
+        # Convert list to DataFrame if necessary
+        if isinstance(df, list):
+            # Use first row as column names
+            columns = df[0]
+            df = pd.DataFrame(df[1:], columns=columns)
+            duck_logger.debug(f"Converted list to DataFrame - Shape: {df.shape}")
+            duck_logger.debug(f"DataFrame columns: {df.columns.tolist()}")
+            duck_logger.debug(f"Sample data:\n{df.head()}")
+            
+        # Check if DataFrame is empty
+        if df.empty:
+            duck_logger.debug("Empty DataFrame in preprocessing")
+            return df
+
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-            df["hour_of_day"] = (df[
-                                     'timestamp'].dt.hour - 7) % 24  # TODO: adjust both the timestamp and hour_of_day by the right time
+            df["hour_of_day"] = (df['timestamp'].dt.hour - 7) % 24  # TODO: adjust both the timestamp and hour_of_day by the right time
 
-        if args.period:
-            now = datetime.now(ZoneInfo('US/Mountain'))
-            if args.ind_var == 'timestamp':
-                cutoff = self.trend_period[self.time_periods[args.period]]
-            else:
-                cutoff = now - timedelta(days=self.time_periods[args.period])
+            if args.period:
+                now = datetime.now(ZoneInfo('US/Mountain'))
+                if args.ind_var == 'timestamp':
+                    cutoff = self.trend_period[self.time_periods[args.period]]
+                else:
+                    cutoff = now - timedelta(days=self.time_periods[args.period])
 
-            df = df[df['timestamp'] >= cutoff]
+                    df = df[df['timestamp'] >= cutoff]
 
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
         if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            df['guild_name'] = df['guild_id'].map(self._guilds)
+            duck_logger.debug(f"Available channel_ids in data: {df['parent_channel_id'].unique()}")
+            duck_logger.debug(f"Available channel mappings: {self._channels}")
+            df['channel_name'] = df['parent_channel_id'].map(self._channels)
+            duck_logger.debug(f"Channel names after mapping: {df['channel_name'].unique()}")
             df = df.drop(columns=['guild_id'])
             if args.exp_var == 'guild_id':
-                args.exp_var = 'guild_name'
+                args.exp_var = 'channel_name'
             else:
-                args.exp_var_2 = 'guild_name'
+                args.exp_var_2 = 'channel_name'
 
         return df
 
@@ -159,9 +225,23 @@ class Reporter:
             raise ArgumentError(None, f"Invalid time period: {args.period}")
 
     def prepare_df(self, df, args):
+        if isinstance(df, list):
+            columns = df[0]
+            df = pd.DataFrame(df[1:], columns=columns)
+            
         df = self.preprocessing(df, args)
-
+        
+        # Check if DataFrame is empty or has no data
+        if df.empty or (len(df.columns) == 1 and df.columns[0] == 'No data available'):
+            return pd.DataFrame()  # Return empty DataFrame
+            
         self.catch_known_issues(df, args)
+
+        duck_logger.debug(f"Data before grouping - Shape: {df.shape}")
+        duck_logger.debug(f"Columns: {df.columns.tolist()}")
+        duck_logger.debug(f"Sample data:\n{df.head()}")
+        duck_logger.debug(f"Unique values in hour_of_day: {df['hour_of_day'].unique() if 'hour_of_day' in df.columns else 'No hour_of_day column'}")
+        duck_logger.debug(f"Unique values in cost: {df['cost'].unique() if 'cost' in df.columns else 'No cost column'}")
 
         if args.exp_var_2:
             if not pd.api.types.is_numeric_dtype(df[args.ind_var]):
@@ -178,7 +258,7 @@ class Reporter:
 
         elif args.exp_var:
             try:
-                df[args.ind_var] = pd.to_numeric(df[args.ind_var])
+                df[args.ind_var] = pd.to_numeric(df[args.ind_var], errors='coerce')
                 if args.average:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].mean().reset_index()
                 elif args.count:
@@ -189,6 +269,7 @@ class Reporter:
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
             except ValueError as e:
+                duck_logger.error(f"Error converting {args.ind_var} to numeric: {e}")
                 df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
 
         else:
@@ -227,15 +308,23 @@ class Reporter:
     def make_graph(self, df, args):
         self.prettify_graph(df, args)
 
+        # Get the current figure
+        fig = plt.gcf()
+        
+        # Ensure the plot is rendered
+        fig.canvas.draw()
+        
+        # Save to buffer
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format='png', bbox_inches='tight')
+        buffer.seek(0)
+        
+        # Show the plot if requested
         if self.show_fig:
             plt.show()
-
-        graph_name = f"{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png"
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
+        
         plt.close()
-        return graph_name, buffer
+        return f"{args.ind_var}_{args.exp_var or 'index'}_{args.period or 'all'}.png", buffer
 
     def parse_args(self, arg_string):
         """Parse command-line arguments using argparse."""
@@ -273,46 +362,118 @@ class Reporter:
         return "\n\n".join(lines)
 
     def get_all_prebaked(self):
-        imgs = []
-        titles = []
-        for key in self.pre_baked:
-            if len(imgs) == 10:  # Discord's limit of number of images you can send at once
+        results = []
+        for key, (command, description) in self.pre_baked.items():
+            if key != 'all':  # Skip the 'all' command itself
+                try:
+                    result = self.get_report(f"!report {key}")
+                    if isinstance(result, list):  # Only add if we got a valid image result
+                        results.extend(result)
+                    else:
+                        duck_logger.warning(f"Skipping {key} - {result}")
+                except Exception as e:
+                    duck_logger.error(f"Error generating report for {key}: {e}")
+                    continue
+        return results
+
+    def get_report(self, arg_string) -> list[tuple[str, io.BytesIO]] | str:
+        try:
+            if arg_string == '!report all':
+                return self.get_all_prebaked()
+            if arg_string == '!report help' or arg_string == '!report h':
+                return self.help_menu()
+
+            if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
+                title, image = feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
+                return [(title, image)]
+
+            args = self.parse_args(arg_string)
+
+            df = self.select_dataframe(args.dataframe)
+            df_limited = self.prepare_df(df, args)
+            
+            if len(df_limited) == 0:
+                return "No data available for this plot."
+
+            title, image = self.make_graph(df_limited, args)
+            return [(title, image)]
+
+        except Exception as e:
+            # Ensure any matplotlib figures are closed
+            plt.close('all')
+            raise  # Re-raise the exception to be handled by the caller
+
+
+    def interactive_report(self):
+        # Interactive report selection loop
+        print("\nAvailable reports:")
+        for key, (_, description) in self.pre_baked.items():
+            print(f"  {key}: {description}")
+        print("\nType 'help' to see this menu again")
+        print("Type 'exit' to quit")
+        while True:
+            command = input("\nEnter report command (or 'help'/'exit'): ").strip()
+            
+            if command.lower() == 'exit':
                 break
-            if key != 'all':
-                sys_string = '!report ' + key
-                title, image = self.get_report(sys_string)
-                imgs.append(image)
-                titles.append(title)
-        return imgs, titles
+            elif command.lower() == 'help':
+                print("\nAvailable reports:")
+                for key, (_, description) in self.pre_baked.items():
+                    print(f"  {key}: {description}")
+                continue
+            
+            # Check if it's a pre-baked command
+            if command in self.pre_baked:
+                command = self.pre_baked[command][0]  # Get the actual command string
+                if command is None:  # Handle special cases like ftrend
+                    command = f"!report {command}"
+            else:
+                print(f"Unknown command: {command}")
+                print("Type 'help' to see available commands")
+                continue
+            
+            # Add !report prefix if not present
+            if not command.startswith('!report'):
+                command = f"!report {command}"
+            
+            print(f"Running command: {command}")  # Debug print
+            self.get_report(command)
 
-    def get_report(self, arg_string):
-        # if arg_string == '!report all': #TODO: get working
-        #     return self.get_all_prebaked()
-        if arg_string == '!report help' or arg_string == '!report h':
-            return self.help_menu(), None
-
-        if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
-            return feed_fancy_graph(self._guilds, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
-
-        args = self.parse_args(arg_string)
-
-        df = self.select_dataframe(args.dataframe)
-
-        df_limited = self.prepare_df(df, args)
-        if len(df_limited) == 0:
-            return "No data available for this plot.", None
-
-        graph_name, graph = self.make_graph(df_limited, args)
-
-        return graph_name, graph
 
 
 if __name__ == '__main__':
     from pathlib import Path
+    import argparse
+    from src.storage.sql_connection import create_sql_session
+
+    # Load environment variables from .env file
+    project_root = Path(__file__).parent.parent.parent
+    env_files = list(project_root.glob('*env'))
+    if env_files:
+        load_dotenv(env_files[0])  # Load the first env file found
+    else:
+        print("Warning: No .env file found in project root")
+
+    parser = argparse.ArgumentParser(description='Run reporter with specified config')
+    parser.add_argument('--config', type=str, help='Path to config.json file')
+    args = parser.parse_args()
 
     this_file = Path(__file__)
-    config = json.loads((this_file.parent.parent / 'config.json').read_text())
-    SQLMetricsHandler = SQLMetricsHandler(this_file.parent.parent / 'state' / 'metrics')
+    project_root = this_file.parent.parent.parent  # Go up three levels to reach project root
+
+    # Use provided config path or fall back to default
+    config_path = Path(args.config) if args.config else project_root / 'config.json'
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found at {config_path}")
+
+    config = json.loads(config_path.read_text())
+    
+    # Create SQL session and initialize handler
+    db_name = os.getenv('DB_NAME')  # Get DB_NAME from env
+    metrics_db_path = project_root / db_name
+    session = create_sql_session({'db_type': 'sqlite', 'database': str(metrics_db_path)})
+    SQLMetricsHandler = SQLMetricsHandler(session)
+    
     reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
 
-    reporter.get_report('!report f1')
+    reporter.interactive_report()

@@ -1,28 +1,20 @@
-from agents import function_tool, FunctionTool
+from agents import FunctionTool
 
 _tools: dict[str, FunctionTool] = {}
 
 
-def register_tool(func) -> FunctionTool:
-    tool = function_tool(func)
-    _tools[func.__name__] = tool
-    return tool
+def register_tool(_func=None, *, send_error_to_llm=True):
+    def decorator(func):
+        setattr(func, "is_tool", True)
+        setattr(func, "send_error_to_llm", send_error_to_llm)
+        return func
+
+    if _func is not None:
+        return decorator(_func)
+
+    return decorator
 
 
-def load_tools():
-    import importlib
-    import pkgutil
-
-    package = importlib.import_module(__package__)
-    for _, module_name, _ in pkgutil.iter_modules(package.__path__):
-        importlib.import_module(f"{package.__name__}.{module_name}")
-
-
-def get_tool(tool_name: str):
-    if tool_name in _tools:
-        return _tools[tool_name]
-
-    raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
-
-
-load_tools()
+def direct_send_message(func):
+    func.direct_send_message = True
+    return func

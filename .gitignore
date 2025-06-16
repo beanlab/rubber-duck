@@ -5,6 +5,7 @@
 /local-testing-configs/
 __pycache__/
 state/
+/logs
 my_config.json
 myConfig.json
 scratch/suites/.DS_Store
@@ -14,4 +15,5 @@ scratch/secrets.env
 github_secrets.txt
 pre-production.env
 v2-production-config.json
+v2-production-config.yaml
 rubberduckdb
