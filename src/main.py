@@ -193,6 +193,10 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
         stat_tools = StatsTools(data_store)
         armory.scrub_tools(stat_tools)
 
+    # Add Socratic tools
+    socratic_tools = SocraticTool()
+    armory.scrub_tools(socratic_tools)
+
     agent_type = settings['agent_type']
 
     match agent_type:
@@ -200,6 +204,33 @@ def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: Age
             agent = build_agent(armory, settings['agent_settings'])
 
         case 'hub-spokes':
+            # Configure hub agent with Socratic tools
+            hub_settings = settings['agent_settings']['hub_agent_settings']
+            hub_settings['tools'] = ['socratic_questioning', 'give_explanation', 'end_conversation']
+            
+            # Configure spoke agents for each tool
+            spoke_settings = [
+                {
+                    "name": "socratic_questioner",
+                    "prompt_file": "prompts/socratic-duck.txt",
+                    "engine": "gpt-4",
+                    "tools": ["socratic_questioning"]
+                },
+                {
+                    "name": "explainer",
+                    "prompt_file": "prompts/explainer.txt",
+                    "engine": "gpt-4",
+                    "tools": ["give_explanation"]
+                },
+                {
+                    "name": "conversation_ender",
+                    "prompt_file": "prompts/end-conversation.txt",
+                    "engine": "gpt-4",
+                    "tools": ["end_conversation"]
+                }
+            ]
+            
+            settings['agent_settings']['spoke_agents_settings'] = spoke_settings
             agent, spoke_agents = create_agents(armory, settings['agent_settings'])
 
         case _:
