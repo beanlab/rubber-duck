@@ -17,8 +17,8 @@ from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
-from .duck_orchestrator import DuckOrchestrator, DuckConversationFactory
-from .metrics.feedback import HaveTAGradingConversation
+from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
@@ -120,23 +120,16 @@ def setup_workflow_manager(
     return workflow_manager
 
 
-def _has_workflow_of_type(config: Config, wtype: str):
-    return any(
-        duck['workflow_type'] == wtype
-        for server_id, server_config in config['servers'].items()
-        for channel_config in server_config['channels']
-        for duck in channel_config['ducks']
-    )
-
-
 def build_conversation_review_duck(
         name: str,
-        bot: DiscordBot, metrics_handler, feedback_manager
-):
+        settings: ConversationReviewSettings,
+        bot: DiscordBot, record_feedback, feedback_manager
+) -> DuckConversation:
     have_ta_conversation = HaveTAGradingConversation(
         name,
+        settings,
         feedback_manager,
-        metrics_handler.record_feedback,
+        record_feedback,
         bot.send_message,
         bot.add_reaction,
     )
@@ -184,27 +177,26 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        sql_session
-) -> dict[DUCK_NAME, DuckConversationFactory]:
+) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
     for duck_config in _iterate_duck_configs(config):
-        duck_type = duck_config['workflow_type']
+        duck_type = duck_config['duck_type']
         settings = duck_config['settings']
         name = duck_config['name']
 
         if duck_type == 'agent_conversation':
-            ducks[name] = lambda ctx: build_agent_conversation_duck(
-                ctx, name, metrics_handler, bot, settings, sql_session
+            ducks[name] = build_agent_conversation_duck(
+                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
             )
 
         elif duck_type == 'conversation_review':
-            ducks[name] = lambda ctx: build_conversation_review_duck(
-                name, bot, metrics_handler, feedback_manager
+            ducks[name] = build_conversation_review_duck(
+                name, settings, bot, metrics_handler.record_feedback, feedback_manager
             )
 
         elif duck_type == 'registration':
-            ducks[name] = lambda ctx: build_registration_duck(name, bot, settings)
+            ducks[name] = build_registration_duck(name, bot, settings)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -220,12 +212,11 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        sql_session
-) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversationFactory]]]:
+) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
 
     channel_ducks = {}
 
@@ -256,10 +247,8 @@ def _build_feedback_queues(config: Config, sql_session):
 
     convo_review_ducks = (
         duck
-        for server_config in config['servers'].values()
-        for channel_config in server_config['channels']
-        for duck in channel_config['ducks']
-        if duck['workflow_type'] == 'conversation_review'
+        for duck in _iterate_duck_configs(config)
+        if duck['duck_type'] == 'conversation_review'
     )
 
     target_channel_ids = (
@@ -289,11 +278,12 @@ async def main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, sql_session)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 bot.send_message,
+                bot.add_reaction,
                 ducks,
                 feedback_manager.remember_conversation
             )
@@ -354,8 +344,7 @@ if __name__ == '__main__':
 
         log_dir = add_file_handler(args.log_path)
     else:
-        duck_logger.error("No log path provided. Logging to console only.")
-        raise ValueError("Log path must be provided for logging.")
+        duck_logger.warn("No log path provided. Logging to console only.")
 
     # Add console handler to the duck logger
     add_console_handler()

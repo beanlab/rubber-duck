@@ -2,6 +2,56 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+ducks:
+  - name: standard-rubber-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        Hello! How can I help you?
+      agents:
+        - name: RubberDuck
+          engine: gpt-4.1
+          prompt_file: prompts/standard-rubber-duck.txt
+          max_iterations: 5
+      timeout: 600
+
+  - name: stats-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        I'm an exploratory data analysis assistant. 
+        I can help you with basic statistics and data visualization. 
+        You can ask me to:
+        1. Perform various statistical calculations. 
+        2. Create visualizations.
+        3. Provide insights based on your data.
+      timeout: 60
+      agents:
+        - name: Standard_Rubber_Duck
+          prompt_file: prompts/stats.txt
+          engine: gpt-4.1
+          tools:
+            - explain_capabilities
+            - describe_dataset
+            - get_dataset_names
+            - get_variable_names
+            - plot_barplot
+            - plot_histogram
+            - plot_boxplot
+            - plot_dotplot
+            - plot_pie_chart
+            - plot_proportion_barplot
+            - calculate_mean
+            - calculate_skewness
+            - calculate_std
+            - calculate_median
+            - calculate_mode
+            - calculate_five_number_summary
+            - calculate_table_of_counts
+            - calculate_proportions
+            - show_dataset_head
+          max_iterations: 5
+
 servers:
   927616651409649675:
     server_name: CS 110
@@ -10,7 +60,7 @@ servers:
         channel_name: review-cs-110
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1234556460453597276
@@ -19,20 +69,7 @@ servers:
       - channel_id: 1234556460453597276
         channel_name: general/duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
   747510855536738336:
     server_name: CS 235
@@ -41,7 +78,7 @@ servers:
         channel_name: review-cs-235
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1195490291134779502
@@ -50,20 +87,7 @@ servers:
       - channel_id: 1195490291134779502
         channel_name: student-text-channels/duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
   1235303213796691998:
     server_name: CS 111
@@ -72,7 +96,7 @@ servers:
         channel_name: review-cs-111
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1365456542287269919
@@ -81,20 +105,7 @@ servers:
       - channel_id: 1365456542287269919
         channel_name: Student Text Channels/duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
   1371951485629370458:
     server_name: Stats
@@ -103,7 +114,7 @@ servers:
         channel_name: ta-review
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1371951696061661215
@@ -113,63 +124,12 @@ servers:
       - channel_id: 1371951696061661215
         channel_name: duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
       - channel_id: 1374066971523678279
         channel_name: stats-tool
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            weight: 1
-            settings:
-              introduction: |
-                I'm an exploratory data analysis assistant. 
-                I can help you with basic statistics and data visualization. 
-                You can ask me to perform:
-                1. Various statistical calculations. 
-                2. Create visualizations.
-                3. Provide insights based on your data.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/stats.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                tools:
-                  - explain_capabilities
-                  - describe_dataset
-                  - get_dataset_names
-                  - get_variable_names
-                  - plot_barplot
-                  - plot_histogram
-                  - plot_boxplot
-                  - plot_dotplot
-                  - plot_pie_chart
-                  - plot_proportion_barplot
-                  - calculate_mean
-                  - calculate_skewness
-                  - calculate_std
-                  - calculate_median
-                  - calculate_mode
-                  - calculate_five_number_summary
-                  - calculate_table_of_counts
-                  - calculate_proportions
-                  - show_dataset_head
-                max_iterations: 5
-              timeout: 60
+          - stats-duck
 
   1354902266246598928:
     server_name: Physics
@@ -178,7 +138,7 @@ servers:
         channel_name: review-phys-230
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1363949528201564170
@@ -187,26 +147,13 @@ servers:
       - channel_id: 1363949528201564170
         channel_name: physics-230-phys230
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
       - channel_id: 1359587713749094700
         channel_name: review-phys-430
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1359587525605458030
@@ -215,20 +162,7 @@ servers:
       - channel_id: 1359587525605458030
         channel_name: physics-430-phys430
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
   1338616224858374287:
     server_name: Rubber Duck Demo Server
@@ -237,7 +171,7 @@ servers:
         channel_name: vintage-duck-review
         ducks:
           - name: review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1338616283671040000
@@ -245,45 +179,29 @@ servers:
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            settings:
-              introduction: |
-                I'm a general-purpose rubber duck. 
-                I can help you with any topic you want to discuss.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/standard-rubber-duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
-              timeout: 600
+          - standard-rubber-duck
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
+          - name: socratic-rubber-duck
+            duck_type: agent_conversation
             settings:
               introduction: |
                 I'm a Socratic-style rubber duck. 
                 I can help you think through your problems by asking questions.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/socratic_duck.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                max_iterations: 5
+              agents:
+                - name: socrates
+                  prompt_file: prompts/socratic_duck.txt
+                  engine: gpt-4.1
+                  max_iterations: 5
               timeout: 600
 
       - channel_id: 1379959992110546995
         channel_name: registration-duck
         ducks:
           - name: Registration-Workflow
-            workflow_type: registration
-            weight: 1
+            duck_type: registration
             settings:
               cache_timeout: 60800
               authenticated_user_role_name: I-passed-registration
@@ -300,45 +218,8 @@ servers:
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: agent_conversation
-            weight: 1
-            settings:
-              introduction: |
-                I'm an exploratory data analysis assistant. 
-                I can help you with basic statistics and data visualization. 
-                You can ask me to perform:
-                1. Various statistical calculations. 
-                2. Create visualizations.
-                3. Provide insights based on your data.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/stats.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                tools:
-                  - explain_capabilities
-                  - describe_dataset
-                  - get_dataset_names
-                  - get_variable_names
-                  - plot_barplot
-                  - plot_histogram
-                  - plot_boxplot
-                  - plot_dotplot
-                  - plot_pie_chart
-                  - plot_proportion_barplot
-                  - calculate_mean
-                  - calculate_skewness
-                  - calculate_std
-                  - calculate_median
-                  - calculate_mode
-                  - calculate_five_number_summary
-                  - calculate_table_of_counts
-                  - calculate_proportions
-                  - show_dataset_head
-                max_iterations: 5
-              timeout: 60
+          - stats-tool
+
 
 feedback_notifier_settings:
   feedback_check_hour: 9

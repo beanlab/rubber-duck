@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import TypedDict, NotRequired, Literal
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -14,6 +14,7 @@ class FileData(TypedDict):
 class AgentMessage(TypedDict):
     content: NotRequired[str]
     file: NotRequired[FileData]
+    agent_name: str
 
 
 class GPTMessage(TypedDict):
@@ -53,23 +54,18 @@ class RegistrationSettings(TypedDict):
 
 
 class SingleAgentSettings(TypedDict):
-    prompt_file: str
-    engine: str
     name: str
-    handoff_prompt: str
+    engine: str
+    prompt_file: str
     tools: list[str]
+    handoff_prompt: str
     handoffs: list[str]
-
-
-class MultiAgentSettings(TypedDict):
-    starting_agent: str
-    individual_agent_settings: list[SingleAgentSettings]
 
 
 class AgentConversationSettings(TypedDict):
     introduction: str
-    agent_type: str
-    agent_settings: SingleAgentSettings | MultiAgentSettings
+    agents: list[SingleAgentSettings]
+    starting_agent: str | None  # If not set, will use first agent listed in `agents`
     timeout: int
 
 
@@ -87,7 +83,7 @@ class DuckContext:
 class DuckConfig(TypedDict):
     name: str
     "The channel name is not used in the code. It provides a description of the duck."
-    workflow_type: str
+    duck_type: str  # Supported options found in main.py::build_ducks
     settings: dict
 
 
@@ -143,6 +139,5 @@ class Config(TypedDict):
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
-    default_duck_settings: dict[str, dict]
     feedback_notifier_settings: FeedbackNotifierSettings
     reporter_settings: ReporterConfig

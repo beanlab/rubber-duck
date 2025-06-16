@@ -3,16 +3,15 @@ from typing import Any
 
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
-from sqlalchemy.orm import Session
 
-from .gen_ai import RecordUsage, AgentClient, MultiAgentClient
+from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
-from ..duck_orchestrator import DuckConversationFactory
-from ..storage.sql_quest import SqlBlobStorage
+from ..conversation.conversation import AgentConversation
+from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
-    SingleAgentSettings, MultiAgentSettings, Config
+    SingleAgentSettings, Config
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -40,8 +39,11 @@ class UsageAgentHooks(AgentHooks[DuckContext]):
         )
 
 
-def build_agent(armory: Armory, config: SingleAgentSettings, agent_hooks: AgentHooks[DuckContext]) -> Agent[
-    DuckContext]:
+def build_agent(
+        armory: Armory,
+        config: SingleAgentSettings,
+        agent_hooks: AgentHooks[DuckContext]
+) -> Agent[DuckContext]:
     tools = [
         armory.get_specific_tool(tool)
         for tool in config.get("tools", [])
@@ -60,20 +62,20 @@ def build_agent(armory: Armory, config: SingleAgentSettings, agent_hooks: AgentH
     )
 
 
-def build_agents(
+def _build_agents(
         armory: Armory,
-        settings: MultiAgentSettings,
-        agent_hooks: AgentHooks[DuckContext]
+        agent_hooks: AgentHooks[DuckContext],
+        settings: list[SingleAgentSettings],
 ) -> dict[str, Agent[DuckContext]]:
     agents = {}
 
     # Initial agent setup
-    for agent_settings in settings['individual_agent_settings']:
+    for agent_settings in settings:
         agent = build_agent(armory, agent_settings, agent_hooks)
         agents[agent_settings['name']] = agent
 
     # Add on agent handoffs
-    for agent_settings in settings['individual_agent_settings']:
+    for agent_settings in settings:
         agent_name = agent_settings['name']
         agent = agents[agent_name]
         handoff_targets = agent_settings.get('handoffs', [])
@@ -84,61 +86,58 @@ def build_agents(
     return agents
 
 
+# noinspection PyTypeChecker
+_armory: Armory = None
+
+
+def _get_armory(config: Config) -> Armory:
+    global _armory
+    if _armory is None:
+        _armory = Armory()
+
+        if 'dataset_folder_locations' in config:
+            data_store = DataStore(config['dataset_folder_locations'])
+            stat_tools = StatsTools(data_store)
+            _armory.scrub_tools(stat_tools)
+
+    return _armory
+
+
 def build_agent_conversation_duck(
         name: str,
         config: Config,
-        metrics_handler,
-        bot,
         settings: AgentConversationSettings,
-        sql_session: Session,
+        bot,
+        record_message: RecordMessage,
         record_usage: RecordUsage
-) -> DuckConversationFactory:
-    armory = Armory()
-    if 'dataset_folder_locations' in config:
-        data_store = DataStore(config['dataset_folder_locations'])
-        stat_tools = StatsTools(data_store)
-        armory.scrub_tools(stat_tools)
+) -> DuckConversation:
 
     usage_hooks = UsageAgentHooks(record_usage)
+    armory = _get_armory(config)
 
-    agent_type = settings['agent_type']
-
-    match agent_type:
-        case 'single-agent':
-            agent = build_agent(armory, settings['agent_settings'], usage_hooks)
-            return AgentClient(
-                agent,
-                settings.get('introduction', 'Hello. How can I help you?'),
-                bot.typing
-            )
-
-        case 'multi-agent':
-            last_agent_blob_storage = SqlBlobStorage('last_agent_state', sql_session)
-            agents = build_agents(armory, settings['agent_settings'], usage_hooks)
-            agent_client = MultiAgentClient(
-                agents,
-                settings['agent_settings']['starting_agent'],
-                settings.get('introduction', 'Hello. How can I help you?'),
-                bot.typing,
-                last_agent_blob_storage,
-
-            )
-
-        case _:
-            raise NotImplementedError(f'Agent type {agent_type} not implemented.')
+    agents = _build_agents(armory, usage_hooks, settings['agents'])
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-    retryable_ai_client = RetryableGenAI(
-        agent_client,
-        bot.send_message,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
+
+    genai_clients = {
+        name: RetryableGenAI(
+            AgentClient(agent, bot.typing),
+            bot.send_message,
+            ai_completion_retry_protocol
+        )
+        for name, agent in agents.items()
+    }
+
+    starting_agent = settings.get('starting_agent')
+    if not starting_agent:
+        starting_agent = next(iter(genai_clients.keys()))
 
     agent_conversation = AgentConversation(
         name,
-        retryable_ai_client,
-        metrics_handler.record_message,
+        settings['introduction'],
+        genai_clients,
+        starting_agent,
+        record_message,
         bot.send_message,
         bot.add_reaction,
         settings['timeout'],

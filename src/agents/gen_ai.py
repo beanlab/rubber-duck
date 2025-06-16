@@ -6,7 +6,7 @@ from typing import TypedDict, Protocol
 from agents import Agent, Runner, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
-from quest import step, BlobStorage, suspendable
+from quest import step
 
 from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
 from ..utils.logger import duck_logger
@@ -16,19 +16,11 @@ Sendable = str | tuple[str, BytesIO]
 
 
 class GenAIClient(Protocol):
-    introduction: str | None
-
     async def get_completion(
             self,
             context: DuckContext,
             message_history: list[GPTMessage],
     ) -> AgentMessage: ...
-
-    async def __aenter__(self) -> 'GenAIClient':
-        ...
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        ...
 
 
 class GenAIException(Exception):
@@ -64,9 +56,15 @@ class RecordUsage(Protocol):
 def _result_to_agent_message(result):
     last_item = result.new_items[-1]
     if isinstance(last_item, ToolCallOutputItem):
-        return AgentMessage(file=FileData(filename=last_item.output[0], bytes=last_item.output[1]))
+        return AgentMessage(
+            agent_name=result.last_agent.name,
+            file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
+        )
     else:
-        return AgentMessage(content=result.final_output)
+        return AgentMessage(
+            agent_name=result.last_agent.name,
+            content=result.final_output
+        )
 
 
 async def _run_with_exception_handling(coroutine):
@@ -89,18 +87,10 @@ class AgentClient:
     def __init__(
             self,
             agent: Agent,
-            introduction: str,
             typing: IndicateTyping
     ):
         self._agent = agent
-        self.introduction = introduction
         self._typing = typing
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        ...
 
     async def get_completion(
             self,
@@ -115,86 +105,27 @@ class AgentClient:
     async def _get_completion(
             self,
             context: DuckContext,
-            message_history: list
+            message_history: list,
+            **kwargs
     ) -> AgentMessage:
         async with self._typing(context.thread_id):
             result = await Runner.run(
                 self._agent,
                 message_history,
                 context=context,
-                max_turns=100
+                **kwargs
             )
 
             return _result_to_agent_message(result)
-
-
-class MultiAgentClient:
-    def __init__(self,
-                 agents: dict[str, Agent],
-                 starting_agent: str,
-                 introduction: str,
-                 typing: IndicateTyping,
-                 thread_id: int,
-                 blob_storage: BlobStorage
-                 ):
-        self.introduction = introduction
-
-        self._storage_key = f'multi-agent-{thread_id}'
-        self._agents = agents
-        self._name_of_last_agent = starting_agent
-        self._typing = typing
-        self._blob_storage = blob_storage
-
-    async def __aenter__(self):
-        if self._blob_storage.has_blob(self._storage_key):
-            self._name_of_last_agent = self._blob_storage.read_blob(self._storage_key)
-
-    @suspendable
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._blob_storage.has_blob(self._storage_key):
-            self._blob_storage.delete_blob(self._storage_key)
-
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list
-    ) -> AgentMessage:
-        return await _run_with_exception_handling(self._get_completion(
-            context,
-            message_history
-        ))
-
-    async def _get_completion(
-            self,
-            context: DuckContext,
-            message_history: list
-    ) -> AgentMessage:
-
-        async with self._typing(context.thread_id):
-            result = await Runner.run(
-                self._agents[self._name_of_last_agent],
-                message_history,
-                context=context,
-                max_turns=5
-            )
-
-            self._name_of_last_agent = result.last_agent.name
-            self._blob_storage.write_blob(self._storage_key, self._name_of_last_agent)
-
-        return _result_to_agent_message(result)
 
 
 class RetryableGenAI:
     def __init__(self,
                  genai: GenAIClient,
                  send_message: SendMessage,
-                 typing: IndicateTyping,
                  retry_config: RetryConfig
                  ):
-        self.introduction = genai.introduction
-
         self._send_message = step(send_message)
-        self._typing = typing
         self._retry_config = retry_config
         self._genai = genai
 
@@ -209,10 +140,9 @@ class RetryableGenAI:
         retries = 0
         while True:
             try:
-                async with self._typing(context.thread_id):
-                    return await self._genai.get_completion(
-                        context, message_history
-                    )
+                return await self._genai.get_completion(
+                    context, message_history
+                )
 
             except RetryableException as ex:
                 if retries == 0:

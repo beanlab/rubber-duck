@@ -1,8 +1,10 @@
-import logging
 import asyncio
+import logging
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from queue import Queue
+
 from quest.utils import quest_logger
+
 from ..utils.config_types import AdminSettings
 
 formatter = logging.Formatter(
@@ -14,6 +16,7 @@ formatter = logging.Formatter(
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
 quest_logger.setLevel(logging.DEBUG)
+
 
 def add_console_handler():
     """Add a console handler to the duck logger."""
@@ -37,12 +40,13 @@ def add_file_handler(file_path: str):
     duck_logger.addHandler(file_handler)
     quest_logger.addHandler(file_handler)
 
+
 # Function to start reporting error logs to Discord
 def filter_logs(send_message, config: AdminSettings):
     """Filter logs to send them to Discord."""
     log_queue = Queue()
-    level_name = config["log_level"].upper()
-    log_level = getattr(logging, level_name, logging.ERROR)
+    level_name = config.get('log_level', 'WARN').upper()
+    log_level = getattr(logging, level_name)
 
     q_handler = QueueHandler(log_queue)
     q_handler.setLevel(log_level)
