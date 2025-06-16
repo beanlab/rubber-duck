@@ -23,6 +23,7 @@ scipy = "^1.15.3"
 websockets = "^15.0.1"
 makefun = "^1.16.0"
 pyyaml = "^6.0.2"
+alembic = "^1.16.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

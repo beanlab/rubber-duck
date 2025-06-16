@@ -143,7 +143,7 @@ class SQLMetricsHandler:
             cols_new = ", ".join(column_map.keys())
             cols_old = ", ".join(column_map.values())
 
-            # Migrate the table   data
+            # Migrate the table data
             copy_stmt = text(f"""
                 INSERT INTO {temp_table_name} ({cols_new})
                 SELECT {cols_old} FROM {table_name}
