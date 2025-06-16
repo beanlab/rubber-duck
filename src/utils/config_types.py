@@ -1,11 +1,25 @@
 from dataclasses import dataclass
-from typing import TypedDict
-
-from ..utils.protocols import SendMessage
+from typing import TypedDict, NotRequired, Literal
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
+DUCK_NAME = str
 
+
+class FileData(TypedDict):
+    filename: str
+    bytes: bytes
+
+
+class AgentMessage(TypedDict):
+    content: NotRequired[str]
+    file: NotRequired[FileData]
+    agent_name: str
+
+
+class GPTMessage(TypedDict):
+    role: str
+    content: str
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -40,51 +54,50 @@ class RegistrationSettings(TypedDict):
 
 
 class SingleAgentSettings(TypedDict):
-    prompt_file: str
-    engine: str
     name: str
-    handoff_prompt: str
+    engine: str
+    prompt_file: str
     tools: list[str]
-    max_iterations: int
-
-
-class HubSpokesAgentSettings(TypedDict):
-    hub_agent_settings: SingleAgentSettings
-    spoke_agents_settings: list[SingleAgentSettings]
+    handoff_prompt: str
+    handoffs: list[str]
 
 
 class AgentConversationSettings(TypedDict):
     introduction: str
-    agent_type: str
-    agent_settings: SingleAgentSettings | HubSpokesAgentSettings
+    agents: list[SingleAgentSettings]
+    starting_agent: str | None  # If not set, will use first agent listed in `agents`
     timeout: int
 
 
 @dataclass
 class DuckContext:
     guild_id: int
-    channel_id: int
+    parent_channel_id: int
     author_id: int
     author_mention: str
     content: str
     message_id: int
     thread_id: int
-    send_message: SendMessage
 
 
 class DuckConfig(TypedDict):
     name: str
     "The channel name is not used in the code. It provides a description of the duck."
-    workflow_type: str
-    weight: int
+    duck_type: str  # Supported options found in main.py::build_ducks
     settings: dict
+
+
+class WeightedDuck(TypedDict):
+    weight: int
+    duck: DUCK_NAME | DuckConfig
 
 
 class ChannelConfig(TypedDict):
     channel_id: int
     channel_name: str
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
-    ducks: list[DuckConfig]
+    ducks: list[DUCK_NAME | DuckConfig | WeightedDuck]
+    "Either the name of the duck"
 
 
 class ServerConfig(TypedDict):
@@ -100,6 +113,7 @@ class SQLConfig(TypedDict):
     host: str
     port: str
     database: str
+
 
 class RetryProtocol(TypedDict):
     max_retries: int
@@ -120,10 +134,10 @@ class ReporterConfig(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
+    ducks: list[DuckConfig]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
-    default_duck_settings: dict[str, dict]
     feedback_notifier_settings: FeedbackNotifierSettings
     reporter_settings: ReporterConfig

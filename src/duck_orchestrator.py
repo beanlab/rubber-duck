@@ -37,12 +37,14 @@ class DuckOrchestrator:
     def __init__(self,
                  setup_thread: SetupThread,
                  send_message,
+                 add_reaction,
                  ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
         self._setup_thread: SetupThread = step(setup_thread)
         self._send_message = step(send_message)
+        self._add_reaction = step(add_reaction)
         self._ducks = ducks
         self._remember_conversation = remember_conversation
 
@@ -55,15 +57,17 @@ class DuckOrchestrator:
         if len(possible_ducks) == 1:
             return possible_ducks[0][1]
 
-        weights = [w for w, dk in possible_ducks]
-        return random.choices(possible_ducks, weights=weights, k=1)[1]
+        else:
+            weights = [w for w, dk in possible_ducks]
+            return random.choices(possible_ducks, weights=weights, k=1)[0][1]
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
 
-        # Select the duck
+        if 'duck' in initial_message['content']:
+            await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
+
         duck = self._get_duck(initial_message['channel_id'])
 
-        # Create a thread
         thread_id = await self._setup_thread(
             initial_message['channel_id'],
             initial_message['author_mention'],
@@ -72,13 +76,12 @@ class DuckOrchestrator:
 
         context = DuckContext(
             guild_id=initial_message['guild_id'],
-            channel_id=initial_message['channel_id'],
+            parent_channel_id=initial_message['channel_id'],
             author_id=initial_message['author_id'],
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],
             message_id=initial_message['message_id'],
-            thread_id=thread_id,
-            send_message=self._send_message
+            thread_id=thread_id
         )
 
         async with alias(str(thread_id)):
@@ -92,7 +95,7 @@ class DuckOrchestrator:
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
-        # Remember conversation
+        # Remember the conversation
         self._remember_conversation(FeedbackData(
             duck_type=duck.name,
             guild_id=initial_message['guild_id'],
