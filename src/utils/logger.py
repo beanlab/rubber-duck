@@ -6,19 +6,19 @@ from quest.utils import quest_logger
 from ..utils.config_types import AdminSettings
 
 formatter = logging.Formatter(
-    fmt='%(asctime)s %(levelname).4s %(name)s - %(task)s - %(message)s',
+    fmt='%(asctime)s %(levelname)s %(name)s - %(task)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
 # Set up loggers
 duck_logger = logging.getLogger("duck")
-duck_logger.setLevel(logging.DEBUG)
 quest_logger.setLevel(logging.DEBUG)
 
 def add_console_handler():
     """Add a console handler to the duck logger."""
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.DEBUG)
 
     duck_logger.addHandler(console_handler)
     quest_logger.addHandler(console_handler)
@@ -34,12 +34,21 @@ def add_file_handler(file_path: str):
         encoding='utf-8'
     )
     file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
     duck_logger.addHandler(file_handler)
     quest_logger.addHandler(file_handler)
 
 # Function to start reporting error logs to Discord
 def filter_logs(send_message, config: AdminSettings):
     """Filter logs to send them to Discord."""
+    # Remove any existing queue handlers
+    for handler in duck_logger.handlers[:]:
+        if isinstance(handler, QueueHandler):
+            duck_logger.removeHandler(handler)
+    for handler in quest_logger.handlers[:]:
+        if isinstance(handler, QueueHandler):
+            quest_logger.removeHandler(handler)
+
     log_queue = Queue()
     level_name = config["log_level"].upper()
     log_level = getattr(logging, level_name, logging.ERROR)
@@ -51,10 +60,10 @@ def filter_logs(send_message, config: AdminSettings):
     duck_logger.addHandler(q_handler)
     quest_logger.addHandler(q_handler)
 
-    asyncio.create_task(log_queue_watcher(send_message, config['admin_channel_id'], log_queue))
+    asyncio.create_task(log_queue_watcher(send_message, config['admin_channel_id'], log_queue, log_level))
 
 
-async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
+async def log_queue_watcher(send_message, channel_id, log_queue: Queue, min_level: int):
     loop = asyncio.get_running_loop()
 
     def _blocking_get():
@@ -65,6 +74,8 @@ async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
         message = record.getMessage()
 
         try:
-            await send_message(channel_id, f"[{record.levelname}] {message}")
+            # Only send messages that are at or above the minimum level
+            if record.levelno >= min_level:
+                await send_message(channel_id, f"[{record.levelname}] {message}")
         except Exception as e:
             print(f"Failed to send log message to Discord: {e}")
