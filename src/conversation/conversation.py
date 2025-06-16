@@ -1,16 +1,11 @@
 import asyncio
-from typing import Protocol
 
-from quest import step, queue, wrap_steps
+from quest import step, queue
 
+from ..agents.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext
-from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.protocols import Message, SendMessage, AddReaction
-
-
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
 class BasicSetupConversation:
@@ -45,10 +40,15 @@ class AgentSetupConversation:
         return message_history
 
 
+AGENT_NAME, AGENT_MESSAGE = str, str
+
+
 class AgentConversation:
     def __init__(self,
                  name: str,
-                 ai_agent: GenAIClient,
+                 introduction: str,
+                 ai_agents: dict[str, GenAIClient],
+                 starting_agent: str,
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
@@ -56,7 +56,10 @@ class AgentConversation:
                  armory: Armory
                  ):
         self.name = name
-        self._ai_client = ai_agent
+
+        self._introduction = introduction
+        self._ai_clients = ai_agents
+        self._starting_agent = starting_agent
 
         self._record_message = step(record_message)
 
@@ -67,40 +70,44 @@ class AgentConversation:
         self._armory = armory
 
     @step
-    async def _get_and_send_ai_response(self, context: DuckContext, message_history: list[GPTMessage]) -> str:
+    async def _get_and_send_ai_response(
+            self,
+            context: DuckContext,
+            agent_name: str,
+            message_history: list[GPTMessage]
+    ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
-        response = await self._ai_client.get_completion(
+        response: AgentMessage = await self._ai_clients[agent_name].get_completion(
             context,
             message_history,
         )
 
-        if isinstance(response, str):
-            await self._send_message(context.thread_id, response)
-            return response
+        if file := response.get('file'):
+            await self._send_message(context.thread_id, file=file)
+            return file['filename']
 
-        elif isinstance(response, tuple):
-            await self._send_message(context.thread_id, file=response)
-            return response[0]
+        if content := response.get('content'):
+            await self._send_message(context.thread_id, content)
+            return response['agent_name'], content
 
-        else:
-            raise NotImplementedError("Unsupported response type from AI client: {}".format(type(response)))
+        raise NotImplementedError(f'AI completion had neither content nor file.')
 
     async def __call__(self, context: DuckContext):
 
-        if 'duck' in context.content:
-            await self._add_reaction(context.channel_id, context.message_id, "🦆")
-
+        agent_name = self._starting_agent
         message_history = []
 
-        introduction = self._ai_client.introduction or "Hi, how can I help you?"
+        introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
-                try:  # catch all errors
-                    try:
-                        # Waiting for a response from the user
-                        message: Message = await asyncio.wait_for(messages.get(), self._wait_for_user_timeout)
+                try:  # catch GenAIException
+                    try:  # Timeout
+                        message: Message = await asyncio.wait_for(
+                            messages.get(),
+                            self._wait_for_user_timeout
+                        )
 
                     except asyncio.TimeoutError:
                         break
@@ -120,10 +127,13 @@ class AgentConversation:
                         message_history[-1]['content']
                     )
 
-                    response = await self._get_and_send_ai_response(context, message_history)
+                    agent_name, response = await self._get_and_send_ai_response(
+                        context,
+                        agent_name,
+                        message_history
+                    )
 
                     message_history.append(GPTMessage(role='assistant', content=response))
-
 
                 except GenAIException:
                     await self._send_message(context.thread_id,

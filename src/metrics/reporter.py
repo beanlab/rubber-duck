@@ -99,21 +99,21 @@ class Reporter:
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, SQLMetricsHandler, server_config: ServerConfig, reporting_config: ReporterConfig, show_fig=False):
+    def __init__(self, SQLMetricsHandler, server_configs: dict[str, ServerConfig], reporting_config: ReporterConfig, show_fig=False):
         self.SQLMetricsHandler = SQLMetricsHandler
         wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
         self._pricing = reporting_config['gpt_pricing']
         self.show_fig = show_fig
-        self._reporting_config = self._make_reporting_config(server_config)
+        self._reporting_config = self._make_reporting_config(server_configs)
         # Create a flat mapping of channel IDs to channel names
         self._channels = {}
         for server_channels in self._reporting_config.values():
             self._channels.update({int(channel_id): channel_name for channel_id, channel_name in server_channels.items()})
 
-    def _make_reporting_config(self, server_config:ServerConfig) -> dict:
+    def _make_reporting_config(self, server_configs: dict[str, ServerConfig]) -> dict:
         """This function converts the server_config into a dictionary that maps server names to their channels."""
         reporting_config = {}
-        for server in server_config.values():
+        for server in server_configs.values():
             server_name = server['server_name']
             channel_dict = {}
             for channel in server['channels']:
