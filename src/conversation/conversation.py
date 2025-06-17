@@ -2,6 +2,7 @@ import asyncio
 
 from quest import step, queue
 
+from .message_context import generate_message_history_from_message_context
 from ..agents.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
@@ -21,25 +22,6 @@ class BasicSetupConversation:
             guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
         return message_history
 
-
-class AgentSetupConversation:
-    def __init__(self, record_message):
-        self._record_message = step(record_message)
-
-    async def __call__(self, thread_id: int, initial_message: Message) -> list[GPTMessage]:
-        message_history = [GPTMessage(role='system',
-                                      content="Introduce yourself and what you can do to the user using the talk_to_user tool"),
-                           GPTMessage(role='user', content="Hi")]
-        user_id = initial_message['author_id']
-        guild_id = initial_message['guild_id']
-
-        await self._record_message(
-            guild_id, thread_id, user_id, message_history[0]['role'], message_history[0]['content'])
-        await self._record_message(
-            guild_id, thread_id, user_id, message_history[1]['role'], message_history[1]['content'])
-        return message_history
-
-
 AGENT_NAME, AGENT_MESSAGE = str, str
 
 
@@ -53,8 +35,9 @@ class AgentConversation:
                  send_message: SendMessage,
                  add_reaction: AddReaction,
                  wait_for_user_timeout,
-                 armory: Armory
-                 ):
+                 armory: Armory,
+                 message_context: list[str],
+    ):
         self.name = name
 
         self._introduction = introduction
@@ -68,6 +51,8 @@ class AgentConversation:
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
+
+        self._message_context = message_context
 
     @step
     async def _get_and_send_ai_response(
@@ -95,7 +80,7 @@ class AgentConversation:
     async def __call__(self, context: DuckContext):
 
         agent_name = self._starting_agent
-        message_history = []
+        message_history = generate_message_history_from_message_context(self._message_context[:])
 
         introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
