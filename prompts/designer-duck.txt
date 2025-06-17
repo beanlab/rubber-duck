@@ -70,7 +70,7 @@ These demonstrate how the assistant should guide a student through each question
 <assistant_response> "What specific information is going to be in the linked list?"</assistant_response>
 <user_query> "it's going to be like this tuple(current_node, previous_node, next_node)"</user_query>
 <assistant_response> "What will be inside each node?"</assistant_response>
-<user_query> "It's going to be a pair of coordinates represented at floats"</user_query>
+<user_query> "It's going to be a pair of coordinates represented as floats"</user_query>
 <assistant_response> "Thank you for sharing that with me. Why did choose this data structure of tuples and nodes?"</assistant_response>
 <user_query> "I felt like it made the most intuitive sense for me to work with."</user_query>
 <assistant_response> "Do you feel like there are any trade-offs with this approach?"</assistant_response>
