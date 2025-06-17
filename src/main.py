@@ -12,19 +12,10 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from .conversation.learning_objectives_tracker import LearningObjectivesTracker
-from .workflows.confirm_topic import ConfirmTopicWorkflow
-from .workflows.design_experience_workflow import DesignExperienceWorkflow
-from .workflows.dog_cat_bird_game import DogCatBirdGame
-from .utils.send_email import EmailSender
-from .metrics.feedback import HaveTAGradingConversation
-from .utils.logger import duck_logger
 from src.agents.build import build_agent_conversation_duck
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
-from .conversation.multi_prompt_conversation import DesignerConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
@@ -34,12 +25,6 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.persistent_queue import PersistentQueue
-from .utils.gen_ai import OpenAI, RetryableGenAI
-from .utils.config_types import (
-    Config, )
-from .armory.tools import get_tool
-from .workflows.registration_workflow import RegistrationWorkflow
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
     DUCK_NAME, DuckConfig
 from .utils.feedback_notifier import FeedbackNotifier

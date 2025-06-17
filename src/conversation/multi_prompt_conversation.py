@@ -1,17 +1,16 @@
 import asyncio
-from asyncio import timeout
 from pathlib import Path
 from typing import Optional
 
 from quest import step, wrap_steps, queue
 
 from ..conversation.conversation import BasicSetupConversation
-from ..utils.gen_ai import RetryableGenAI, RecordMessage, GPTMessage, RecordUsage, GenAIException, Sendable
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, IndicateTyping, AddReaction, ReportError
 from ..utils.folder_utils import FolderUtils
 from ..views.assignment_selection_view import AssignmentSelectionView
 
+# This is where we need to focus next. There is a lot of code here that can be simplified
 
 class DesignerConversation:
     def __init__(self,

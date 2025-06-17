@@ -134,7 +134,7 @@ class SQLMetricsHandler:
 
             return data
         except Exception as e:
-            duck_logger.exception(f"An error occured: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
             raise
 
     def get_messages(self):
