@@ -68,7 +68,7 @@ ducks:
             - show_dataset_head
           max_iterations: 5
       file_size_limit: 4096 # 4KB limit
-      file_type_ext: [ ".txt", ".csv", ".tsv", ".json", ".md" ]
+      file_type_ext: [".txt", ".csv", ".tsv", ".json", ".md"]
 
 servers:
   927616651409649675:
@@ -275,12 +275,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [ 0.03, 0.06 ]
-    "gpt-4o": [ 0.0025, 0.01 ]
-    "gpt-4-1106-preview": [ 0.01, 0.03 ]
-    "gpt-4-0125-preview": [ 0.01, 0.03 ]
-    "o4-mini": [ 0.000150, 0.0006 ]
-    "gpt-4-turbo": [ 0.01, 0.03 ]
-    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
-    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
-    "gpt-3.5-turbo": [ 0.001, 0.003 ]
+    "gpt-4": [0.03, 0.06]
+    "gpt-4o": [0.0025, 0.01]
+    "gpt-4-1106-preview": [0.01, 0.03]
+    "gpt-4-0125-preview": [0.01, 0.03]
+    "o4-mini": [0.000150, 0.0006]
+    "gpt-4-turbo": [0.01, 0.03]
+    "gpt-4-turbo-preview": [0.01, 0.03]
+    "gpt-3.5-turbo-1106": [0.001, 0.002]
+    "gpt-3.5-turbo": [0.001, 0.003]

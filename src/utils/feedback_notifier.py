@@ -22,6 +22,7 @@ class FeedbackNotifier:
         self._feedback_manager = feedback_manager
         self._send_message: SendMessage = send_message
         self._server_configs = server_configs
+        self._settings = feedback_notifier_settings
         self._feedback_mapping = self._build_feedback_mapping()
         self._feedback_check_hour = feedback_notifier_settings['feedback_check_hour']
         self._feedback_check_minute = feedback_notifier_settings['feedback_check_minute']
@@ -85,7 +86,7 @@ class FeedbackNotifier:
 
                     # Find all ducks of type conversation_review in this channel
                     for duck in channel['ducks']:
-                        if duck['workflow_type'] == 'conversation_review':
+                        if duck['duck_type'] == 'conversation_review':
                             target_channels.extend(duck['settings']['target_channel_ids'])
 
                     if target_channels:

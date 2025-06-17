@@ -7,7 +7,22 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import Attachment, Message
 
 
-def as_message(message: discord.Message) -> Message:
+async def as_attachment(attachment):
+    content = await attachment.read()
+    return Attachment(
+        attachment_id=attachment.id,
+        description=attachment.description,
+        filename=attachment.filename,
+        size=attachment.size,
+        content=content.decode('utf-8')
+    )
+
+
+async def as_message(message: discord.Message) -> Message:
+    attachments = []
+    for attachment in message.attachments:
+        attachments.append(await as_attachment(attachment))
+    
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -17,15 +32,7 @@ def as_message(message: discord.Message) -> Message:
         author_mention=message.author.mention,
         message_id=message.id,
         content=message.content,
-        file=[as_attachment(attachment) for attachment in message.attachments]
-    )
-
-
-def as_attachment(attachment):
-    return Attachment(
-        attachment_id=attachment.id,
-        description=attachment.description,
-        filename=attachment.filename
+        file=attachments
     )
 
 
@@ -118,7 +125,7 @@ class DiscordBot(discord.Client):
         if message.content.startswith('//'):
             return
 
-        await self._rubber_duck.route_message(as_message(message))
+        await self._rubber_duck.route_message(await as_message(message))
 
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         # Ignore messages from the bot or other bots
