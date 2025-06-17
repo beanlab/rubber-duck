@@ -60,6 +60,7 @@ class SingleAgentSettings(TypedDict):
     tools: list[str]
     handoff_prompt: str
     handoffs: list[str]
+    output_type: str
 
 
 class AgentConversationSettings(TypedDict):
@@ -67,6 +68,7 @@ class AgentConversationSettings(TypedDict):
     agents: list[SingleAgentSettings]
     starting_agent: str | None  # If not set, will use first agent listed in `agents`
     timeout: int
+    message_context: list[dict]
 
 
 @dataclass

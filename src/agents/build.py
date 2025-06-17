@@ -5,6 +5,7 @@ from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
 
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
+from .output_types import get_output_type
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
@@ -58,7 +59,8 @@ def build_agent(
         tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
         model=config["engine"],
         hooks=agent_hooks,
-        handoffs=[]
+        handoffs=[],
+        output_type=get_output_type(config["output_type"]) if config["output_type"] else None,
     )
 
 
@@ -141,7 +143,7 @@ def build_agent_conversation_duck(
         bot.send_message,
         bot.add_reaction,
         settings['timeout'],
-        armory
+        settings['message_context']
     )
 
     return agent_conversation
