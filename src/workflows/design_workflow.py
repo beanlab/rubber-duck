@@ -35,13 +35,9 @@ class DesignWorkflow:
         self._record_message = record_message
         self._record_usage = record_usage
 
-    @step
-    async def _send_message(self, thread_id, content=None, file=None):
-        """Send a message to the thread"""
-        return await self._bot.send_message(thread_id, content, file)
 
     @step
-    async def _get_available_assignments(self, thread_id):
+    async def _display_available_assignments(self, thread_id):
         """Get and display available assignments"""
         assignments = list(self._settings['assignment_names'].keys())
         await self._send_message(
@@ -106,7 +102,7 @@ class DesignWorkflow:
         await self._send_message(thread_id, self._settings['introduction'])
 
         # Get and display available assignments
-        assignments = await self._get_available_assignments(thread_id)
+        assignments = await self._display_available_assignments(thread_id)
         
         try:
             # Get user's assignment selection
