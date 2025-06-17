@@ -6,7 +6,7 @@ import json
 from src.utils.config_types import LearningObjectiveSettings
 
 from ..utils.gen_ai import GPTMessage
-from ..utils.logger import duck_logger
+from src.utils.logger import duck_logger
 
 class LearningObjective:
     def __init__(self, principles: list[str]):
