@@ -17,7 +17,7 @@ async def as_attachment(attachment):
         content=content.decode('utf-8')
     )
 
-
+# make this comprehension
 async def as_message(message: discord.Message) -> Message:
     attachments = []
     for attachment in message.attachments:

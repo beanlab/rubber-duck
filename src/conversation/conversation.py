@@ -74,17 +74,14 @@ class AgentConversation:
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
 
+# support multiple files if one fails let the user know and continue.
     @step
     async def _handle_file_message(
             self,
             context: DuckContext,
             file: dict,
             message_history: list[GPTMessage]
-    ) -> bool:
-        """Handle file message processing
-        Returns:
-            bool: True if file was processed successfully, False otherwise
-        """
+    ) -> str:
         filename = file.get('filename', '')
         ext = os.path.splitext(filename)[-1].lower()
         size = file.get('size', 0)
@@ -101,7 +98,7 @@ class AgentConversation:
 
                 file_message = f"(From file `{filename}`)\n\n{content}"
                 message_history.append(GPTMessage(role='user', content=file_message))
-
+                # structure the message better into the history
                 await self._record_message(
                     context.guild_id, context.thread_id, context.author_id, "user", file_message
                 )
