@@ -116,6 +116,7 @@ class AgentConversation:
             )
             return False
 
+# Make a read function in discord bot that will read files.
     @step
     async def _get_and_send_ai_response(
             self,
