@@ -32,6 +32,7 @@ from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
+from .workflows.design_workflow import DesignWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
@@ -197,6 +198,16 @@ def build_ducks(
 
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, settings)
+
+        elif duck_type == 'conversation_design':
+            ducks[name] = DesignWorkflow(
+                name,
+                config['ai_completion_retry_protocol'],
+                settings,
+                bot,
+                metrics_handler.record_message,
+                metrics_handler.record_usage
+            )
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')

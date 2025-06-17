@@ -1,102 +1,108 @@
 from pathlib import Path
-from typing import TypedDict, Any, Coroutine
-from quest import step, queue
+from typing import TypedDict, List
+from quest import step, queue, wrap_steps
 import asyncio
 
-from ..agents.hooks import UsageAgentHooks
-from ..utils.config_types import GPTMessage
+from ..agents.gen_ai import RecordMessage, RecordUsage, RetryableGenAI, GenAIException, AgentClient
+from ..conversation.conversation import AGENT_NAME, AGENT_MESSAGE
+from ..utils.config_types import GPTMessage, DuckContext, AgentMessage
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
-from ..agents.gen_ai import RecordMessage, RecordUsage, AgentClient, RetryableGenAI, GenAIException
-from ..agents.agent_builder import _build_agents, _get_armory
 
 
 class DesignWorkflowSettings(TypedDict):
-    assignment_names: dict[str,Path]
-    "assignment names will be numbered and correlated to a file path"
     introduction: str
+    assignment_names: dict[str, Path]
+    agents: List[dict]
+    timeout: int
+    file_size_limit: int
+    file_type_ext: List[str]
+
 
 class DesignWorkflow:
-    def __init__(self,
-                 name: str,
-                 config: dict,
-                 settings: DesignWorkflowSettings,
-                 bot,
-                 record_message: RecordMessage,
-                 record_usage: RecordUsage
-                 ):
-        self.name = name
-        self._config = config
+    def __init__(
+            self,
+            name: str,
+            ai_completion_retry_protocol: dict,
+            settings: DesignWorkflowSettings,
+            bot,
+            record_message: RecordMessage,
+            record_usage: RecordUsage
+    ):
+        self._name = name
         self._settings = settings
         self._bot = bot
-        self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
-        self._send_message = step(bot.send_message)
-        self._add_reaction = step(bot.add_reaction)
-        self._wait_for_user_timeout = settings.get('timeout', 300)
+        self._record_message = record_message
+        self._record_usage = record_usage
 
-        # Set up the AI agent
-        usage_hooks = UsageAgentHooks(record_usage)
-        armory = _get_armory(config)
-        agents = _build_agents(armory, usage_hooks, settings['agents'])
-        ai_completion_retry_protocol = config['ai_completion_retry_protocol']
+    @step
+    async def _send_message(self, thread_id, content=None, file=None):
+        """Send a message to the thread"""
+        return await self._bot.send_message(thread_id, content, file)
 
-        self._genai_client = RetryableGenAI(
-            AgentClient(agents[settings['agents'][0]['name']], bot.typing),
-            bot.send_message,
-            ai_completion_retry_protocol
+    @step
+    async def _get_available_assignments(self, thread_id):
+        """Get and display available assignments"""
+        assignments = list(self._settings['assignment_names'].keys())
+        await self._send_message(
+            thread_id,
+            'Please select an assignment by number:\n' +
+            '\n'.join(f"{i+1}. {name}" for i, name in enumerate(assignments))
         )
-
-    async def _get_available_assignments(self, thread_id: int) -> dict[str, Path]:
-        """Gets available assignments from settings"""
-        assignments = self._settings.get("assignment_names", [])
-        if not assignments:
-            duck_logger.error("No assignments configured in settings")
-            raise ValueError("No assignments configured")
-
-        # Send numbered list of assignments
-        message = "Please select an assignment by number:\n"
-        for i, assignment in enumerate(assignments, 1):
-            message += f"{i}. {assignment}\n"
-        await self._send_message(thread_id, message)
-
         return assignments
 
-    async def _handle_assignment_selection(self, thread_id: int, assignments: list[str]) -> str:
-        """Handles the assignment selection process"""
+    @step
+    async def _handle_assignment_selection(self, thread_id, assignments):
+        """Handle user's assignment selection"""
         async with queue('messages', None) as messages:
             while True:
                 try:
-                    message: Message = await asyncio.wait_for(
+                    message = await asyncio.wait_for(
                         messages.get(),
-                        self._wait_for_user_timeout
+                        self._settings['timeout']
                     )
-                    
                     try:
-                        selection = int(message['content'].strip())
+                        selection = int(message['content'])
                         if 1 <= selection <= len(assignments):
-                            return assignments[selection - 1]
+                            selected_name = assignments[selection - 1]
+                            selected_path = self._settings['assignment_names'][selected_name]
+                            return selected_name, selected_path
                         else:
-                            await self._send_message(thread_id, f"Please enter a number between 1 and {len(assignments)}")
+                            await self._send_message(thread_id,
+                                                    f"Please enter a number between 1 and {len(assignments)}")
                     except ValueError:
                         await self._send_message(thread_id, "Please enter a valid number")
-                        
                 except asyncio.TimeoutError:
-                    raise TimeoutError("No response received within the time limit")
+                    raise TimeoutError("No assignment selected within time limit")
 
-    async def _get_and_send_ai_response(self, context, message_history):
-        response = await self._genai_client.get_completion(
-            {"thread_id": context.thread_id},
-            message_history
+    @step
+    async def _get_and_send_ai_response(
+            self,
+            context: DuckContext,
+            agent_name: str,
+            message_history: list[GPTMessage]
+    ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
+        """Get AI response and send it to the user"""
+        response: AgentMessage = await self._ai_clients[agent_name].get_completion(
+            context,
+            message_history,
         )
+
+        if file := response.get('file'):
+            await self._send_message(context.thread_id, file=file)
+            return file['filename']
+
         if content := response.get('content'):
             await self._send_message(context.thread_id, content)
-            return content
-        else:
-            await self._send_message(context.thread_id, "I'm having trouble processing your request. Please try again.")
-            return None
+            return response['agent_name'], content
 
-    async def __call__(self, thread_id: int, initial_message: Message):
+        raise NotImplementedError(f'AI completion had neither content nor file.')
+
+    @step
+    async def __call__(self, context):
+        """Main entry point for the design workflow"""
+        thread_id = context.thread_id
+
         await self._send_message(thread_id, self._settings['introduction'])
 
         # Get and display available assignments
@@ -104,52 +110,68 @@ class DesignWorkflow:
         
         try:
             # Get user's assignment selection
-            selected_assignment = await self._handle_assignment_selection(thread_id, assignments)
-            await self._send_message(thread_id, f"Great! Let's discuss your design for: {selected_assignment}. Please describe your design or paste your code.")
+            selected_name, selected_path = await self._handle_assignment_selection(thread_id, assignments)
+            await self._send_message(thread_id,
+                                    f"Great! Let's discuss your design for: {selected_name}. How are you storing your information?")
         except TimeoutError:
             await self._send_message(thread_id, "No assignment was selected within the time limit. Please try again.")
             return
 
-        # Initialize message history with the selected assignment context
+        # Read the assignment file
+        try:
+            with open(selected_path, 'r', encoding='utf-8') as f:
+                assignment_content = f.read()
+        except Exception as e:
+            duck_logger.error(f"Failed to read assignment file {selected_path}: {e}")
+            raise
+
+        # Initialize message history with the selected assignment context and content
         message_history = [
-            GPTMessage(role='system', content=f"You are a design mentor helping students improve their designs for the assignment: {selected_assignment}.")
+            GPTMessage(role='system',
+                        content=f"""You are a design mentor helping students improve their designs for the assignment: {selected_name}.
+                        Here is the assignment description:
+                        {assignment_content}
+                        Please help the student think through their design by asking thoughtful questions and providing guidance.""")
         ]
 
         # Main conversation loop
         async with queue('messages', None) as messages:
             while True:
-                try:
-                    try:
+                try:  # catch GenAIException
+                    try:  # Timeout
                         message: Message = await asyncio.wait_for(
                             messages.get(),
-                            self._wait_for_user_timeout
+                            self._settings['timeout']
                         )
+
                     except asyncio.TimeoutError:
                         break
 
-                    # If the user sent a file, treat it as text if possible
-                    user_content = message['content']
                     if len(message['file']) > 0:
-                        # Just mention that file was received, or optionally try to read as text
-                        user_content += "\n[File(s) attached, please paste relevant code or text if not already included.]"
+                        await self._send_message(
+                            context.thread_id,
+                            "I'm sorry, I can't read file attachments. "
+                            "Please resend your message with the relevant parts of your file included in the message."
+                        )
+                        continue
 
-                    message_history.append(GPTMessage(role='user', content=user_content))
+                    message_history.append(GPTMessage(role='user', content=message['content']))
 
                     await self._record_message(
-                        message['guild_id'], thread_id, message['author_id'],
-                        message_history[-1]['role'], message_history[-1]['content']
+                        context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
+                        message_history[-1]['content']
                     )
 
-                    response = await self._get_and_send_ai_response(
-                        message,
-                        message_history
+                    agent_name, response = await self._get_and_send_ai_response(
+                        context=context,
+                        agent_name=self._settings['agents'][0]['name'],
+                        message_history=message_history
                     )
 
-                    if response:
-                        message_history.append(GPTMessage(role='assistant', content=response))
+                    message_history.append(GPTMessage(role='assistant', content=response))
 
                 except GenAIException:
-                    await self._send_message(thread_id,
+                    await self._send_message(context.thread_id,
                                              'I\'m having trouble processing your request.'
                                              'The admins are aware. Please try again later.')
-                    raise 
+                    raise
