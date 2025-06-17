@@ -1,7 +1,10 @@
+import io
+
 import discord
 
+from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
-from ..utils.protocols import Attachment, Message, SendableFile
+from ..utils.protocols import Attachment, Message
 
 
 def as_message(message: discord.Message) -> Message:
@@ -129,18 +132,31 @@ class DiscordBot(discord.Client):
     # Methods for message-handling protocols
     #
 
-    def _make_discord_file(self, file) -> discord.File:
+    def _make_discord_file(self, file: FileData | discord.File) -> discord.File:
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(file[1], file[0])
+            return discord.File(io.BytesIO(file[1]), file[0])
+        if isinstance(file, dict):
+            return discord.File(file['bytes'], file['filename'])
+
         raise NotImplementedError(f"Unsupported file type: {file}")
 
-    async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
+    async def send_message(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
         channel = self.get_channel(channel_id)
+        # try catch it and fetch the channel if it is not found
         if channel is None:
-            duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
-            raise Exception(f'No channel id {channel_id}')
+            try:
+                channel = await self.fetch_channel(channel_id)
+            except Exception as e:
+                duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
+                raise
+
+        if message:
+            for block in _parse_blocks(message):
+                curr_message = await channel.send(block)
+            # noinspection PyUnboundLocalVariable
+            return curr_message.id
 
         if file is not None:
             files_to_send = []
@@ -181,8 +197,21 @@ class DiscordBot(discord.Client):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    class ChannelTyping:
+        def __init__(self, fetch_channel, channel_id):
+            self._fetch_channel = fetch_channel
+            self._channel_id = channel_id
+
+        async def __aenter__(self):
+            channel = await self._fetch_channel(self._channel_id)
+            self._typing = channel.typing()
+            return await self._typing.__aenter__()
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
+
     def typing(self, channel_id: int):
-        return self.get_channel(channel_id).typing()
+        return self.ChannelTyping(self.fetch_channel, channel_id)
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread
@@ -192,10 +221,3 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
-
-    async def report_error(self, msg: str, notify_admins: bool = False):
-        if notify_admins:
-            try:
-                await self.send_message(self._admin_channel, msg)
-            except:
-                duck_logger.exception(f'Unable to message channel {self._admin_channel}')

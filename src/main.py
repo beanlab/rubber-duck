@@ -4,10 +4,13 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Iterable
 
 import boto3
+import yaml  # Added import for YAML support
 from quest import these
 from quest.extras.sql import SqlBlobStorage
+from quest.utils import quest_logger
 
 from .conversation.learning_objectives_tracker import LearningObjectivesTracker
 from .workflows.confirm_topic import ConfirmTopicWorkflow
@@ -16,14 +19,16 @@ from .workflows.dog_cat_bird_game import DogCatBirdGame
 from .utils.send_email import EmailSender
 from .metrics.feedback import HaveTAGradingConversation
 from .utils.logger import duck_logger
+from src.agents.build import build_agent_conversation_duck
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.conversation import BasicSetupConversation, BasicPromptConversation
 from .conversation.multi_prompt_conversation import DesignerConversation
 from .conversation.threads import SetupPrivateThread
-from .duck_orchestrator import DuckOrchestrator
-from .metrics.feedback_manager import FeedbackManager
+from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
+from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
@@ -34,6 +39,13 @@ from .utils.gen_ai import OpenAI, RetryableGenAI
 from .utils.config_types import (
     Config, )
 from .armory.tools import get_tool
+from .workflows.registration_workflow import RegistrationWorkflow
+from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
+    DUCK_NAME, DuckConfig
+from .utils.feedback_notifier import FeedbackNotifier
+from .utils.logger import duck_logger, filter_logs, add_console_handler
+from .utils.persistent_queue import PersistentQueue
+from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
 
 
@@ -73,16 +85,36 @@ def fetch_config_from_s3() -> Config | None:
         return None
 
 
-# Function to load the configuration from a local file (if needed)
-def load_local_config(file_path: Path) -> Config:
-    duck_logger.info(f"Loading local config from {file_path}")
-    return json.loads(file_path.read_text())
+def load_yaml_config(config_path):
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
-def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message):
-    reporter = Reporter(metrics_handler, config['reporting'])
+def load_json_config(config_path):
+    with open(config_path, 'r') as f:
+        return json.load(f)
 
-    commands = create_commands(send_message, metrics_handler, reporter)
+
+def load_local_config(config_path):
+    if config_path.suffix == '.json':
+        return load_json_config(config_path)
+    elif config_path.suffix == '.yaml':
+        return load_yaml_config(config_path)
+    else:
+        raise ValueError("Config file must be either .json or .yaml")
+
+
+def setup_workflow_manager(
+        config: Config,
+        duck_orchestrator,
+        sql_session,
+        metrics_handler,
+        send_message,
+        log_dir: Path
+):
+    reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
+
+    commands = create_commands(send_message, metrics_handler, reporter, log_dir)
     commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
@@ -103,120 +135,150 @@ def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metri
     return workflow_manager
 
 
-def setup_ducks(config: Config, bot: DiscordBot, metrics_handler, feedback_manager):
-    # admin settings
-    admin_settings = config['admin_settings']
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-
-    # Command channel feature
-    command_channel = admin_settings['admin_channel_id']
-
-    setup_conversation = BasicSetupConversation(
-        metrics_handler.record_message,
-    )
-
-    ai_client = OpenAI(
-        os.environ['OPENAI_API_KEY'],
-        get_tool,
-        metrics_handler.record_usage
-    )
-
-    retryable_ai_client = RetryableGenAI(
-        ai_client,
-        bot.send_message,
-        bot.report_error,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
-
-    have_conversation = BasicPromptConversation(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.typing,
-        bot.send_message,
-        bot.report_error,
-        bot.add_reaction,
-        setup_conversation
-    )
-
-    learning_objectives = LearningObjectivesTracker(
-        retryable_ai_client,
-    )
-
-    have_advanced_conversation = DesignerConversation(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.typing,
-        bot.send_message,
-        bot.report_error,
-        bot.add_reaction,
-        setup_conversation,
-    )
-
+def build_conversation_review_duck(
+        name: str,
+        settings: ConversationReviewSettings,
+        bot: DiscordBot, record_feedback, feedback_manager
+) -> DuckConversation:
     have_ta_conversation = HaveTAGradingConversation(
+        name,
+        settings,
         feedback_manager,
-        metrics_handler.record_feedback,
+        record_feedback,
         bot.send_message,
         bot.add_reaction,
-        bot.report_error
     )
+    return have_ta_conversation
 
 
-    email_confirmation = EmailSender(config['sender_email'])
+def build_registration_duck(
+        name: str, bot: DiscordBot, settings: RegistrationSettings
+):
+    email_confirmation = EmailSender(settings['sender_email'])
 
     registration_workflow = RegistrationWorkflow(
+        name,
         bot.send_message,
         bot.get_channel,
         bot.fetch_guild,
-        email_confirmation
+        email_confirmation,
+        settings
+    )
+    return registration_workflow
+
+
+def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
+    # Look for global configs
+    yield from config['ducks']
+
+    # Look for inline duck configs
+    for server_config in config['servers'].values():
+        for channel_config in server_config['channels']:
+            for item in channel_config['ducks']:
+                if isinstance(item, DUCK_NAME):
+                    continue
+                elif isinstance(item, dict):
+                    if 'weight' in item:
+                        duck = item['duck']
+                        if isinstance(duck, DUCK_NAME):
+                            continue
+                        yield duck
+                    else:
+                        yield item
+
+
+def build_ducks(
+        config: Config,
+        bot: DiscordBot,
+        metrics_handler,
+        feedback_manager,
+) -> dict[DUCK_NAME, DuckConversation]:
+    ducks = {}
+
+    for duck_config in _iterate_duck_configs(config):
+        duck_type = duck_config['duck_type']
+        settings = duck_config['settings']
+        name = duck_config['name']
+
+        if duck_type == 'agent_conversation':
+            ducks[name] = build_agent_conversation_duck(
+                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
+            )
+
+        elif duck_type == 'conversation_review':
+            ducks[name] = build_conversation_review_duck(
+                name, settings, bot, metrics_handler.record_feedback, feedback_manager
+            )
+
+        elif duck_type == 'registration':
+            ducks[name] = build_registration_duck(name, bot, settings)
+
+        else:
+            raise NotImplementedError(f'Duck of type {duck_type} not implemented')
+
+    if not ducks:
+        raise ValueError('No ducks were requested in the config')
+
+    return ducks
+
+
+def _setup_ducks(
+        config: Config,
+        bot: DiscordBot,
+        metrics_handler,
+        feedback_manager,
+) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
+    """
+    Return a dictionary of channel ID to list of weighted ducks
+    """
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
+
+    channel_ducks = {}
+
+    for server_config in config['servers'].values():
+        for channel_config in server_config['channels']:
+            channel_ducks[channel_config['channel_id']] = []
+            for duck_config in channel_config['ducks']:
+                if isinstance(duck_config, str):
+                    name, weight = duck_config, 1
+
+                elif isinstance(duck_config, dict) and 'weight' in duck_config:
+                    name = duck_config['name']
+                    weight = duck_config['weight']
+
+                elif isinstance(duck_config, dict):
+                    name, weight = duck_config['name'], 1
+
+                else:
+                    raise ValueError(f'Incorrect format for duck config: {channel_config["channel_id"]}')
+
+                channel_ducks[channel_config['channel_id']].append((weight, all_ducks[name]))
+
+    return channel_ducks
+
+
+def _build_feedback_queues(config: Config, sql_session):
+    queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
+
+    convo_review_ducks = (
+        duck
+        for duck in _iterate_duck_configs(config)
+        if duck['duck_type'] == 'conversation_review'
     )
 
-    confirm_topic = ConfirmTopicWorkflow(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.typing,
-        bot.send_message,
-        bot.report_error,
-        bot.add_reaction,
-        setup_conversation
-    )
-    dog_cat_bird_game = DogCatBirdGame(
-        retryable_ai_client,
-        metrics_handler.record_message,
-        metrics_handler.record_usage,
-        bot.typing,
-        bot.send_message,
-        bot.report_error,
-        bot.add_reaction,
-        setup_conversation
+    target_channel_ids = (
+        target_id
+        for duck in convo_review_ducks
+        for target_id in duck['settings']['target_channel_ids']
     )
 
-    learning_objectives = LearningObjectivesTracker(
-        retryable_ai_client,
-    )
-
-    design_experience = DesignExperienceWorkflow(
-        bot.send_message,
-        bot.get_channel,
-        bot.fetch_guild,
-        learning_objectives,
-    )
-
-    return {
-        'basic_prompt_conversation': have_conversation,
-        'multi_prompt_conversation': have_advanced_conversation,
-        'confirm_topic': confirm_topic,
-        'dog_cat_bird_game': dog_cat_bird_game,
-        'design_experience': design_experience,
-        'conversation_review': have_ta_conversation,
-        'registration': registration_workflow,
-    }
+    return these({
+        target_id: PersistentQueue(str(target_id), queue_blob_storage)
+        for target_id in target_channel_ids
+    })
 
 
-async def main(config: Config):
+async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -225,35 +287,18 @@ async def main(config: Config):
             bot.send_message
         )
 
-        queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
+        filter_logs(bot.send_message, config['admin_settings'])
 
-        convo_review_ducks = (
-            duck
-            for server_config in config['servers'].values()
-            for channel_config in server_config['channels']
-            for duck in channel_config['ducks']
-            if duck['workflow_type'] == 'conversation_review'
-        )
-
-        target_channel_ids = (
-            target_id
-            for duck in convo_review_ducks
-            for target_id in duck['settings']['target_channel_ids']
-        )
-
-        with these({
-            target_id: PersistentQueue(str(target_id), queue_blob_storage)
-            for target_id in target_channel_ids
-        }) as persistent_queues:
+        with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 bot.send_message,
-                bot.report_error,
+                bot.add_reaction,
                 ducks,
                 feedback_manager.remember_conversation
             )
@@ -269,8 +314,11 @@ async def main(config: Config):
                     duck_orchestrator,
                     sql_session,
                     metrics_handler,
-                    bot.send_message
+                    bot.send_message,
+                    log_dir
             ) as workflow_manager:
+                tasks = []
+
                 admin_channel_id = config['admin_settings']['admin_channel_id']
                 rubber_duck = RubberDuckApp(
                     admin_channel_id,
@@ -278,23 +326,43 @@ async def main(config: Config):
                     workflow_manager
                 )
                 bot.set_duck_app(rubber_duck, admin_channel_id)
-                await bot.start(os.environ['DISCORD_TOKEN'])
+                tasks.append(bot.start(os.environ['DISCORD_TOKEN']))
+
+                if 'feedback_notifier_settings' in config:
+                    # Set up the notifier thread.
+                    notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
+                                                config['feedback_notifier_settings'])
+                    tasks.append(notifier.start())
+
+                await asyncio.gather(*tasks)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json')
+    parser.add_argument('--config', type=Path, default='config.json', help='Path to config file (.json or .yaml)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
+
     args = parser.parse_args()
 
     # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        from quest.utils import quest_logger
-
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
+        quest_logger.setLevel(logging.INFO)
+
+    if args.log_path:
+        # Add a file handler to the duck logger if log path is provided
+        from .utils.logger import add_file_handler
+
+        log_dir = add_file_handler(args.log_path)
+    else:
+        duck_logger.warn("No log path provided. Logging to console only.")
+
+    # Add console handler to the duck logger
+    add_console_handler()
 
     # Try fetching the config from S3 first
     config = fetch_config_from_s3()
@@ -303,4 +371,4 @@ if __name__ == '__main__':
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
 
-    asyncio.run(main(config))
+    asyncio.run(main(config, args.log_path))

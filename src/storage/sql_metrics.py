@@ -65,6 +65,7 @@ class FeedbackModel(MetricsBase):
     user_id = Column(BigInteger)
     reviewer_role_id = Column(BigInteger)
     feedback_score = Column(BigInteger)
+    written_feedback = Column(String(4096))
 
 
 class SQLMetricsHandler:
@@ -74,8 +75,12 @@ class SQLMetricsHandler:
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
-            new_message_row = MessagesModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
-                                            user_id=user_id, role=role, message=message)
+            new_message_row = MessagesModel(timestamp=get_timestamp(),
+                                            guild_id=guild_id,
+                                            thread_id=thread_id,
+                                            user_id=user_id,
+                                            role=role,
+                                            message=message)
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:
@@ -100,14 +105,17 @@ class SQLMetricsHandler:
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
                               user_id: int, reviewer_id: int,
-                              feedback_score: int):
+                              feedback_score: int, written_feedback: str):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
-                                             guild_id=guild_id, parent_channel_id=parent_channel_id,
+                                             guild_id=guild_id,
+                                             parent_channel_id=parent_channel_id,
                                              thread_id=thread_id,
-                                             user_id=user_id, reviewer_role_id=reviewer_id,
-                                             feedback_score=feedback_score)
+                                             user_id=user_id,
+                                             reviewer_role_id=reviewer_id,
+                                             feedback_score=feedback_score,
+                                             written_feedback=written_feedback)
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception as e:
@@ -126,7 +134,8 @@ class SQLMetricsHandler:
 
             return data
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.exception(f"An error occured: {e}")
+            raise
 
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)

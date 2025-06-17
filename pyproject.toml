@@ -1,15 +1,16 @@
 [tool.poetry]
 name = "rubber_duck"
-version = "0.2.4"
+version = "0.2.5"
 description = ""
 authors = ["Gordon Bean <gbean@cs.byu.edu>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
 openai = "^1.11.1"
 discord = "^2.1.0"
 urllib3 = "<2.0"
-quest-py = "0.2.5"
+quest-py = "0.2.15"
 seaborn = "0.13.2"
 pandas = "^2.2.2"
 aiofiles = "^24.1.0"
@@ -20,10 +21,8 @@ pymysql = "^1.1.1"
 openai-agents ="^0.0.14"
 scipy = "^1.15.3"
 websockets = "^15.0.1"
+makefun = "^1.16.0"
 pyyaml = "^6.0.2"
-
-
-[tool.poetry.dev-dependencies]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -2,8 +2,6 @@ from typing import TypeVar, Generic
 
 from quest.persistence import BlobStorage
 
-from ..utils.logger import duck_logger
-
 T = TypeVar('T')
 
 
@@ -32,3 +30,6 @@ class PersistentQueue(Generic[T]):
 
     def __bool__(self) -> bool:
         return bool(self._queue)
+
+    def __len__(self):
+        return len(self._queue)

@@ -1,12 +1,15 @@
 import subprocess
 from datetime import datetime
 from pathlib import Path
+import zipfile
+import io
 
 import discord
 import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..utils.zip_utils import zip_data_file
 
@@ -106,18 +109,29 @@ class ReportCommand(Command):
 
     @step
     async def execute(self, message: Message):
-        content = message['content']
-        channel_id = message['channel_id']
-        img_name, img = self.reporter.get_report(content)
-        if img is None:
-            await self.send_message(channel_id, img_name)
+        """ Execute the report command to generate and send a report based on the message content."""
+        try:
+            content = message['content']
+            channel_id = message['channel_id']
+            if content == '!report help' or content == '!report h':
+                help_text = self.reporter.help_menu()
+                await self.send_message(channel_id, help_text)
+            else:
+                result = self.reporter.get_report(content)
 
-        elif isinstance(img, list):
-            imgs = [discord.File(fp=image, filename=image_name) for image, image_name in zip(img, img_name)]
-            await self.send_message(channel_id, img_name, files=imgs)
-
-        else:
-            await self.send_message(channel_id, img_name, file=discord.File(fp=img, filename=img_name))
+                if result is None:
+                    await self.send_message(channel_id, "No data available")
+                elif isinstance(result, str):  # Help text or error message
+                    await self.send_message(channel_id, result)
+                else:  # List of (title, image) tuples
+                    for title, image in result:
+                        file = discord.File(fp=image, filename=title)
+                        await self.send_message(channel_id, "", file=file)
+        except Exception as e:
+            duck_logger.error(f"Error executing report command: {e}")
+            channel_id = message['channel_id']
+            await self.send_message(channel_id, f"An error occurred while generating the report: {e}")
+            raise
 
 
 class BashExecuteCommand():
@@ -150,18 +164,55 @@ class BashExecuteCommand():
 
 
 class LogCommand(Command):
+    """
+    This command is used to get the log file.
+    It will zip all the log files and send them to the channel.
+    """
     name = "!log"
     help_msg = "get the log file"
 
-    def __init__(self, send_message, bash_execute_command: BashExecuteCommand):
+    def __init__(self, send_message, log_dir: Path = None):
         self.send_message = send_message
+        self.log_dir = log_dir
 
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        await self.send_message(channel_id, 'The log command has been temporarily disabled.')
-        # await self.bash_execute_command(channel_id, f'zip -q -r log.zip {self._log_file_path}')
-        # await self._send_message(channel_id, 'log zip', file='log.zip')
+
+        # Check if logs directory exists
+        if not self.log_dir.exists():
+            await self.send_message(channel_id, 'No logs directory found.')
+            return
+
+        # Get the .log files in the logs directory
+        log_files = list(self.log_dir.glob('*.log*'))
+        if not log_files:
+            await self.send_message(channel_id, 'No log files found.')
+            return
+
+        # Create in-memory zip buffer
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file in log_files:
+                zipf.write(file, arcname=file.name)
+
+        # Move the buffer pointer to the start
+        zip_buffer.seek(0)
+
+        try:
+            # Create Discord file from the zip buffer
+            filename = f'logs_{datetime.now().strftime("%Y_%m_%d_%H_%M")}.zip'
+            discord_file = discord.File(zip_buffer, filename=filename)
+
+            # Send the zip file to the specified channel
+            await self.send_message(channel_id, 'Here are the log files:')
+            await self.send_message(channel_id, "", file=discord_file)
+
+        except Exception as e:
+            await self.send_message(channel_id, f'Error sending log files: {str(e)}')
+
+        finally:
+            zip_buffer.close()
 
 
 class ActiveWorkflowsCommand(Command):
@@ -223,7 +274,7 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
+def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
@@ -235,6 +286,6 @@ def create_commands(send_message, metrics_handler, reporter) -> list[Command]:
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message, BashExecuteCommand(send_message)),
+        LogCommand(send_message,log_dir),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics)
     ]
