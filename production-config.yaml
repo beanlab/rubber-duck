@@ -214,7 +214,7 @@ servers:
                 I can help you think through your problems by asking questions.
               agents:
                 - name: socrates
-                  prompt_file: prompts/socratic_duck.txt
+                  prompt_file: prompts/socratic-duck.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
