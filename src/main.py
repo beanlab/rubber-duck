@@ -200,7 +200,7 @@ def build_ducks(
             )
 
         elif duck_type == 'registration':
-            ducks[name] = build_registration_duck(name, bot, settings)
+            ducks[name] = build_registration_duck(name, bot, config, settings)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
