@@ -36,28 +36,28 @@ from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
-    # Initialize S3 client
-    s3 = boto3.client('s3')
-
-    # Add a section to your env file to allow for local and production environment
-    environment = os.environ.get('ENVIRONMENT')
-    if not environment or environment == 'LOCAL':
-        duck_logger.info("Using local environment")
-        return None
-
-    # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-    s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-    if not s3_path:
-        duck_logger.warning("No S3 path configured")
-        return None
-
-    # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-    bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-    duck_logger.info(f"Config key: {key}")
-
     try:
+        # Initialize S3 client
+        s3 = boto3.client('s3')
+
+        # Add a section to your env file to allow for local and production environment
+        environment = os.environ.get('ENVIRONMENT')
+        if not environment or environment == 'LOCAL':
+            duck_logger.info("Using local environment")
+            return None
+
+        # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
+        s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
+
+        if not s3_path:
+            duck_logger.warning("No S3 path configured")
+            return None
+
+        # Parse bucket name and key from the S3 path (s3://bucket-name/key)
+        bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
+        duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+        duck_logger.info(f"Config key: {key}")
+
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 

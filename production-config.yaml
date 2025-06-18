@@ -259,7 +259,7 @@ servers:
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
-          - stats-tool
+          - stats-duck
 
 feedback_notifier_settings:
   feedback_check_hour: 9
