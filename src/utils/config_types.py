@@ -65,7 +65,7 @@ class SingleAgentSettings(TypedDict):
 class AgentConversationSettings(TypedDict):
     introduction: str
     agents: list[SingleAgentSettings]
-    starting_agent: str | None  # If not set, will use first agent listed in `agents`
+    starting_agent: str | None  # If not set, will use first agent listed in `gen_ai`
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]

@@ -16,7 +16,7 @@ async def main():
 
         return _on_handoff
 
-    # Final agents without handoffs yet
+    # Final gen_ai without handoffs yet
     cat_agent = Agent(
         name="Cat Agent",
         handoff_description="If the user asks a question that does not relate to cats, hand off to the dispatch agent.",

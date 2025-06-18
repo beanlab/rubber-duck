@@ -115,7 +115,7 @@ def build_agent_conversation_duck(
     usage_hooks = UsageAgentHooks(record_usage)
     armory = _get_armory(config)
 
-    agents = _build_agents(armory, usage_hooks, settings['agents'])
+    agents = _build_agents(armory, usage_hooks, settings['gen_ai'])
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
