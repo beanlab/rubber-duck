@@ -1,25 +1,25 @@
 import io
-import os
 
 import discord
+import requests
 
 from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import Attachment, Message
 
 
-async def as_attachment(attachment):
-    content = await attachment.read()
+def as_attachment(attachment):
     return Attachment(
         attachment_id=attachment.id,
         description=attachment.description,
         filename=attachment.filename,
         size=attachment.size,
-        content=content.decode('utf-8')
+        url=attachment.url
     )
 
+
 # make this comprehension
-async def as_message(message: discord.Message) -> Message:
+def as_message(message: discord.Message) -> Message:
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -29,7 +29,7 @@ async def as_message(message: discord.Message) -> Message:
         author_mention=message.author.mention,
         message_id=message.id,
         content=message.content,
-        file=[await as_attachment(a) for a in message.attachments]
+        files=[as_attachment(a) for a in message.attachments]
     )
 
 
@@ -122,7 +122,7 @@ class DiscordBot(discord.Client):
         if message.content.startswith('//'):
             return
 
-        await self._rubber_duck.route_message(await as_message(message))
+        await self._rubber_duck.route_message(as_message(message))
 
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         # Ignore messages from the bot or other bots
@@ -151,8 +151,8 @@ class DiscordBot(discord.Client):
         if channel is None:
             try:
                 channel = await self.fetch_channel(channel_id)
-            except Exception as e:
-                duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
+            except Exception:
+                duck_logger.exception(f'Tried to send message on {channel_id}, but no channel found.')
                 raise
 
         if message:
@@ -214,66 +214,12 @@ class DiscordBot(discord.Client):
         )
         return thread.id
 
-    async def handle_file_message(self, thread_id, files: list[dict], accepted_file_ext:list[str], accepted_file_size:int) -> str:
-        """ 
-        Handle receiving multiple files from Discord. Returns the content of all files formatted with --- around each file.
+    async def read_url(self, url: str) -> str:
+        """
+        Read a URL and return its content as a string.
         """
         try:
-            formatted_contents = []
-            invalid_files = []
-            successful_files = []
-            
-            for file in files:
-                filename = file.get('filename', '')
-                ext = os.path.splitext(filename)[-1].lower()
-                size = file.get('size', 0)
-                content = None
-                
-                # Check if file is valid
-                if ext not in accepted_file_ext:
-                    invalid_files.append(f"`{filename}` (unsupported file type: {ext})")
-                    continue
-                    
-                if size > accepted_file_size:
-                    invalid_files.append(f"`{filename}` (file too large: {size} bytes)")
-                    continue
-                
-                try:
-                    content = file.get('content')
-                    if not content:
-                        await self.send_message(
-                            thread_id,
-                            f"File `{filename}` is supported, but I couldn't read its contents."
-                        )
-                        continue
-                        
-                    # Format each file's content with --- around it and filename header
-                    formatted_content = f"--- {filename} ---\n{content}\n---"
-                    formatted_contents.append(formatted_content)
-                    successful_files.append(filename)
-                    
-                except Exception as e:
-                    duck_logger.error(f"Error reading file {filename}: {str(e)}")
-                    invalid_files.append(f"`{filename}` (error reading file)")
-                    continue
-            
-            # Notify user about invalid files
-            if invalid_files:
-                invalid_files_msg = "The following files were not processed:\n" + "\n".join(invalid_files)
-                await self.send_message(thread_id, invalid_files_msg)
-            
-            # Notify user about successful files
-            if successful_files:
-                success_msg = "Successfully processed the following files:\n" + "\n".join(f"`{filename}`" for filename in successful_files)
-                await self.send_message(thread_id, success_msg)
-            
-            if not formatted_contents:
-                return "No valid file contents were found."
-                
-            # Join all formatted contents with newlines
-            return "\n\n".join(formatted_contents)
-
-        except Exception as e:
-            error_msg = f"Error processing files: {str(e)}"
-            duck_logger.error(error_msg)
-            return error_msg
+            return requests.get(url).text
+        except Exception:
+            duck_logger.exception(f"Error reading URL {url}")
+            raise

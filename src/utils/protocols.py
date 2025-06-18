@@ -8,7 +8,7 @@ class Attachment(TypedDict):
     description: str
     filename: str
     size: int
-    content: str
+    url: str
 
 
 class Message(TypedDict):
@@ -20,7 +20,7 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    file: list[Attachment]
+    files: list[Attachment]
 
 
 class SendMessage(Protocol):

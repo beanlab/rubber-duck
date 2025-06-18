@@ -2,18 +2,18 @@
 file_size_limit: &file_size_limit 4096 # 4KB limit
 file_type_ext: &file_type_ext
   [
-    ".txt",
-    ".py",
-    ".java",
-    ".cpp",
-    ".c",
-    ".h",
-    ".hpp",
-    ".js",
-    ".ts",
-    ".html",
-    ".css",
-    ".md",
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
   ]
 
 sql:
