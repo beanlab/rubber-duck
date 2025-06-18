@@ -1,4 +1,5 @@
 import io
+import os
 
 import discord
 
@@ -212,3 +213,69 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
+
+    async def handle_file_message(self, thread_id, files: list[dict], accepted_file_ext:list[str], accepted_file_size:int) -> str:
+        """
+        Handle receiving multiple files from Discord. Returns the content of all files formatted with --- around each file.
+        
+        Args:
+            thread_id: The Discord thread ID to send messages to
+            files: List of file dictionaries containing file information
+            accepted_file_ext: List of accepted file extensions
+            accepted_file_size: Maximum file size in bytes
+            
+        Returns:
+            str: Formatted string containing all file contents, or error message if processing failed
+        """
+        try:
+            formatted_contents = []
+            invalid_files = []
+            
+            for file in files:
+                filename = file.get('filename', '')
+                ext = os.path.splitext(filename)[-1].lower()
+                size = file.get('size', 0)
+                content = None
+                
+                # Check if file is valid
+                if ext not in accepted_file_ext:
+                    invalid_files.append(f"`{filename}` (unsupported file type: {ext})")
+                    continue
+                    
+                if size > accepted_file_size:
+                    invalid_files.append(f"`{filename}` (file too large: {size} bytes)")
+                    continue
+                
+                try:
+                    content = file.get('content')
+                    if not content:
+                        await self.send_message(
+                            thread_id,
+                            f"File `{filename}` is supported, but I couldn't read its contents."
+                        )
+                        continue
+                        
+                    # Format each file's content with --- around it and filename header
+                    formatted_content = f"--- {filename} ---\n{content}\n---"
+                    formatted_contents.append(formatted_content)
+                    
+                except Exception as e:
+                    duck_logger.error(f"Error reading file {filename}: {str(e)}")
+                    invalid_files.append(f"`{filename}` (error reading file)")
+                    continue
+            
+            # Notify user about invalid files
+            if invalid_files:
+                invalid_files_msg = "The following files were not processed:\n" + "\n".join(invalid_files)
+                await self.send_message(thread_id, invalid_files_msg)
+            
+            if not formatted_contents:
+                return "No valid file contents were found."
+                
+            # Join all formatted contents with newlines
+            return "\n\n".join(formatted_contents)
+
+        except Exception as e:
+            error_msg = f"Error processing files: {str(e)}"
+            duck_logger.error(error_msg)
+            return error_msg

@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from quest import step, queue
 
@@ -53,6 +52,7 @@ class AgentConversation:
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
+                 handle_file_message,
                  wait_for_user_timeout,
                  armory: Armory,
                  file_size_limit: int,
@@ -68,53 +68,13 @@ class AgentConversation:
 
         self._send_message = step(send_message)
         self._add_reaction: AddReaction = step(add_reaction)
+        self._handle_file_message = step(handle_file_message)
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
 
-# support multiple files if one fails let the user know and continue.
-    @step
-    async def _handle_file_message(
-            self,
-            context: DuckContext,
-            file: dict,
-            message_history: list[GPTMessage]
-    ) -> str:
-        filename = file.get('filename', '')
-        ext = os.path.splitext(filename)[-1].lower()
-        size = file.get('size', 0)
-
-        if ext in self._file_type_ext and size <= self._file_size_limit:
-            try:
-                content = file.get('content')
-                if not content:
-                    await self._send_message(
-                        context.thread_id,
-                        f"File `{filename}` is supported, but I couldn't read its contents."
-                    )
-                    return False
-
-                file_message = f"(From file `{filename}`)\n\n{content}"
-                message_history.append(GPTMessage(role='user', content=file_message))
-                # structure the message better into the history
-                await self._record_message(
-                    context.guild_id, context.thread_id, context.author_id, "user", file_message
-                )
-                return True
-            except Exception as e:
-                await self._send_message(
-                    context.thread_id,
-                    f"Failed to read the file `{filename}`: {str(e)}"
-                )
-                return False
-        else:
-            await self._send_message(
-                context.thread_id,
-                f"Sorry, I can only process small text files (< 4KB) with extensions: {', '.join(self._file_type_ext)}."
-            )
-            return False
 
 # Make a read function in discord bot that will read files.
     @step
@@ -161,8 +121,18 @@ class AgentConversation:
                         break
 
                     if len(message['file']) > 0:
-                        if not await self._handle_file_message(context, message['file'][0], message_history):
-                            continue
+                        file_content = await self._handle_file_message(
+                            context.thread_id,
+                            message['file'],
+                            self._file_type_ext,
+                            self._file_size_limit
+                        )
+                        if file_content:
+                            message_history.append(GPTMessage(role='user', content=file_content))
+                            await self._record_message(
+                                context.guild_id, context.thread_id, context.author_id, "user", file_content
+                            )
+                        continue
 
                     message_history.append(GPTMessage(role='user', content=message['content']))
 

@@ -140,6 +140,7 @@ def build_agent_conversation_duck(
         record_message,
         bot.send_message,
         bot.add_reaction,
+        bot.handle_file_message,
         settings['timeout'],
         armory,
         settings['file_size_limit'],
