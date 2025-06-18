@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import io
 import json
 import logging
 import os
@@ -12,12 +13,12 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from .gen_ai.build import build_agent_conversation_duck
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .gen_ai.build import build_agent_conversation_duck
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -61,7 +62,8 @@ def fetch_config_from_s3() -> Config | None:
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
         # Read the content of the file and parse it as JSON
-        config = json.loads(response['Body'].read().decode('utf-8'))
+        content = response['Body'].read().decode('utf-8')
+        config = load_config('.' + key.split('.')[-1], content)
         duck_logger.info("Successfully loaded config from S3")
         return config
 
@@ -70,23 +72,25 @@ def fetch_config_from_s3() -> Config | None:
         return None
 
 
-def load_yaml_config(config_path):
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+def read_yaml(content):
+    return yaml.safe_load(io.StringIO(content))
 
 
-def load_json_config(config_path):
-    with open(config_path, 'r') as f:
-        return json.load(f)
+def read_json(content):
+    return json.loads(content)
 
 
-def load_local_config(config_path):
-    if config_path.suffix == '.json':
-        return load_json_config(config_path)
-    elif config_path.suffix == '.yaml':
-        return load_yaml_config(config_path)
+def load_config(file_type, content):
+    if file_type == '.json':
+        return read_json(content)
+    elif file_type == '.yaml':
+        return read_yaml(content)
     else:
-        raise ValueError("Config file must be either .json or .yaml")
+        raise NotImplementedError(f'Unsupported config extension: {file_type}')
+
+
+def load_local_config(config_path: Path):
+    return load_config(config_path.suffix, config_path.read_text())
 
 
 def setup_workflow_manager(

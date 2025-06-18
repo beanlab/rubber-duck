@@ -115,7 +115,7 @@ def build_agent_conversation_duck(
     usage_hooks = UsageAgentHooks(record_usage)
     armory = _get_armory(config)
 
-    agents = _build_agents(armory, usage_hooks, settings['gen_ai'])
+    agents = _build_agents(armory, usage_hooks, settings['agents'])
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
@@ -143,8 +143,8 @@ def build_agent_conversation_duck(
         bot.read_url,
         settings['timeout'],
         armory,
-        settings['file_size_limit'],
-        settings['file_type_ext'],
+        settings.get('file_size_limit', 0),
+        settings.get('file_type_ext', [])
     )
 
     return agent_conversation
