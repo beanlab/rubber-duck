@@ -215,17 +215,8 @@ class DiscordBot(discord.Client):
         return thread.id
 
     async def handle_file_message(self, thread_id, files: list[dict], accepted_file_ext:list[str], accepted_file_size:int) -> str:
-        """
+        """ 
         Handle receiving multiple files from Discord. Returns the content of all files formatted with --- around each file.
-        
-        Args:
-            thread_id: The Discord thread ID to send messages to
-            files: List of file dictionaries containing file information
-            accepted_file_ext: List of accepted file extensions
-            accepted_file_size: Maximum file size in bytes
-            
-        Returns:
-            str: Formatted string containing all file contents, or error message if processing failed
         """
         try:
             formatted_contents = []
