@@ -141,9 +141,9 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, settings: RegistrationSettings
+        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
 ):
-    email_confirmation = EmailSender(settings['sender_email'])
+    email_confirmation = EmailSender(config['sender_email'])
 
     registration_workflow = RegistrationWorkflow(
         name,

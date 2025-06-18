@@ -143,3 +143,4 @@ class Config(TypedDict):
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: FeedbackNotifierSettings
     reporter_settings: ReporterConfig
+    sender_email: str
