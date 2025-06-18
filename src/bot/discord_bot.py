@@ -19,10 +19,6 @@ async def as_attachment(attachment):
 
 # make this comprehension
 async def as_message(message: discord.Message) -> Message:
-    attachments = []
-    for attachment in message.attachments:
-        attachments.append(await as_attachment(attachment))
-    
     return Message(
         guild_id=message.guild.id,
         channel_name=message.channel.name,
@@ -32,7 +28,7 @@ async def as_message(message: discord.Message) -> Message:
         author_mention=message.author.mention,
         message_id=message.id,
         content=message.content,
-        file=attachments
+        file=[await as_attachment(a) for a in message.attachments]
     )
 
 
