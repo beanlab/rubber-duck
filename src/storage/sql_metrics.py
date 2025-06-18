@@ -84,7 +84,7 @@ class SQLMetricsHandler:
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         try:
@@ -101,7 +101,7 @@ class SQLMetricsHandler:
             self.session.add(new_usage_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
                               user_id: int, reviewer_id: int,
@@ -119,7 +119,7 @@ class SQLMetricsHandler:
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     def sql_model_to_data_list(self, table_model):
         try:
@@ -134,7 +134,7 @@ class SQLMetricsHandler:
 
             return data
         except Exception as e:
-            duck_logger.exception(f"An error occured: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
             raise
 
     def get_messages(self):
