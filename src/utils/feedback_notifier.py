@@ -85,7 +85,7 @@ class FeedbackNotifier:
 
                     # Find all ducks of type conversation_review in this channel
                     for duck in channel['ducks']:
-                        if duck['workflow_type'] == 'conversation_review':
+                        if duck['duck_type'] == 'conversation_review':
                             target_channels.extend(duck['settings']['target_channel_ids'])
 
                     if target_channels:

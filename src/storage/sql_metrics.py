@@ -124,17 +124,17 @@ class SQLMetricsHandler:
     def sql_model_to_data_list(self, table_model):
         try:
             data = []
-            records = iter(self.session.query(table_model).all())
-            header = next(records)
+            records = list(self.session.query(table_model).all())
+            if not records:
+                return [["No data available"]]
+            header = records[0]
             data.append([key for key, _ in header])
             data.append([value for _, value in header])
-
-            for record in records:
+            for record in records[1:]:
                 data.append([value for _, value in record])
-
             return data
         except Exception as e:
-            duck_logger.exception(f"An error occured: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
             raise
 
     def get_messages(self):

@@ -4,6 +4,7 @@ import sys
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
 import os
 
@@ -93,17 +94,24 @@ class Reporter:
                "How expensive is the average thread based on the time of day over the past year?"),
         'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg',
                "What does the distribution of thread cost look like over the past year?"),
-        'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg',
-               "How expensive is the average thread based on the class over the past year?"),
+        'u4': ('!report -df usage -iv cost -p year -ev channel_name -avg',
+               "How expensive is the average thread based on the parent channel name over the past year?"),
         'u5': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
                "How many threads being opened per class during what time over the past year?")
     }
 
-    def __init__(self, SQLMetricsHandler, server_configs: dict[str, ServerConfig], reporting_config: ReporterConfig, show_fig=False):
+    def __init__(self,
+                 SQLMetricsHandler,
+                 server_configs: dict[str, ServerConfig],
+                 reporting_config: ReporterConfig,
+                 retrieve_channel,
+                 show_fig=False
+                 ):
         self.SQLMetricsHandler = SQLMetricsHandler
         wrap_steps(self.SQLMetricsHandler, ["record_message", "record_usage", "record_feedback"])
         self._pricing = reporting_config['gpt_pricing']
         self.show_fig = show_fig
+        self._retrieve_channel = retrieve_channel
         self._reporting_config = self._make_reporting_config(server_configs)
         # Create a flat mapping of channel IDs to channel names
         self._channels = {}
@@ -201,16 +209,13 @@ class Reporter:
         if args.dataframe == 'usage':
             df['cost'] = df.apply(self.compute_cost, axis=1)
 
-        if args.exp_var == 'guild_id' or args.exp_var_2 == 'guild_id':
-            duck_logger.debug(f"Available channel_ids in data: {df['parent_channel_id'].unique()}")
-            duck_logger.debug(f"Available channel mappings: {self._channels}")
-            df['channel_name'] = df['parent_channel_id'].map(self._channels)
-            duck_logger.debug(f"Channel names after mapping: {df['channel_name'].unique()}")
-            df = df.drop(columns=['guild_id'])
-            if args.exp_var == 'guild_id':
-                args.exp_var = 'channel_name'
-            else:
-                args.exp_var_2 = 'channel_name'
+        if args.exp_var == 'parent_channel_id':
+            # Fetch channel names using bot.get_channel
+            channel_names = {}
+            channel = self._retrieve_channel(df['parent_channel_id'])
+            df['channel_name'] = df['parent_channel_id'].map(channel_names)
+            df = df.drop(columns=['parent_channel_id'])
+            args.exp_var = 'channel_name'
 
         return df
 

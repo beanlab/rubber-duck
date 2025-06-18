@@ -185,6 +185,19 @@ class DiscordBot(discord.Client):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
         await message.add_reaction(reaction)
 
+    async def retrieve_channel(self, channel_id: int):
+        """
+        Retrieve a channel by its ID. First tries to get it, then fetches it if not found.
+        """
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.fetch_channel(channel_id)
+            except Exception as e:
+                duck_logger.error(f'Channel {channel_id} not found: {e}')
+                raise
+        return channel
+
     class ChannelTyping:
         def __init__(self, fetch_channel, channel_id):
             self._fetch_channel = fetch_channel
@@ -209,3 +222,4 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
+    

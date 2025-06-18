@@ -95,9 +95,16 @@ def setup_workflow_manager(
         sql_session,
         metrics_handler,
         send_message,
+        retrieve_channel,
         log_dir: Path
 ):
-    reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
+    reporter = Reporter(
+        metrics_handler,
+        config['servers'],
+        config['reporter_settings'],
+        retrieve_channel,
+        True
+    )
 
     commands = create_commands(send_message, metrics_handler, reporter, log_dir)
     commands_workflow = BotCommands(commands, send_message)
@@ -300,6 +307,7 @@ async def main(config: Config, log_dir: Path):
                     sql_session,
                     metrics_handler,
                     bot.send_message,
+                    bot.retrieve_channel,
                     log_dir
             ) as workflow_manager:
                 tasks = []
