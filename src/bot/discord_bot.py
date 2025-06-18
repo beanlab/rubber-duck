@@ -230,6 +230,7 @@ class DiscordBot(discord.Client):
         try:
             formatted_contents = []
             invalid_files = []
+            successful_files = []
             
             for file in files:
                 filename = file.get('filename', '')
@@ -258,6 +259,7 @@ class DiscordBot(discord.Client):
                     # Format each file's content with --- around it and filename header
                     formatted_content = f"--- {filename} ---\n{content}\n---"
                     formatted_contents.append(formatted_content)
+                    successful_files.append(filename)
                     
                 except Exception as e:
                     duck_logger.error(f"Error reading file {filename}: {str(e)}")
@@ -268,6 +270,11 @@ class DiscordBot(discord.Client):
             if invalid_files:
                 invalid_files_msg = "The following files were not processed:\n" + "\n".join(invalid_files)
                 await self.send_message(thread_id, invalid_files_msg)
+            
+            # Notify user about successful files
+            if successful_files:
+                success_msg = "Successfully processed the following files:\n" + "\n".join(f"`{filename}`" for filename in successful_files)
+                await self.send_message(thread_id, success_msg)
             
             if not formatted_contents:
                 return "No valid file contents were found."
