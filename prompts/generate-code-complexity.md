@@ -8,7 +8,7 @@ Do not modify the given code. Provide all of your analysis in comments in the co
 
 # Output Format
 Return the code with the comments
-If there are any comments in the code p
+If there are any comments in the code, please ignore them
 
 **Do not modify the code** Keep the order and functions the same. Only add comments. 
 For each line also explain why the complexity is what it is.
@@ -16,7 +16,10 @@ Summarize the time complexity of each function on the same line of the function 
 
 Return the code _**EXACTLY**_ as was given EXCEPT for added comments. 
 
-Do not change anything. Return the code in full, just with the time complexities
+Do not change anything. Return the code in full, just with the time complexities added as comments.
+
+Please wrap the code in a markdown code fence that specifies the language of the code. 
+For example, if the code is in python, use three backticks followed by 'python' to start the code fence.
 
 Keep all the analysis on the same line as the functions, (tabbed over), so it is easier to read
 

@@ -20,6 +20,16 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+agents_as_tools:
+  - tool_name: generate_code_complexity_analysis
+    description: |
+      This tool takes source code as a string and returns a string describing 
+      the order of complexity (Big-O analysis) of the provided code.
+    agents:
+      - name: CodeComplexityAgent
+        prompt_file: prompts/generate-code-complexity.md
+        engine: gpt-4.1
+
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
@@ -202,6 +212,31 @@ servers:
         channel_name: vintage-duck
         ducks:
           - standard-rubber-duck
+
+      - channel_id: 1385293810782965830
+        channel_name: code-complexity-analysis-duck
+        ducks:
+          - name: code-complexity-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Upload a code file and I'll analyze it for you. 
+                You can also ask me questions about Big-O analysis.
+              timeout: 600
+              file_size_limit: 5100
+              file_type_ext: [ 'py', 'java', 'cpp', 'c', 'h', 'hpp', 'ts', 'js' ]
+              agents:
+                - name: ComplexityDuck
+                  prompt: |
+                    You are a helpful CS assistant.
+                    You explain Big-O analysis. 
+                    You can use the provided tools to generate a complexity analysis report
+                    when the user provides a code file.
+                    Keep your responses brief and clear. Provide the tool output to the user verbatim.
+                  engine: gpt-4.1
+                  max_iterations: 15
+                  tools:
+                    - generate_code_complexity_analysis
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
