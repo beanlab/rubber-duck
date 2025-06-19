@@ -94,8 +94,8 @@ class RegistrationWorkflow:
             # Wait for user response
             response = await self._wait_for_message()
             if not response:
-                await self._send_message(thread_id, "No response received. Please try again.")
-                raise TimeoutError("Timeout, please start a new chat.")
+                await self._send_message(thread_id, "No response received. Please start a new chat.")
+                raise TimeoutError("Timeout waiting for user email verification")
 
             if response == 'resend':
                 token = self._email_sender.send_email(email, token)
@@ -126,36 +126,42 @@ class RegistrationWorkflow:
             role_list = "\n".join([f"{i + 1}. {role['name']}"
                                    for i, role in enumerate(available_roles)])
             await self._send_message(thread_id,
-                                     "Please select your roles:\n\n"
-                                     "1. Find your lecture section and lab section in BYU MyMap\n"
-                                     "2. Enter the numbers of your roles separated by commas.\n\n"
+                                     "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
+                                     "- These may include lecture section or lab section\n\n"
+                                     "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
                                      "**Example: '1,3,4'**\n\n"
                                      f"Available roles:\n{role_list}")
 
             # Wait for user response
             response = await self._wait_for_message()
-            if not response:
-                await self._send_message(thread_id, "No response received. Please try again.")
+            if response is None or not response.strip():
+                await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
                 return []
 
+            if 'skip' in response:
+                await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
+                return []
+                
             # Split by comma and convert to integers
             selected_indices = []
+            errors = []
             for idx in response.split(','):
                 try:
                     num = int(idx.strip())
                     if 1 <= num <= len(available_roles):
                         selected_indices.append(num - 1)
                 except ValueError:
-                    continue
+                    errors.append(f'"{idx}" is not a valid role number')
 
-            selected_roles = []
-            for idx in selected_indices:
-                selected_roles.append(available_roles[idx]['id'])
-
-            if not selected_roles:
-                await self._send_message(thread_id, "No valid roles selected. Please try again.")
-                continue  # Reprompt the user
-
+            if errors:
+                await self._send_message(thread_id, "\n".join(errors))
+                continue
+            
+            selected_roles = [
+                available_roles[idx]['id']
+                for idx in selected_indices
+            ]
+            
             return selected_roles
 
     @step
