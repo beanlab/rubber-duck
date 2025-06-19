@@ -162,7 +162,6 @@ def build_agent_conversation_duck(
         bot.send_message,
         bot.add_reaction,
         bot.read_url,
-        bot.read_file,
         settings.get('timeout', 60*5),
         armory,
         settings.get('file_size_limit', 0),
