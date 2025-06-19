@@ -12,6 +12,7 @@ from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config
+from ..utils.logger import duck_logger
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -99,6 +100,8 @@ def _get_armory(config: Config) -> Armory:
             data_store = DataStore(config['dataset_folder_locations'])
             stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
+        else:
+            duck_logger.warning("**No dataset folder locations provided in config**")
 
     return _armory
 
