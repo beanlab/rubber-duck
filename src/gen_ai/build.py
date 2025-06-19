@@ -100,12 +100,14 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
             stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
 
-        if 'tools-as-agents' in config:
-            for agent_settings in config['tools-as-agents']:
-                no_op_armory = Armory()
-
-                agent = build_agent(no_op_armory, agent_settings['agents'], usage_hooks)
-                _armory.add_agent_as_tool(agent, agent_settings['name'], agent_settings['agents']['description'])
+        # Agents used as tools don't get any tools of their own. We use an empty amory to make them.
+        armory_for_agents_as_tools = Armory()  
+        
+        for agent_settings in config.get('tools_as_agents', []):
+            agents = _build_agents(armory_for_agents_as_tools, usage_hooks, agent_settings['agents'])
+            head_agent_name = agent_settings['starting_agent']
+            head_agent = agents[head_agent_name]
+            _armory.add_agent_as_tool(head_agent, agent_settings['name'], agent_settings['description'])
 
     return _armory
 
