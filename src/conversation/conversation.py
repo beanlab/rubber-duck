@@ -58,6 +58,7 @@ class AgentConversation:
                  file_size_limit: int,
                  file_type_ext: list[str] = None
                  ):
+
         self.name = name
 
         self._introduction = introduction
@@ -75,8 +76,7 @@ class AgentConversation:
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
 
-
-# Make a read function in discord bot that will read files.
+    # Make a read function in discord bot that will read files.
     @step
     async def _get_and_send_ai_response(
             self,

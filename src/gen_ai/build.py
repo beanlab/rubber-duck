@@ -7,6 +7,7 @@ from quest import step
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
+from ..armory.socratic_tool import SocraticTool
 from ..armory.stat_tools import StatsTools
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
@@ -55,8 +56,25 @@ def _build_agent(
     if not prompt:
         prompt_path = config.get("prompt_file")
         if not prompt_path:
-            raise ValueError(f"You must provide either 'prompt' or 'prompt_file' for {config['name']}")
-        prompt = Path(prompt_path).read_text(encoding="utf-8")
+            # Try prompt_files (list) as fallback
+            prompt_files = config.get("prompt_files", [])
+            if prompt_files:
+                # Combine all prompt files
+                prompt_parts = []
+                for file_path in prompt_files:
+                    prompt_parts.append(Path(file_path).read_text(encoding="utf-8"))
+                prompt = "\n\n".join(prompt_parts)
+            else:
+                raise ValueError(f"You must provide either 'prompt', 'prompt_file', or 'prompt_files' for {config['name']}")
+        else:
+            # Handle case where prompt_file might be a list
+            if isinstance(prompt_path, list):
+                prompt_parts = []
+                for file_path in prompt_path:
+                    prompt_parts.append(Path(file_path).read_text(encoding="utf-8"))
+                prompt = "\n\n".join(prompt_parts)
+            else:
+                prompt = Path(prompt_path).read_text(encoding="utf-8")
 
     return Agent(
         name=config["name"],
@@ -113,6 +131,10 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
+
+        # Add Socratic tools
+        socratic_tools = SocraticTool()
+        _armory.scrub_tools(socratic_tools)
 
         # Agents used as tools don't get any tools of their own. We use an empty amory to make them.
         armory_for_agents_as_tools = Armory()

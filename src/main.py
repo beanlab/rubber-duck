@@ -1,14 +1,13 @@
 import argparse
 import asyncio
-import io
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Iterable
 
 import boto3
 import yaml  # Added import for YAML support
+from agents import ToolsToFinalOutputResult
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
@@ -19,15 +18,14 @@ from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
 from .gen_ai.build import build_agent_conversation_duck
-from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
+from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig
+from .utils.config_types import Config, ChannelConfig, RegistrationSettings, DUCK_WEIGHT
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -36,34 +34,33 @@ from .workflows.registration_workflow import RegistrationWorkflow
 
 
 def fetch_config_from_s3() -> Config | None:
+    # Initialize S3 client
+    s3 = boto3.client('s3')
+
+    # Add a section to your env file to allow for local and production environment
+    environment = os.environ.get('ENVIRONMENT')
+    if not environment or environment == 'LOCAL':
+        duck_logger.info("Using local environment")
+        return None
+
+    # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
+    s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
+
+    if not s3_path:
+        duck_logger.warning("No S3 path configured")
+        return None
+
+    # Parse bucket name and key from the S3 path (s3://bucket-name/key)
+    bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
+    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.info(f"Config key: {key}")
+
     try:
-        # Initialize S3 client
-        s3 = boto3.client('s3')
-
-        # Add a section to your env file to allow for local and production environment
-        environment = os.environ.get('ENVIRONMENT')
-        if not environment or environment == 'LOCAL':
-            duck_logger.info("Using local environment")
-            return None
-
-        # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-        s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-        if not s3_path:
-            duck_logger.warning("No S3 path configured")
-            return None
-
-        # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-        bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-        duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-        duck_logger.info(f"Config key: {key}")
-
         # Download file from S3
         response = s3.get_object(Bucket=bucket_name, Key=key)
 
         # Read the content of the file and parse it as JSON
-        content = response['Body'].read().decode('utf-8')
-        config = load_config('.' + key.split('.')[-1], content)
+        config = json.loads(response['Body'].read().decode('utf-8'))
         duck_logger.info("Successfully loaded config from S3")
         return config
 
@@ -72,35 +69,26 @@ def fetch_config_from_s3() -> Config | None:
         return None
 
 
-def read_yaml(content):
-    return yaml.safe_load(io.StringIO(content))
+def load_yaml_config(config_path):
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
-def read_json(content):
-    return json.loads(content)
+def load_json_config(config_path):
+    with open(config_path, 'r') as f:
+        return json.load(f)
 
 
-def load_config(file_type, content):
-    if file_type == '.json':
-        return read_json(content)
-    elif file_type == '.yaml':
-        return read_yaml(content)
+def load_local_config(config_path):
+    if config_path.suffix == '.json':
+        return load_json_config(config_path)
+    elif config_path.suffix == '.yaml':
+        return load_yaml_config(config_path)
     else:
-        raise NotImplementedError(f'Unsupported config extension: {file_type}')
+        raise ValueError("Config file must be either .json or .yaml")
 
 
-def load_local_config(config_path: Path):
-    return load_config(config_path.suffix, config_path.read_text())
-
-
-def setup_workflow_manager(
-        config: Config,
-        duck_orchestrator,
-        sql_session,
-        metrics_handler,
-        send_message,
-        log_dir: Path
-):
+def setup_workflow_manager(config: Config, duck_orchestrator, sql_session, metrics_handler, send_message,log_dir: Path):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
 
     commands = create_commands(send_message, metrics_handler, reporter, log_dir)
@@ -124,16 +112,61 @@ def setup_workflow_manager(
     return workflow_manager
 
 
+def _has_workflow_of_type(config: Config, wtype: str):
+    return any(
+        duck['workflow_type'] == wtype
+        for server_id, server_config in config['servers'].items()
+        for channel_config in server_config['channels']
+        for duck in channel_config['ducks']
+    )
+
+
+def setup_ducks(
+        config: Config,
+        bot: DiscordBot,
+        metrics_handler,
+        feedback_manager
+) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
+    """
+    Return a dictionary of channel ID to list of weighted ducks
+    """
+    channel_ducks = {}
+
+    for server_config in config['servers'].values():
+        for channel_config in server_config['channels']:
+            channel_ducks[channel_config['channel_id']] = build_ducks(
+                channel_config, bot, metrics_handler, feedback_manager, config
+            )
+
+    return channel_ducks
+
+
+def tools_to_final_output_handler(run_context, tool_results):
+    """
+    Custom handler to determine if tool results should be final output.
+    This function is called after tools are executed.
+    """
+    for tool_result in tool_results:
+        if tool_result.tool.direct_send_message:
+            return ToolsToFinalOutputResult(
+                is_final_output=True,
+                final_output=tool_result.output
+            )
+    return ToolsToFinalOutputResult(
+        is_final_output=False,
+        final_output=None
+    )
+
+
 def build_conversation_review_duck(
         name: str,
-        settings: ConversationReviewSettings,
-        bot: DiscordBot, record_feedback, feedback_manager
-) -> DuckConversation:
+        bot: DiscordBot, metrics_handler, feedback_manager, settings
+):
     have_ta_conversation = HaveTAGradingConversation(
         name,
         settings,
         feedback_manager,
-        record_feedback,
+        metrics_handler.record_feedback,
         bot.send_message,
         bot.add_reaction,
     )
@@ -141,9 +174,9 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
+        name: str, bot: DiscordBot, settings: RegistrationSettings
 ):
-    email_confirmation = EmailSender(config['sender_email'])
+    email_confirmation = EmailSender(settings['sender_email'])
 
     registration_workflow = RegistrationWorkflow(
         name,
@@ -156,51 +189,35 @@ def build_registration_duck(
     return registration_workflow
 
 
-def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
-    # Look for global configs
-    yield from config['ducks']
-
-    # Look for inline duck configs
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            for item in channel_config['ducks']:
-                if isinstance(item, DUCK_NAME):
-                    continue
-                elif isinstance(item, dict):
-                    if 'weight' in item:
-                        duck = item['duck']
-                        if isinstance(duck, DUCK_NAME):
-                            continue
-                        yield duck
-                    else:
-                        yield item
-
-
 def build_ducks(
-        config: Config,
+        channel_config: ChannelConfig,
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-) -> dict[DUCK_NAME, DuckConversation]:
-    ducks = {}
-
-    for duck_config in _iterate_duck_configs(config):
+        config: Config
+) -> list[tuple[DUCK_WEIGHT, DuckConversation]]:
+    ducks = []
+    for duck_config in channel_config['ducks']:
         duck_type = duck_config['duck_type']
         settings = duck_config['settings']
         name = duck_config['name']
+        weight: float = duck_config.get('weight', 1.0)
 
         if duck_type == 'agent_conversation':
-            ducks[name] = build_agent_conversation_duck(
-                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
-            )
+            ducks.append((weight, build_agent_conversation_duck(
+                name, 
+                config, 
+                settings, 
+                bot, 
+                metrics_handler.record_message, 
+                metrics_handler.record_usage
+            )))
 
         elif duck_type == 'conversation_review':
-            ducks[name] = build_conversation_review_duck(
-                name, settings, bot, metrics_handler.record_feedback, feedback_manager
-            )
+            ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager, settings)))
 
         elif duck_type == 'registration':
-            ducks[name] = build_registration_duck(name, bot, config, settings)
+            ducks.append((weight, build_registration_duck(name, bot, settings)))
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -211,47 +228,14 @@ def build_ducks(
     return ducks
 
 
-def _setup_ducks(
-        config: Config,
-        bot: DiscordBot,
-        metrics_handler,
-        feedback_manager,
-) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
-    """
-    Return a dictionary of channel ID to list of weighted ducks
-    """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
-
-    channel_ducks = {}
-
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            channel_ducks[channel_config['channel_id']] = []
-            for duck_config in channel_config['ducks']:
-                if isinstance(duck_config, str):
-                    name, weight = duck_config, 1
-
-                elif isinstance(duck_config, dict) and 'weight' in duck_config:
-                    name = duck_config['name']
-                    weight = duck_config['weight']
-
-                elif isinstance(duck_config, dict):
-                    name, weight = duck_config['name'], 1
-
-                else:
-                    raise ValueError(f'Incorrect format for duck config: {channel_config["channel_id"]}')
-
-                channel_ducks[channel_config['channel_id']].append((weight, all_ducks[name]))
-
-    return channel_ducks
-
-
 def _build_feedback_queues(config: Config, sql_session):
     queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
 
     convo_review_ducks = (
         duck
-        for duck in _iterate_duck_configs(config)
+        for server_config in config['servers'].values()
+        for channel_config in server_config['channels']
+        for duck in channel_config['ducks']
         if duck['duck_type'] == 'conversation_review'
     )
 
@@ -282,12 +266,11 @@ async def main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
+            ducks = setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
                 bot.send_message,
-                bot.add_reaction,
                 ducks,
                 feedback_manager.remember_conversation
             )
@@ -345,10 +328,10 @@ if __name__ == '__main__':
     if args.log_path:
         # Add a file handler to the duck logger if log path is provided
         from .utils.logger import add_file_handler
-
         log_dir = add_file_handler(args.log_path)
     else:
-        duck_logger.warn("No log path provided. Logging to console only.")
+        duck_logger.error("No log path provided. Logging to console only.")
+        raise ValueError("Log path must be provided for logging.")
 
     # Add console handler to the duck logger
     add_console_handler()
@@ -360,4 +343,4 @@ if __name__ == '__main__':
         # If fetching from S3 failed, load from local file
         config = load_local_config(args.config)
 
-    asyncio.run(main(config, args.log_path))
+    asyncio.run(main(config,args.log_path))
