@@ -27,7 +27,7 @@ class FeedbackManager:
                 f"Remembering conversation for channel {feedback_data['parent_channel_id']}: {feedback_data}")
             queue.put(feedback_data)
         else:
-            duck_logger.warning(f"No queue found for channel {feedback_data['parent_channel_id']} when remembering")
+            duck_logger.debug(f"No queue found for channel {feedback_data['parent_channel_id']} when remembering")
 
     async def get_conversation(self, channel_id) -> FeedbackData | None:
         # Must be async to work with quest.step

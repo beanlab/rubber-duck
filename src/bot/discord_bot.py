@@ -140,9 +140,9 @@ class DiscordBot(discord.Client):
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(io.BytesIO(file[1]), file[0])
+            return discord.File(io.BytesIO(file[1]), filename=file[0])
         if isinstance(file, dict):
-            return discord.File(file['bytes'], file['filename'])
+            return discord.File(io.BytesIO(file['bytes']), filename=file['filename'])
 
         raise NotImplementedError(f"Unsupported file type: {file}")
 
