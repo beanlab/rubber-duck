@@ -92,7 +92,7 @@ class AgentConversation:
 
         if file := response.get('file'):
             await self._send_message(context.thread_id, file=file)
-            return file['filename']
+            return agent_name, f"Sent file: {file['filename']}"
 
         if content := response.get('content'):
             await self._send_message(context.thread_id, content)

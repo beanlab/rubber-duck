@@ -12,6 +12,7 @@ from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config, MultiAgentSettings
+from ..utils.logger import duck_logger
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -110,6 +111,8 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
             data_store = DataStore(config['dataset_folder_locations'])
             stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
+        else:
+            duck_logger.warning("**No dataset folder locations provided in config**")
 
         # Agents used as tools don't get any tools of their own. We use an empty amory to make them.
         armory_for_agents_as_tools = Armory()
