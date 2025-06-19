@@ -56,7 +56,7 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
-    prompt_file: str
+    prompt_file: list[str]
     tools: list[str]
     handoff_prompt: str
     handoffs: list[str]
@@ -69,7 +69,6 @@ class AgentConversationSettings(TypedDict):
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]
-    context: list[str] | None
 
 
 @dataclass
