@@ -27,7 +27,8 @@ agents_as_tools:
       the order of complexity (Big-O analysis) of the provided code.
     agents:
       - name: CodeComplexityAgent
-        prompt_file: prompts/generate-code-complexity.md
+        prompt_files:
+        - prompts/generate-code-complexity.md
         engine: gpt-4.1
 
 ducks:
@@ -39,7 +40,8 @@ ducks:
       agents:
         - name: RubberDuck
           engine: gpt-4.1
-          prompt_file: prompts/standard-rubber-duck.txt
+          prompt_files:
+          - prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
       file_size_limit: *file_size_limit
@@ -58,7 +60,8 @@ ducks:
       timeout: 60
       agents:
         - name: Standard_Rubber_Duck
-          prompt_file: prompts/stats.txt
+          prompt_files:
+          - prompts/stats.txt
           engine: gpt-4.1
           tools:
             - explain_capabilities
@@ -249,7 +252,8 @@ servers:
                 I can help you think through your problems by asking questions.
               agents:
                 - name: socrates
-                  prompt_file: prompts/socratic-duck.txt
+                  prompt_files:
+                  - prompts/socratic-duck.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
@@ -287,7 +291,8 @@ servers:
               agents:
                 - name: DesignerDuck
                   engine: gpt-4.1
-                  prompt_file: prompts/designer-duck.txt
+                  prompt_files:
+                  - prompts/designer-duck.txt
                   max_iterations: 5
               timeout: 600
 

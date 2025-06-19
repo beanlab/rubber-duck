@@ -224,18 +224,3 @@ class DiscordBot(discord.Client):
         except Exception:
             duck_logger.exception(f"Error reading URL {url}")
             raise
-
-    async def read_file(self, file_path: str) -> str:
-        """
-        Read a file from the filesystem and return its content as a string.
-        """
-        try:
-            path = Path(file_path)
-            if path.exists() and path.is_file():
-                return path.read_text(encoding='utf-8')
-            else:
-                duck_logger.error(f"File not found or not accessible: {file_path}")
-                return f"File not found or not accessible: {file_path}"
-        except Exception as e:
-            duck_logger.exception(f"Error reading file {file_path}: {e}")
-            return f"Error reading file: {str(e)}"

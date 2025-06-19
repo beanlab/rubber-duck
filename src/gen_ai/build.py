@@ -43,7 +43,7 @@ class UsageAgentHooks(AgentHooks[DuckContext]):
 def _build_agent(
         armory: Armory,
         config: SingleAgentSettings,
-        agent_hooks: AgentHooks[DuckContext]
+        agent_hooks: AgentHooks[DuckContext],
 ) -> Agent[DuckContext]:
     tools = [
         armory.get_specific_tool(tool)
@@ -53,10 +53,10 @@ def _build_agent(
 
     prompt = config.get('prompt')
     if not prompt:
-        prompt_path = config.get("prompt_file")
-        if not prompt_path:
+        prompt_files = config.get("prompt_files")
+        prompt = f'\n--------\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
+        if not prompt_files:
             raise ValueError(f"You must provide either 'prompt' or 'prompt_file' for {config['name']}")
-        prompt = Path(prompt_path).read_text(encoding="utf-8")
 
     return Agent(
         name=config["name"],

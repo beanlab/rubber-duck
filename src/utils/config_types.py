@@ -57,7 +57,7 @@ class SingleAgentSettings(TypedDict):
     name: str
     engine: str
     prompt: NotRequired[str]
-    prompt_file: NotRequired[str]
+    prompt_files: NotRequired[list[str]]
     tools: list[str]
     handoff_prompt: str
     handoffs: list[str]
