@@ -47,7 +47,7 @@ def build_agent(
     tools = [
         armory.get_specific_tool(tool)
         for tool in config.get("tools", [])
-        if tool in armory.get_all_tool_names() # this is silently failing if the tool isn't there
+        if tool in armory.get_all_tool_names()
     ]
 
     return Agent(
