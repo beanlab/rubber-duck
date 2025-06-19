@@ -7,20 +7,17 @@ from pathlib import Path
 
 import boto3
 import yaml  # Added import for YAML support
-from agents import Agent, ToolsToFinalOutputResult
+from agents import ToolsToFinalOutputResult
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from .armory.socratic_tool import make_sub_conversation
-from .armory.armory import Armory
-from .armory.stat_tools import StatsTools
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.conversation import AgentConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .gen_ai.build import build_agent_conversation_duck
 from .metrics.feedback import HaveTAGradingConversation
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -28,11 +25,8 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
-from .utils.config_types import Config, ChannelConfig, RegistrationSettings, AgentConversationSettings, \
-    SingleAgentSettings, HubSpokesAgentSettings, DUCK_WEIGHT, DuckContext
-from .utils.data_store import DataStore
+from .utils.config_types import Config, ChannelConfig, RegistrationSettings, DUCK_WEIGHT
 from .utils.feedback_notifier import FeedbackNotifier
-from .utils.gen_ai import RetryableGenAI, AgentClient
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
@@ -141,7 +135,7 @@ def setup_ducks(
     for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
             channel_ducks[channel_config['channel_id']] = build_ducks(
-                channel_config, bot, metrics_handler, feedback_manager
+                channel_config, bot, metrics_handler, feedback_manager, config
             )
 
     return channel_ducks
@@ -164,112 +158,13 @@ def tools_to_final_output_handler(run_context, tool_results):
     )
 
 
-def build_agent(armory: Armory, config: SingleAgentSettings) -> Agent[DuckContext]:
-    tools = [
-        armory.get_specific_tool(tool)
-        for tool in config.get("tools", [])
-        if tool in armory.get_all_tool_names()
-    ]
-    return Agent[DuckContext](
-        name=config["name"],
-        handoff_description=config.get("handoff_prompt", ""),
-        instructions=Path(config["prompt_file"]).read_text(encoding="utf-8"),
-        tools=tools,
-        tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
-        model=config["engine"],
-    )
-
-
-def create_agents(armory: Armory, settings: HubSpokesAgentSettings) -> tuple[Agent, list[Agent]]:
-    return build_agent(armory, settings["hub_agent_settings"]), [
-        build_agent(armory, agent) for agent in settings.get("spoke_agents_settings", [])
-    ]
-
-
-def build_agent_conversation_duck(name: str, metrics_handler, bot, settings: AgentConversationSettings):
-    armory = Armory()
-    if 'dataset_folder_locations' in config:
-        data_store = DataStore(config['dataset_folder_locations'])
-        stat_tools = StatsTools(data_store)
-        armory.scrub_tools(stat_tools)
-
-    # Add Socratic tools
-    socratic_tools = SocraticTool()
-    armory.scrub_tools(socratic_tools)
-
-    agent_type = settings['agent_type']
-
-    match agent_type:
-        case 'single-agent':
-            agent = build_agent(armory, settings['agent_settings'])
-
-        case 'hub-spokes':
-            # Configure hub agent with Socratic tools
-            hub_settings = settings['agent_settings']['hub_agent_settings']
-            hub_settings['tools'] = ['socratic_questioning', 'give_explanation', 'end_conversation']
-            
-            # Configure spoke agents for each tool
-            spoke_settings = [
-                {
-                    "name": "socratic_questioner",
-                    "prompt_file": "prompts/socratic-duck.txt",
-                    "engine": "gpt-4",
-                    "tools": ["socratic_questioning"]
-                },
-                {
-                    "name": "explainer",
-                    "prompt_file": "prompts/explainer.txt",
-                    "engine": "gpt-4",
-                    "tools": ["give_explanation"]
-                },
-                {
-                    "name": "conversation_ender",
-                    "prompt_file": "prompts/end-conversation.txt",
-                    "engine": "gpt-4",
-                    "tools": ["end_conversation"]
-                }
-            ]
-            
-            settings['agent_settings']['spoke_agents_settings'] = spoke_settings
-            agent, spoke_agents = create_agents(armory, settings['agent_settings'])
-
-        case _:
-            raise NotImplementedError(f'Agent type {agent_type} not implemented.')
-
-    agent_client = AgentClient(
-        settings.get('introduction', 'Hello. How can I help you?'),
-        agent,
-        metrics_handler.record_usage,
-        bot.typing
-    )
-
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-    retryable_ai_client = RetryableGenAI(
-        agent_client,
-        bot.send_message,
-        bot.typing,
-        ai_completion_retry_protocol
-    )
-
-    agent_conversation = AgentConversation(
-        name,
-        retryable_ai_client,
-        metrics_handler.record_message,
-        bot.send_message,
-        bot.add_reaction,
-        settings['timeout'],
-        armory
-    )
-
-    return agent_conversation
-
-
 def build_conversation_review_duck(
         name: str,
-        bot: DiscordBot, metrics_handler, feedback_manager
+        bot: DiscordBot, metrics_handler, feedback_manager, settings
 ):
     have_ta_conversation = HaveTAGradingConversation(
         name,
+        settings,
         feedback_manager,
         metrics_handler.record_feedback,
         bot.send_message,
@@ -298,20 +193,28 @@ def build_ducks(
         channel_config: ChannelConfig,
         bot: DiscordBot,
         metrics_handler,
-        feedback_manager
+        feedback_manager,
+        config: Config
 ) -> list[tuple[DUCK_WEIGHT, DuckConversation]]:
     ducks = []
     for duck_config in channel_config['ducks']:
-        duck_type = duck_config['workflow_type']
+        duck_type = duck_config['duck_type']
         settings = duck_config['settings']
         name = duck_config['name']
         weight: float = duck_config.get('weight', 1.0)
 
-        if duck_type == 'basic_prompt_conversation':
-            ducks.append((weight, build_agent_conversation_duck(name, metrics_handler, bot, settings)))
+        if duck_type == 'agent_conversation':
+            ducks.append((weight, build_agent_conversation_duck(
+                name, 
+                config, 
+                settings, 
+                bot, 
+                metrics_handler.record_message, 
+                metrics_handler.record_usage
+            )))
 
         elif duck_type == 'conversation_review':
-            ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager)))
+            ducks.append((weight, build_conversation_review_duck(name, bot, metrics_handler, feedback_manager, settings)))
 
         elif duck_type == 'registration':
             ducks.append((weight, build_registration_duck(name, bot, settings)))
@@ -333,7 +236,7 @@ def _build_feedback_queues(config: Config, sql_session):
         for server_config in config['servers'].values()
         for channel_config in server_config['channels']
         for duck in channel_config['ducks']
-        if duck['workflow_type'] == 'conversation_review'
+        if duck['duck_type'] == 'conversation_review'
     )
 
     target_channel_ids = (
