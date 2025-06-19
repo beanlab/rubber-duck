@@ -47,7 +47,7 @@ def build_agent(
     tools = [
         armory.get_specific_tool(tool)
         for tool in config.get("tools", [])
-        if tool in armory.get_all_tool_names()
+        if tool in armory.get_all_tool_names() # this is silently failing if the tool isn't there
     ]
 
     return Agent(
@@ -90,7 +90,7 @@ def _build_agents(
 _armory: Armory = None
 
 
-def _get_armory(config: Config) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
@@ -99,6 +99,13 @@ def _get_armory(config: Config) -> Armory:
             data_store = DataStore(config['dataset_folder_locations'])
             stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
+
+        if 'tools-as-agents' in config:
+            for agent_settings in config['tools-as-agents']:
+                no_op_armory = Armory()
+
+                agent = build_agent(no_op_armory, agent_settings['agents'], usage_hooks)
+                _armory.add_agent_as_tool(agent, agent_settings['name'], agent_settings['agents']['description'])
 
     return _armory
 
@@ -111,9 +118,8 @@ def build_agent_conversation_duck(
         record_message: RecordMessage,
         record_usage: RecordUsage
 ) -> DuckConversation:
-
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config)
+    armory = _get_armory(config, usage_hooks)
 
     agents = _build_agents(armory, usage_hooks, settings['agents'])
 
