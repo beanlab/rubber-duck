@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 from quest import step, queue
 
@@ -54,11 +55,12 @@ class AgentConversation:
                  send_message: SendMessage,
                  add_reaction: AddReaction,
                  read_url,
+                 read_file,
                  wait_for_user_timeout,
                  armory: Armory,
                  file_size_limit: int,
                  file_type_ext: list[str] = None,
-                 context: list[str] = None
+                 context: list[str] = None,
                  ):
         self.name = name
 
@@ -71,6 +73,7 @@ class AgentConversation:
         self._send_message = step(send_message)
         self._add_reaction: AddReaction = step(add_reaction)
         self._read_url = step(read_url)
+        self._read_file = step(read_file)
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
@@ -80,16 +83,17 @@ class AgentConversation:
 
 
     @step
-    def _load_context_files(self) -> str:
-        """Load context files from the armory if context is provided."""
+    async def _load_context_files(self) -> str:
+        """Load context files from file paths if context is provided."""
         if not self._context:
+            duck_logger.debug("No context provided")
             return ""
-            
+        
+        duck_logger.debug(f"Loading context files: {self._context}")
         context_content = []
-        for file_name in self._context:
-            file_content = self._armory.get_file_content(file_name)
-            if file_content:
-                context_content.append(f'**{file_name}**\n--------\n{file_content}\n--------\n')
+        for file_path in self._context:
+            file_content = await self._read_file(file_path)
+            context_content.append(f'**{Path(file_path).name}**\n--------\n{file_content}\n--------\n')
         
         return '\n'.join(context_content)
 
@@ -124,7 +128,7 @@ class AgentConversation:
         message_history = []
         # Load context files if provided
         if self._context:
-            context_files = self._load_context_files()
+            context_files = await self._load_context_files()
             message_history.append(GPTMessage(role='assistant', content=context_files))
             await self._record_message(context.guild_id, context.thread_id, context.author_id, "assistant", context_files)
             duck_logger.debug(f"Context files loaded: {context_files}")

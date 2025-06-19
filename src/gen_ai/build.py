@@ -141,11 +141,12 @@ def build_agent_conversation_duck(
         bot.send_message,
         bot.add_reaction,
         bot.read_url,
+        bot.read_file,
         settings['timeout'],
         armory,
         settings.get('file_size_limit', 0),
         settings.get('file_type_ext', []),
-        settings.get('context', None)
+        settings.get('context', None),
     )
 
     return agent_conversation
