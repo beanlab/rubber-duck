@@ -1,6 +1,88 @@
+# Anchors
+file_size_limit: &file_size_limit 4096 # 4KB limit
+file_type_ext: &file_type_ext
+  [
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
+  ]
+
 sql:
   db_type: sqlite
   database: /rubber-duck.db
+
+agents_as_tools:
+  - tool_name: generate_code_complexity_analysis
+    description: |
+      This tool takes source code as a string and returns a string describing 
+      the order of complexity (Big-O analysis) of the provided code.
+    agents:
+      - name: CodeComplexityAgent
+        prompt_file: prompts/generate-code-complexity.md
+        engine: gpt-4.1
+
+ducks:
+  - name: standard-rubber-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        Hello! How can I help you?
+      agents:
+        - name: RubberDuck
+          engine: gpt-4.1
+          prompt_file: prompts/standard-rubber-duck.txt
+          max_iterations: 5
+      timeout: 600
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
+
+  - name: stats-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        I'm an exploratory data analysis assistant. 
+        I can help you with basic statistics and data visualization. 
+        You can ask me to:
+        1. Perform various statistical calculations. 
+        2. Create visualizations.
+        3. Provide insights based on your data.
+      timeout: 60
+      agents:
+        - name: Standard_Rubber_Duck
+          prompt_file: prompts/stats.txt
+          engine: gpt-4.1
+          tools:
+            - explain_capabilities
+            - describe_dataset
+            - get_dataset_names
+            - get_variable_names
+            - plot_barplot
+            - plot_histogram
+            - plot_boxplot
+            - plot_dotplot
+            - plot_pie_chart
+            - plot_proportion_barplot
+            - calculate_mean
+            - calculate_skewness
+            - calculate_std
+            - calculate_median
+            - calculate_mode
+            - calculate_five_number_summary
+            - calculate_table_of_counts
+            - calculate_proportions
+            - show_dataset_head
+          max_iterations: 5
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
 
 servers:
   927616651409649675:
@@ -10,7 +92,7 @@ servers:
         channel_name: review-cs-110
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1234556460453597276
@@ -19,11 +101,7 @@ servers:
       - channel_id: 1234556460453597276
         channel_name: general/duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+          - standard-rubber-duck
 
   747510855536738336:
     server_name: CS 235
@@ -32,7 +110,7 @@ servers:
         channel_name: review-cs-235
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1195490291134779502
@@ -41,12 +119,7 @@ servers:
       - channel_id: 1195490291134779502
         channel_name: student-text-channels/duck-pond
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
-              timeout: 600
+          - standard-rubber-duck
 
   1235303213796691998:
     server_name: CS 111
@@ -55,7 +128,7 @@ servers:
         channel_name: review-cs-111
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1365456542287269919
@@ -64,12 +137,7 @@ servers:
       - channel_id: 1365456542287269919
         channel_name: Student Text Channels/duck-pond
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
-              timeout: 600
+          - standard-rubber-duck
 
   1371951485629370458:
     server_name: Stats
@@ -78,7 +146,7 @@ servers:
         channel_name: ta-review
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1371951696061661215
@@ -88,55 +156,12 @@ servers:
       - channel_id: 1371951696061661215
         channel_name: duck-pond
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
-              timeout: 600
+          - standard-rubber-duck
 
       - channel_id: 1374066971523678279
         channel_name: stats-tool
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
-            weight: 1
-            settings:
-              introduction: |
-                I'm an exploratory data analysis assistant. 
-                I can help you with basic statistics and data visualization. 
-                You can ask me to perform:
-                1. Various statistical calculations. 
-                2. Create visualizations.
-                3. Provide insights based on your data.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/stats.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                tools:
-                  - explain_capabilities
-                  - describe_dataset
-                  - get_dataset_names
-                  - get_variable_names
-                  - plot_barplot
-                  - plot_histogram
-                  - plot_boxplot
-                  - plot_dotplot
-                  - plot_pie_chart
-                  - plot_proportion_barplot
-                  - calculate_mean
-                  - calculate_skewness
-                  - calculate_std
-                  - calculate_median
-                  - calculate_mode
-                  - calculate_five_number_summary
-                  - calculate_table_of_counts
-                  - calculate_proportions
-                  - show_dataset_head
-                max_iterations: 5
-              timeout: 60
+          - stats-duck
 
   1354902266246598928:
     server_name: Physics
@@ -145,7 +170,7 @@ servers:
         channel_name: review-phys-230
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1363949528201564170
@@ -154,18 +179,13 @@ servers:
       - channel_id: 1363949528201564170
         channel_name: physics-230-phys230
         ducks:
-          - name: basic_prompt_conversation
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
-              timeout: 600
+          - standard-rubber-duck
 
       - channel_id: 1359587713749094700
         channel_name: review-phys-430
         ducks:
           - name: conversation_review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1359587525605458030
@@ -174,12 +194,7 @@ servers:
       - channel_id: 1359587525605458030
         channel_name: physics-430-phys430
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
-            settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
-              timeout: 600
+          - standard-rubber-duck
 
   1338616224858374287:
     server_name: Rubber Duck Demo Server
@@ -188,7 +203,7 @@ servers:
         channel_name: vintage-duck-review
         ducks:
           - name: review
-            workflow_type: conversation_review
+            duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1338616283671040000
@@ -196,29 +211,56 @@ servers:
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
+          - standard-rubber-duck
+
+      - channel_id: 1385293810782965830
+        channel_name: code-complexity-analysis-duck
+        ducks:
+          - name: code-complexity-duck
+            duck_type: agent_conversation
             settings:
-              prompt_file: prompts/standard-rubber-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                Upload a code file and I'll analyze it for you. 
+                You can also ask me questions about Big-O analysis.
               timeout: 600
+              file_size_limit: 5100
+              file_type_ext: [ 'py', 'java', 'cpp', 'c', 'h', 'hpp', 'ts', 'js' ]
+              agents:
+                - name: ComplexityDuck
+                  prompt: |
+                    You are a helpful CS assistant.
+                    You explain Big-O analysis. 
+                    You can use the provided tools to generate a complexity analysis report
+                    when the user provides a code file.
+                    Keep your responses brief and clear. Provide the tool output to the user verbatim.
+                  engine: gpt-4.1
+                  max_iterations: 15
+                  tools:
+                    - generate_code_complexity_analysis
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
         ducks:
           - name: socratic-rubber-duck
-            workflow_type: basic_prompt_conversation
+            duck_type: agent_conversation
             settings:
-              prompt_file: prompts/socratic-duck.txt
-              engine: gpt-4.1
+              introduction: |
+                I'm a Socratic-style rubber duck. 
+                I can help you think through your problems by asking questions.
+              agents:
+                - name: socrates
+                  prompt_file: prompts/socratic-duck.txt
+                  engine: gpt-4.1
+                  max_iterations: 5
               timeout: 600
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
 
       - channel_id: 1379959992110546995
         channel_name: registration-duck
         ducks:
           - name: Registration-Workflow
-            workflow_type: registration
-            weight: 1
+            duck_type: registration
             settings:
               cache_timeout: 60800
               authenticated_user_role_name: I-passed-registration
@@ -232,48 +274,27 @@ servers:
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
 
+      - channel_id: 1384678077694480434
+        channel_name: designer-duck
+        ducks:
+          - name: designer-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
+                I'm specialized with helping you on Project 2: Convex Hull.
+                Let's work on this together! How is data stored in your project?
+              agents:
+                - name: DesignerDuck
+                  engine: gpt-4.1
+                  prompt_file: prompts/designer-duck.txt
+                  max_iterations: 5
+              timeout: 600
+
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
-          - name: standard-rubber-duck
-            workflow_type: basic_prompt_conversation
-            weight: 1
-            settings:
-              introduction: |
-                I'm an exploratory data analysis assistant. 
-                I can help you with basic statistics and data visualization. 
-                You can ask me to perform:
-                1. Various statistical calculations. 
-                2. Create visualizations.
-                3. Provide insights based on your data.
-              agent_type: single-agent
-              agent_settings:
-                name: Standard_Rubber_Duck
-                prompt_file: prompts/stats.txt
-                engine: gpt-4.1
-                handoff_prompt:
-                tools:
-                  - explain_capabilities
-                  - describe_dataset
-                  - get_dataset_names
-                  - get_variable_names
-                  - plot_barplot
-                  - plot_histogram
-                  - plot_boxplot
-                  - plot_dotplot
-                  - plot_pie_chart
-                  - plot_proportion_barplot
-                  - calculate_mean
-                  - calculate_skewness
-                  - calculate_std
-                  - calculate_median
-                  - calculate_mode
-                  - calculate_five_number_summary
-                  - calculate_table_of_counts
-                  - calculate_proportions
-                  - show_dataset_head
-                max_iterations: 5
-              timeout: 60
+          - stats-duck
 
 feedback_notifier_settings:
   feedback_check_hour: 9
@@ -296,12 +317,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [0.03, 0.06]
-    "gpt-4o": [0.0025, 0.01]
-    "gpt-4-1106-preview": [0.01, 0.03]
-    "gpt-4-0125-preview": [0.01, 0.03]
-    "o4-mini": [0.000150, 0.0006]
-    "gpt-4-turbo": [0.01, 0.03]
-    "gpt-4-turbo-preview": [0.01, 0.03]
-    "gpt-3.5-turbo-1106": [0.001, 0.002]
-    "gpt-3.5-turbo": [0.001, 0.003]
+    "gpt-4": [ 0.03, 0.06 ]
+    "gpt-4o": [ 0.0025, 0.01 ]
+    "gpt-4-1106-preview": [ 0.01, 0.03 ]
+    "gpt-4-0125-preview": [ 0.01, 0.03 ]
+    "o4-mini": [ 0.000150, 0.0006 ]
+    "gpt-4-turbo": [ 0.01, 0.03 ]
+    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
+    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
+    "gpt-3.5-turbo": [ 0.001, 0.003 ]

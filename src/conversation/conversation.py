@@ -1,16 +1,11 @@
 import asyncio
-from typing import Protocol
 
-from quest import step, queue, wrap_steps
+from quest import step, queue
 
+from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext
-from ..utils.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.protocols import Message, SendMessage, AddReaction
-
-
-class HaveConversation(Protocol):
-    async def __call__(self, thread_id: int, engine: str, message_history: list[GPTMessage], timeout: int = 600): ...
 
 
 class BasicSetupConversation:
@@ -45,88 +40,129 @@ class AgentSetupConversation:
         return message_history
 
 
+AGENT_NAME, AGENT_MESSAGE = str, str
+
+
 class AgentConversation:
     def __init__(self,
                  name: str,
-                 ai_agent: GenAIClient,
+                 introduction: str,
+                 ai_agents: dict[str, GenAIClient],
+                 starting_agent: str,
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
+                 read_url,
                  wait_for_user_timeout,
-                 armory: Armory
+                 armory: Armory,
+                 file_size_limit: int,
+                 file_type_ext: list[str] = None
                  ):
 
         self.name = name
-        self._ai_client = ai_agent
+
+        self._introduction = introduction
+        self._ai_clients = ai_agents
+        self._starting_agent = starting_agent
 
         self._record_message = step(record_message)
 
         self._send_message = step(send_message)
         self._add_reaction: AddReaction = step(add_reaction)
+        self._read_url = step(read_url)
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
+        self._file_size_limit = file_size_limit
+        self._file_type_ext = file_type_ext or []
 
+    # Make a read function in discord bot that will read files.
     @step
-    async def _get_and_send_ai_response(self, context: DuckContext, message_history: list[GPTMessage]) -> str:
+    async def _get_and_send_ai_response(
+            self,
+            context: DuckContext,
+            agent_name: str,
+            message_history: list[GPTMessage]
+    ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
-        response = await self._ai_client.get_completion(
+        response: AgentMessage = await self._ai_clients[agent_name].get_completion(
             context,
             message_history,
         )
 
-        if isinstance(response, str):
-            await self._send_message(context.thread_id, response)
-            return response
+        if file := response.get('file'):
+            await self._send_message(context.thread_id, file=file)
+            return agent_name, f"Sent file: {file['filename']}"
 
-        elif isinstance(response, tuple):
-            await self._send_message(context.thread_id, file=response)
-            return response[0]
+        if content := response.get('content'):
+            await self._send_message(context.thread_id, content)
+            return response['agent_name'], content
 
-        else:
-            raise NotImplementedError("Unsupported response type from AI client: {}".format(type(response)))
+        raise NotImplementedError(f'AI completion had neither content nor file.')
 
     async def __call__(self, context: DuckContext):
 
-        if 'duck' in context.content:
-            await self._add_reaction(context.channel_id, context.message_id, "🦆")
-
+        agent_name = self._starting_agent
         message_history = []
 
-        introduction = self._ai_client.introduction or "Hi, how can I help you?"
+        introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
 
         async with queue('messages', None) as messages:
             while True:
-                try:  # catch all errors
-                    try:
-                        # Waiting for a response from the user
-                        message: Message = await asyncio.wait_for(messages.get(), self._wait_for_user_timeout)
+                try:  # catch GenAIException
+                    try:  # Timeout
+                        message: Message = await asyncio.wait_for(
+                            messages.get(),
+                            self._wait_for_user_timeout
+                        )
 
                     except asyncio.TimeoutError:
                         break
 
-                    if len(message['file']) > 0:
-                        await self._send_message(
-                            context.thread_id,
-                            "I'm sorry, I can't read file attachments. "
-                            "Please resend your message with the relevant parts of your file included in the message."
+                    if message['content']:
+                        message_history.append(GPTMessage(role='user', content=message['content']))
+                        await self._record_message(
+                            context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
+                            message_history[-1]['content']
                         )
-                        continue
 
-                    message_history.append(GPTMessage(role='user', content=message['content']))
+                    errors = []
+                    for attachment in message['files']:
+                        if attachment['size'] > self._file_size_limit:
+                            errors.append(
+                                f"File {attachment['filename']} is too large. "
+                                f"Please upload a file smaller than {self._file_size_limit / 1024 / 1024:.2f} MB."
+                            )
+                            continue
 
-                    await self._record_message(
-                        context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
-                        message_history[-1]['content']
+                        if attachment['filename'].split('.')[-1] not in self._file_type_ext:
+                            errors.append(
+                                f"File {attachment['filename']} is not an allowed type. "
+                                f"Allowed types are: {', '.join(self._file_type_ext)}."
+                            )
+                            continue
+
+                        file_content = await self._read_url(attachment['url'])
+                        if file_content:
+                            file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
+                            message_history.append(GPTMessage(role='user', content=file_content))
+                            await self._record_message(
+                                context.guild_id, context.thread_id, context.author_id, "user", file_content
+                            )
+
+                    if errors:
+                        message_history.append(GPTMessage(role='assistant', content='\n'.join(errors)))
+                        await self._send_message(context.thread_id, '\n'.join(errors))
+                        continue  # wait for the user to respond
+
+                    agent_name, response = await self._get_and_send_ai_response(
+                        context,
+                        agent_name,
+                        message_history
                     )
 
-
-
-                    response = await self._get_and_send_ai_response(context, message_history)
-
                     message_history.append(GPTMessage(role='assistant', content=response))
-
 
                 except GenAIException:
                     await self._send_message(context.thread_id,
