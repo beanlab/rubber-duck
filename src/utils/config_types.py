@@ -69,6 +69,7 @@ class AgentConversationSettings(TypedDict):
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]
+    context: list[str] | None
 
 
 @dataclass

@@ -5,6 +5,7 @@ from quest import step, queue
 from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 
@@ -56,7 +57,8 @@ class AgentConversation:
                  wait_for_user_timeout,
                  armory: Armory,
                  file_size_limit: int,
-                 file_type_ext: list[str] = None
+                 file_type_ext: list[str] = None,
+                 context: list[str] = None
                  ):
         self.name = name
 
@@ -74,6 +76,22 @@ class AgentConversation:
         self._armory = armory
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
+        self._context = context
+
+
+    @step
+    def _load_context_files(self) -> str:
+        """Load context files from the armory if context is provided."""
+        if not self._context:
+            return ""
+            
+        context_content = []
+        for file_name in self._context:
+            file_content = self._armory.get_file_content(file_name)
+            if file_content:
+                context_content.append(f'**{file_name}**\n--------\n{file_content}\n--------\n')
+        
+        return '\n'.join(context_content)
 
 
 # Make a read function in discord bot that will read files.
@@ -104,6 +122,12 @@ class AgentConversation:
 
         agent_name = self._starting_agent
         message_history = []
+        # Load context files if provided
+        if self._context:
+            context_files = self._load_context_files()
+            message_history.append(GPTMessage(role='assistant', content=context_files))
+            await self._record_message(context.guild_id, context.thread_id, context.author_id, "assistant", context_files)
+            duck_logger.debug(f"Context files loaded: {context_files}")
 
         introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
