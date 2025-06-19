@@ -17,5 +17,3 @@ pre-production.env
 v2-production-config.json
 v2-production-config.yaml
 rubberduckdb
-random_context.txt
-random_context_2.txt
