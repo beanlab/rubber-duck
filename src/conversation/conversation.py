@@ -1,10 +1,12 @@
 import asyncio
+from pathlib import Path
 
 from quest import step, queue
 
 from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 
@@ -56,7 +58,7 @@ class AgentConversation:
                  wait_for_user_timeout,
                  armory: Armory,
                  file_size_limit: int,
-                 file_type_ext: list[str] = None
+                 file_type_ext: list[str] = None,
                  ):
         self.name = name
 
@@ -74,7 +76,6 @@ class AgentConversation:
         self._armory = armory
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
-
 
 # Make a read function in discord bot that will read files.
     @step
