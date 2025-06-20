@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
@@ -41,30 +41,23 @@ class UsageAgentHooks(AgentHooks[DuckContext]):
 
 
 def _build_agent(
-        armory: Armory,
         config: SingleAgentSettings,
         agent_hooks: AgentHooks[DuckContext],
 ) -> Agent[DuckContext]:
-    tools = [
-        armory.get_specific_tool(tool)
-        for tool in config.get("tools", [])
-        if tool in armory.get_all_tool_names()
-    ]
-
     prompt = config.get('prompt')
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
             raise ValueError(f"You must provide either 'prompt' or 'prompt_file' for {config['name']}")
-        
+
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 
     return Agent(
         name=config["name"],
         handoff_description=config.get("handoff_prompt", ""),
         instructions=prompt,
-        tools=tools,
-        tool_use_behavior={"stop_at_tool_names": [tool.name for tool in tools if hasattr(tool, 'direct_send_message')]},
+        tools=[],
+        tool_use_behavior={},
         model=config["engine"],
         hooks=agent_hooks,
         handoffs=[]
@@ -72,24 +65,23 @@ def _build_agent(
 
 
 def _build_agents(
-        armory: Armory,
         agent_hooks: AgentHooks[DuckContext],
         settings: list[SingleAgentSettings],
-) -> dict[str, Agent[DuckContext]]:
+) -> dict[str, tuple[Agent[DuckContext], SingleAgentSettings]]:
     agents = {}
 
     # Initial agent setup
     for agent_settings in settings:
-        agent = _build_agent(armory, agent_settings, agent_hooks)
-        agents[agent_settings['name']] = agent
+        agent = _build_agent(agent_settings, agent_hooks)
+        agents[agent_settings['name']] = agent, agent_settings
 
     # Add on agent handoffs
     for agent_settings in settings:
         agent_name = agent_settings['name']
-        agent = agents[agent_name]
+        agent = agents[agent_name][0]
         handoff_targets = agent_settings.get('handoffs', [])
 
-        handoffs = [agents[target] for target in handoff_targets]
+        handoffs = [agents[target][0] for target in handoff_targets]
         agent.handoffs = handoffs
 
     return agents
@@ -101,6 +93,23 @@ def _get_starting_agent(settings: MultiAgentSettings):
 
 # noinspection PyTypeChecker
 _armory: Armory = None
+
+
+def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], armory: Armory):
+    for agent, settings in agents:
+        tools = [
+            armory.get_specific_tool(tool)
+            for tool in settings.get('tools', [])
+            if tool in armory.get_all_tool_names()
+        ]
+        agent.tools = tools
+        agent.tool_use_behavior = {
+            "stop_at_tool_names": [
+                tool.name
+                for tool in tools
+                if hasattr(tool, 'direct_send_message')
+            ]
+        }
 
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
@@ -115,13 +124,14 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-        # Agents used as tools don't get any tools of their own. We use an empty amory to make them.
-        armory_for_agents_as_tools = Armory()
+    all_tool_agents = []
+    for agent_settings in config.get('agents_as_tools', []):
+        agents = _build_agents(usage_hooks, agent_settings['agents'])
+        all_tool_agents.extend(agents.values())
+        head_agent = agents[_get_starting_agent(agent_settings)][0]
+        _armory.add_agent_as_tool(head_agent, agent_settings['tool_name'], agent_settings['description'])
 
-        for agent_settings in config.get('agents_as_tools', []):
-            agents = _build_agents(armory_for_agents_as_tools, usage_hooks, agent_settings['agents'])
-            head_agent = agents[_get_starting_agent(agent_settings)]
-            _armory.add_agent_as_tool(head_agent, agent_settings['tool_name'], agent_settings['description'])
+    _add_tools_to_agents(all_tool_agents, _armory)
 
     return _armory
 
@@ -137,7 +147,8 @@ def build_agent_conversation_duck(
     usage_hooks = UsageAgentHooks(record_usage)
     armory = _get_armory(config, usage_hooks)
 
-    agents = _build_agents(armory, usage_hooks, settings['agents'])
+    conversation_agents = _build_agents(usage_hooks, settings['agents'])
+    _add_tools_to_agents(conversation_agents.values(), armory)
 
     ai_completion_retry_protocol = config['ai_completion_retry_protocol']
 
@@ -147,7 +158,7 @@ def build_agent_conversation_duck(
             bot.send_message,
             ai_completion_retry_protocol
         )
-        for name, agent in agents.items()
+        for name, (agent, _) in conversation_agents.items()
     }
 
     starting_agent = settings.get('starting_agent')
@@ -163,7 +174,7 @@ def build_agent_conversation_duck(
         bot.send_message,
         bot.add_reaction,
         bot.read_url,
-        settings.get('timeout', 60*5),
+        settings.get('timeout', 60 * 5),
         armory,
         settings.get('file_size_limit', 0),
         settings.get('file_type_ext', []),
