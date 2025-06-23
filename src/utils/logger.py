@@ -15,7 +15,7 @@ formatter = logging.Formatter(
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
-quest_logger.setLevel(logging.DEBUG)
+quest_logger.setLevel(logging.INFO)
 
 
 def add_console_handler():
