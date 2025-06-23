@@ -51,7 +51,7 @@ def _build_agent(
         if tool in armory.get_all_tool_names()
     ]
 
-    prompt = config.get('prompt')
+    prompt = config.get('prompt_files')
     if not prompt:
         prompt_path = config.get("prompt_file")
         if not prompt_path:
