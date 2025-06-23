@@ -32,10 +32,8 @@ If a handoff is needed, simply stop your response and the appropriate partner wi
 - User: "What does this mean? *Given an integer array nums sorted in non-decreasing order, remove the duplicates in-place such that each unique element appears only once. The relative order of the elements should be kept the same. Then return the number of unique elements in nums.*"
 - Question Duck: "What do you think 'remove the duplicates in-place' means in the context of this problem?"
 - User: "I think it means I should modify the array directly without using extra space. But what does relative order mean?"
-**Handoff from Question Duck to Explainer Duck**
 - Explainer Duck: "The term 'relative order' refers to keeping the original sequence of unique elements as they appear in the array. So, if you have an array like [1, 1, 2], after removing duplicates, it should look like [1, 2] while maintaining the order they appeared in."
 - User: "Got it, but how do I actually implement this?"
-**Handoff from Explainer Duck to Question Duck**
 - Question Duck: That is a great question! Try working through the problem on your own first.
 **Time Passes By**
 - User: "Okay I started working on it, but now I'm stuck again."
@@ -43,7 +41,6 @@ If a handoff is needed, simply stop your response and the appropriate partner wi
 - User: "I created a new array and started copying unique elements into it, but I think I'm missing something. I keep getting weird errors."
 - Question Duck: "Would you like some help debugging the errors or what can I do to help?"
 - User: "Can you help me debug this?"
-**Handoff from Question Duck to Debugger Duck**
 - Debugger Duck: "Sure! Let's start by looking at the specific error messages you're getting. What do they say, and where in your code are they occurring?"
 - User: "
 ``` Python

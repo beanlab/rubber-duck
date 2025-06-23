@@ -44,11 +44,11 @@ def _build_agent(
         config: SingleAgentSettings,
         agent_hooks: AgentHooks[DuckContext],
 ) -> Agent[DuckContext]:
-    prompt = config.get('prompt_files')
+    prompt = config.get('prompt')
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
-            raise ValueError(f"You must provide either 'prompt' or 'prompt_file' for {config['name']}")
+            raise ValueError(f"You must provide either 'prompt' or 'prompt_files' for {config['name']}")
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 

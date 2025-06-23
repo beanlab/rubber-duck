@@ -111,6 +111,9 @@ class AgentConversation:
         agent_name = self._starting_agent
         message_history = []
 
+        # Reset previous agent name for new conversation
+        self._previous_agent_name = None
+
         duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
         introduction = self._introduction or "Hi, how can I help you?"
