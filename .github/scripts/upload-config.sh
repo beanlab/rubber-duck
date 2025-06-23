@@ -1,36 +1,22 @@
 #!/bin/bash
 
-# Usage: ./upload-config.sh <local_file_path> <s3_bucket_name> <s3_key>
+# Usage: ./upload_to_s3.sh rubber-duck-config file1 file2 ...
 
-# Exit if any command fails
-set -e
+# This script uploads specified files to an S3 bucket.
 
-# Input arguments
-LOCAL_FILE=$1
-BUCKET_NAME=$2
-S3_KEY=$3
-
-# Check if all arguments are provided
-if [[ -z "$LOCAL_FILE" || -z "$BUCKET_NAME" || -z "$S3_KEY" ]]; then
-  echo "Usage: $0 <local_file_path> <s3_bucket_name> <s3_key>"
-  echo "Example: $0 config/production-config.json my-config-bucket path/to/config/production-config.json"
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 <s3-bucket-name> <file1> [file2 ... fileN]"
   exit 1
 fi
 
-# Validate that the file exists
-if [ ! -f "$LOCAL_FILE" ]; then
-  echo "Error: Local file '$LOCAL_FILE' does not exist."
-  exit 1
-fi
+BUCKET="$1"
+shift
 
-echo "Uploading $LOCAL_FILE to s3://$BUCKET_NAME/$S3_KEY ..."
-
-# Upload to S3
-aws s3 cp "$LOCAL_FILE" "s3://$BUCKET_NAME/$S3_KEY"
-
-if [ $? -eq 0 ]; then
-  echo "✅ Upload successful!"
-else
-  echo "❌ Upload failed!"
-  exit 1
-fi
+for FILE in "$@"; do
+  if [ -f "$FILE" ]; then
+    echo "Uploading $FILE to s3://$BUCKET/"
+    aws s3 cp "$FILE" "s3://$BUCKET/"
+  else
+    echo "File not found: $FILE"
+  fi
+done

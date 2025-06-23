@@ -8,16 +8,15 @@ from scipy import stats
 from scipy.stats import skew, norm, ttest_1samp, t
 from seaborn.external.kde import gaussian_kde
 
-from .cache import Cache, cache_tool, BytesIOPrep
-from .tools import register_tool
-from ..utils.data_store import DataStore
+from .cache import cache_result
+from .tools import register_tool, direct_send_message
+from src.armory.data_store import DataStore
 from ..utils.logger import duck_logger
 
 
 class StatsTools:
-    def __init__(self, datastore: DataStore, cache: Cache):
+    def __init__(self, datastore: DataStore):
         self._datastore = datastore
-        self._cache = cache
 
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
@@ -79,12 +78,12 @@ class StatsTools:
                 plt.ylabel("Proportion")
                 plt.xlabel(column)
 
-    def _save_plot(self, name: str) -> tuple[str, io.BytesIO]:
+    def _save_plot(self, name: str) -> tuple[str, bytes]:
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
         buffer.seek(0)
         plt.close()
-        return name, buffer
+        return name, buffer.read()
 
     def _photo_name(self, *args) -> str:
         return "_".join(str(arg) for arg in args if arg) + ".png"
@@ -128,8 +127,9 @@ class StatsTools:
         return f"Variable names in {dataset}: {', '.join(data)}"
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def show_dataset_head(self, dataset: str, n: int) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes]:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
         data = self._datastore.get_dataset(dataset)
@@ -175,12 +175,13 @@ class StatsTools:
         plt.close(fig)
         buf.seek(0)
 
-        return name, buf
+        return name, buf.read()
 
     # Tools for dataset statistics and visualizations
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_histogram(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -201,8 +202,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_boxplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -222,8 +224,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_dotplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -243,8 +246,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -263,8 +267,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -287,8 +292,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @cache_tool(BytesIOPrep())
-    def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, io.BytesIO]:
+    @direct_send_message
+    @cache_result
+    def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
@@ -363,6 +369,7 @@ class StatsTools:
             return "Error calculating mode"
 
     @register_tool
+    @direct_send_message
     def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")

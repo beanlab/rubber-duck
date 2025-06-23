@@ -75,12 +75,16 @@ class SQLMetricsHandler:
 
     async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
         try:
-            new_message_row = MessagesModel(timestamp=get_timestamp(), guild_id=guild_id, thread_id=thread_id,
-                                            user_id=user_id, role=role, message=message)
+            new_message_row = MessagesModel(timestamp=get_timestamp(),
+                                            guild_id=guild_id,
+                                            thread_id=thread_id,
+                                            user_id=user_id,
+                                            role=role,
+                                            message=message)
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         try:
@@ -97,7 +101,7 @@ class SQLMetricsHandler:
             self.session.add(new_usage_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
                               user_id: int, reviewer_id: int,
@@ -105,15 +109,17 @@ class SQLMetricsHandler:
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
-                                             guild_id=guild_id, parent_channel_id=parent_channel_id,
+                                             guild_id=guild_id,
+                                             parent_channel_id=parent_channel_id,
                                              thread_id=thread_id,
-                                             user_id=user_id, reviewer_role_id=reviewer_id,
+                                             user_id=user_id,
+                                             reviewer_role_id=reviewer_id,
                                              feedback_score=feedback_score,
                                              written_feedback=written_feedback)
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.error(f"An error occurred: {e}")
 
     def sql_model_to_data_list(self, table_model):
         try:
@@ -128,7 +134,8 @@ class SQLMetricsHandler:
 
             return data
         except Exception as e:
-            duck_logger.error(f"An error occured: {e}")
+            duck_logger.exception(f"An error occurred: {e}")
+            raise
 
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)

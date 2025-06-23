@@ -4,8 +4,9 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..utils.protocols import AddReaction, SendMessage, ReportError, Message
+from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
+from ..utils.protocols import AddReaction, SendMessage, Message
 
 
 class RecordFeedback(Protocol):
@@ -22,17 +23,21 @@ class ConversationReviewSettings(TypedDict):
 
 class HaveTAGradingConversation:
     def __init__(self,
+                 name: str,
+                 settings: ConversationReviewSettings,
                  feedback_manager: FeedbackManager,
                  record_feedback: RecordFeedback,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
-                 report_error: ReportError,
                  ):
+        self.name = name
+
+        self._settings = settings
+
         self._feedback_manager = wrap_steps(feedback_manager, ['get_conversation'])
         self._record_feedback: RecordFeedback = step(record_feedback)
         self._send_message = step(send_message)
         self._add_reaction = step(add_reaction)
-        self._report_error = step(report_error)
 
         self._reactions = {
             '⏭️': 'nan',
@@ -68,13 +73,13 @@ class HaveTAGradingConversation:
                     feedback_score = self._reactions.get(feedback_emoji, 'nan')
                     await self._add_reaction(thread_id, message_id, '✅')
 
-
                     if feedback_score != 'nan':
-                        await self._send_message(thread_id, f"Please explain why you gave this conversation a score of {feedback_score}")
+                        await self._send_message(thread_id,
+                                                 f"Please explain why you gave this conversation a score of {feedback_score}")
                         try:
                             async with queue('messages', None) as messages:
-                                        message: Message = await asyncio.wait_for(messages.get(), timeout=90)
-                                        message_content = message['content']
+                                message: Message = await asyncio.wait_for(messages.get(), timeout=90)
+                                message_content = message['content']
                             if message_content == '-':
                                 await self._send_message(thread_id, "No feedback provided, skipping.")
                             else:
@@ -84,10 +89,6 @@ class HaveTAGradingConversation:
                             await self._send_message(thread_id, "No feedback provided, skipping.")
                     else:
                         message_content = '-'
-
-
-
-
 
                     duck_logger.info(f"Recording feedback: {feedback_score} from reviewer {reviewer_id}")
                     await self._record_feedback(
@@ -107,26 +108,29 @@ class HaveTAGradingConversation:
                     await self._add_reaction(thread_id, message_id, '❌')
                     raise
 
-    async def _serve_messages(self, thread_id, settings: ConversationReviewSettings):
-        target_channel_ids = settings['target_channel_ids']
+    async def _serve_messages(self, thread_id):
+        target_channel_ids = self._settings['target_channel_ids']
         duck_logger.info(f"Serving messages for channels: {target_channel_ids}")
 
         for target_channel_id in target_channel_ids:
-            await self._flush_conversations_for_channel(thread_id, target_channel_id, settings.get('timeout', 60 * 5))
+            await self._flush_conversations_for_channel(thread_id, target_channel_id,
+                                                        self._settings.get('timeout', 60 * 5))
 
         await self._send_message(thread_id, "No more conversations to review.")
 
-    async def __call__(self, thread_id: int, settings: ConversationReviewSettings, initial_message: Message):
+    async def __call__(self, context: DuckContext):
+        thread_id = context.thread_id
         duck_logger.info(f"Starting TA review session in thread {thread_id}")
 
         await self._send_message(
             thread_id,
             'After you provide feedback on a conversation, another will be served.\n'
+            '**You can skip giving written feedback to a conversation by clicking "-" then "enter".**\n'
             'If you do not respond for five minutes, this session will end.\n'
         )
 
         try:
-            await self._serve_messages(thread_id, settings)
+            await self._serve_messages(thread_id)
 
         except asyncio.TimeoutError:
             duck_logger.warning(f"TA review session timed out in thread {thread_id}")

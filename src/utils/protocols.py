@@ -1,11 +1,14 @@
-from io import BytesIO
 from typing import Protocol, TypedDict
+
+from ..utils.config_types import FileData
 
 
 class Attachment(TypedDict):
     attachment_id: int
     description: str
     filename: str
+    size: int
+    url: str
 
 
 class Message(TypedDict):
@@ -17,14 +20,11 @@ class Message(TypedDict):
     author_mention: str
     message_id: int
     content: str
-    file: list[Attachment]
-
-
-SendableFile = tuple[str, BytesIO]
+    files: list[Attachment]
 
 
 class SendMessage(Protocol):
-    async def __call__(self, channel_id: int, message: str = None, file: SendableFile = None, view=None) -> int: ...
+    async def __call__(self, channel_id: int, message: str = None, file: FileData = None, view=None) -> int: ...
 
 
 class EditMessage(Protocol):

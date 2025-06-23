@@ -1,9 +1,25 @@
+import io
+from pathlib import Path
+
 import discord
+import requests
 
+from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
-from ..utils.protocols import Attachment, Message, SendableFile
+from ..utils.protocols import Attachment, Message
 
 
+def as_attachment(attachment):
+    return Attachment(
+        attachment_id=attachment.id,
+        description=attachment.description,
+        filename=attachment.filename,
+        size=attachment.size,
+        url=attachment.url
+    )
+
+
+# make this comprehension
 def as_message(message: discord.Message) -> Message:
     return Message(
         guild_id=message.guild.id,
@@ -14,15 +30,7 @@ def as_message(message: discord.Message) -> Message:
         author_mention=message.author.mention,
         message_id=message.id,
         content=message.content,
-        file=[as_attachment(attachment) for attachment in message.attachments]
-    )
-
-
-def as_attachment(attachment):
-    return Attachment(
-        attachment_id=attachment.id,
-        description=attachment.description,
-        filename=attachment.filename
+        files=[as_attachment(a) for a in message.attachments]
     )
 
 
@@ -128,22 +136,30 @@ class DiscordBot(discord.Client):
     # Methods for message-handling protocols
     #
 
-    def _make_discord_file(self, file) -> discord.File:
+    def _make_discord_file(self, file: FileData | discord.File) -> discord.File:
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(file[1], file[0])
+            return discord.File(io.BytesIO(file[1]), filename=file[0])
+        if isinstance(file, dict):
+            return discord.File(io.BytesIO(file['bytes']), filename=file['filename'])
+
         raise NotImplementedError(f"Unsupported file type: {file}")
 
-    async def send_message(self, channel_id, message: str = None, file: SendableFile = None, view=None) -> int:
+    async def send_message(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
         channel = self.get_channel(channel_id)
+        # try catch it and fetch the channel if it is not found
         if channel is None:
-            duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
-            raise Exception(f'No channel id {channel_id}')
+            try:
+                channel = await self.fetch_channel(channel_id)
+            except Exception:
+                duck_logger.exception(f'Tried to send message on {channel_id}, but no channel found.')
+                raise
 
         if message:
             for block in _parse_blocks(message):
                 curr_message = await channel.send(block)
+            # noinspection PyUnboundLocalVariable
             return curr_message.id
 
         if file is not None:
@@ -199,9 +215,12 @@ class DiscordBot(discord.Client):
         )
         return thread.id
 
-    async def report_error(self, msg: str, notify_admins: bool = False):
-        if notify_admins:
-            try:
-                await self.send_message(self._admin_channel, msg)
-            except:
-                duck_logger.exception(f'Unable to message channel {self._admin_channel}')
+    async def read_url(self, url: str) -> str:
+        """
+        Read a URL and return its content as a string.
+        """
+        try:
+            return requests.get(url).text
+        except Exception:
+            duck_logger.exception(f"Error reading URL {url}")
+            raise
