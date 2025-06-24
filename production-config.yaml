@@ -310,7 +310,7 @@ servers:
                 - name: DesignerDuck
                   engine: gpt-4.1
                   prompt_files:
-                    - prompts/312-design-experiences/convex_hull-designer-duck.txt
+                    - prompts/312-design-experiences/gene-sequencing-designer-duck
                   max_iterations: 5
               timeout: 600
 
