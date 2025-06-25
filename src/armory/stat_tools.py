@@ -6,8 +6,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-from scipy.stats import skew, norm, ttest_1samp, t
+from scipy.stats import skew, norm, ttest_1samp, t, chi2_contingency
 from seaborn.external.kde import gaussian_kde
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error
+import statsmodels.formula.api as smf
 
 from .cache import cache_result
 from .tools import register_tool, direct_send_message
@@ -23,8 +26,6 @@ class StatsTools:
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
             series = pd.Series(series)
-        if not isinstance(series, pd.Series):
-            raise ValueError(f"Expected a pandas Series, got {type(series)}")
         return series.dtype == object or pd.api.types.is_categorical_dtype(series)
 
     def _plot_message_with_axes(self, data: pd.DataFrame, column: str, title: str, kind: str):
@@ -42,8 +43,6 @@ class StatsTools:
 
         if kind in {"hist", "box", "dot"}:
             values = pd.to_numeric(data[column], errors='coerce').dropna()
-            if values.empty:
-                raise ValueError(f"No valid numeric data found in column '{column}' for plotting.")
             if kind == "hist":
                 ax.set_xlim(values.min(), values.max())
                 ax.set_ylim(0, 1)
@@ -133,7 +132,7 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes]:
+    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes] | str:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
 
@@ -143,7 +142,7 @@ class StatsTools:
         data = self._datastore.get_dataset(dataset)
 
         if not isinstance(n, int) or n <= 0:
-            raise ValueError("n must be a positive integer.")
+            return "n must be a positive integer."
 
         df = data.head(n)
 
@@ -522,7 +521,7 @@ class StatsTools:
         elif tail == "Between" and z2 is not None:
             return f"The probability is {round(norm.cdf(max(z, z2)) - norm.cdf(min(z, z2)), 4)}"
         else:
-            raise ValueError("Invalid input for tail or missing z2")
+            return "Invalid input for tail or missing z2"
 
     @register_tool
     @direct_send_message
@@ -542,7 +541,7 @@ class StatsTools:
             upper = norm.ppf(max(p1, p2), loc=mean, scale=std)
             return f"The percentile is {round(lower, 4), round(upper, 4)}"
         else:
-            raise ValueError("Invalid input for tail or missing p2")
+            return "Invalid input for tail or missing p2"
 
     @register_tool
     @direct_send_message
@@ -881,3 +880,316 @@ class StatsTools:
                         f"{round(ci['ci_upper'], 4)})\n")
 
         return summary
+
+
+    @register_tool
+    @direct_send_message
+    async def calculate_one_sample_proportion_z_test(self, dataset: str, variable: str, category: str,
+                                                     p_null: float = 0.5,
+                                                     alternative: Literal["greater", "less", "two.sided"] = "two.sided",
+                                                     conf_level: float = 0.95) -> str:
+        """
+        Performs a one-sample z-test for proportions, testing whether the proportion of a category equals p_null.
+        """
+
+        duck_logger.debug(
+            f"Z-test for dataset={dataset}, variable={variable}, category={category}, p_null={p_null}, alternative={alternative}, conf_level={conf_level}")
+
+        if dataset not in self._datastore.get_available_datasets():
+            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+
+        data = self._datastore.get_dataset(dataset)
+
+        if variable not in data.columns:
+            variable = await self._autocorrect(data.columns.to_list(), variable)
+
+        if category not in data[variable].unique():
+            category = await self._autocorrect(data[variable].unique(), category)
+
+        series = data[variable].dropna()
+
+        if not self._is_categorical(series):
+            return f"The variable '{variable}' must be categorical for a proportion z-test."
+
+        n = len(series)
+        if n == 0:
+            return "The selected variable contains no non-missing values."
+
+        phat = np.sum(series == category) / n
+
+        se = np.sqrt(p_null * (1 - p_null) / n)
+        z_stat = (phat - p_null) / se
+
+        if alternative == "greater":
+            p_value = 1 - norm.cdf(z_stat)
+        elif alternative == "less":
+            p_value = norm.cdf(z_stat)
+        else:  # "two.sided"
+            p_value = 2 * min(norm.cdf(z_stat), 1 - norm.cdf(z_stat))
+
+        se_phat = np.sqrt(phat * (1 - phat) / n)
+        z_critical = norm.ppf(1 - (1 - conf_level) / 2)
+        ci_lower = phat - z_critical * se_phat
+        ci_upper = phat + z_critical * se_phat
+
+        summary = (
+            f"Z-Test for H0: π({category}) = {p_null}\n"
+            f"Alternative Hypothesis: π({category}) {alternative.replace('two.sided', '≠')} {p_null}\n"
+            f"Observed proportion (p̂): {round(phat, 4)}\n"
+            f"Z Test Statistic: {round(z_stat, 4)}\n"
+            f"P-value: {round(p_value, 4)}\n"
+            f"Sample size (n): {n}\n"
+            f"{int(conf_level * 100)}% Confidence Interval for π({category}): "
+            f"({round(ci_lower, 4)}, {round(ci_upper, 4)})"
+        )
+        return summary
+
+
+    @register_tool
+    @direct_send_message
+    async def calculate_two_sample_proportion_z_test(self, dataset: str, response_variable: str, response_category: str,
+                                                     group_variable: str, group1: str, group2: str,
+                                                     alternative: Literal["greater", "less", "two.sided"] = "two.sided",
+                                                     conf_level: float = 0.95) -> str:
+        """
+        Performs a two-sample z-test for proportions, testing whether the proportion of response_category is the same in two groups.
+        """
+        duck_logger.debug(
+            f"Two-sample Z-test on dataset={dataset}, response_variable={response_variable}, "
+            f"response_category={response_category}, group_variable={group_variable}, group1={group1}, group2={group2}, "
+            f"alternative={alternative}, conf_level={conf_level}"
+        )
+
+        if dataset not in self._datastore.get_available_datasets():
+            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+
+        data = self._datastore.get_dataset(dataset)
+
+        # Autocorrect any variable names
+        for var in [response_variable, group_variable]:
+            if var not in data.columns:
+                corrected = await self._autocorrect(data.columns.to_list(), var)
+                if var == response_variable:
+                    response_variable = corrected
+                else:
+                    group_variable = corrected
+
+        if response_category not in data[response_variable].unique():
+            response_category = await self._autocorrect(data[response_variable].unique(), response_category)
+
+        for group_val in [group1, group2]:
+            if group_val not in data[group_variable].unique():
+                corrected = await self._autocorrect(data[group_variable].unique(), group_val)
+                if group_val == group1:
+                    group1 = corrected
+                else:
+                    group2 = corrected
+
+        # Filter out missing values
+        df = data[[response_variable, group_variable]].dropna()
+        if not self._is_categorical(df[response_variable]) or not self._is_categorical(df[group_variable]):
+            return f"Both '{response_variable}' and '{group_variable}' must be categorical for a two-sample proportion z-test."
+
+        # Group counts
+        group1_data = df[df[group_variable] == group1]
+        group2_data = df[df[group_variable] == group2]
+
+        n1 = len(group1_data)
+        n2 = len(group2_data)
+
+        if n1 == 0 or n2 == 0:
+            return f"One or both groups have no observations."
+
+        phat1 = np.sum(group1_data[response_variable] == response_category) / n1
+        phat2 = np.sum(group2_data[response_variable] == response_category) / n2
+
+        pooled_phat = (phat1 * n1 + phat2 * n2) / (n1 + n2)
+        se = np.sqrt(pooled_phat * (1 - pooled_phat) * (1 / n1 + 1 / n2))
+
+        z_stat = (phat1 - phat2) / se
+
+        # Compute p-value
+        if alternative == "greater":
+            p_value = 1 - norm.cdf(z_stat)
+        elif alternative == "less":
+            p_value = norm.cdf(z_stat)
+        else:  # "two.sided"
+            p_value = 2 * min(norm.cdf(z_stat), 1 - norm.cdf(z_stat))
+
+        # Confidence interval for difference in proportions
+        se_diff = np.sqrt(phat1 * (1 - phat1) / n1 + phat2 * (1 - phat2) / n2)
+        z_critical = norm.ppf(1 - (1 - conf_level) / 2)
+        ci_lower = (phat1 - phat2) - z_critical * se_diff
+        ci_upper = (phat1 - phat2) + z_critical * se_diff
+
+        summary = (
+            f"Two-Sample Z-Test for H0: π({group1}) = π({group2})\n"
+            f"Alternative Hypothesis: π({group1}) {alternative.replace('two.sided', '≠')} π({group2})\n"
+            f"phat({group1}) = {round(phat1, 4)}\n"
+            f"phat({group2}) = {round(phat2, 4)}\n"
+            f"Difference (phat1 - phat2) = {round(phat1 - phat2, 4)}\n"
+            f"Z Test Statistic: {round(z_stat, 4)}\n"
+            f"P-value: {round(p_value, 4)}\n"
+            f"{int(conf_level * 100)}% Confidence Interval for Difference: "
+            f"({round(ci_lower, 4)}, {round(ci_upper, 4)})"
+        )
+
+        return summary
+
+
+    @register_tool
+    @direct_send_message
+    async def calculate_chi_squared_test(self, dataset: str, row_variable: str, col_variable: str) -> str:
+        """
+        Performs a Chi-squared test of independence between two categorical variables.
+        """
+        duck_logger.debug(
+            f"Chi-squared test on dataset={dataset}, row_variable={row_variable}, col_variable={col_variable}"
+        )
+
+        if dataset not in self._datastore.get_available_datasets():
+            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+
+        data = self._datastore.get_dataset(dataset)
+
+        # Autocorrect variable names
+        for var in [row_variable, col_variable]:
+            if var not in data.columns:
+                corrected = await self._autocorrect(data.columns.to_list(), var)
+                if var == row_variable:
+                    row_variable = corrected
+                else:
+                    col_variable = corrected
+
+        df = data[[row_variable, col_variable]].dropna()
+
+        if not self._is_categorical(df[row_variable]) or not self._is_categorical(df[col_variable]):
+            return f"Both '{row_variable}' and '{col_variable}' must be categorical for a Chi-squared test."
+
+        contingency_table = pd.crosstab(df[row_variable], df[col_variable])
+
+        if contingency_table.empty:
+            return "The contingency table is empty after removing missing values. Please check your inputs."
+
+        chi2, p, dof, expected = chi2_contingency(contingency_table)
+
+        summary = (
+            f"Chi-squared Test of Independence\n"
+            f"Variables: {row_variable} and {col_variable}\n"
+            f"Degrees of Freedom: {dof}\n"
+            f"Test Statistic (χ²): {round(chi2, 4)}\n"
+            f"P-value: {round(p, 4)}\n\n"
+            f"Observed Table:\n{contingency_table.to_string()}\n\n"
+            f"Expected Counts:\n{pd.DataFrame(expected, index=contingency_table.index, columns=contingency_table.columns).round(2).to_string()}"
+        )
+
+        return summary
+
+
+    @register_tool
+    @direct_send_message
+    async def simple_linear_regression(
+        self,
+        dataset: str,
+        response: str,
+        explanatory: str,
+        prediction_value: float = None,
+        interval_type: Literal["confidence", "prediction"] = "confidence",
+        conf_level: float = 0.95,
+        cv_folds: int = 5
+    ) -> str:
+        """Performs simple linear regression with summary statistics, confidence intervals, prediction, and cross-validation."""
+
+        duck_logger.debug(
+            f"Running SLR on {dataset}: {response} ~ {explanatory}, prediction_value={prediction_value}, "
+            f"interval_type={interval_type}, conf_level={conf_level}, cv_folds={cv_folds}"
+        )
+
+        # Load dataset
+        if dataset not in self._datastore.get_available_datasets():
+            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+        data = self._datastore.get_dataset(dataset)
+
+        # Validate column names
+        if response not in data.columns:
+            response = await self._autocorrect(data.columns.tolist(), response)
+        if explanatory not in data.columns:
+            explanatory = await self._autocorrect(data.columns.tolist(), explanatory)
+
+        df = data[[response, explanatory]].dropna()
+        if df.empty:
+            return "No valid data after removing missing values."
+
+        # Ensure response is numeric
+        if not pd.api.types.is_numeric_dtype(df[response]):
+            try:
+                df[response] = pd.to_numeric(df[response], errors="coerce")
+                df = df.dropna(subset=[response])
+            except Exception:
+                return f"The response variable '{response}' could not be converted to numeric."
+
+        if df.empty:
+            return "No valid rows remain after cleaning non-numeric or missing values."
+
+        # Handle categorical or numeric explanatory variable
+        if self._is_categorical(df[explanatory]):
+            df[explanatory] = df[explanatory].astype("category")
+            formula = f"{response} ~ C({explanatory})"
+        else:
+            formula = f"{response} ~ {explanatory}"
+
+        # Fit regression model
+        try:
+            model = smf.ols(formula=formula, data=df).fit()
+        except Exception as e:
+            return f"Failed to fit regression model: {str(e)}"
+
+        # Coefficients + CI
+        coef_summary = model.summary2().tables[1]
+        conf_ints = model.conf_int(alpha=1 - conf_level)
+        coef_summary["CI Lower Bound"] = conf_ints[0]
+        coef_summary["CI Upper Bound"] = conf_ints[1]
+
+        coef_summary = coef_summary[["Coef.", "t", "P>|t|", "CI Lower Bound", "CI Upper Bound"]]
+        coef_summary.columns = ["Estimate", "t value", "p-value", "CI Lower Bound", "CI Upper Bound"]
+
+        # Optional prediction
+        prediction_output = ""
+        if prediction_value is not None:
+            try:
+                new_data = pd.DataFrame({explanatory: [prediction_value]})
+                pred = model.get_prediction(new_data)
+                pred_summary = pred.summary_frame(alpha=1 - conf_level)
+                prediction = pred_summary.iloc[0]
+                prediction_output = (
+                    f"\nPrediction for {response} when {explanatory} = {prediction_value}:\n"
+                    f"Predicted value: {round(prediction['mean'], 4)}\n"
+                    f"{int(conf_level * 100)}% {interval_type.title()} Interval: "
+                    f"({round(prediction[f'{interval_type}_ci_lower'], 4)}, "
+                    f"{round(prediction[f'{interval_type}_ci_upper'], 4)})\n"
+                )
+            except Exception as e:
+                prediction_output = f"\nPrediction could not be generated: {e}"
+
+        # Cross-validated RMSE
+        kf = KFold(n_splits=cv_folds, shuffle=True, random_state=1)
+        rmse_scores = []
+
+        for train_idx, test_idx in kf.split(df):
+            train_df, test_df = df.iloc[train_idx], df.iloc[test_idx]
+            cv_model = smf.ols(formula=formula, data=train_df).fit()
+            preds = cv_model.predict(test_df)
+            rmse = np.sqrt(mean_squared_error(test_df[response], preds))
+            rmse_scores.append(rmse)
+
+        mean_rmse = round(np.mean(rmse_scores), 4)
+
+        # Final output
+        return (
+            f"Simple Linear Regression: {response} ~ {explanatory}\n"
+            f"R-squared: {round(model.rsquared, 4)}\n"
+            f"Residual standard error (sigma): {round(np.sqrt(model.scale), 4)}\n"
+            f"\nCoefficient Summary:\n{coef_summary.to_string()}\n"
+            f"\nCross-validated RMSE ({cv_folds}-fold): {mean_rmse}\n"
+            f"{prediction_output}"
+        )
