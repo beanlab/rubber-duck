@@ -48,7 +48,7 @@ def _build_agent(
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
-            raise ValueError(f"You must provide either 'prompt' or 'prompt_file' for {config['name']}")
+            raise ValueError(f"You must provide either 'prompt' or 'prompt_files' for {config['name']}")
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 

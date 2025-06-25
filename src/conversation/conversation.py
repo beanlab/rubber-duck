@@ -86,6 +86,8 @@ class AgentConversation:
             message_history: list[GPTMessage]
     ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
+        duck_logger.debug(f"Processing with agent: {agent_name} (Thread: {context.thread_id})")
+
         response: AgentMessage = await self._ai_clients[agent_name].get_completion(
             context,
             message_history,
@@ -97,6 +99,9 @@ class AgentConversation:
 
         if content := response.get('content'):
             await self._send_message(context.thread_id, content)
+            # Log if the agent decided to hand off to another agent
+            if response['agent_name'] != agent_name:
+                duck_logger.info(f"Agent {agent_name} decided to hand off to {response['agent_name']} (Thread: {context.thread_id})")
             return response['agent_name'], content
 
         raise NotImplementedError(f'AI completion had neither content nor file.')
@@ -105,6 +110,11 @@ class AgentConversation:
 
         agent_name = self._starting_agent
         message_history = []
+
+        # Reset previous agent name for new conversation
+        self._previous_agent_name = None
+
+        duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
         introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
@@ -162,6 +172,14 @@ class AgentConversation:
                         agent_name,
                         message_history
                     )
+
+                    # Log agent handoff if the agent changed
+                    if hasattr(self, '_previous_agent_name') and self._previous_agent_name != agent_name:
+                        duck_logger.debug(f"Agent handoff: {self._previous_agent_name} -> {agent_name}")
+                    elif not hasattr(self, '_previous_agent_name'):
+                        duck_logger.debug(f"Starting with agent: {agent_name} (Thread: {context.thread_id})")
+                    
+                    self._previous_agent_name = agent_name
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 

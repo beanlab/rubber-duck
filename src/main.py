@@ -337,7 +337,7 @@ if __name__ == '__main__':
     # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        quest_logger.setLevel(logging.DEBUG)
+        # quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
