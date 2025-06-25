@@ -304,7 +304,7 @@ servers:
             settings:
               introduction: |
                 Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
-                I'm specialized with helping you on Project 2: Convex Hull.
+                I'm specialized with helping you on Project 4: Gene Sequencing.
                 Let's work on this together! How is data stored in your project?
               agents:
                 - name: DesignerDuck
