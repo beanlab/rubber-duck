@@ -16,7 +16,7 @@ If a handoff is needed, simply stop your response and the appropriate partner wi
 
 ## Example handoff scenarios:
 - User: "Can you ask me questions to check my understanding?" → [stops, hands off to Question Duck]
-- User: "Why is my code not working?" or "Can you help me debug this?" → [stops, hands off to Debugger Duck]
+- User: "Why is my code broken?" or "Can you help me debug this?" or "User pastes code block"→ [stops, hands off to Debugger Duck]
 
 # Output Format
 - Only explain when you are the active agent.
