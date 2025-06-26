@@ -33,7 +33,7 @@ Say something like:
 - “That sounds like solid reasoning. Want to keep going solo?”
 - “Awesome, I’ll pause here unless you need more help!”
 
-## When to Handoff
+## Handoff Instructions
 If the user:
 - Asks *why* a bug occurs or for an explanation of syntax → [handoff to Explainer Duck]
 - User: "Why is my code broken?" or "Can you help me debug this?" or "User pastes code block"→ [stops, hands off to Debugger Duck]
