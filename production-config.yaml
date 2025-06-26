@@ -47,6 +47,43 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
+  - name: question-debug-explain-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        Hello! I can help you by asking questions (Socratic), 
+        or by explaining concepts (Explainer),
+        or by teaching you how to debug your code (Debugger).
+      agents:
+        - name: socratic
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/socratic-explainer-prompts/question-duck.txt
+          handoffs:
+            - explainer
+            - debugger
+          max_iterations: 5
+        - name: explainer
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/socratic-explainer-prompts/explainer-duck.txt
+          handoffs:
+            - socratic
+            - debugger
+          max_iterations: 5
+        - name: debugger
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/socratic-explainer-prompts/debugger-duck.txt
+          handoffs:
+            - socratic
+            - explainer
+          max_iterations: 5
+      starting_agent: socratic
+      timeout: 600
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
+
   - name: stats-duck
     duck_type: agent_conversation
     settings:
@@ -210,6 +247,11 @@ servers:
             settings:
               target_channel_ids:
                 - 1338616283671040000
+
+      - channel_id: 1386813881716048044
+        channel_name: question-debug-explain-duck
+        ducks:
+          - question-debug-explain-duck
 
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
