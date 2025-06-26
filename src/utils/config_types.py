@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired, Literal
+from typing import TypedDict, NotRequired
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -56,17 +56,28 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
-    prompt_file: str
+    prompt: NotRequired[str]
+    prompt_files: NotRequired[list[str]]
     tools: list[str]
     handoff_prompt: str
     handoffs: list[str]
 
 
-class AgentConversationSettings(TypedDict):
-    introduction: str
+class MultiAgentSettings(TypedDict):
     agents: list[SingleAgentSettings]
-    starting_agent: str | None  # If not set, will use first agent listed in `agents`
+    starting_agent: str | None  # If not set, will use first agent listed in `gen_ai`
+
+
+class AgentAsToolSettings(MultiAgentSettings):
+    tool_name: str
+    description: str
+
+
+class AgentConversationSettings(MultiAgentSettings):
+    introduction: str
     timeout: int
+    file_size_limit: int
+    file_type_ext: list[str]
 
 
 @dataclass
@@ -135,9 +146,11 @@ class ReporterConfig(TypedDict):
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
+    agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: FeedbackNotifierSettings
     reporter_settings: ReporterConfig
+    sender_email: str

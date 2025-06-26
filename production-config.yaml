@@ -1,6 +1,35 @@
+# Anchors
+file_size_limit: &file_size_limit 4096 # 4KB limit
+file_type_ext: &file_type_ext
+  [
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
+  ]
+
 sql:
   db_type: sqlite
   database: /rubber-duck.db
+
+agents_as_tools:
+  - tool_name: generate_code_complexity_analysis
+    description: |
+      This tool takes source code as a string and returns a string describing 
+      the order of complexity (Big-O analysis) of the provided code.
+    agents:
+      - name: CodeComplexityAgent
+        prompt_files:
+        - prompts/generate-code-complexity.md
+        engine: gpt-4.1
 
 ducks:
   - name: standard-rubber-duck
@@ -11,9 +40,12 @@ ducks:
       agents:
         - name: RubberDuck
           engine: gpt-4.1
-          prompt_file: prompts/standard-rubber-duck.txt
+          prompt_files:
+          - prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
 
   - name: stats-duck
     duck_type: agent_conversation
@@ -28,7 +60,8 @@ ducks:
       timeout: 60
       agents:
         - name: Standard_Rubber_Duck
-          prompt_file: prompts/stats.txt
+          prompt_files:
+          - prompts/stats.txt
           engine: gpt-4.1
           tools:
             - explain_capabilities
@@ -51,6 +84,8 @@ ducks:
             - calculate_proportions
             - show_dataset_head
           max_iterations: 5
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
 
 servers:
   927616651409649675:
@@ -181,6 +216,31 @@ servers:
         ducks:
           - standard-rubber-duck
 
+      - channel_id: 1385293810782965830
+        channel_name: code-complexity-analysis-duck
+        ducks:
+          - name: code-complexity-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Upload a code file and I'll analyze it for you. 
+                You can also ask me questions about Big-O analysis.
+              timeout: 600
+              file_size_limit: 5100
+              file_type_ext: [ 'py', 'java', 'cpp', 'c', 'h', 'hpp', 'ts', 'js' ]
+              agents:
+                - name: ComplexityDuck
+                  prompt: |
+                    You are a helpful CS assistant.
+                    You explain Big-O analysis. 
+                    You can use the provided tools to generate a complexity analysis report
+                    when the user provides a code file.
+                    Keep your responses brief and clear. Provide the tool output to the user verbatim.
+                  engine: gpt-4.1
+                  max_iterations: 15
+                  tools:
+                    - generate_code_complexity_analysis
+
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
         ducks:
@@ -192,10 +252,13 @@ servers:
                 I can help you think through your problems by asking questions.
               agents:
                 - name: socrates
-                  prompt_file: prompts/socratic_duck.txt
+                  prompt_files:
+                  - prompts/socratic-duck.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
 
       - channel_id: 1379959992110546995
         channel_name: registration-duck
@@ -215,11 +278,28 @@ servers:
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
 
+      - channel_id: 1384678077694480434
+        channel_name: designer-duck
+        ducks:
+          - name: designer-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
+                I'm specialized with helping you on Project 2: Convex Hull.
+                Let's work on this together! How is data stored in your project?
+              agents:
+                - name: DesignerDuck
+                  engine: gpt-4.1
+                  prompt_files:
+                  - prompts/designer-duck.txt
+                  max_iterations: 5
+              timeout: 600
+
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
-          - stats-tool
-
+          - stats-duck
 
 feedback_notifier_settings:
   feedback_check_hour: 9
@@ -242,12 +322,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [0.03, 0.06]
-    "gpt-4o": [0.0025, 0.01]
-    "gpt-4-1106-preview": [0.01, 0.03]
-    "gpt-4-0125-preview": [0.01, 0.03]
-    "o4-mini": [0.000150, 0.0006]
-    "gpt-4-turbo": [0.01, 0.03]
-    "gpt-4-turbo-preview": [0.01, 0.03]
-    "gpt-3.5-turbo-1106": [0.001, 0.002]
-    "gpt-3.5-turbo": [0.001, 0.003]
+    "gpt-4": [ 0.03, 0.06 ]
+    "gpt-4o": [ 0.0025, 0.01 ]
+    "gpt-4-1106-preview": [ 0.01, 0.03 ]
+    "gpt-4-0125-preview": [ 0.01, 0.03 ]
+    "o4-mini": [ 0.000150, 0.0006 ]
+    "gpt-4-turbo": [ 0.01, 0.03 ]
+    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
+    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
+    "gpt-3.5-turbo": [ 0.001, 0.003 ]

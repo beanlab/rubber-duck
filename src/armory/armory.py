@@ -1,7 +1,6 @@
 from typing import Callable
 
-from agents import FunctionTool, function_tool
-
+from agents import FunctionTool, function_tool, Agent
 
 
 class Armory:
@@ -32,6 +31,9 @@ class Armory:
             tool.direct_send_message = True
 
         self._tools[tool_function.__name__] = tool
+
+    def add_agent_as_tool(self, agent: Agent, name: str, description: str):
+        self._tools[name] = agent.as_tool(name, description)
 
     def get_specific_tool(self, tool_name: str):
         if tool_name in self._tools:
