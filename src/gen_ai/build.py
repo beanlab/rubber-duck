@@ -1,10 +1,11 @@
+import os
 from pathlib import Path
 from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
 
-from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
+from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage, ChatCompletions
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.rag import MultiClassRAGDatabase
@@ -122,7 +123,8 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAG
             _armory.scrub_tools(rag)
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
-            stat_tools = StatsTools(data_store)
+            chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
+            stat_tools = StatsTools(data_store, chat_completions.autocorrect)
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
