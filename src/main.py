@@ -13,6 +13,8 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .armory.rag import MultiClassRAGDatabase
+from .workflows.class_information_worflow import ClassInformationWorkflow
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -27,7 +29,7 @@ from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig
+    DUCK_NAME, DuckConfig, ClassInformationSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -127,7 +129,9 @@ def setup_workflow_manager(
 def build_conversation_review_duck(
         name: str,
         settings: ConversationReviewSettings,
-        bot: DiscordBot, record_feedback, feedback_manager
+        bot: DiscordBot,
+        record_feedback,
+        feedback_manager
 ) -> DuckConversation:
     have_ta_conversation = HaveTAGradingConversation(
         name,
@@ -141,7 +145,10 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
+        name: str,
+        bot: DiscordBot,
+        config: Config,
+        settings: RegistrationSettings
 ):
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -155,6 +162,26 @@ def build_registration_duck(
     )
     return registration_workflow
 
+def build_class_information_duck(
+        name,
+        bot: DiscordBot,
+        settings: ClassInformationSettings,
+        rag: MultiClassRAGDatabase
+):
+    rag.get_or_create_collection(str(settings['target_channel_id']))
+
+    class_information_workflow = ClassInformationWorkflow(
+        name,
+        rag,
+        bot.send_message,
+        settings
+    )
+    return class_information_workflow
+
+def _make_rag_database():
+    host = os.getenv("CHROMA_DB_HOST_IP")
+    port = int(os.getenv("CHROMA_DB_PORT"))
+    return MultiClassRAGDatabase(host, port)
 
 def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     # Look for global configs
@@ -181,6 +208,7 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        rag: MultiClassRAGDatabase
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
@@ -191,7 +219,7 @@ def build_ducks(
 
         if duck_type == 'agent_conversation':
             ducks[name] = build_agent_conversation_duck(
-                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
+                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage, rag
             )
 
         elif duck_type == 'conversation_review':
@@ -201,6 +229,9 @@ def build_ducks(
 
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, config, settings)
+
+        elif duck_type == 'class_information':
+            ducks[name] = build_class_information_duck(name, bot, settings, rag)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -216,11 +247,12 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        rag: MultiClassRAGDatabase
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, rag)
 
     channel_ducks = {}
 
@@ -281,8 +313,9 @@ async def main(config: Config, log_dir: Path):
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
+            rag = _make_rag_database()
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, rag)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,

@@ -7,6 +7,7 @@ from quest import step
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
+from ..armory.rag import MultiClassRAGDatabase
 from ..armory.stat_tools import StatsTools
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
@@ -112,11 +113,13 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
         }
 
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAGDatabase) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
 
+        if rag:
+            _armory.scrub_tools(rag)
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
             stat_tools = StatsTools(data_store)
@@ -142,10 +145,11 @@ def build_agent_conversation_duck(
         settings: AgentConversationSettings,
         bot,
         record_message: RecordMessage,
-        record_usage: RecordUsage
+        record_usage: RecordUsage,
+        rag: MultiClassRAGDatabase
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks)
+    armory = _get_armory(config, usage_hooks, rag)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'])
     _add_tools_to_agents(conversation_agents.values(), armory)

@@ -52,6 +52,13 @@ class RegistrationSettings(TypedDict):
     roles: RolesSettings
     sender_email: str
 
+class ClassInformationSettings(TypedDict):
+    target_channel_id: int
+    class_name: str
+    class_categories: list[str]
+    file_size_limit: int
+    file_type_ext: list[str]
+
 
 class SingleAgentSettings(TypedDict):
     name: str
