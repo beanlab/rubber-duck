@@ -1,5 +1,5 @@
 import chromadb
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Callable, Awaitable
 import hashlib
 
 from agents import RunContextWrapper
@@ -13,6 +13,7 @@ class MultiClassRAGDatabase:
     def __init__(self,
                  chroma_host: str,
                  chroma_port: int,
+                 autocorrect: Callable[[list[str], str], Awaitable[str]],
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
                  enable_chunking: bool = True):
@@ -20,16 +21,14 @@ class MultiClassRAGDatabase:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.enable_chunking = enable_chunking
-
+        self._autocorrect = autocorrect
         self.client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
-        self._collections = {}  # Cache for collections
+        self._collections = {}
 
     def _get_collection_name(self, channel_id: str) -> str:
-        """Generate a collection name from channel ID"""
         return f"channel_{channel_id}"
 
     def get_or_create_collection(self, channel_id: str):
-        """Get or create a collection for a specific channel"""
         if channel_id not in self._collections:
             collection_name = self._get_collection_name(channel_id)
             self._collections[channel_id] = self.client.get_or_create_collection(
@@ -69,7 +68,6 @@ class MultiClassRAGDatabase:
         return chunks
 
     def add_document(self, channel_id: str, category: str, document_name: str, content: str) -> List[str]:
-        """Add a document to a specific channel's collection"""
         collection = self.get_or_create_collection(channel_id)
         chunks = self._chunk_text(content)
         chunk_ids = []
@@ -97,6 +95,29 @@ class MultiClassRAGDatabase:
         return chunk_ids
 
     @register_tool
+    def get_categories(self, ctx: RunContextWrapper[DuckContext]) -> List[str]:
+        """
+        Get all document categories that a student can get information about for a specific channel
+
+        Returns:
+            List[str]: A sorted list of unique categories available in the channel.
+
+        """
+
+        channel_id = str(ctx.context.parent_channel_id)
+        try:
+            collection = self.get_or_create_collection(channel_id)
+            all_data = collection.get()
+            if not all_data['metadatas']:
+                return []
+
+            categories = list(set(meta.get('category', '') for meta in all_data['metadatas']))
+            return sorted([c for c in categories if c])
+        except Exception as e:
+            print(f"Error getting categories for channel {channel_id}: {e}")
+            return []
+
+    @register_tool
     def search_by_category(self,
                            ctx: RunContextWrapper[DuckContext],
                            category: str,
@@ -106,7 +127,6 @@ class MultiClassRAGDatabase:
         Search for relevant document chunks within a specific category in a channel.
 
         Args:
-            channel_id (str): The channel ID to search within.
             category (str): The category to filter documents by (e.g., "Lectures", "Homework").
             query (str): The search query string provided by the user.
             n_results (int, optional): The maximum number of results to return. Defaults to 5.
@@ -120,6 +140,9 @@ class MultiClassRAGDatabase:
 
         try:
             collection = self.get_or_create_collection(channel_id)
+            available_categories = self._get_categories(channel_id)
+            category = self._autocorrect(available_categories, category)
+
             results = collection.query(
                 query_texts=[query],
                 n_results=n_results,
@@ -136,7 +159,6 @@ class MultiClassRAGDatabase:
         Search for relevant document chunks across an entire channel's collection.
 
         Args:
-            channel_id (str): The channel ID to search within.
             query (str): The search query string provided by the user.
             n_results (int, optional): The maximum number of results to return. Defaults to 5.
 

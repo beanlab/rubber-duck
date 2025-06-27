@@ -13,6 +13,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.gen_ai.gen_ai import ChatCompletions
 from .armory.rag import MultiClassRAGDatabase
 from .workflows.class_information_worflow import ClassInformationWorkflow
 from .bot.discord_bot import DiscordBot
@@ -178,10 +179,10 @@ def build_class_information_duck(
     )
     return class_information_workflow
 
-def _make_rag_database():
+def _make_rag_database(chat_completions: ChatCompletions) -> MultiClassRAGDatabase:
     host = os.getenv("CHROMA_DB_HOST_IP")
     port = int(os.getenv("CHROMA_DB_PORT"))
-    return MultiClassRAGDatabase(host, port)
+    return MultiClassRAGDatabase(host, port, chat_completions.autocorrect)
 
 def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     # Look for global configs
@@ -208,7 +209,8 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        rag: MultiClassRAGDatabase
+        rag: MultiClassRAGDatabase,
+        chat_completions: ChatCompletions
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
@@ -219,7 +221,7 @@ def build_ducks(
 
         if duck_type == 'agent_conversation':
             ducks[name] = build_agent_conversation_duck(
-                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage, rag
+                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage, rag, chat_completions
             )
 
         elif duck_type == 'conversation_review':
@@ -247,12 +249,13 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        rag: MultiClassRAGDatabase
+        rag: MultiClassRAGDatabase,
+        chat_completions: ChatCompletions
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, rag)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, rag, chat_completions)
 
     channel_ducks = {}
 
@@ -313,9 +316,11 @@ async def main(config: Config, log_dir: Path):
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
-            rag = _make_rag_database()
+            chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
+            rag = _make_rag_database(chat_completions)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, rag)
+
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, rag, chat_completions)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,

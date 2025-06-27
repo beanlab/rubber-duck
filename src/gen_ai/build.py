@@ -114,7 +114,7 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
         }
 
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAGDatabase) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAGDatabase, chat_completions: ChatCompletions) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
@@ -123,7 +123,6 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAG
             _armory.scrub_tools(rag)
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
-            chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
             stat_tools = StatsTools(data_store, chat_completions.autocorrect)
             _armory.scrub_tools(stat_tools)
         else:
@@ -148,10 +147,11 @@ def build_agent_conversation_duck(
         bot,
         record_message: RecordMessage,
         record_usage: RecordUsage,
-        rag: MultiClassRAGDatabase
+        rag: MultiClassRAGDatabase,
+        chat_completions: ChatCompletions
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks, rag)
+    armory = _get_armory(config, usage_hooks, rag, chat_completions)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'])
     _add_tools_to_agents(conversation_agents.values(), armory)

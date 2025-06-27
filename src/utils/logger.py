@@ -15,7 +15,7 @@ formatter = logging.Formatter(
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
-#quest_logger.setLevel(logging.DEBUG)
+quest_logger.setLevel(logging.DEBUG)
 
 
 def add_console_handler():
@@ -24,7 +24,7 @@ def add_console_handler():
     console_handler.setFormatter(formatter)
 
     duck_logger.addHandler(console_handler)
-#    quest_logger.addHandler(console_handler)
+    quest_logger.addHandler(console_handler)
 
 
 def add_file_handler(file_path: str):
@@ -38,7 +38,7 @@ def add_file_handler(file_path: str):
     )
     file_handler.setFormatter(formatter)
     duck_logger.addHandler(file_handler)
-#   quest_logger.addHandler(file_handler)
+    quest_logger.addHandler(file_handler)
 
 
 # Function to start reporting error logs to Discord
@@ -53,7 +53,7 @@ def filter_logs(send_message, config: AdminSettings):
     q_handler.setFormatter(formatter)
 
     duck_logger.addHandler(q_handler)
-#    quest_logger.addHandler(q_handler)
+    quest_logger.addHandler(q_handler)
 
     asyncio.create_task(log_queue_watcher(send_message, config['admin_channel_id'], log_queue))
 

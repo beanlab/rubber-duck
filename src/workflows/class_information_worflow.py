@@ -30,15 +30,45 @@ class ClassInformationWorkflow:
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
         await self._send_message(context.thread_id, "In this conversation, you will provide information about your class. You can send documents of type [.txt, .md, .pdf, .docx]")
-        for category in self._settings['class_categories']:
-            while True:
-                await self._send_message(thread_id,
-                                         f"Please add relative documents and URLs to the **{category}** category.")
-                errors = await self._wait_for_message(category, thread_id)
-                if errors:
-                    await self._send_message(thread_id, errors)
-                else:
-                    break
+        while(True):
+            await self._send_message(thread_id, "Please select a category for the class information you want to provide. "
+                                                 "You can choose from the following categories:")
+            if not self._settings['class_categories']:
+                await self._send_message(thread_id, "No categories are configured. Please contact an administrator.")
+                return
+            # Create a dictionary to map category numbers to category names and send a message with the options
+
+            cat_dict = {}
+            cat_string = ""
+            for i, cat in enumerate(self._settings['class_categories']):
+                cat_dict[str(i + 1)] = cat
+                cat_string += f"{i + 1}. {cat}\n"
+            cat_string += f"{len(self._settings['class_categories']) + 1}. Exit\n"
+            await self._send_message(thread_id, cat_string)
+
+            # Wait for the user to select a category or exit
+            async with queue('messages', None) as messages:
+                cat_num: Message = await asyncio.wait_for(messages.get(), timeout=300)
+
+            if cat_num['content'] == str(len(self._settings['class_categories']) + 1):
+                break
+
+            category = cat_dict.get(cat_num['content'], None)
+
+            # If the category is not valid, send an error message and ask again
+            if category is None:
+                await self._send_message(thread_id, "Invalid category selected. Please try again.")
+                continue
+
+            else:
+                while True:
+                    await self._send_message(thread_id,
+                                             f"Please add relative documents and URLs to the **{category}** category.")
+                    errors = await self._wait_for_message(category, thread_id)
+                    if errors:
+                        await self._send_message(thread_id, errors)
+                    else:
+                        break
 
         await self._send_message(thread_id, "Thank you for providing the information. The class information has been updated.")
 

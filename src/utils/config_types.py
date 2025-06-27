@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import TypedDict, NotRequired, Literal
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -52,10 +52,12 @@ class RegistrationSettings(TypedDict):
     roles: RolesSettings
     sender_email: str
 
+CategoryType = Literal["Assignments", "Lecture Notes", "Exams", "Projects", "Resources"]
+
 class ClassInformationSettings(TypedDict):
     target_channel_id: int
     class_name: str
-    class_categories: list[str]
+    class_categories: list[CategoryType]
     file_size_limit: int
     file_type_ext: list[str]
 
