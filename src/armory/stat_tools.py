@@ -179,14 +179,14 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "histogram")
 
         if column not in data.columns.to_list():
-            raise ValueError(f"Column '{column}' not found in dataset.")
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Histogram of {column}", "hist")
@@ -202,14 +202,14 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "boxplot")
 
         if column not in data.columns.to_list():
-            raise ValueError(f"Column '{column}' not found.")
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Boxplot of {column}", "box")
@@ -224,14 +224,14 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "dotplot")
 
         if column not in data.columns.to_list():
-            raise ValueError(f"Column '{column}' not found.")
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Dotplot of {column}", "dot")
@@ -246,14 +246,14 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "barplot")
 
         if column not in data.columns.to_list():
-            raise ValueError(f"Column '{column}' not found.")
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
 
         value_counts = data[column].value_counts()
         plt.figure(figsize=(8, 6))
@@ -267,14 +267,14 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "piechart")
 
-        if column not in data.columns:
-            raise ValueError(f"Column '{column}' not found.")
+        if column not in data.columns.to_list():
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
 
         if not self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Pie Chart of {column}", "dot")
@@ -292,15 +292,17 @@ class StatsTools:
     @register_tool
     @direct_send_message
     @cache_result
-    def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
         data = self._datastore.get_dataset(dataset)
 
+        if column not in data.columns.to_list():
+            return f"Column '{column}' not found in dataset '{dataset}'. Available columns are: {', '.join(data.columns)}"
+
         name = self._photo_name(dataset, column, "proportionbarplot")
         title = f"Proportion Barplot of {column}"
 
-        # Let the enhanced plot message function handle fallback or actual plot
         self._plot_message_with_axes(data, column, title, kind="proportion")
 
         return self._save_plot(name)
