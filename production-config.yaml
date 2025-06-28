@@ -286,12 +286,13 @@ servers:
             settings:
               introduction: |
                 Welcome to the Design Experience Bot! My goal is to teach you questions you can use to think critically about your code. 
+                I'm trained to help you with the the Convex Hull design project.
                 Are you ready?
               agents:
                 - name: RubberDuck
                   engine: gpt-4.1
                   prompt_files:
-                    - prompts/312-design-prompts/designer-duck-v2.txt
+                    - prompts/312-design-prompts/designer-duck-convex-hull.txt
                   max_iterations: 5
               timeout: 3600 # 1 hour timeout for design discussions
               file_size_limit: *file_size_limit
