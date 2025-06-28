@@ -281,20 +281,21 @@ servers:
       - channel_id: 1384678077694480434
         channel_name: designer-duck
         ducks:
-          - name: designer-duck
+          - name: standard-rubber-duck
             duck_type: agent_conversation
             settings:
               introduction: |
-                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
-                I'm specialized with helping you on Project 2: Convex Hull.
-                Let's work on this together! How is data stored in your project?
+                Welcome to the Design Experience Bot! My goal is to teach you questions you can use to think critically about your code. 
+                Are you ready?
               agents:
-                - name: DesignerDuck
+                - name: RubberDuck
                   engine: gpt-4.1
                   prompt_files:
-                  - prompts/designer-duck.txt
+                    - prompts/312-design-prompts/designer-duck-v2.txt
                   max_iterations: 5
-              timeout: 600
+              timeout: 3600 # 1 hour timeout for design discussions
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool
