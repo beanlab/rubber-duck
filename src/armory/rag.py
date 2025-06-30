@@ -4,9 +4,9 @@ import hashlib
 
 from agents import RunContextWrapper
 
-from src.armory.tools import register_tool
-from src.utils.config_types import DuckContext
-from src.utils.logger import duck_logger
+from ..armory.tools import register_tool
+from ..utils.config_types import DuckContext
+from ..utils.logger import duck_logger
 
 
 class MultiClassRAGDatabase:
@@ -18,11 +18,11 @@ class MultiClassRAGDatabase:
                  chunk_overlap: int = 200,
                  enable_chunking: bool = True):
 
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
-        self.enable_chunking = enable_chunking
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+        self._enable_chunking = enable_chunking
         self._autocorrect = autocorrect
-        self.client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
+        self._client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
         self._collections = {}
 
     def _get_collection_name(self, channel_id: str) -> str:
@@ -31,28 +31,28 @@ class MultiClassRAGDatabase:
     def get_or_create_collection(self, channel_id: str):
         if channel_id not in self._collections:
             collection_name = self._get_collection_name(channel_id)
-            self._collections[channel_id] = self.client.get_or_create_collection(
+            self._collections[channel_id] = self._client.get_or_create_collection(
                 name=collection_name,
                 metadata={"description": f"Documents for channel {channel_id}", "channel_id": channel_id}
             )
         return self._collections[channel_id]
 
     def _chunk_text(self, text: str) -> List[str]:
-        if not self.enable_chunking:
+        if not self._enable_chunking:
             return [text]
 
-        if len(text) <= self.chunk_size:
+        if len(text) <= self._chunk_size:
             return [text]
 
         chunks = []
         start = 0
 
         while start < len(text):
-            end = start + self.chunk_size
+            end = start + self._chunk_size
 
             if end < len(text):
                 sentence_break = text.rfind('.', start, end)
-                if sentence_break > start + self.chunk_size - 100:
+                if sentence_break > start + self._chunk_size - 100:
                     end = sentence_break + 1
                 else:
                     word_break = text.rfind(' ', start, end)
@@ -63,7 +63,7 @@ class MultiClassRAGDatabase:
             if chunk:
                 chunks.append(chunk)
 
-            start = max(start + 1, end - self.chunk_overlap)
+            start = max(start + 1, end - self._chunk_overlap)
 
         return chunks
 
@@ -81,7 +81,7 @@ class MultiClassRAGDatabase:
                 "document_name": document_name,
                 "chunk_index": i,
                 "total_chunks": len(chunks),
-                "is_chunked": self.enable_chunking
+                "is_chunked": self._enable_chunking
             }
 
             collection.add(
@@ -96,6 +96,7 @@ class MultiClassRAGDatabase:
 
     @register_tool
     def get_categories(self, ctx: RunContextWrapper[DuckContext]) -> List[str]:
+
         """
         Get all document categories that a student can get information about for a specific channel
 
@@ -118,11 +119,11 @@ class MultiClassRAGDatabase:
             return []
 
     @register_tool
-    def search_by_category(self,
+    async def search_by_category(self,
                            ctx: RunContextWrapper[DuckContext],
                            category: str,
                            query: str,
-                           n_results: int = 2) -> List[Dict[str, Any]]:
+                           n_results: int = 4) -> List[Dict[str, Any]]:
         """
         Search for relevant document chunks within a specific category in a channel.
 
@@ -140,8 +141,9 @@ class MultiClassRAGDatabase:
 
         try:
             collection = self.get_or_create_collection(channel_id)
-            available_categories = self._get_categories(channel_id)
-            category = self._autocorrect(available_categories, category)
+            available_categories = self.get_categories(ctx)
+            if category not in available_categories:
+                category = await self._autocorrect(available_categories, category)
 
             results = collection.query(
                 query_texts=[query],
@@ -154,7 +156,7 @@ class MultiClassRAGDatabase:
             return []
 
     @register_tool
-    def search_channel(self, ctx: RunContextWrapper[DuckContext], query: str, n_results: int = 2) -> List[Dict[str, Any]]:
+    def search_channel(self, ctx: RunContextWrapper[DuckContext], query: str, n_results: int = 4) -> List[Dict[str, Any]]:
         """
         Search for relevant document chunks across an entire channel's collection.
 
@@ -201,20 +203,6 @@ class MultiClassRAGDatabase:
         return formatted_results
 
 
-    def get_documents_in_category(self, channel_id: str, category: str) -> List[str]:
-        """Get all document names in a specific category for a channel"""
-        try:
-            collection = self.get_or_create_collection(channel_id)
-            results = collection.get(where={"category": {"$eq": category}})
-            if not results['metadatas']:
-                return []
-
-            doc_names = list(set(meta.get('document_name', '') for meta in results['metadatas']))
-            return sorted([name for name in doc_names if name])
-        except Exception as e:
-            print(f"Error getting documents for channel {channel_id}/{category}: {e}")
-            return []
-
     def delete_document(self, channel_id: str, category: str, document_name: str) -> bool:
         """Delete a specific document from a channel"""
         try:
@@ -242,7 +230,7 @@ class MultiClassRAGDatabase:
         """Delete an entire channel's collection"""
         try:
             collection_name = self._get_collection_name(channel_id)
-            self.client.delete_collection(name=collection_name)
+            self._client.delete_collection(name=collection_name)
             if channel_id in self._collections:
                 del self._collections[channel_id]
             print(f"Deleted channel: {channel_id}")
@@ -250,27 +238,3 @@ class MultiClassRAGDatabase:
         except Exception as e:
             print(f"Error deleting channel {channel_id}: {e}")
             return False
-
-
-    def update_chunking_settings(self,
-                                 chunk_size: int = None,
-                                 chunk_overlap: int = None,
-                                 enable_chunking: bool = None):
-        """Update chunking settings for new documents"""
-        if chunk_size is not None:
-            self.chunk_size = chunk_size
-        if chunk_overlap is not None:
-            self.chunk_overlap = chunk_overlap
-        if enable_chunking is not None:
-            self.enable_chunking = enable_chunking
-
-        print(f"Updated global settings: chunk_size={self.chunk_size}, "
-              f"chunk_overlap={self.chunk_overlap}, enable_chunking={self.enable_chunking}")
-
-    def get_chunking_settings(self) -> Dict[str, Any]:
-        """Get current chunking settings"""
-        return {
-            "chunk_size": self.chunk_size,
-            "chunk_overlap": self.chunk_overlap,
-            "enable_chunking": self.enable_chunking
-        }

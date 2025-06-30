@@ -12,8 +12,9 @@ import yaml  # Added import for YAML support
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
+from scrapfly import ScrapflyClient
 
-from src.gen_ai.gen_ai import ChatCompletions
+from .gen_ai.gen_ai import ChatCompletions
 from .armory.rag import MultiClassRAGDatabase
 from .workflows.class_information_worflow import ClassInformationWorkflow
 from .bot.discord_bot import DiscordBot
@@ -170,10 +171,12 @@ def build_class_information_duck(
         rag: MultiClassRAGDatabase
 ):
     rag.get_or_create_collection(str(settings['target_channel_id']))
+    scrape = ScrapflyClient(key=os.getenv("SCRAPFLY_API_KEY"))
 
     class_information_workflow = ClassInformationWorkflow(
         name,
         rag,
+        scrape,
         bot.send_message,
         settings
     )
@@ -305,6 +308,10 @@ def _build_feedback_queues(config: Config, sql_session):
 async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
+    chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
+
+    rag = _make_rag_database(chat_completions)
+
     async with DiscordBot() as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
@@ -316,9 +323,6 @@ async def main(config: Config, log_dir: Path):
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
-            chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
-            rag = _make_rag_database(chat_completions)
-
 
             ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, rag, chat_completions)
 

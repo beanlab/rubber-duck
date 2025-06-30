@@ -119,8 +119,8 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAG
     if _armory is None:
         _armory = Armory()
 
-        if rag:
-            _armory.scrub_tools(rag)
+        _armory.scrub_tools(rag)
+
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
             stat_tools = StatsTools(data_store, chat_completions.autocorrect)
