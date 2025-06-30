@@ -28,7 +28,7 @@ agents_as_tools:
     agents:
       - name: CodeComplexityAgent
         prompt_files:
-        - prompts/generate-code-complexity.md
+        - prompts/other/generate-code-complexity.md
         engine: gpt-4.1
 
 ducks:
@@ -41,7 +41,7 @@ ducks:
         - name: RubberDuck
           engine: gpt-4.1
           prompt_files:
-          - prompts/standard-rubber-duck.txt
+          - prompts/single-agent-prompts/standard-prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
       file_size_limit: *file_size_limit
@@ -61,7 +61,7 @@ ducks:
       agents:
         - name: Standard_Rubber_Duck
           prompt_files:
-          - prompts/stats.txt
+          - prompts/single-agent-prompts/class-prompts/stats.txt
           engine: gpt-4.1
           tools:
             - explain_capabilities
@@ -253,7 +253,7 @@ servers:
               agents:
                 - name: socrates
                   prompt_files:
-                  - prompts/socratic-duck.txt
+                  - prompts/single-agent-prompts/functional-prompts/socratic-duck.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
@@ -292,7 +292,7 @@ servers:
                 - name: DesignerDuck
                   engine: gpt-4.1
                   prompt_files:
-                  - prompts/designer-duck.txt
+                  - prompts/single-agent-prompts/functional-prompts/designer-duck.txt
                   max_iterations: 5
               timeout: 600
 
