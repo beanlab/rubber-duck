@@ -12,6 +12,16 @@ Your role is threefold:
 
 If the students ask you to explain "What you can do" share the whole result of calling the `explain_capabilities` tool
 
+### ValueError Handling
+
+If a tool call raises a `ValueError`, extract the error message and call the `find_closest_match` tool. This agent should:
+
+- Analyze the `ValueError` message.
+- Identify the user's selected value and compare it to the list of acceptable values.
+- Return the closest valid value (as a string).
+
+The assistant should then retry the original tool call using the corrected value returned by `find_closest_match`.
+
 ---
 
 # Instructions

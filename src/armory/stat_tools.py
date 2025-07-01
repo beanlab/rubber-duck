@@ -19,9 +19,8 @@ from ..utils.logger import duck_logger
 
 
 class StatsTools:
-    def __init__(self, datastore: DataStore, autocorrect: Callable[[list[str], str], Awaitable[str]]):
+    def __init__(self, datastore: DataStore):
         self._datastore = datastore
-        self._autocorrect = autocorrect
 
     def _is_categorical(self, series) -> bool:
         if isinstance(series, list) or isinstance(series, dict):
@@ -124,7 +123,7 @@ class StatsTools:
     async def get_variable_names(self, dataset: str) -> str:
         """Returns a list of all variable names in the dataset."""
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
         data = self._datastore.get_dataset(dataset).columns.to_list()
         return f"Variable names in {dataset}: {', '.join(data)}"
@@ -137,7 +136,7 @@ class StatsTools:
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
@@ -193,13 +192,13 @@ class StatsTools:
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "histogram")
 
         if column not in data.columns.to_list():
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Histogram of {column}", "hist")
@@ -220,13 +219,13 @@ class StatsTools:
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "boxplot")
 
         if column not in data.columns.to_list():
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Boxplot of {column}", "box")
@@ -246,13 +245,13 @@ class StatsTools:
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "dotplot")
 
         if column not in data.columns.to_list():
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Dotplot of {column}", "dot")
@@ -272,13 +271,13 @@ class StatsTools:
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "barplot")
 
         if column not in data.columns.to_list():
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         value_counts = data[column].value_counts()
         plt.figure(figsize=(8, 6))
@@ -297,13 +296,13 @@ class StatsTools:
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "piechart")
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if not self._is_categorical(data[column]):
             self._plot_message_with_axes(data, column, f"Pie Chart of {column}", "dot")
@@ -326,12 +325,12 @@ class StatsTools:
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         name = self._photo_name(dataset, column, "proportionbarplot")
         title = f"Proportion Barplot of {column}"
@@ -347,12 +346,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if self._is_categorical(series):
@@ -365,12 +364,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating skewness for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if self._is_categorical(series):
@@ -383,12 +382,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating standard deviation for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if self._is_categorical(series):
@@ -401,12 +400,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating median for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if self._is_categorical(series):
@@ -419,12 +418,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating approximate mode (KDE) for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column].dropna()
 
@@ -449,12 +448,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if self._is_categorical(series):
@@ -469,12 +468,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating table of counts for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if not self._is_categorical(series):
@@ -489,12 +488,12 @@ class StatsTools:
         duck_logger.debug(f"Calculating proportions for: {column} in dataset: {dataset}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column not in data.columns:
-            column = await self._autocorrect(data.columns.to_list(), column)
+            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         series = data[column]
         if not self._is_categorical(series):
@@ -578,7 +577,7 @@ class StatsTools:
             f"Calculating confidence interval and t-test for {dataset}.{variable} with alternative={alternative}, mu={mu}, conf_level={conf_level}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         sample_data = data[variable].dropna()
@@ -625,7 +624,7 @@ class StatsTools:
         name = self._photo_name(dataset, alternative, mu, conf_level, "t_distribution")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
         series = data[column].dropna()
@@ -697,15 +696,15 @@ class StatsTools:
                           f"alternative={alternative}, conf_level={conf_level}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if column1 not in data.columns:
-            column1 = await self._autocorrect(data.columns.to_list(), column1)
+            raise ValueError(f"Column '{column1}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if column2 not in data.columns:
-            column2 = await self._autocorrect(data.columns.to_list(), column2)
+            raise ValueError(f"Column '{column2}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         # Identify categorical and numeric columns
         if self._is_categorical(data[column1]) and not self._is_categorical(data[column2]):
@@ -783,15 +782,15 @@ class StatsTools:
             f"conf_level={conf_level}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if group_column not in data.columns:
-            group_column = await self._autocorrect(data.columns.to_list(), group_column)
+            raise ValueError(f"Column '{group_column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if value_column not in data.columns:
-            value_column = await self._autocorrect(data.columns.to_list(), value_column)
+            raise ValueError(f"Column '{group_column}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         # Validate variable types
         if not self._is_categorical(data[group_column]):
@@ -896,15 +895,15 @@ class StatsTools:
             f"Z-test for dataset={dataset}, variable={variable}, category={category}, p_null={p_null}, alternative={alternative}, conf_level={conf_level}")
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
         if variable not in data.columns:
-            variable = await self._autocorrect(data.columns.to_list(), variable)
+            raise ValueError(f"Column '{variable}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if category not in data[variable].unique():
-            category = await self._autocorrect(data[variable].unique(), category)
+            raise ValueError(f"Column '{category}' not found in dataset '{dataset}'. Available columns: {data[variable].unique()}")
 
         series = data[variable].dropna()
 
@@ -961,29 +960,23 @@ class StatsTools:
         )
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
-        # Autocorrect any variable names
         for var in [response_variable, group_variable]:
             if var not in data.columns:
-                corrected = await self._autocorrect(data.columns.to_list(), var)
-                if var == response_variable:
-                    response_variable = corrected
-                else:
-                    group_variable = corrected
+                raise ValueError(
+                    f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if response_category not in data[response_variable].unique():
-            response_category = await self._autocorrect(data[response_variable].unique(), response_category)
+            raise ValueError(f"Column '{response_variable}' not found in dataset '{dataset}'. Available variables: {data[response_variable].unique()}")
 
         for group_val in [group1, group2]:
             if group_val not in data[group_variable].unique():
-                corrected = await self._autocorrect(data[group_variable].unique(), group_val)
-                if group_val == group1:
-                    group1 = corrected
-                else:
-                    group2 = corrected
+                raise ValueError(
+                    f"Group Value '{group_val}' not found in dataset '{dataset}'. Available group_val: {data[group_variable].unique()}")
+
 
         # Filter out missing values
         df = data[[response_variable, group_variable]].dropna()
@@ -1048,18 +1041,15 @@ class StatsTools:
         )
 
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
 
         data = self._datastore.get_dataset(dataset)
 
-        # Autocorrect variable names
         for var in [row_variable, col_variable]:
             if var not in data.columns:
-                corrected = await self._autocorrect(data.columns.to_list(), var)
-                if var == row_variable:
-                    row_variable = corrected
-                else:
-                    col_variable = corrected
+                raise ValueError(
+                    f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
+
 
         df = data[[row_variable, col_variable]].dropna()
 
@@ -1107,14 +1097,16 @@ class StatsTools:
 
         # Load dataset
         if dataset not in self._datastore.get_available_datasets():
-            dataset = await self._autocorrect(self._datastore.get_available_datasets(), dataset)
+            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
         data = self._datastore.get_dataset(dataset)
 
         # Validate column names
         if response not in data.columns:
-            response = await self._autocorrect(data.columns.tolist(), response)
+            raise ValueError(
+                f"Column '{response}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
         if explanatory not in data.columns:
-            explanatory = await self._autocorrect(data.columns.tolist(), explanatory)
+            raise ValueError(
+                f"Column '{explanatory}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         df = data[[response, explanatory]].dropna()
         if df.empty:

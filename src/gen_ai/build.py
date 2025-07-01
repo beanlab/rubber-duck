@@ -5,7 +5,7 @@ from typing import Any, Iterable
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
 
-from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage, ChatCompletions
+from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
@@ -120,8 +120,7 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
-            chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
-            stat_tools = StatsTools(data_store, chat_completions.autocorrect)
+            stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
