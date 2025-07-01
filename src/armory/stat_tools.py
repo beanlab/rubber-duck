@@ -1,5 +1,5 @@
 import io
-from typing import Optional, Literal, Callable, Coroutine, Awaitable
+from typing import Optional, Literal, Callable, Awaitable
 
 import matplotlib.pyplot as plt
 import numpy as np

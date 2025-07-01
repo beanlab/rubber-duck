@@ -16,7 +16,7 @@ class MultiClassRAGDatabase:
                  autocorrect: Callable[[list[str], str], Awaitable[str]],
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
-                 enable_chunking: bool = True):
+                 enable_chunking: bool = False):
 
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap

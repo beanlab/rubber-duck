@@ -211,10 +211,13 @@ def build_ducks(
         config: Config,
         bot: DiscordBot,
         metrics_handler,
-        feedback_manager,
-        rag: MultiClassRAGDatabase,
-        chat_completions: ChatCompletions
+        feedback_manager
 ) -> dict[DUCK_NAME, DuckConversation]:
+
+    chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
+
+    rag = _make_rag_database(chat_completions)
+
     ducks = {}
 
     for duck_config in _iterate_duck_configs(config):
@@ -251,14 +254,12 @@ def _setup_ducks(
         config: Config,
         bot: DiscordBot,
         metrics_handler,
-        feedback_manager,
-        rag: MultiClassRAGDatabase,
-        chat_completions: ChatCompletions
+        feedback_manager
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, rag, chat_completions)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
 
     channel_ducks = {}
 
@@ -308,10 +309,6 @@ def _build_feedback_queues(config: Config, sql_session):
 async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
-    chat_completions = ChatCompletions(os.environ['OPENAI_API_KEY'])
-
-    rag = _make_rag_database(chat_completions)
-
     async with DiscordBot() as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
@@ -324,7 +321,7 @@ async def main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, rag, chat_completions)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
