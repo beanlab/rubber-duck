@@ -5,8 +5,7 @@ from typing import TypedDict, Protocol
 
 from agents import Agent, Runner, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
-from openai.types.chat import ChatCompletion
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from quest import step
 
 from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
@@ -89,7 +88,6 @@ async def _run_with_exception_handling(coroutine):
                                  "for more details on how to resolve this error") from ex
 
 
-
 class AgentClient:
     def __init__(
             self,
@@ -122,7 +120,6 @@ class AgentClient:
                 context=context,
                 **kwargs
             )
-
             return _result_to_agent_message(result)
 
 
