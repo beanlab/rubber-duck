@@ -3,7 +3,6 @@ from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
-
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
