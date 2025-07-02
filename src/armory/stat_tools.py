@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-from scipy.stats import skew, norm, ttest_1samp, t, chi2_contingency
+from scipy.stats import skew, norm, ttest_1samp, chi2_contingency
 from seaborn.external.kde import gaussian_kde
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
