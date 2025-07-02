@@ -58,7 +58,7 @@ ducks:
         - name: socratic
           engine: gpt-4.1
           prompt_files:
-            - prompts/socratic-explainer-prompts/question-duck.txt
+            - prompts/socratic-explainer-prompts/problem-solving-duck.txt
           handoffs:
             - explainer
             - debugger
