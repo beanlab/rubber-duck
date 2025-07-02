@@ -1,11 +1,9 @@
-import os
 from pathlib import Path
 from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
-
-from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage, ChatCompletions
+from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.rag import MultiClassRAGDatabase
@@ -114,7 +112,7 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
         }
 
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAGDatabase, chat_completions: ChatCompletions) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAGDatabase) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
@@ -123,7 +121,7 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, rag: MultiClassRAG
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
-            stat_tools = StatsTools(data_store, chat_completions.autocorrect)
+            stat_tools = StatsTools(data_store)
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
@@ -147,11 +145,10 @@ def build_agent_conversation_duck(
         bot,
         record_message: RecordMessage,
         record_usage: RecordUsage,
-        rag: MultiClassRAGDatabase,
-        chat_completions: ChatCompletions
+        rag: MultiClassRAGDatabase
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks, rag, chat_completions)
+    armory = _get_armory(config, usage_hooks, rag)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'])
     _add_tools_to_agents(conversation_agents.values(), armory)
