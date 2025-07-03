@@ -1,40 +1,39 @@
 import os
 import chromadb
 
-
 def main():
-    """Wipe all collections from the Chroma database."""
     try:
         # Connect to Chroma database using environment variables
-        host = os.getenv("CHROMA_DB_HOST_IP")
-        port = os.getenv("CHROMA_DB_PORT")
+        host = os.getenv("CHROMA_HOST")
+        port = os.getenv("CHROMA_PORT")
 
         if not host:
-            raise ValueError("CHROMA_DB_HOST_IP environment variable is not set")
+            raise ValueError("CHROMA_HOST environment variable is not set")
         if not port:
-            raise ValueError("CHROMA_DB_PORT environment variable is not set")
+            raise ValueError("CHROMA_PORT environment variable is not set")
 
         print(f"Connecting to Chroma database at {host}:{port}")
         client = chromadb.HttpClient(host=host, port=int(port))
 
-        # List and delete all collections
+        # List all collections (returns list of dicts with collection metadata)
         collections = client.list_collections()
         print(f"Found {len(collections)} collections")
 
         if not collections:
             print("No collections to delete.")
-            return
+            return 0
 
         print("\nCollections found:")
-        for i, collection_name in enumerate(collections, 1):
+        for i, collection_info in enumerate(collections, 1):
+            collection_name = collection_info.name
             try:
                 collection = client.get_collection(collection_name)
                 count = collection.count()
                 print(f"  {i}. {collection_name} ({count} documents)")
 
-                # Show first few document IDs if they exist
                 if count > 0:
-                    result = collection.get(limit=5)  # Get first 5 documents
+                    # get returns dict with keys: ids, metadatas, documents
+                    result = collection.get(limit=5)
                     if result['ids']:
                         print(f"     Sample documents: {', '.join(result['ids'][:3])}")
                         if len(result['ids']) > 3:
@@ -44,25 +43,23 @@ def main():
             except Exception as e:
                 print(f"  {i}. {collection_name} (error reading: {str(e)})")
 
-        # Confirm deletion
         confirm = input(f"Are you sure you want to delete all {len(collections)} collections? (y/N): ")
         if confirm.lower() != 'y':
             print("Operation cancelled.")
-            return
+            return 0
 
-        # Delete each collection
-        for collection_name in collections:
+        # Delete each collection by name
+        for collection_info in collections:
+            collection_name = collection_info.name
             client.delete_collection(collection_name)
             print(f"Deleted collection: {collection_name}")
 
         print("All collections deleted successfully!")
+        return 0
 
     except Exception as e:
         print(f"Error: {e}")
         return 1
-
-    return 0
-
 
 if __name__ == "__main__":
     exit(main())

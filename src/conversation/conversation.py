@@ -142,7 +142,7 @@ class AgentConversation:
                             )
                             continue
 
-                        file_content = await self._read_url(attachment['url'])
+                        file_content = await self._read_url(attachment['url'], attachment['filename'].split('.')[-1])
                         if file_content:
                             file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
                             message_history.append(GPTMessage(role='user', content=file_content))

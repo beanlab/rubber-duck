@@ -87,7 +87,6 @@ async def _run_with_exception_handling(coroutine):
         raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                  "for more details on how to resolve this error") from ex
 
-
 class AgentClient:
     def __init__(
             self,

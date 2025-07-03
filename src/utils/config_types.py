@@ -81,13 +81,17 @@ class AgentAsToolSettings(MultiAgentSettings):
     tool_name: str
     description: str
 
+class ConfigTools(TypedDict):
+    name: str
+    description: str
+    tool_type: str
+    settings: dict
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]
-
 
 @dataclass
 class DuckContext:
@@ -134,6 +138,9 @@ class SQLConfig(TypedDict):
     port: str
     database: str
 
+class ChromaConfig(TypedDict):
+    host: str
+    port: int
 
 class RetryProtocol(TypedDict):
     max_retries: int
@@ -154,7 +161,9 @@ class ReporterConfig(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
+    chroma: NotRequired[ChromaConfig]
     ducks: list[DuckConfig]
+    tools: list[ConfigTools]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

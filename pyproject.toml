@@ -26,8 +26,10 @@ pyyaml = "^6.0.2"
 python-docx = "^1.2.0"
 scikit-learn = "==1.7.0"
 statsmodels = "==0.14.4"
-scrapfly-sdk = "==0.8.23"
-beautifulsoup4 = "^4.13.4"
+langchain-text-splitters = "^0.3.8"
+beautifulsoup4 = "==4.13.4"
+chromadb-client = "==1.0.15"
+chromadb = "==1.0.15"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
