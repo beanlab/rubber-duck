@@ -1,12 +1,10 @@
 import asyncio
-from pathlib import Path
 
 from quest import step, queue
 
 from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
-from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 
@@ -154,7 +152,7 @@ class AgentConversation:
                             )
                             continue
 
-                        file_content = await self._read_url(attachment['url'])
+                        file_content = await self._read_url(attachment['url'], attachment['filename'].split('.')[-1])
                         if file_content:
                             file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
                             message_history.append(GPTMessage(role='user', content=file_content))
