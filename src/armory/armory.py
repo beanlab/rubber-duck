@@ -2,7 +2,7 @@ from typing import Callable
 
 from agents import FunctionTool, function_tool, Agent, RunContextWrapper
 
-from src.utils.config_types import DuckContext
+from ..utils.config_types import DuckContext
 
 
 def custom_tool_error_function(ctx: RunContextWrapper[DuckContext], error: Exception) -> str:
