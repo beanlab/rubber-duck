@@ -293,7 +293,7 @@ servers:
                   engine: gpt-4.1
                   prompt_files:
                     - prompts/312-project-design/phd-duck.txt
-                    - prompts/312-project-design/convex-hull/convex-hull.txt
+                    - prompts/312-project-design/convex-hull/convex-hull-instructions.txt
                     - prompts/312-project-design/convex-hull/extra-considerations.txt
                   max_iterations: 5
               timeout: 3600 # 1 hour timeout for design discussions
