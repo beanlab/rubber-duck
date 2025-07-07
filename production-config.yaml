@@ -20,6 +20,26 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+
+chroma:
+  host: 00.00.00.00
+  port: 8000
+
+
+tools:
+  # Config tools will be created at runtime. When creating a RAG tool, you will create two tools:
+  # 1. A tool for adding documents to the RAG system this will be named <tool_name>_add
+  # 2. A tool for querying the RAG system this will be named <tool_name>_query
+  - name: RAG_CLASS
+    description: |
+      Look up ...
+    tool_type: RAG
+    settings:
+      collection_name: cs110
+      chunk_size: 1000
+      chunk_overlap: 100
+      enable_chunking: False
+
 agents_as_tools:
   - tool_name: generate_code_complexity_analysis
     description: |
