@@ -13,6 +13,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.commands.feedback_summarizer import FeedbackSummarizer
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -24,7 +25,7 @@ from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
-from .storage.sql_metrics import SQLMetricsHandler
+from src.metrics.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
     DUCK_NAME, DuckConfig
@@ -102,8 +103,8 @@ def setup_workflow_manager(
         log_dir: Path
 ):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
-
-    commands = create_commands(send_message, metrics_handler, reporter, log_dir)
+    feedback = FeedbackSummarizer(os.getenv('OPENAI_API_KEY'))
+    commands = create_commands(send_message, metrics_handler, reporter, log_dir, feedback)
     commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
