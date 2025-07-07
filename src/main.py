@@ -186,7 +186,7 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        chroma_session = None
+        chroma_session
 ) -> dict[DUCK_NAME, DuckConversation]:
 
     ducks = {}
@@ -277,6 +277,7 @@ def _build_feedback_queues(config: Config, sql_session):
 
 async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
+
     chroma_session = create_chroma_session(config.get('chroma')) if config.get('chroma') else None
 
     async with DiscordBot() as bot:

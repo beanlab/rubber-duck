@@ -45,18 +45,11 @@ def make_add_document_tool(tool_name: str, chroma_client: chromadb.HttpClient, c
         Returns:
             List[str]: A list of chunk IDs for the added document.
         """
-        duck_logger.debug("Entering Tool: Adding document '%s' to collection '%s'", document_name, collection_name)
-        duck_logger.debug("Using ChromaDB client: %s", chroma_client)
-
         collection = chroma_client.get_or_create_collection(name=collection_name, metadata={"description": "Shared documents collection"})
-        duck_logger.debug("Finished getting or creating collection: %s", collection_name)
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         chunks = text_splitter.split_text(content) if enable_chunking else [content]
-        duck_logger.debug("Text splitter created with chunk size %d and overlap %d", chunk_size, chunk_overlap)
         chunk_ids = []
         content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
-
-        duck_logger.debug("Past text splitter, number of chunks: %d", len(chunks))
 
         for i, chunk in enumerate(chunks):
             chunk_id = f"{document_name}_{content_hash}_chunk_{i}"
@@ -72,7 +65,6 @@ def make_add_document_tool(tool_name: str, chroma_client: chromadb.HttpClient, c
                 metadatas=[metadata],
                 ids=[chunk_id]
             )
-            duck_logger.debug("Adding chunk %d with ID: %s", i, chunk_id)
 
             chunk_ids.append(chunk_id)
 
@@ -105,6 +97,7 @@ def make_search_documents_tool(tool_name: str, chroma_client: chromadb.HttpClien
                 query_texts=[query],
                 n_results=n_results
             )
+            duck_logger.error("Search results: %s", results)
             return _format_results(results)
         except Exception as e:
             duck_logger.error("Error searching collection: %s", e)

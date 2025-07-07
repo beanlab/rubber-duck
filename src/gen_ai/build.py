@@ -116,17 +116,19 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
 
 def _add_config_tools_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
     for tool_config in config.get('tools', []):
-        if tool_config['tool_type'] == 'RAG':
-            if not chroma_session:
-                raise ValueError("ChromaDB session is required for RAG tools")
-            tool_settings = tool_config['settings']
-            add_tool = make_add_document_tool(tool_config['name'] + "_add", chroma_session, tool_settings['collection_name'],
-                                          tool_settings.get('chunk_size', 1000),
-                                          tool_settings.get('chunk_overlap', 100),
-                                          tool_settings.get('enable_chunking', False))
-            query_tool = make_search_documents_tool(tool_config['name'] + "_query", chroma_session, tool_settings['collection_name'])
-            armory.add_tool(add_tool)
-            armory.add_tool(query_tool)
+        match tool_config['tool_type']:
+            case 'RAG':
+                if not chroma_session:
+                    raise ValueError("ChromaDB session is required for RAG tools")
+                tool_settings = tool_config['settings']
+                add_tool = make_add_document_tool(tool_config['name'] + "_add", chroma_session, tool_settings['collection_name'],
+                                              tool_settings.get('chunk_size', 1000),
+                                              tool_settings.get('chunk_overlap', 100),
+                                              tool_settings.get('enable_chunking', False))
+                query_tool = make_search_documents_tool(tool_config['name'] + "_query", chroma_session, tool_settings['collection_name'])
+                armory.add_tool(add_tool)
+                armory.add_tool(query_tool)
+
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
     global _armory
