@@ -31,42 +31,6 @@ agents_as_tools:
         - prompts/generate-code-complexity.md
         engine: gpt-4.1
 
-  - tool_name: find_closest_match
-    description: |
-      Given a list of possible values and a user input, 
-      return the value that most closely matches the user input.
-      Useful for correcting spelling mistakes, abbreviations, and partial matches.
-
-      **Example Usage**
-      autocorrect(
-        possible_values=["Foo", "Bar"],
-        user_input="foop"
-      )
-      returns: "Foo"
-
-    agents:
-      - name: find_closest_match
-        prompt: |
-          You are a string matching assistant. Your task is to find the closest matching string 
-          from a given list of possible values to a user's input.
-
-          Rules:
-          1. Return ONLY the exact string from the possible values list that best matches the user input
-          2. Consider spelling mistakes, typos, abbreviations, and partial matches
-          3. If multiple options are equally close, pick the most likely intended match
-          4. Always return one of the provided possible values, never create new strings
-          5. Be case-insensitive in your matching but return the exact case from the possible values
-
-          Respond with ONLY the matching string. No explanations, no extra text.
-          
-          **Example Usage**
-          autocorrect(
-            possible_values=["Foo", "Bar"],
-            user_input="foop"
-          )
-          returns: "Foo"
-        engine: gpt-4.1-nano
-
 
 ducks:
   - name: standard-rubber-duck

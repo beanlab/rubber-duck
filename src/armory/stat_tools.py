@@ -13,7 +13,7 @@ from sklearn.metrics import mean_squared_error
 import statsmodels.formula.api as smf
 
 from .cache import cache_result
-from .tools import register_tool, direct_send_message
+from .tools import register_tool, sends_image
 from ..armory.data_store import DataStore
 from ..utils.logger import duck_logger
 
@@ -106,16 +106,16 @@ class StatsTools:
         return f"Variable names in {dataset}: {', '.join(data)}"
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes] | str:
+    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes]:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
 
         data = self._valid_dataset_name(dataset)
 
         if not isinstance(n, int) or n <= 0:
-            return "n must be a positive integer."
+            raise ValueError("n must be a positive integer.")
 
         df = data.head(n)
 
@@ -157,9 +157,9 @@ class StatsTools:
 
     # Tools for dataset statistics and visualizations
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
 
@@ -169,7 +169,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            return "Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead."
+            raise ValueError("Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead.")
 
         plt.figure(figsize=(8, 6))
         sns.histplot(column_val, kde=True, bins=20)
@@ -180,9 +180,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
 
@@ -192,7 +192,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            return "Boxplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
+            raise ValueError("Boxplots are not appropriate for categorical data. Please use a barplot or pie chart instead.")
 
         plt.figure(figsize=(8, 6))
         sns.boxplot(y=column_val)
@@ -202,9 +202,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
 
@@ -214,7 +214,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            return "Dotplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
+            raise ValueError("Dotplots are not appropriate for categorical data. Please use a barplot or pie chart instead.")
 
         plt.figure(figsize=(8, 6))
         sns.stripplot(x=column_val, jitter=True)
@@ -224,9 +224,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
 
@@ -236,7 +236,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if not self._is_categorical(column_val):
-            return "Barplots are not appropriate for numeric data. Please use a histogram or boxplot instead."
+            raise ValueError("Barplots are not appropriate for numeric data. Please use a histogram or boxplot instead.")
 
         value_counts = column_val.value_counts()
         plt.figure(figsize=(8, 6))
@@ -248,9 +248,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
 
@@ -260,7 +260,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if not self._is_categorical(column_val):
-            return "Pie charts are not appropriate for numeric data. Please use a barplot or histogram instead."
+            raise ValueError("Pie charts are not appropriate for numeric data. Please use a barplot or histogram instead.")
 
         value_counts = column_val.dropna().value_counts()
         labels = [f"{label} ({round(p * 100, 1)}%)" for label, p in (value_counts / value_counts.sum()).items()]
@@ -273,9 +273,9 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
-    async def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+    async def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
 
@@ -286,7 +286,7 @@ class StatsTools:
         name = self._photo_name(dataset, column, "proportionbarplot")
 
         if not self._is_categorical(column_val):
-            return "Proportion barplots are not appropriate for numeric data. Please use a barplot or boxplot chart instead."
+            raise ValueError("Proportion barplots are not appropriate for numeric data. Please use a barplot or boxplot chart instead.")
 
         counts = column_val.dropna().value_counts()
         proportions = (counts / counts.sum()).reset_index()
@@ -376,7 +376,7 @@ class StatsTools:
             return "Error calculating mode"
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
@@ -424,7 +424,7 @@ class StatsTools:
     # Tools for distribution statistics and visualizations
 
     @register_tool
-    @direct_send_message
+    @sends_image
     def calculate_probability_from_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates the probability for one or two z-scores from a normal distribution. Can handle upper tail, lower tail, or between two z-scores."""
         duck_logger.debug(f"Calculating probability for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
@@ -442,7 +442,7 @@ class StatsTools:
             return "Invalid input for tail or missing z2"
 
     @register_tool
-    @direct_send_message
+    @sends_image
     def calculate_percentiles_from_normal_distribution(self, p1: float, p2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates z-score values corresponding to given percentiles from a normal distribution."""
         duck_logger.debug(f"Calculating percentiles for p1={p1}, p2={p2}, mean={mean}, std={std}, tail={tail}")
@@ -462,7 +462,7 @@ class StatsTools:
             return "Invalid input for tail or missing p2"
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
     def plot_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Upper Tail") -> tuple[str, bytes]:
         """Plots a normal distribution with shaded areas for specified z-scores. If only one z-score is provided, it will shade the area for that z-score."""
@@ -488,7 +488,7 @@ class StatsTools:
 
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_confidence_interval_and_t_test(self, dataset: str, variable: str, alternative: Literal[
         "greater", "less", "two.sided"] = "two.sided", mu: float = 0, conf_level: float = 0.95) -> str:
         """Performs a one-sample t-test and returns a formatted summary string of the test results."""
@@ -528,7 +528,7 @@ class StatsTools:
         return summary
 
     @register_tool
-    @direct_send_message
+    @sends_image
     @cache_result
     async def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative: Literal["greater", "less", "two.sided"] = "two.sided", mu: float= 0,
                                                     conf_level: float = 0.95) -> tuple[str, bytes] | str:
@@ -602,7 +602,7 @@ class StatsTools:
 
     # Tools for Two Mean EDA
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_two_mean_t_test(self, dataset: str, column1: str, column2: str,
                                         alternative: Literal["greater", "less", "two.sided"] = "two.sided",
                                         conf_level: float = 0.95) -> str:
@@ -682,7 +682,7 @@ class StatsTools:
         return summary
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_one_way_anova(self, dataset: str, group_column: str, value_column: str,
                                       conf_level: float = 0.95) -> str:
         """Performs a one-way ANOVA test on a numeric variable across groups defined by a categorical variable."""
@@ -786,7 +786,7 @@ class StatsTools:
 
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_one_sample_proportion_z_test(self, dataset: str, variable: str, category: str,
                                                      p_null: float = 0.5,
                                                      alternative: Literal["greater", "less", "two.sided"] = "two.sided",
@@ -845,7 +845,7 @@ class StatsTools:
 
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_two_sample_proportion_z_test(self, dataset: str, response_variable: str, response_category: str,
                                                      group_variable: str, group1: str, group2: str,
                                                      alternative: Literal["greater", "less", "two.sided"] = "two.sided",
@@ -928,7 +928,7 @@ class StatsTools:
 
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def calculate_chi_squared_test(self, dataset: str, row_variable: str, col_variable: str) -> str:
         """
         Performs a Chi-squared test of independence between two categorical variables.
@@ -971,7 +971,7 @@ class StatsTools:
 
 
     @register_tool
-    @direct_send_message
+    @sends_image
     async def simple_linear_regression(
         self,
         dataset: str,

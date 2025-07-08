@@ -28,9 +28,8 @@ class Armory:
             self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
-
-        if hasattr(tool_function, "direct_send_message"):
-            tool_function = self.send_directly(tool_function)
+        if hasattr(tool_function, "sends_image"):
+            tool_function = self.send_image_directly(tool_function)
 
         tool = function_tool(tool_function)
 
@@ -47,11 +46,9 @@ class Armory:
     def get_all_tool_names(self):
         return list(self._tools.keys())
 
-
-    def send_directly(self, func):
+    def send_image_directly(self, func):
         sig = inspect.signature(func)
 
-        # Create a new Parameter for ctx with the correct type
         ctx_param = inspect.Parameter(
             name="wrapper",
             kind=Parameter.POSITIONAL_OR_KEYWORD,
@@ -60,50 +57,30 @@ class Armory:
 
         new_params = list(sig.parameters.values())
 
-        # Insert ctx as FIRST parameter, not second
         param_names = [p.name for p in new_params]
         if "wrapper" not in param_names:
-            new_params.insert(0, ctx_param)  # Changed from 1 to 0
+            new_params.insert(0, ctx_param)
 
         new_sig = sig.replace(parameters=new_params)
 
-        is_async = inspect.iscoroutinefunction(func)
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            bound = new_sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+            wrapper_arg = bound.arguments["wrapper"]
 
-        if is_async:
-            @wraps(func)
-            async def async_wrapper(*args, **kwargs):
-                bound = new_sig.bind(*args, **kwargs)
-                bound.apply_defaults()
-                wrapper = bound.arguments["wrapper"]
+            call_args = {
+                k: v for k, v in bound.arguments.items() if k != "wrapper"
+            }
 
-                # Prepare args to call the original method (without wrapper)
-                call_args = {
-                    k: v for k, v in bound.arguments.items() if k != "wrapper"
-                }
-
+            if inspect.iscoroutinefunction(func):
                 result = await func(**call_args)
-                name, data = result
-                await self.send_message(wrapper.context.thread_id, file=result)  # Fixed: use self.send_message
-                return name
-
-            async_wrapper.__signature__ = new_sig
-            return async_wrapper
-
-        else:
-            @wraps(func)
-            def sync_wrapper(*args, **kwargs):
-                bound = new_sig.bind(*args, **kwargs)
-                bound.apply_defaults()
-                wrapper = bound.arguments["wrapper"]
-
-                call_args = {
-                    k: v for k, v in bound.arguments.items() if k != "wrapper"
-                }
-
+            else:
                 result = func(**call_args)
-                name, data = result
-                self.send_message(wrapper.context.thread_id, file=result)
-                return name
 
-            sync_wrapper.__signature__ = new_sig
-            return sync_wrapper
+            name, _ = result
+            await self.send_message(wrapper_arg.context.thread_id, file=result)
+            return name
+
+        wrapper.__signature__ = new_sig
+        return wrapper
