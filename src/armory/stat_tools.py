@@ -108,14 +108,14 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes]:
+    async def show_dataset_head(self, dataset: str, n: int) -> tuple[str, bytes] | str:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
 
         data = self._valid_dataset_name(dataset)
 
         if not isinstance(n, int) or n <= 0:
-            raise ValueError("n must be a positive integer.")
+            return "n must be a positive integer."
 
         df = data.head(n)
 
@@ -159,7 +159,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
 
@@ -169,7 +169,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            raise ValueError("Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead.")
+            return "Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead."
 
         plt.figure(figsize=(8, 6))
         sns.histplot(column_val, kde=True, bins=20)
@@ -182,7 +182,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_boxplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
 
@@ -192,7 +192,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            raise ValueError("Boxplots are not appropriate for categorical data. Please use a barplot or pie chart instead.")
+            return "Boxplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
 
         plt.figure(figsize=(8, 6))
         sns.boxplot(y=column_val)
@@ -204,7 +204,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_dotplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
 
@@ -214,7 +214,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if self._is_categorical(column_val):
-            raise ValueError("Dotplots are not appropriate for categorical data. Please use a barplot or pie chart instead.")
+            return "Dotplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
 
         plt.figure(figsize=(8, 6))
         sns.stripplot(x=column_val, jitter=True)
@@ -226,7 +226,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
 
@@ -236,7 +236,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if not self._is_categorical(column_val):
-            raise ValueError("Barplots are not appropriate for numeric data. Please use a histogram or boxplot instead.")
+            return "Barplots are not appropriate for numeric data. Please use a histogram or boxplot instead."
 
         value_counts = column_val.value_counts()
         plt.figure(figsize=(8, 6))
@@ -250,7 +250,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_pie_chart(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
 
@@ -260,7 +260,7 @@ class StatsTools:
         column_val = self._valid_column_name(dataset, column, data)
 
         if not self._is_categorical(column_val):
-            raise ValueError("Pie charts are not appropriate for numeric data. Please use a barplot or histogram instead.")
+            return "Pie charts are not appropriate for numeric data. Please use a barplot or histogram instead."
 
         value_counts = column_val.dropna().value_counts()
         labels = [f"{label} ({round(p * 100, 1)}%)" for label, p in (value_counts / value_counts.sum()).items()]
@@ -275,7 +275,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes]:
+    async def plot_proportion_barplot(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
 
@@ -286,7 +286,7 @@ class StatsTools:
         name = self._photo_name(dataset, column, "proportionbarplot")
 
         if not self._is_categorical(column_val):
-            raise ValueError("Proportion barplots are not appropriate for numeric data. Please use a barplot or boxplot chart instead.")
+            return "Proportion barplots are not appropriate for numeric data. Please use a barplot or boxplot chart instead."
 
         counts = column_val.dropna().value_counts()
         proportions = (counts / counts.sum()).reset_index()

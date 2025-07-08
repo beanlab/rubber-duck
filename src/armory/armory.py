@@ -5,7 +5,7 @@ from typing import Callable, Awaitable
 
 from agents import FunctionTool, function_tool, Agent, RunContextWrapper
 
-from src.utils.config_types import DuckContext
+from ..utils.config_types import DuckContext
 
 
 class Armory:
