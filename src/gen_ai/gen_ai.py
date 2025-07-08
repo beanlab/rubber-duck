@@ -56,14 +56,9 @@ class RecordUsage(Protocol):
 def _result_to_agent_message(result):
     last_item = result.new_items[-1]
     if isinstance(last_item, ToolCallOutputItem):
-        if not isinstance(last_item.output, tuple):
-            return AgentMessage(
-                agent_name=result.last_agent.name,
-                content=last_item.output
-            )
         return AgentMessage(
             agent_name=result.last_agent.name,
-            file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
+            content=last_item.output
         )
     else:
         return AgentMessage(
