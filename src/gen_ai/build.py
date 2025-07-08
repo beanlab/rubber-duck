@@ -102,14 +102,6 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
             if tool in armory.get_all_tool_names()
         ]
         agent.tools = tools
-        # agent.tool_use_behavior = {
-        #     "stop_at_tool_names": [
-        #         tool.name
-        #         for tool in tools
-        #         if hasattr(tool, 'direct_send_message')
-        #     ]
-        # }
-
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks, send_message) -> Armory:
     global _armory
