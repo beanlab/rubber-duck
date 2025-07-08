@@ -1,19 +1,17 @@
-from typing import Callable
+import inspect
+from inspect import Parameter
+from functools import wraps
+from typing import Callable, Awaitable
 
 from agents import FunctionTool, function_tool, Agent, RunContextWrapper
 
-from ..utils.config_types import DuckContext
+from src.utils.config_types import DuckContext
 
-
-def custom_tool_error_function(ctx: RunContextWrapper[DuckContext], error: Exception) -> str:
-    if isinstance(error, ValueError):
-        return f"{str(error)}"
-
-    return f"An unexpected error occurred while running the tool. Error: {str(error)}"
 
 class Armory:
-    def __init__(self):
+    def __init__(self, send_message):
         self._tools: dict[str, FunctionTool] = {}
+        self.send_message = send_message
 
     def scrub_tools(self, tool_instance: object):
         for attr_name in dir(tool_instance):
@@ -30,13 +28,11 @@ class Armory:
             self.add_tool(method)
 
     def add_tool(self, tool_function: Callable):
-        if not tool_function.send_error_to_llm:
-            tool = function_tool(tool_function, failure_error_function=None)
-        else:
-            tool = function_tool(tool_function, failure_error_function=custom_tool_error_function)
 
         if hasattr(tool_function, "direct_send_message"):
-            tool.direct_send_message = True
+            tool_function = self.send_directly(tool_function)
+
+        tool = function_tool(tool_function)
 
         self._tools[tool_function.__name__] = tool
 
@@ -50,3 +46,64 @@ class Armory:
 
     def get_all_tool_names(self):
         return list(self._tools.keys())
+
+
+    def send_directly(self, func):
+        sig = inspect.signature(func)
+
+        # Create a new Parameter for ctx with the correct type
+        ctx_param = inspect.Parameter(
+            name="wrapper",
+            kind=Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=RunContextWrapper[DuckContext],
+        )
+
+        new_params = list(sig.parameters.values())
+
+        # Insert ctx as FIRST parameter, not second
+        param_names = [p.name for p in new_params]
+        if "wrapper" not in param_names:
+            new_params.insert(0, ctx_param)  # Changed from 1 to 0
+
+        new_sig = sig.replace(parameters=new_params)
+
+        is_async = inspect.iscoroutinefunction(func)
+
+        if is_async:
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                bound = new_sig.bind(*args, **kwargs)
+                bound.apply_defaults()
+                wrapper = bound.arguments["wrapper"]
+
+                # Prepare args to call the original method (without wrapper)
+                call_args = {
+                    k: v for k, v in bound.arguments.items() if k != "wrapper"
+                }
+
+                result = await func(**call_args)
+                name, data = result
+                await self.send_message(wrapper.context.thread_id, file=result)  # Fixed: use self.send_message
+                return name
+
+            async_wrapper.__signature__ = new_sig
+            return async_wrapper
+
+        else:
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                bound = new_sig.bind(*args, **kwargs)
+                bound.apply_defaults()
+                wrapper = bound.arguments["wrapper"]
+
+                call_args = {
+                    k: v for k, v in bound.arguments.items() if k != "wrapper"
+                }
+
+                result = func(**call_args)
+                name, data = result
+                self.send_message(wrapper.context.thread_id, file=result)
+                return name
+
+            sync_wrapper.__signature__ = new_sig
+            return sync_wrapper
