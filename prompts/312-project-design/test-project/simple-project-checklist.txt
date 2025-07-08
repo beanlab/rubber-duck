@@ -1,0 +1,17 @@
+----------------------------------------------------------------------------------------------
+# Code Review Checklist
+
+## Common Mistakes
+- [ ] Crashes on bad input or missing files
+- [ ] Features incomplete or buggy
+- [ ] Hard-coded values instead of config/vars
+- [ ] Missing comments or unclear naming
+- [ ] Duplicate or overly complex code
+
+## Scrutiny Points
+- [ ] Input validation and error handling in place
+- [ ] Data persistence logic works reliably
+- [ ] File I/O is safe and efficient
+- [ ] Code is modular and logically organized
+- [ ] Edge cases are handled (e.g. empty lists, invalid IDs)
+
