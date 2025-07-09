@@ -2,6 +2,7 @@ import random
 import traceback as tb
 import uuid
 from typing import Protocol, Callable
+from pathlib import Path
 
 from quest import step, alias
 
@@ -74,6 +75,9 @@ class DuckOrchestrator:
             initial_message['content']
         )
 
+        checklist_content = Path("prompts/312-project-design/convex-hull/convex-hull-checklist.txt").read_text(encoding="utf-8")
+        duck_logger.debug(f"Loaded checklist for thread {thread_id}: {len(checklist_content)} characters")
+
         context = DuckContext(
             guild_id=initial_message['guild_id'],
             parent_channel_id=initial_message['channel_id'],
@@ -81,7 +85,8 @@ class DuckOrchestrator:
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],
             message_id=initial_message['message_id'],
-            thread_id=thread_id
+            thread_id=thread_id,
+            checklist_markdown=checklist_content
         )
 
         async with alias(str(thread_id)):

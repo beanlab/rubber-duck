@@ -1,8 +1,0 @@
------------------------------------------------------------------------------------------------------------------------
-# Summary
-Here are some additional considerations for the convex hull project:
-
-## Considerations
-1. **Performance**: Ensure that the algorithm is efficient, especially for large datasets. Make sure the user implements the algorithm using the tangent line method.
-
------------------------------------------------------------------------------------------------------------------------

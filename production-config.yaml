@@ -294,7 +294,7 @@ servers:
                   prompt_files:
                     - prompts/312-project-design/phd-duck.txt
                     - prompts/312-project-design/convex-hull/convex-hull-instructions.txt
-                    - prompts/312-project-design/convex-hull/extra-considerations.txt
+                    - prompts/312-project-design/convex-hull/convex-hull-checklist.txt
                   max_iterations: 5
               timeout: 3600 # 1 hour timeout for design discussions
               file_size_limit: *file_size_limit

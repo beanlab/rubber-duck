@@ -8,6 +8,7 @@ from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
+from ..armory.socratic_tools import SocraticTools
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
@@ -117,6 +118,10 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
+
+        # Load socratic tools
+        socratic_tools = SocraticTools()
+        _armory.scrub_tools(socratic_tools)
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])

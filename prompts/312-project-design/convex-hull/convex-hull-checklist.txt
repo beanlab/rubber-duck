@@ -1,0 +1,12 @@
+-----------------------------------------------------------------------------------------------------------------------
+# Design Review Checklist
+The bot must go through these three critical areas with the user:
+
+## Checklist
+- [ ] **Algorithm Selection & Justification**: Verify the user is using a tangent algorithm for the convex hull and can explain how it works, including the steps involved in the algorithm.
+
+- [ ] **Data Structure Design**: Ensure the user has designed appropriate data structures for storing points and the hull, with clear reasoning for their choices.
+
+- [ ] **Time Complexity**: Confirm the user has a Time Complexity: O(n log n)
+
+-----------------------------------------------------------------------------------------------------------------------
