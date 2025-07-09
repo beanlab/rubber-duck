@@ -1,7 +1,12 @@
 import hashlib
+import io
 from typing import Any
 
+import PyPDF2
+import aiohttp
 import chromadb
+import docx
+from crawl4ai import CrawlerRunConfig, CacheMode, AsyncWebCrawler
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from src.armory.tools import register_tool
@@ -24,6 +29,135 @@ class RAGManager:
             chunk_overlap=chunk_overlap
         )
 
+    def _add_document_tool(self, document_name: str, content: str) -> dict[str, list[str]]:
+        collection = self._chroma_client.get_or_create_collection(
+            name=self._collection_name,
+            metadata={"description": "Shared documents collection"}
+        )
+
+        chunks = self._text_splitter.split_text(content) if self._enable_chunking else [content]
+        chunk_ids = []
+        content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+
+        for i, chunk in enumerate(chunks):
+            chunk_id = f"{document_name}_{content_hash}_chunk_{i}"
+            metadata = {
+                "document_name": document_name,
+                "chunk_index": i,
+                "total_chunks": len(chunks),
+                "is_chunked": self._enable_chunking
+            }
+
+            collection.add(
+                documents=[chunk],
+                metadatas=[metadata],
+                ids=[chunk_id]
+            )
+
+            chunk_ids.append(chunk_id)
+
+        duck_logger.debug(f"Added document: {document_name} ({len(chunks)} chunks)")
+        return {document_name: chunk_ids}
+
+    def create_add_url_tool(self):
+        async def add_url(url: str) -> dict[str, list[str]]:
+            """
+            Extracts text content from the provided URL if it is not a discord URL, and adds it to the RAG collection.
+            Must be a valid URL that is not a Discord URL.
+
+            Args:
+                url (str): The URL from which to extract text content.
+
+            Returns:
+                str: The extracted text content.
+            """
+            content = ""
+            run_config = CrawlerRunConfig(
+                cache_mode=CacheMode.ENABLED,
+                check_robots_txt=True,
+                word_count_threshold=10,
+                only_text=True,
+                wait_for="css:.dynamic-content",
+                delay_before_return_html=1.0,
+                exclude_external_links=True,
+                exclude_internal_links=True,
+                exclude_all_images=True,
+                exclude_social_media_links=True
+            )
+            async with AsyncWebCrawler() as crawler:
+                result = await crawler.arun(url, run_config=run_config)
+                content = result.markdown
+
+            return self._add_document_tool(url, content)
+
+        add_url.__name__ = self._tool_name + "_add_url"
+        register_tool(add_url)
+        return add_url
+
+    def create_add_file_tool(self):
+        async def add_file(url: str, file_type: str) -> dict[str, list[str]]:
+            """
+            Add a file to the RAG collection by fetching it from a Discord URL in the message history and extracting its text content.
+            Must be a Discord File URL
+
+            Args:
+                url (str): The URL of the file to be added.
+                file_type (str): The type of the file (e.g., "txt", "pdf", "docx").
+
+            Returns:
+                dict: A dictionary with the document name and list of chunk IDs.
+            """
+            content = ""
+            file_type = file_type.lower()
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        if response.status != 200:
+                            raise ValueError(f"Failed to fetch file. Status code: {response.status}")
+                        file_bytes = await response.read()
+
+                if file_type in ["txt", "md"]:
+                    content = file_bytes.decode("utf-8")
+
+                elif file_type == "pdf":
+                    reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+                    text = ""
+                    for page in reader.pages:
+                        text += page.extract_text() or ""
+                    content = text.strip()
+
+                elif file_type == "docx":
+                    document = docx.Document(io.BytesIO(file_bytes))
+                    content = "\n".join([para.text for para in document.paragraphs])
+
+                return self._add_document_tool(url, content)
+
+            except Exception as e:
+                raise ValueError(f"Error reading file: {e}")
+
+        add_file.__name__ = self._tool_name + "_add_file"
+        register_tool(add_file)
+        return add_file
+
+
+    def create_add_text_tool(self):
+        def add_text(document_name: str, content: str) -> dict[str, list[str]]:
+            """
+            Adds a set of text content from the user to the RAG collection.
+
+            Args:
+                document_name (str): The name of the document.
+                content (str): The text content of the document.
+
+            Returns:
+                dict: A dictionary with the document name and list of chunk IDs.
+            """
+            return self._add_document_tool(document_name, content)
+
+        add_text.__name__ = self._tool_name + "_add_text"
+        register_tool(add_text)
+        return add_text
+
     def _format_results(self, results) -> list[dict[str, Any]]:
         formatted_results = []
 
@@ -41,49 +175,6 @@ class RAGManager:
             })
 
         return formatted_results
-
-    def create_add_document_tool(self):
-        def add_document_tool(document_name: str, content: str) -> dict[str, list[str]]:
-            """
-            Add any text, url, or file document to the collection, chunking it if necessary.
-            Args:
-                document_name (str): The name of the document being added.
-                content (str): The content of the document to be added.
-            Returns:
-                List[str]: A list of chunk IDs for the added document.
-            """
-            collection = self._chroma_client.get_or_create_collection(
-                name=self._collection_name,
-                metadata={"description": "Shared documents collection"}
-            )
-
-            chunks = self._text_splitter.split_text(content) if self._enable_chunking else [content]
-            chunk_ids = []
-            content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
-
-            for i, chunk in enumerate(chunks):
-                chunk_id = f"{document_name}_{content_hash}_chunk_{i}"
-                metadata = {
-                    "document_name": document_name,
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
-                    "is_chunked": self._enable_chunking
-                }
-
-                collection.add(
-                    documents=[chunk],
-                    metadatas=[metadata],
-                    ids=[chunk_id]
-                )
-
-                chunk_ids.append(chunk_id)
-
-            duck_logger.debug(f"Added document: {document_name} ({len(chunks)} chunks)")
-            return {document_name:chunk_ids}
-
-        add_document_tool.__name__ = self._tool_name + "_add"
-        register_tool(add_document_tool)
-        return add_document_tool
 
     def create_search_documents_tool(self):
         def search_documents_tool(query: str, n_results: int = 4) -> list[dict[str, Any]]:

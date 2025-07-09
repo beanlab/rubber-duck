@@ -15,7 +15,7 @@ from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config, MultiAgentSettings
-from ..utils.logger import duck_logger
+from ..utils.logger import duck_logger, add_file_handler
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -124,11 +124,15 @@ def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Unio
                 rag = RAGManager(tool_config['name'], chroma_session, tool_settings['collection_name'], tool_settings.get('chunk_size', 1000),
                                               tool_settings.get('chunk_overlap', 100),
                                               tool_settings.get('enable_chunking', False))
-                add_tool = rag.create_add_document_tool()
+                add_url = rag.create_add_url_tool()
+                add_file = rag.create_add_file_tool()
+                add_text = rag.create_add_text_tool()
                 query_tool = rag.create_search_documents_tool()
                 list_tool = rag.create_list_documents_tool()
                 delete_tool = rag.create_delete_document_tool()
-                armory.add_tool(add_tool)
+                armory.add_tool(add_url)
+                armory.add_tool(add_file)
+                armory.add_tool(add_text)
                 armory.add_tool(query_tool)
                 armory.add_tool(list_tool)
                 armory.add_tool(delete_tool)
