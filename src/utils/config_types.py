@@ -81,7 +81,7 @@ class AgentAsToolSettings(MultiAgentSettings):
     tool_name: str
     description: str
 
-class ConfigTools(TypedDict):
+class ConfigToolset(TypedDict):
     name: str
     description: str
     tool_type: str
@@ -163,7 +163,7 @@ class Config(TypedDict):
     sql: SQLConfig
     chroma: NotRequired[ChromaConfig]
     ducks: list[DuckConfig]
-    tools: list[ConfigTools]
+    toolsets: list[ConfigToolset]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

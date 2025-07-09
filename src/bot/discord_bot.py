@@ -216,31 +216,3 @@ class DiscordBot(discord.Client):
         )
         return thread.id
 
-    async def read_url(self, url: str, file_type: str) -> str:
-        file_type = file_type.lower()
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to fetch file. Status code: {response.status}")
-                    file_bytes = await response.read()
-
-            if file_type in ["txt", "md"]:
-                return file_bytes.decode("utf-8")
-
-            elif file_type == "pdf":
-                reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() or ""
-                return text.strip()
-
-            elif file_type == "docx":
-                document = docx.Document(io.BytesIO(file_bytes))
-                return "\n".join([para.text for para in document.paragraphs])
-
-            else:
-                raise ValueError(f"Unsupported file type: {file_type}")
-
-        except Exception as e:
-            raise ValueError(f"Error reading file: {e}")
