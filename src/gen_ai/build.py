@@ -173,7 +173,7 @@ def build_agent_conversation_duck(
 
     agent_conversation = AgentConversation(
         name,
-        settings['introduction'],
+        settings.get('introduction'),
         genai_clients,
         starting_agent,
         record_message,
