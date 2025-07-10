@@ -4,6 +4,7 @@ import PyPDF2
 import aiohttp
 import docx
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
+from datetime import datetime
 
 from ..armory.tools import register_tool
 import re
@@ -83,3 +84,13 @@ class Extraction:
 
         except Exception as e:
             raise ValueError(f"Error reading file: {e}")
+
+        @register_tool
+        def get_todays_date(self) -> str:
+            """
+            Returns today's date in YYYY-MM-DD format.
+
+            Returns:
+                str: Today's date.
+            """
+            return datetime.now().strftime("%Y-%m-%d")

@@ -1,6 +1,7 @@
 import hashlib
 import io
 from typing import Any
+from datetime import datetime, date
 
 import PyPDF2
 import aiohttp
@@ -29,7 +30,38 @@ class RAGManager:
             chunk_overlap=chunk_overlap
         )
 
-    def _add_document_tool(self, document_name: str, content: str) -> dict[str, list[str]]:
+    def _is_date_in_range(self, date_str: str, start_date: str = None, end_date: str = None) -> bool:
+        """
+        Check if a date string is within the specified range.
+
+        Args:
+            date_str (str): ISO date string to check
+            start_date (str, optional): Start date in YYYY-MM-DD format
+            end_date (str, optional): End date in YYYY-MM-DD format
+
+        Returns:
+            bool: True if date is in range, False otherwise
+        """
+        if date_str == 'unknown':
+            return False
+
+
+        check_date = datetime.fromisoformat(date_str).date()
+
+        if start_date:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            if check_date < start:
+                return False
+
+        if end_date:
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            if check_date > end:
+                return False
+
+        return True
+
+
+    def _add_document_tool(self, document_name: str, content: str, category: str = "other") -> dict[str, list[str]]:
         collection = self._chroma_client.get_or_create_collection(
             name=self._collection_name,
             metadata={"description": "Shared documents collection"}
@@ -38,6 +70,7 @@ class RAGManager:
         chunks = self._text_splitter.split_text(content) if self._enable_chunking else [content]
         chunk_ids = []
         content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
+        date_added = datetime.now().strftime("%Y-%m-%d")
 
         for i, chunk in enumerate(chunks):
             chunk_id = f"{document_name}_{content_hash}_chunk_{i}"
@@ -45,7 +78,9 @@ class RAGManager:
                 "document_name": document_name,
                 "chunk_index": i,
                 "total_chunks": len(chunks),
-                "is_chunked": self._enable_chunking
+                "is_chunked": self._enable_chunking,
+                "date_added": date_added,
+                "category": category.lower()
             }
 
             collection.add(
@@ -56,20 +91,21 @@ class RAGManager:
 
             chunk_ids.append(chunk_id)
 
-        duck_logger.debug(f"Added document: {document_name} ({len(chunks)} chunks)")
+        duck_logger.debug(f"Added document: {document_name} ({len(chunks)} chunks) - Category: {category}")
         return {document_name: chunk_ids}
 
     def create_add_url_tool(self):
-        async def add_url(url: str) -> dict[str, list[str]]:
+        async def add_url(url: str, category: str = "other") -> dict[str, list[str]]:
             """
             Extracts text content from the provided URL if it is not a discord URL, and adds it to the RAG collection.
             Must be a valid URL that is not a Discord URL.
 
             Args:
                 url (str): The URL from which to extract text content.
+                category (str, optional): The category for the document. Defaults to "other".
 
             Returns:
-                str: The extracted text content.
+                dict: A dictionary with the document name and list of chunk IDs.
             """
             content = ""
             run_config = CrawlerRunConfig(
@@ -88,21 +124,23 @@ class RAGManager:
                 result = await crawler.arun(url, run_config=run_config)
                 content = result.markdown
 
-            return self._add_document_tool(url, content)
+            return self._add_document_tool(url, content, category)
 
         add_url.__name__ = self._tool_name + "_add_url"
         register_tool(add_url)
         return add_url
 
     def create_add_file_tool(self):
-        async def add_file(url: str, file_type: str) -> dict[str, list[str]]:
+        async def add_file(url: str, file_name: str, file_type: str, category: str = "other") -> dict[str, list[str]]:
             """
             Add a file to the RAG collection by fetching it from a Discord URL in the message history and extracting its text content.
             Must be a Discord File URL
 
             Args:
                 url (str): The URL of the file to be added.
+                file_name: str: The name of the file to be added.
                 file_type (str): The type of the file (e.g., "txt", "pdf", "docx").
+                category (str, optional): The category for the document. Defaults to "other".
 
             Returns:
                 dict: A dictionary with the document name and list of chunk IDs.
@@ -130,7 +168,7 @@ class RAGManager:
                     document = docx.Document(io.BytesIO(file_bytes))
                     content = "\n".join([para.text for para in document.paragraphs])
 
-                return self._add_document_tool(url, content)
+                return self._add_document_tool(file_name, content, category)
 
             except Exception as e:
                 raise ValueError(f"Error reading file: {e}")
@@ -139,20 +177,20 @@ class RAGManager:
         register_tool(add_file)
         return add_file
 
-
     def create_add_text_tool(self):
-        def add_text(document_name: str, content: str) -> dict[str, list[str]]:
+        def add_text(document_name: str, content: str, category: str = "other") -> dict[str, list[str]]:
             """
             Adds a set of text content from the user to the RAG collection.
 
             Args:
                 document_name (str): The name of the document.
                 content (str): The text content of the document.
+                category (str, optional): The category for the document. Defaults to "other".
 
             Returns:
                 dict: A dictionary with the document name and list of chunk IDs.
             """
-            return self._add_document_tool(document_name, content)
+            return self._add_document_tool(document_name, content, category)
 
         add_text.__name__ = self._tool_name + "_add_text"
         register_tool(add_text)
@@ -172,6 +210,8 @@ class RAGManager:
             formatted_results.append({
                 "text": doc.strip(),
                 "document_name": metadata.get("source", f"doc_{i}"),
+                "category": metadata.get("category", "other"),
+                "date_added": metadata.get("date_added", "unknown")
             })
 
         return formatted_results
@@ -210,14 +250,19 @@ class RAGManager:
         return search_documents_tool
 
     def create_list_documents_tool(self):
-        def list_documents_tool() -> str:
+        def list_documents_tool(category: str = None, start_date: str = None, end_date: str = None) -> str:
             """
-            List all documents in the collection as a numbered list.
+            List all documents in the collection as a numbered list, optionally filtered by category or date range.
+
+            Args:
+                category (str, optional): Filter documents by category. If None, all categories are included.
+                start_date (str, optional): Filter documents from this date onwards (YYYY-MM-DD format).
+                end_date (str, optional): Filter documents up to this date (YYYY-MM-DD format).
 
             Returns:
-                str: A numbered list of all documents in the collection
+                str: A numbered list of all documents in the collection with their metadata
             """
-            duck_logger.debug("Listing all documents in collection")
+            duck_logger.debug(f"Listing documents - Category: {category}, Start: {start_date}, End: {end_date}")
 
             try:
                 collection = self._chroma_client.get_or_create_collection(
@@ -231,22 +276,45 @@ class RAGManager:
                 if not results['metadatas']:
                     return "No documents found in the collection."
 
-                # Extract unique document names
-                document_names = set()
+                # Extract unique documents with their metadata
+                documents = {}
                 for metadata in results['metadatas']:
                     if metadata and 'document_name' in metadata:
-                        document_names.add(metadata['document_name'])
+                        doc_name = metadata['document_name']
+                        doc_category = metadata.get('category', 'other')
+                        doc_date = metadata.get('date_added', 'unknown')
 
-                if not document_names:
-                    return "No documents found in the collection."
+                        # Apply filters
+                        if category and doc_category != category.lower():
+                            continue
+                        if (start_date or end_date) and not self._is_date_in_range(doc_date, start_date, end_date):
+                            continue
 
-                # Create numbered list
+                        documents[doc_name] = {
+                            'category': doc_category,
+                            'date_added': doc_date
+                        }
+
+                if not documents:
+                    filter_msg = ""
+                    if category:
+                        filter_msg += f" in category '{category}'"
+                    if start_date and end_date:
+                        filter_msg += f" between '{start_date}' and '{end_date}'"
+                    elif start_date:
+                        filter_msg += f" from '{start_date}' onwards"
+                    elif end_date:
+                        filter_msg += f" up to '{end_date}'"
+                    return f"No documents found{filter_msg}."
+
+                # Create numbered list with metadata
                 document_list = []
-                for i, doc_name in enumerate(sorted(document_names), 1):
-                    document_list.append(f"{i}. {doc_name}")
+                for i, (doc_name, metadata) in enumerate(sorted(documents.items()), 1):
+                    date_display = metadata['date_added'][:10] if metadata['date_added'] != 'unknown' else 'unknown'
+                    document_list.append(f"{i}. {doc_name} (Category: {metadata['category']}, Date: {date_display})")
 
                 result = "Documents in collection:\n" + "\n".join(document_list)
-                duck_logger.debug(f"Found {len(document_names)} documents")
+                duck_logger.debug(f"Found {len(documents)} documents")
                 return result
 
             except Exception as e:
@@ -259,17 +327,25 @@ class RAGManager:
         return list_documents_tool
 
     def create_delete_document_tool(self):
-        def delete_document_tool(document_name: str) -> str:
+        def delete_document_tool(document_name: str = None, category: str = None, start_date: str = None,
+                                 end_date: str = None) -> str:
             """
-            Delete a specific document and all its chunks from the collection.
+            Delete documents from the collection. Can delete by specific name, category, or date range.
 
             Args:
-                document_name: The name of the document to delete
+                document_name (str, optional): The name of the specific document to delete
+                category (str, optional): Delete all documents in this category
+                start_date (str, optional): Delete documents from this date onwards (YYYY-MM-DD format)
+                end_date (str, optional): Delete documents up to this date (YYYY-MM-DD format)
 
             Returns:
                 str: Success or error message
             """
-            duck_logger.debug("Deleting document: %s", document_name)
+            if not any([document_name, category, start_date, end_date]):
+                return "Must specify either document_name, category, or date range (start_date/end_date) to delete documents."
+
+            duck_logger.debug(
+                f"Deleting documents - Name: {document_name}, Category: {category}, Start: {start_date}, End: {end_date}")
 
             try:
                 collection = self._chroma_client.get_or_create_collection(
@@ -283,27 +359,134 @@ class RAGManager:
                 if not results['metadatas'] or not results['ids']:
                     return f"No documents found in the collection."
 
-                # Find all chunk IDs for the specified document
+                # Find all chunk IDs to delete based on criteria
                 chunk_ids_to_delete = []
+                documents_to_delete = set()
+
                 for i, metadata in enumerate(results['metadatas']):
-                    if metadata and metadata.get('document_name') == document_name:
+                    if not metadata:
+                        continue
+
+                    should_delete = False
+
+                    # Check specific document name
+                    if document_name and metadata.get('document_name') == document_name:
+                        should_delete = True
+
+                    # Check category
+                    if category and metadata.get('category') == category.lower():
+                        should_delete = True
+
+                    # Check date range
+                    if (start_date or end_date) and self._is_date_in_range(metadata.get('date_added', ''), start_date,
+                                                                           end_date):
+                        should_delete = True
+
+                    if should_delete:
                         chunk_ids_to_delete.append(results['ids'][i])
+                        documents_to_delete.add(metadata.get('document_name'))
 
                 if not chunk_ids_to_delete:
-                    return f"Document '{document_name}' not found in the collection."
+                    criteria = []
+                    if document_name:
+                        criteria.append(f"name '{document_name}'")
+                    if category:
+                        criteria.append(f"category '{category}'")
+                    if start_date and end_date:
+                        criteria.append(f"date range '{start_date}' to '{end_date}'")
+                    elif start_date:
+                        criteria.append(f"date from '{start_date}' onwards")
+                    elif end_date:
+                        criteria.append(f"date up to '{end_date}'")
+                    return f"No documents found matching criteria: {', '.join(criteria)}."
 
-                # Delete all chunks for this document
+                # Delete all matching chunks
                 collection.delete(ids=chunk_ids_to_delete)
 
-                success_msg = f"Successfully deleted document '{document_name}' ({len(chunk_ids_to_delete)} chunks removed)"
+                success_msg = f"Successfully deleted {len(documents_to_delete)} documents ({len(chunk_ids_to_delete)} chunks removed)"
+                if document_name:
+                    success_msg = f"Successfully deleted document '{document_name}' ({len(chunk_ids_to_delete)} chunks removed)"
+                elif category:
+                    success_msg = f"Successfully deleted {len(documents_to_delete)} documents from category '{category}' ({len(chunk_ids_to_delete)} chunks removed)"
+                elif start_date and end_date:
+                    success_msg = f"Successfully deleted {len(documents_to_delete)} documents from date range '{start_date}' to '{end_date}' ({len(chunk_ids_to_delete)} chunks removed)"
+                elif start_date:
+                    success_msg = f"Successfully deleted {len(documents_to_delete)} documents from '{start_date}' onwards ({len(chunk_ids_to_delete)} chunks removed)"
+                elif end_date:
+                    success_msg = f"Successfully deleted {len(documents_to_delete)} documents up to '{end_date}' ({len(chunk_ids_to_delete)} chunks removed)"
+
                 duck_logger.debug(success_msg)
                 return success_msg
 
             except Exception as e:
-                error_msg = f"Error deleting document '{document_name}': {e}"
+                error_msg = f"Error deleting documents: {e}"
                 duck_logger.error(error_msg)
                 return error_msg
 
         delete_document_tool.__name__ = self._tool_name + "_delete"
         register_tool(delete_document_tool)
         return delete_document_tool
+
+    def create_list_categories_tool(self):
+        def list_categories_tool() -> str:
+            """
+            List all unique categories in the collection.
+
+            Returns:
+                str: A list of all categories with document counts
+            """
+            duck_logger.debug("Listing all categories in collection")
+
+            try:
+                collection = self._chroma_client.get_or_create_collection(
+                    name=self._collection_name,
+                    metadata={"description": "Shared documents collection"}
+                )
+
+                # Get all documents in the collection
+                results = collection.get()
+
+                if not results['metadatas']:
+                    return "No documents found in the collection."
+
+                # Count documents by category
+                category_counts = {}
+                for metadata in results['metadatas']:
+                    if metadata and 'category' in metadata:
+                        category = metadata['category']
+                        if category not in category_counts:
+                            category_counts[category] = set()
+                        category_counts[category].add(metadata.get('document_name'))
+
+                if not category_counts:
+                    return "No categories found in the collection."
+
+                # Create category list with counts
+                category_list = []
+                for category, documents in sorted(category_counts.items()):
+                    category_list.append(f"• {category}: {len(documents)} documents")
+
+                result = "Categories in collection:\n" + "\n".join(category_list)
+                duck_logger.debug(f"Found {len(category_counts)} categories")
+                return result
+
+            except Exception as e:
+                error_msg = f"Error listing categories: {e}"
+                duck_logger.debug(error_msg)
+                return error_msg
+
+        list_categories_tool.__name__ = self._tool_name + "_list_cat"
+        register_tool(list_categories_tool)
+        return list_categories_tool
+
+
+
+    def register_all_tools(self, add_tool):
+
+        add_tool(self.create_add_url_tool())
+        add_tool(self.create_add_file_tool())
+        add_tool(self.create_add_text_tool())
+        add_tool(self.create_search_documents_tool())
+        add_tool(self.create_list_documents_tool())
+        add_tool(self.create_delete_document_tool())
+        add_tool(self.create_list_categories_tool())
