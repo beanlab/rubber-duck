@@ -8,6 +8,7 @@ from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
+from ..armory.socratic_tools import SocraticTools
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
@@ -97,11 +98,12 @@ _armory: Armory = None
 
 def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], armory: Armory):
     for agent, settings in agents:
-        tools = [
-            armory.get_specific_tool(tool)
-            for tool in settings.get('tools', [])
-            if tool in armory.get_all_tool_names()
-        ]
+        tools = []
+        for tool_name in settings.get('tools', []):
+            if tool_name in armory.get_all_tool_names():
+                tool = armory.get_specific_tool(tool_name)
+                duck_logger.debug(f"Adding tool '{tool_name}' to agent '{agent.name}'", extra={"task": "tool_assignment"})
+                tools.append(tool)
         agent.tools = tools
         agent.tool_use_behavior = {
             "stop_at_tool_names": [
@@ -116,6 +118,10 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
+
+        # Load socratic tools
+        socratic_tools = SocraticTools()
+        _armory.scrub_tools(socratic_tools)
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
@@ -167,7 +173,7 @@ def build_agent_conversation_duck(
 
     agent_conversation = AgentConversation(
         name,
-        settings['introduction'],
+        settings.get('introduction'),
         genai_clients,
         starting_agent,
         record_message,

@@ -89,6 +89,7 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
+    checklist_markdown: str | None = None
 
 
 class DuckConfig(TypedDict):
