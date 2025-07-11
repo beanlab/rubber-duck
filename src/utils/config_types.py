@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import TypedDict, NotRequired, Literal
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -52,6 +52,15 @@ class RegistrationSettings(TypedDict):
     roles: RolesSettings
     sender_email: str
 
+CategoryType = Literal["Assignments", "Lecture Notes", "Exams", "Projects", "Resources"]
+
+class ClassInformationSettings(TypedDict):
+    target_channel_id: int
+    class_name: str
+    class_categories: list[CategoryType]
+    file_size_limit: int
+    file_type_ext: list[str]
+
 
 class SingleAgentSettings(TypedDict):
     name: str
@@ -72,13 +81,17 @@ class AgentAsToolSettings(MultiAgentSettings):
     tool_name: str
     description: str
 
+class ConfigToolset(TypedDict):
+    name: str
+    description: str
+    tool_type: str
+    settings: dict
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]
-
 
 @dataclass
 class DuckContext:
@@ -125,6 +138,9 @@ class SQLConfig(TypedDict):
     port: str
     database: str
 
+class ChromaConfig(TypedDict):
+    host: str
+    port: int
 
 class RetryProtocol(TypedDict):
     max_retries: int
@@ -145,7 +161,9 @@ class ReporterConfig(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
+    chroma: NotRequired[ChromaConfig]
     ducks: list[DuckConfig]
+    toolsets: list[ConfigToolset]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

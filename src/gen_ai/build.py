@@ -1,12 +1,14 @@
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Union
 
+import chromadb
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
-
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
+from ..armory.config_tools.make_rag_tools import RAGManager
 from ..armory.data_store import DataStore
+from ..armory.extraction import Extraction
 from ..armory.stat_tools import StatsTools
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
@@ -111,11 +113,25 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
             ]
         }
 
+def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
+    for tool_config in config.get('toolsets', []):
+        match tool_config['tool_type']:
+            case 'RAG':
+                if not chroma_session:
+                    raise ValueError("ChromaDB session is required for RAG tools")
+                tool_settings = tool_config['settings']
+                rag = RAGManager(tool_config['name'], chroma_session, tool_settings['collection_name'], tool_settings.get('chunk_size', 1000),
+                                              tool_settings.get('chunk_overlap', 100),
+                                              tool_settings.get('enable_chunking', False))
+                rag.rag_factory(armory.add_tool)
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
     global _armory
+
     if _armory is None:
         _armory = Armory()
+
+        _armory.scrub_tools(Extraction())
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
@@ -123,6 +139,8 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
+
+    _add_toolsets_to_armory(config, _armory, chroma_session)
 
     all_tool_agents = []
     for agent_settings in config.get('agents_as_tools', []):
@@ -136,16 +154,20 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     return _armory
 
 
+
+
 def build_agent_conversation_duck(
         name: str,
         config: Config,
         settings: AgentConversationSettings,
         bot,
         record_message: RecordMessage,
-        record_usage: RecordUsage
+        record_usage: RecordUsage,
+        chroma_session: Union[chromadb.HttpClient, None] = None
+
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks)
+    armory = _get_armory(config, usage_hooks, chroma_session)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'])
     _add_tools_to_agents(conversation_agents.values(), armory)
@@ -173,7 +195,6 @@ def build_agent_conversation_duck(
         record_message,
         bot.send_message,
         bot.add_reaction,
-        bot.read_url,
         settings.get('timeout', 60 * 5),
         armory,
         settings.get('file_size_limit', 0),

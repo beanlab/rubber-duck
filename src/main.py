@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Iterable
 
 import boto3
-import yaml  # Added import for YAML support
+import yaml
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .storage.chroma_connection import create_chroma_session
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
@@ -127,7 +128,9 @@ def setup_workflow_manager(
 def build_conversation_review_duck(
         name: str,
         settings: ConversationReviewSettings,
-        bot: DiscordBot, record_feedback, feedback_manager
+        bot: DiscordBot,
+        record_feedback,
+        feedback_manager
 ) -> DuckConversation:
     have_ta_conversation = HaveTAGradingConversation(
         name,
@@ -141,7 +144,10 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
+        name: str,
+        bot: DiscordBot,
+        config: Config,
+        settings: RegistrationSettings
 ):
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -154,7 +160,6 @@ def build_registration_duck(
         settings
     )
     return registration_workflow
-
 
 def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     # Look for global configs
@@ -181,7 +186,9 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        chroma_session
 ) -> dict[DUCK_NAME, DuckConversation]:
+
     ducks = {}
 
     for duck_config in _iterate_duck_configs(config):
@@ -191,7 +198,7 @@ def build_ducks(
 
         if duck_type == 'agent_conversation':
             ducks[name] = build_agent_conversation_duck(
-                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
+                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage, chroma_session
             )
 
         elif duck_type == 'conversation_review':
@@ -216,11 +223,12 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        chroma_session,
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, chroma_session)
 
     channel_ducks = {}
 
@@ -270,6 +278,8 @@ def _build_feedback_queues(config: Config, sql_session):
 async def main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
+    chroma_session = create_chroma_session(config.get('chroma')) if config.get('chroma') else None
+
     async with DiscordBot() as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
@@ -282,7 +292,7 @@ async def main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, chroma_session)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
