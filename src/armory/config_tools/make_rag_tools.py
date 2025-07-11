@@ -481,8 +481,7 @@ class RAGManager:
 
 
 
-    def register_all_tools(self, add_tool):
-
+    def rag_factory(self, add_tool):
         add_tool(self.create_add_url_tool())
         add_tool(self.create_add_file_tool())
         add_tool(self.create_add_text_tool())

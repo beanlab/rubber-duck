@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any, Iterable, Union
 
@@ -15,7 +14,7 @@ from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config, MultiAgentSettings
-from ..utils.logger import duck_logger, add_file_handler
+from ..utils.logger import duck_logger
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -124,7 +123,7 @@ def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Unio
                 rag = RAGManager(tool_config['name'], chroma_session, tool_settings['collection_name'], tool_settings.get('chunk_size', 1000),
                                               tool_settings.get('chunk_overlap', 100),
                                               tool_settings.get('enable_chunking', False))
-                rag.register_all_tools(armory.add_tool)
+                rag.rag_factory(armory.add_tool)
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
     global _armory
