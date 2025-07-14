@@ -42,7 +42,10 @@ class StatsTools:
             available = self._datastore.get_available_datasets()
             formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
             raise KeyError(f"Dataset '{dataset}' not found. Available datasets:\n{formatted}")
-        return self._datastore.get_dataset(dataset)
+        try:
+            return self._datastore.get_dataset(dataset)
+        except KeyError as e:
+            raise e
 
     def _valid_column_name(self, dataset: str, column: str, data: pd.DataFrame) -> pd.Series:
         if column not in data.columns.to_list():
