@@ -10,8 +10,8 @@ import docx
 from crawl4ai import CrawlerRunConfig, CacheMode, AsyncWebCrawler
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from src.armory.tools import register_tool
-from src.utils.logger import duck_logger
+from ..tools import register_tool
+from ...utils.logger import duck_logger
 
 
 class RAGManager:

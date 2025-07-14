@@ -4,6 +4,7 @@ from typing import Any, Iterable, Union
 import chromadb
 from agents import Agent, AgentHooks, RunContextWrapper
 from quest import step
+
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.config_tools.make_rag_tools import RAGManager
@@ -113,6 +114,7 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
             ]
         }
 
+
 def create_rag_toolset(tool_config, chroma_session):
     tool_settings = tool_config['settings']
     return RAGManager(
@@ -124,6 +126,7 @@ def create_rag_toolset(tool_config, chroma_session):
         tool_settings.get('enable_chunking', False)
     )
 
+
 def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
     for tool_config in config.get('toolsets', []):
         match tool_config['tool_type']:
@@ -134,7 +137,8 @@ def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Unio
                 armory.add_toolset(toolset.get_all_tools())
 
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
+def _get_armory(config: Config, usage_hooks: UsageAgentHooks,
+                chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
     global _armory
 
     if _armory is None:
@@ -161,8 +165,6 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Un
     _add_tools_to_agents(all_tool_agents, _armory)
 
     return _armory
-
-
 
 
 def build_agent_conversation_duck(

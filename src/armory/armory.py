@@ -16,6 +16,9 @@ class Armory:
         self._tools: dict[str, FunctionTool] = {}
 
     def scrub_tools(self, tool_instance: object):
+        # if hasattr(tool_instance, "get_tools"):
+        #     for name, tools in tool_instance.get_tools():
+
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue
