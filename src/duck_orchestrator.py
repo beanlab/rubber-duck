@@ -74,9 +74,6 @@ class DuckOrchestrator:
             initial_message['author_mention'],
             initial_message['content']
         )
-
-
-
         context = DuckContext(
             guild_id=initial_message['guild_id'],
             parent_channel_id=initial_message['channel_id'],
@@ -84,7 +81,7 @@ class DuckOrchestrator:
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],
             message_id=initial_message['message_id'],
-            thread_id=thread_id,
+            thread_id=thread_id
         )
 
         async with alias(str(thread_id)):
