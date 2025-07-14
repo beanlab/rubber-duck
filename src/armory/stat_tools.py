@@ -970,14 +970,14 @@ class StatsTools:
     @register_tool
     @sends_image
     async def simple_linear_regression(
-        self,
-        dataset: str,
-        response: str,
-        explanatory: str,
-        prediction_value: float = None,
-        interval_type: Literal["confidence", "prediction"] = "confidence",
-        conf_level: float = 0.95,
-        cv_folds: int = 5
+            self,
+            dataset: str,
+            response: str,
+            explanatory: str,
+            prediction_value: float = None,
+            interval_type: Literal["confidence", "prediction"] = "confidence",
+            conf_level: float = 0.95,
+            cv_folds: int = 5
     ) -> str:
         """Performs simple linear regression with summary statistics, confidence intervals, prediction, and cross-validation."""
 
@@ -988,15 +988,13 @@ class StatsTools:
 
         # Load dataset
         data = self._datastore.get_dataset(dataset)
-        # Validate column names
-        if response not in data.columns:
-            raise KeyError(
-                f"Column '{response}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
-        if explanatory not in data.columns:
-            raise KeyError(
-                f"Column '{explanatory}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
-        df = data[[response, explanatory]].dropna()
+
+        response_series = self._datastore.get_column(data, response)
+        explanatory_series = self._datastore.get_column(data, explanatory)
+
+
+        df = pd.concat([response_series, explanatory_series], axis=1).dropna()
         if df.empty:
             return "No valid data after removing missing values."
 
@@ -1051,7 +1049,7 @@ class StatsTools:
             except Exception as e:
                 prediction_output = f"\nPrediction could not be generated: {e}"
 
-
+        # Cross-validation
         kf = KFold(n_splits=cv_folds, shuffle=True, random_state=1)
         rmse_scores = []
 
@@ -1064,7 +1062,6 @@ class StatsTools:
 
         mean_rmse = round(np.mean(rmse_scores), 4)
 
-        # Final output
         return (
             f"Simple Linear Regression: {response} ~ {explanatory}\n"
             f"R-squared: {round(model.rsquared, 4)}\n"
