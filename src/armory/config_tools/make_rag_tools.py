@@ -1,7 +1,7 @@
 import hashlib
 import io
+from datetime import datetime
 from typing import Any
-from datetime import datetime, date
 
 import PyPDF2
 import aiohttp
@@ -31,20 +31,8 @@ class RAGManager:
         )
 
     def _is_date_in_range(self, date_str: str, start_date: str = None, end_date: str = None) -> bool:
-        """
-        Check if a date string is within the specified range.
-
-        Args:
-            date_str (str): ISO date string to check
-            start_date (str, optional): Start date in YYYY-MM-DD format
-            end_date (str, optional): End date in YYYY-MM-DD format
-
-        Returns:
-            bool: True if date is in range, False otherwise
-        """
         if date_str == 'unknown':
             return False
-
 
         check_date = datetime.fromisoformat(date_str).date()
 
@@ -60,8 +48,7 @@ class RAGManager:
 
         return True
 
-
-    def _add_document_tool(self, document_name: str, content: str, category: str = "other") -> dict[str, list[str]]:
+    def _add_document_tool(self, document_name: str, content: str, category: str = "Other") -> dict[str, list[str]]:
         collection = self._chroma_client.get_or_create_collection(
             name=self._collection_name,
             metadata={"description": "Shared documents collection"}
@@ -80,7 +67,7 @@ class RAGManager:
                 "total_chunks": len(chunks),
                 "is_chunked": self._enable_chunking,
                 "date_added": date_added,
-                "category": category.lower()
+                "category": category.lower().capitalize()
             }
 
             collection.add(
@@ -95,7 +82,7 @@ class RAGManager:
         return {document_name: chunk_ids}
 
     def create_add_url_tool(self):
-        async def add_url(url: str, category: str = "other") -> dict[str, list[str]]:
+        async def add_url(url: str, category: str = "Other") -> dict[str, list[str]]:
             """
             Extracts text content from the provided URL if it is not a discord URL, and adds it to the RAG collection.
             Must be a valid URL that is not a Discord URL.
@@ -131,7 +118,7 @@ class RAGManager:
         return add_url
 
     def create_add_file_tool(self):
-        async def add_file(url: str, file_name: str, file_type: str, category: str = "other") -> dict[str, list[str]]:
+        async def add_file(url: str, file_name: str, file_type: str, category: str = "Other") -> dict[str, list[str]]:
             """
             Add a file to the RAG collection by fetching it from a Discord URL in the message history and extracting its text content.
             Must be a Discord File URL
@@ -178,7 +165,7 @@ class RAGManager:
         return add_file
 
     def create_add_text_tool(self):
-        def add_text(document_name: str, content: str, category: str = "other") -> dict[str, list[str]]:
+        def add_text(document_name: str, content: str, category: str = "Other") -> dict[str, list[str]]:
             """
             Adds a set of text content from the user to the RAG collection.
 
@@ -478,8 +465,6 @@ class RAGManager:
         list_categories_tool.__name__ = self._tool_name + "_list_cat"
         register_tool(list_categories_tool)
         return list_categories_tool
-
-
 
     def get_all_tools(self):
         return [

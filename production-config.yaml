@@ -26,10 +26,20 @@ chroma:
   port: 8000
 
 
-tools:
-  # Config tools will be created at runtime. When creating a RAG tool, you will create two tools:
-  # 1. A tool for adding documents to the RAG system this will be named <tool_name>_add
-  # 2. A tool for querying the RAG system this will be named <tool_name>_query
+toolsets:
+  # Config tools will be created at runtime. When creating a RAG tool, you will create two types tools:
+
+  # Admin Tools:
+  # 1. A tool for adding url info to the RAG system this will be named <tool_name>_add_url
+  # 2. A tool for adding documents to the RAG system this will be named <tool_name>_add_file
+  # 3. A tool for adding text to the RAG system this will be named <tool_name>_add_text
+  # 4. A tool for deleting documents from the RAG system this will be named <tool_name>_delete
+  # 5. A tool for listing all documents in the RAG system this will be named <tool_name>_list
+  # 6. A tool for listing categories in the RAG system this will be named <tool_name>_list_categories
+
+  # User Tools:
+  # 1. A tool for querying the RAG system this will be named <tool_name>_query
+
   - name: RAG_CLASS
     description: |
       Look up ...

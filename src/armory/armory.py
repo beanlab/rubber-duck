@@ -29,8 +29,7 @@ class Armory:
 
             self.add_tool(method)
 
-    def add_toolset(self, toolset):
-        tools = toolset.get_all_tools()
+    def add_toolset(self, tools: list[Callable]):
         for tool in tools:
             self.add_tool(tool)
 

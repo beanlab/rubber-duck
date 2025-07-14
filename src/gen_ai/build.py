@@ -124,7 +124,7 @@ def create_rag_toolset(tool_config, chroma_session):
         tool_settings.get('enable_chunking', False)
     )
 
-def add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
+def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
     for tool_config in config.get('toolsets', []):
         match tool_config['tool_type']:
             case 'RAG':
