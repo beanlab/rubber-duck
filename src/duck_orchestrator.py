@@ -75,8 +75,7 @@ class DuckOrchestrator:
             initial_message['content']
         )
 
-        checklist_content = Path("prompts/312-project-design/convex-hull/convex-hull-checklist.txt").read_text(encoding="utf-8")
-        duck_logger.debug(f"Loaded checklist for thread {thread_id}: {len(checklist_content)} characters")
+
 
         context = DuckContext(
             guild_id=initial_message['guild_id'],
@@ -86,7 +85,6 @@ class DuckOrchestrator:
             content=initial_message['content'],
             message_id=initial_message['message_id'],
             thread_id=thread_id,
-            checklist_markdown=checklist_content
         )
 
         async with alias(str(thread_id)):
