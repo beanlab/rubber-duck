@@ -113,17 +113,26 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
             ]
         }
 
-def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
+def create_rag_toolset(tool_config, chroma_session):
+    tool_settings = tool_config['settings']
+    return RAGManager(
+        tool_config['name'],
+        chroma_session,
+        tool_settings['collection_name'],
+        tool_settings.get('chunk_size', 1000),
+        tool_settings.get('chunk_overlap', 100),
+        tool_settings.get('enable_chunking', False)
+    )
+
+def add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Union[chromadb.HttpClient, None] = None):
     for tool_config in config.get('toolsets', []):
         match tool_config['tool_type']:
             case 'RAG':
                 if not chroma_session:
                     raise ValueError("ChromaDB session is required for RAG tools")
-                tool_settings = tool_config['settings']
-                rag = RAGManager(tool_config['name'], chroma_session, tool_settings['collection_name'], tool_settings.get('chunk_size', 1000),
-                                              tool_settings.get('chunk_overlap', 100),
-                                              tool_settings.get('enable_chunking', False))
-                rag.rag_factory(armory.add_tool)
+                toolset = create_rag_toolset(tool_config, chroma_session)
+                armory.add_toolset(toolset.get_all_tools())
+
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks, chroma_session: Union[chromadb.HttpClient, None]) -> Armory:
     global _armory

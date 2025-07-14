@@ -481,11 +481,13 @@ class RAGManager:
 
 
 
-    def rag_factory(self, add_tool):
-        add_tool(self.create_add_url_tool())
-        add_tool(self.create_add_file_tool())
-        add_tool(self.create_add_text_tool())
-        add_tool(self.create_search_documents_tool())
-        add_tool(self.create_list_documents_tool())
-        add_tool(self.create_delete_document_tool())
-        add_tool(self.create_list_categories_tool())
+    def get_all_tools(self):
+        return [
+            self.create_add_url_tool(),
+            self.create_add_file_tool(),
+            self.create_add_text_tool(),
+            self.create_search_documents_tool(),
+            self.create_list_documents_tool(),
+            self.create_delete_document_tool(),
+            self.create_list_categories_tool()
+        ]

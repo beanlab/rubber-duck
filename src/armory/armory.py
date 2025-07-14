@@ -29,6 +29,11 @@ class Armory:
 
             self.add_tool(method)
 
+    def add_toolset(self, toolset):
+        tools = toolset.get_all_tools()
+        for tool in tools:
+            self.add_tool(tool)
+
     def add_tool(self, tool_function: Callable):
         if not tool_function.send_error_to_llm:
             tool = function_tool(tool_function, failure_error_function=None)

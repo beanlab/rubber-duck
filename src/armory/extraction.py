@@ -85,12 +85,12 @@ class Extraction:
         except Exception as e:
             raise ValueError(f"Error reading file: {e}")
 
-        @register_tool
-        def get_todays_date(self) -> str:
-            """
-            Returns today's date in YYYY-MM-DD format.
+    @register_tool
+    def get_today_date(self) -> str:
+        """
+        Returns today's date in YYYY-MM-DD format.
 
-            Returns:
-                str: Today's date.
-            """
-            return datetime.now().strftime("%Y-%m-%d")
+        Returns:
+            str: Today's date.
+        """
+        return datetime.now().strftime("%Y-%m-%d")
