@@ -41,14 +41,14 @@ class StatsTools:
         if dataset not in self._datastore.get_available_datasets():
             available = self._datastore.get_available_datasets()
             formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
-            raise ValueError(f"Dataset '{dataset}' not found. Available datasets:\n{formatted}")
+            raise KeyError(f"Dataset '{dataset}' not found. Available datasets:\n{formatted}")
         return self._datastore.get_dataset(dataset)
 
     def _valid_column_name(self, dataset: str, column: str, data: pd.DataFrame) -> pd.Series:
         if column not in data.columns.to_list():
             available = data.columns.to_list()
             formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
-            raise ValueError(f"Column '{column}' not found in dataset '{dataset}'. Available columns:\n{formatted}")
+            raise KeyError(f"Column '{column}' not found in dataset '{dataset}'. Available columns:\n{formatted}")
         return data[column]
 
 
@@ -99,10 +99,8 @@ class StatsTools:
     @register_tool
     async def get_variable_names(self, dataset: str) -> str:
         """Returns a list of all variable names in the dataset."""
-        if dataset not in self._datastore.get_available_datasets():
-            raise ValueError(f"Dataset '{dataset}' not found. Available datasets: {self._datastore.get_available_datasets()}")
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
-        data = self._datastore.get_dataset(dataset).columns.to_list()
+        data = self._valid_dataset_name(dataset).columns.to_list()
         return f"Variable names in {dataset}: {', '.join(data)}"
 
     @register_tool
@@ -305,7 +303,7 @@ class StatsTools:
         """Calculates the mean of a numeric column in the dataset, if not categorical."""
         duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
 
-        data = self._datastore.get_dataset(dataset)
+        data = self._valid_dataset_name(dataset)
 
         series = self._valid_column_name(dataset, column, data)
 
@@ -504,7 +502,6 @@ class StatsTools:
         mean_estimate = sample_data.mean()
         se = sample_data.std(ddof=1) / np.sqrt(len(sample_data))
 
-        # Calculate confidence interval manually using t-critical value
         t_critical = stats.t.ppf((1 + conf_level) / 2, df)
         ci_lower = mean_estimate - t_critical * se
         ci_upper = mean_estimate + t_critical * se
@@ -863,15 +860,15 @@ class StatsTools:
 
         for var in [response_variable, group_variable]:
             if var not in data.columns:
-                raise ValueError(
+                raise KeyError(
                     f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         if response_category not in data[response_variable].unique():
-            raise ValueError(f"Column '{response_variable}' not found in dataset '{dataset}'. Available variables: {data[response_variable].unique()}")
+            raise KeyError(f"Column '{response_variable}' not found in dataset '{dataset}'. Available variables: {data[response_variable].unique()}")
 
         for group_val in [group1, group2]:
             if group_val not in data[group_variable].unique():
-                raise ValueError(
+                raise KeyError(
                     f"Group Value '{group_val}' not found in dataset '{dataset}'. Available group_val: {data[group_variable].unique()}")
 
 
@@ -941,7 +938,7 @@ class StatsTools:
 
         for var in [row_variable, col_variable]:
             if var not in data.columns:
-                raise ValueError(
+                raise KeyError(
                     f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
 
@@ -993,10 +990,10 @@ class StatsTools:
         data = self._valid_dataset_name(dataset)
         # Validate column names
         if response not in data.columns:
-            raise ValueError(
+            raise KeyError(
                 f"Column '{response}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
         if explanatory not in data.columns:
-            raise ValueError(
+            raise KeyError(
                 f"Column '{explanatory}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
         df = data[[response, explanatory]].dropna()

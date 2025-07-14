@@ -1,7 +1,7 @@
 import inspect
 from inspect import Parameter
 from functools import wraps
-from typing import Callable, Awaitable
+from typing import Callable
 
 from agents import FunctionTool, function_tool, Agent, RunContextWrapper
 
@@ -68,11 +68,9 @@ class Armory:
             bound = new_sig.bind(*args, **kwargs)
             bound.apply_defaults()
             wrapper_arg = bound.arguments["wrapper"]
-
             call_args = {
                 k: v for k, v in bound.arguments.items() if k != "wrapper"
             }
-
             if inspect.iscoroutinefunction(func):
                 result = await func(**call_args)
             else:
