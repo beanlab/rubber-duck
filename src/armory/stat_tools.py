@@ -37,16 +37,6 @@ class StatsTools:
     def _photo_name(self, *args) -> str:
         return "_".join(str(arg) for arg in args if arg) + ".png"
 
-    def _valid_dataset_name(self, dataset: str) -> pd.DataFrame:
-        if dataset not in self._datastore.get_available_datasets():
-            available = self._datastore.get_available_datasets()
-            formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
-            raise KeyError(f"Dataset '{dataset}' not found. Available datasets:\n{formatted}")
-        try:
-            return self._datastore.get_dataset(dataset)
-        except KeyError as e:
-            raise e
-
     def _valid_column_name(self, dataset: str, column: str, data: pd.DataFrame) -> pd.Series:
         if column not in data.columns.to_list():
             available = data.columns.to_list()
@@ -69,8 +59,8 @@ class StatsTools:
     def list_categories(self, dataset: str, column: str) -> str:
         """Returns a list of unique categories in the specified column of the dataset."""
         duck_logger.debug(f"Used list_categories on dataset={dataset}, column={column}")
-        data = self._valid_dataset_name(dataset)
-        column_val = self._valid_column_name(dataset, column, data)
+        data = self._datastore.get_dataset(dataset)
+        column_val = self._datastore.get_column(data, column)
 
         if not self._is_categorical(column_val):
             return f"Column '{column}' is not categorical. Categories can only be listed for categorical columns."
@@ -103,7 +93,7 @@ class StatsTools:
     async def get_variable_names(self, dataset: str) -> str:
         """Returns a list of all variable names in the dataset."""
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
-        data = self._valid_dataset_name(dataset).columns.to_list()
+        data = self._datastore.get_dataset(dataset)
         return f"Variable names in {dataset}: {', '.join(data)}"
 
     @register_tool
@@ -113,7 +103,7 @@ class StatsTools:
         """Shows the first n rows of the dataset as a table image."""
         duck_logger.debug(f"Generating head preview for {dataset} with n={n}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
         if not isinstance(n, int) or n <= 0:
             return "n must be a positive integer."
@@ -164,10 +154,10 @@ class StatsTools:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "histogram")
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         if self._is_categorical(column_val):
             return "Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead."
@@ -187,10 +177,10 @@ class StatsTools:
         """Generate a boxplot for the specified dataset column."""
         duck_logger.debug(f"Generating boxplot for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "boxplot")
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         if self._is_categorical(column_val):
             return "Boxplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
@@ -209,10 +199,10 @@ class StatsTools:
         """Generate a dotplot for the specified dataset column."""
         duck_logger.debug(f"Generating dotplot for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "dotplot")
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         if self._is_categorical(column_val):
             return "Dotplots are not appropriate for categorical data. Please use a barplot or pie chart instead."
@@ -231,10 +221,10 @@ class StatsTools:
         """Generate a barplot for the specified dataset column."""
         duck_logger.debug(f"Generating barplot for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "barplot")
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         if not self._is_categorical(column_val):
             return "Barplots are not appropriate for numeric data. Please use a histogram or boxplot instead."
@@ -255,10 +245,10 @@ class StatsTools:
         """Generate a pie chart for the specified dataset column."""
         duck_logger.debug(f"Generating pie chart for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         name = self._photo_name(dataset, column, "piechart")
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         if not self._is_categorical(column_val):
             return "Pie charts are not appropriate for numeric data. Please use a barplot or histogram instead."
@@ -280,9 +270,9 @@ class StatsTools:
         """Generate a proportion barplot for the specified dataset column."""
         duck_logger.debug(f"Generating proportion barplot for {dataset}.{column}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        column_val = self._valid_column_name(dataset, column, data)
+        column_val = self._datastore.get_column(data, column)
 
         name = self._photo_name(dataset, column, "proportionbarplot")
 
@@ -306,9 +296,9 @@ class StatsTools:
         """Calculates the mean of a numeric column in the dataset, if not categorical."""
         duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if self._is_categorical(series):
             return "Mean cannot be calculated for categorical data"
@@ -319,9 +309,9 @@ class StatsTools:
         """Calculates the skewness (asymmetry) of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating skewness for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if self._is_categorical(series):
             return "Skewness cannot be calculated for categorical data"
@@ -332,9 +322,9 @@ class StatsTools:
         """Calculates the standard deviation of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating standard deviation for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if self._is_categorical(series):
             return "Standard Deviation cannot be calculated for categorical data"
@@ -345,9 +335,9 @@ class StatsTools:
         """Calculates the median (middle value) of a numeric column in the dataset."""
         duck_logger.debug(f"Calculating median for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if self._is_categorical(series):
             return "Median cannot be calculated for categorical data"
@@ -358,9 +348,9 @@ class StatsTools:
         """Estimates the mode of a numeric column using the peak of a KDE (kernel density estimate)."""
         duck_logger.debug(f"Calculating approximate mode (KDE) for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data).dropna()
+        series = self._datastore.get_column(data, column).dropna()
 
         if self._is_categorical(series):
             return "Mode cannot be calculated for categorical data"
@@ -382,9 +372,9 @@ class StatsTools:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if self._is_categorical(series):
             return "5 Number Summary cannot be calculated for categorical data"
@@ -397,9 +387,9 @@ class StatsTools:
         """Returns a frequency table (category counts) for a categorical column in the dataset."""
         duck_logger.debug(f"Calculating table of counts for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if not self._is_categorical(series):
             return "Table of Counts cannot be calculated for quantitative data"
@@ -412,9 +402,9 @@ class StatsTools:
         """Returns the relative proportions of each category in a categorical column of the dataset."""
         duck_logger.debug(f"Calculating proportions for: {column} in dataset: {dataset}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data)
+        series = self._datastore.get_column(data, column)
 
         if not self._is_categorical(series):
             return "Proportions can only be calculated for categorical data"
@@ -496,9 +486,9 @@ class StatsTools:
         duck_logger.debug(
             f"Calculating confidence interval and t-test for {dataset}.{variable} with alternative={alternative}, mu={mu}, conf_level={conf_level}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        sample_data = self._valid_column_name(dataset, variable, data).dropna()
+        sample_data = self._datastore.get_column(data, variable).dropna()
 
         t_stat, p_value = ttest_1samp(sample_data, popmean=mu)
         df = len(sample_data) - 1
@@ -541,9 +531,9 @@ class StatsTools:
 
         name = self._photo_name(dataset, alternative, mu, conf_level, "t_distribution")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        series = self._valid_column_name(dataset, column, data).dropna()
+        series = self._datastore.get_column(data, column).dropna()
 
         if self._is_categorical(series):
             return "T-statistic cannot be calculated for categorical data"
@@ -611,10 +601,10 @@ class StatsTools:
         duck_logger.debug(f"Calculating two-sample t-test for {dataset}.{column1} and {dataset}.{column2}, "
                           f"alternative={alternative}, conf_level={conf_level}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        column1_val = self._valid_column_name(dataset, column1, data)
-        column2_val = self._valid_column_name(dataset, column2, data)
+        column1_val = self._datastore.get_column(data, column1)
+        column2_val = self._datastore.get_column(data, column2)
 
         # Identify categorical and numeric columns
         if self._is_categorical(column1_val) and not self._is_categorical(column2_val):
@@ -691,10 +681,10 @@ class StatsTools:
             f"Calculating one-way ANOVA for {dataset}.{value_column} grouped by {dataset}.{group_column}, "
             f"conf_level={conf_level}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        group_column_val = self._valid_column_name(dataset, group_column, data)
-        value_column_val = self._valid_column_name(dataset, value_column, data)
+        group_column_val = self._datastore.get_column(data, group_column)
+        value_column_val = self._datastore.get_column(data, value_column)
 
         # Validate variable types
         if not self._is_categorical(group_column_val):
@@ -798,9 +788,9 @@ class StatsTools:
         duck_logger.debug(
             f"Z-test for dataset={dataset}, variable={variable}, category={category}, p_null={p_null}, alternative={alternative}, conf_level={conf_level}")
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        variable_val = self._valid_column_name(dataset, variable, data)
+        variable_val = self._datastore.get_column(data, variable)
 
         if category not in variable_val.unique():
             raise ValueError(f"Column '{category}' not found in dataset '{dataset}'. Available categories: {data[variable].unique()}")
@@ -843,7 +833,6 @@ class StatsTools:
         )
         return summary
 
-
     @register_tool
     @sends_image
     async def calculate_two_sample_proportion_z_test(self, dataset: str, response_variable: str, response_category: str,
@@ -859,30 +848,38 @@ class StatsTools:
             f"alternative={alternative}, conf_level={conf_level}"
         )
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        for var in [response_variable, group_variable]:
-            if var not in data.columns:
-                raise KeyError(
-                    f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
+        # Try getting the columns safely
 
-        if response_category not in data[response_variable].unique():
-            raise KeyError(f"Column '{response_variable}' not found in dataset '{dataset}'. Available variables: {data[response_variable].unique()}")
+        response_series = self._datastore.get_column(data, response_variable)
+        group_series = self._datastore.get_column(data, group_variable)
+
+
+        if response_category not in response_series.unique():
+            return (
+                f"Response category '{response_category}' not found in column '{response_variable}'. "
+                f"Available values are: {response_series.unique().tolist()}"
+            )
 
         for group_val in [group1, group2]:
-            if group_val not in data[group_variable].unique():
-                raise KeyError(
-                    f"Group Value '{group_val}' not found in dataset '{dataset}'. Available group_val: {data[group_variable].unique()}")
-
+            if group_val not in group_series.unique():
+                return (
+                    f"Group value '{group_val}' not found in column '{group_variable}'. "
+                    f"Available values are: {group_series.unique().tolist()}"
+                )
 
         # Filter out missing values
         df = data[[response_variable, group_variable]].dropna()
-        if not self._is_categorical(df[response_variable]) or not self._is_categorical(df[group_variable]):
+        response_series = self._datastore.get_column(df, response_variable)
+        group_series = self._datastore.get_column(df, group_variable)
+
+        if not self._is_categorical(response_series) or not self._is_categorical(group_series):
             return f"Both '{response_variable}' and '{group_variable}' must be categorical for a two-sample proportion z-test."
 
         # Group counts
-        group1_data = df[df[group_variable] == group1]
-        group2_data = df[df[group_variable] == group2]
+        group1_data = df[group_series == group1]
+        group2_data = df[group_series == group2]
 
         n1 = len(group1_data)
         n2 = len(group2_data)
@@ -926,7 +923,6 @@ class StatsTools:
 
         return summary
 
-
     @register_tool
     @sends_image
     async def calculate_chi_squared_test(self, dataset: str, row_variable: str, col_variable: str) -> str:
@@ -937,20 +933,22 @@ class StatsTools:
             f"Chi-squared test on dataset={dataset}, row_variable={row_variable}, col_variable={col_variable}"
         )
 
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
 
-        for var in [row_variable, col_variable]:
-            if var not in data.columns:
-                raise KeyError(
-                    f"Column '{var}' not found in dataset '{dataset}'. Available columns: {data.columns.to_list()}")
 
+        self._datastore.get_column(data, row_variable)
+        self._datastore.get_column(data, col_variable)
 
         df = data[[row_variable, col_variable]].dropna()
 
-        if not self._is_categorical(df[row_variable]) or not self._is_categorical(df[col_variable]):
+        # Access dropped-na columns safely again
+        row_series = self._datastore.get_column(df, row_variable)
+        col_series = self._datastore.get_column(df, col_variable)
+
+        if not self._is_categorical(row_series) or not self._is_categorical(col_series):
             return f"Both '{row_variable}' and '{col_variable}' must be categorical for a Chi-squared test."
 
-        contingency_table = pd.crosstab(df[row_variable], df[col_variable])
+        contingency_table = pd.crosstab(row_series, col_series)
 
         if contingency_table.empty:
             return "The contingency table is empty after removing missing values. Please check your inputs."
@@ -968,7 +966,6 @@ class StatsTools:
         )
 
         return summary
-
 
     @register_tool
     @sends_image
@@ -990,7 +987,7 @@ class StatsTools:
         )
 
         # Load dataset
-        data = self._valid_dataset_name(dataset)
+        data = self._datastore.get_dataset(dataset)
         # Validate column names
         if response not in data.columns:
             raise KeyError(
