@@ -119,9 +119,12 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     if _armory is None:
         _armory = Armory()
 
-        # Load socratic tools
-        socratic_tools = SocraticTools()
-        _armory.scrub_tools(socratic_tools)
+        # Load socratic tools if enabled in config
+        if config.get('enable_socratic_tools', False):
+            socratic_tools = SocraticTools()
+            _armory.scrub_tools(socratic_tools)
+        else:
+            duck_logger.warning("Socratic tools are disabled in config")
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
