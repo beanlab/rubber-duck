@@ -20,6 +20,36 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+
+chroma:
+  host: 00.00.00.00
+  port: 8000
+
+
+toolsets:
+  # Config tools will be created at runtime. When creating a RAG tool, you will create two types tools:
+
+  # Admin Tools:
+  # 1. A tool for adding url info to the RAG system this will be named <tool_name>_add_url
+  # 2. A tool for adding documents to the RAG system this will be named <tool_name>_add_file
+  # 3. A tool for adding text to the RAG system this will be named <tool_name>_add_text
+  # 4. A tool for deleting documents from the RAG system this will be named <tool_name>_delete
+  # 5. A tool for listing all documents in the RAG system this will be named <tool_name>_list
+  # 6. A tool for listing categories in the RAG system this will be named <tool_name>_list_categories
+
+  # User Tools:
+  # 1. A tool for querying the RAG system this will be named <tool_name>_query
+
+  - name: RAG_CLASS
+    description: |
+      Look up ...
+    tool_type: RAG
+    settings:
+      collection_name: cs110
+      chunk_size: 1000
+      chunk_overlap: 100
+      enable_chunking: False
+
 agents_as_tools:
   - tool_name: generate_code_complexity_analysis
     description: |
@@ -30,6 +60,43 @@ agents_as_tools:
         prompt_files:
         - prompts/generate-code-complexity.md
         engine: gpt-4.1
+
+  - tool_name: find_closest_match
+    description: |
+      Given a list of possible values and a user input, 
+      return the value that most closely matches the user input.
+      Useful for correcting spelling mistakes, abbreviations, and partial matches.
+
+      **Example Usage**
+      autocorrect(
+        possible_values=["Foo", "Bar"],
+        user_input="foop"
+      )
+      returns: "Foo"
+
+    agents:
+      - name: find_closest_match
+        prompt: |
+          You are a string matching assistant. Your task is to find the closest matching string 
+          from a given list of possible values to a user's input.
+
+          Rules:
+          1. Return ONLY the exact string from the possible values list that best matches the user input
+          2. Consider spelling mistakes, typos, abbreviations, and partial matches
+          3. If multiple options are equally close, pick the most likely intended match
+          4. Always return one of the provided possible values, never create new strings
+          5. Be case-insensitive in your matching but return the exact case from the possible values
+
+          Respond with ONLY the matching string. No explanations, no extra text.
+          
+          **Example Usage**
+          autocorrect(
+            possible_values=["Foo", "Bar"],
+            user_input="foop"
+          )
+          returns: "Foo"
+        engine: gpt-4.1-nano
+
 
 ducks:
   - name: standard-rubber-duck
@@ -61,9 +128,10 @@ ducks:
       agents:
         - name: Standard_Rubber_Duck
           prompt_files:
-          - prompts/stats.txt
+            - prompts/stats.txt
           engine: gpt-4.1
           tools:
+            - find_closest_match
             - explain_capabilities
             - describe_dataset
             - get_dataset_names
@@ -83,6 +151,17 @@ ducks:
             - calculate_table_of_counts
             - calculate_proportions
             - show_dataset_head
+            - calculate_probability_from_normal_distribution
+            - calculate_percentiles_from_normal_distribution
+            - plot_normal_distribution
+            - plot_confidence_interval_and_t_distribution
+            - calculate_confidence_interval_and_t_test
+            - calculate_two_mean_t_test
+            - calculate_one_way_anova
+            - calculate_one_sample_proportion_z_test
+            - calculate_two_sample_proportion_z_test
+            - calculate_chi_squared_test
+            - simple_linear_regression
           max_iterations: 5
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext

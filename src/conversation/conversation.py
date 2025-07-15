@@ -1,12 +1,10 @@
 import asyncio
-from pathlib import Path
 
 from quest import step, queue
 
 from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
-from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 
@@ -54,7 +52,6 @@ class AgentConversation:
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
-                 read_url,
                  wait_for_user_timeout,
                  armory: Armory,
                  file_size_limit: int,
@@ -70,7 +67,6 @@ class AgentConversation:
 
         self._send_message = step(send_message)
         self._add_reaction: AddReaction = step(add_reaction)
-        self._read_url = step(read_url)
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
@@ -154,13 +150,11 @@ class AgentConversation:
                             )
                             continue
 
-                        file_content = await self._read_url(attachment['url'])
-                        if file_content:
-                            file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
-                            message_history.append(GPTMessage(role='user', content=file_content))
-                            await self._record_message(
-                                context.guild_id, context.thread_id, context.author_id, "user", file_content
-                            )
+                        file_content = f'**Name: {attachment["filename"]}**\n--------\nURL: {attachment["url"]}\n--------\nFile Type: {attachment["filename"].split(".")[-1]}\n--------\n'
+                        message_history.append(GPTMessage(role='user', content=file_content))
+                        await self._record_message(
+                            context.guild_id, context.thread_id, context.author_id, "user", file_content
+                        )
 
                     if errors:
                         message_history.append(GPTMessage(role='assistant', content='\n'.join(errors)))

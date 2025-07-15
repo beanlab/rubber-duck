@@ -56,6 +56,11 @@ class RecordUsage(Protocol):
 def _result_to_agent_message(result):
     last_item = result.new_items[-1]
     if isinstance(last_item, ToolCallOutputItem):
+        if not isinstance(last_item.output, tuple):
+            return AgentMessage(
+                agent_name=result.last_agent.name,
+                content=last_item.output
+            )
         return AgentMessage(
             agent_name=result.last_agent.name,
             file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
@@ -81,7 +86,6 @@ async def _run_with_exception_handling(coroutine):
         duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
         raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                  "for more details on how to resolve this error") from ex
-
 
 class AgentClient:
     def __init__(
@@ -115,7 +119,6 @@ class AgentClient:
                 context=context,
                 **kwargs
             )
-
             return _result_to_agent_message(result)
 
 
