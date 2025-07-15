@@ -7,7 +7,7 @@ from quest import step
 
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
-from ..armory.config_tools.make_rag_tools import RAGManager
+from src.armory.rag_toolset import RAGManager
 from ..armory.data_store import DataStore
 from ..armory.extraction import Extraction
 from ..armory.stat_tools import StatsTools
@@ -134,7 +134,7 @@ def _add_toolsets_to_armory(config: Config, armory: Armory, chroma_session: Unio
                 if not chroma_session:
                     raise ValueError("ChromaDB session is required for RAG tools")
                 toolset = create_rag_toolset(tool_config, chroma_session)
-                armory.add_toolset(toolset.get_all_tools())
+                armory.scrub_tools(toolset)
 
 
 def _get_armory(config: Config, usage_hooks: UsageAgentHooks,

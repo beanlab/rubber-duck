@@ -1,3 +1,4 @@
+import types
 from typing import Callable
 
 from agents import FunctionTool, function_tool, Agent, RunContextWrapper
@@ -16,9 +17,6 @@ class Armory:
         self._tools: dict[str, FunctionTool] = {}
 
     def scrub_tools(self, tool_instance: object):
-        # if hasattr(tool_instance, "get_tools"):
-        #     for name, tools in tool_instance.get_tools():
-
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue
@@ -37,10 +35,7 @@ class Armory:
             self.add_tool(tool)
 
     def add_tool(self, tool_function: Callable):
-        if not tool_function.send_error_to_llm:
-            tool = function_tool(tool_function, failure_error_function=None)
-        else:
-            tool = function_tool(tool_function, failure_error_function=custom_tool_error_function)
+        tool = function_tool(tool_function)
 
         if hasattr(tool_function, "direct_send_message"):
             tool.direct_send_message = True
@@ -57,3 +52,4 @@ class Armory:
 
     def get_all_tool_names(self):
         return list(self._tools.keys())
+
