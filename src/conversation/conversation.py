@@ -115,7 +115,7 @@ class AgentConversation:
 
         duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
-        introduction = self._introduction or "Hi, how can I help you?" # This is redundant. We should remove this.
+        introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
 
         async with queue('messages', None) as messages:

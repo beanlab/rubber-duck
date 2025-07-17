@@ -2,7 +2,6 @@ import random
 import traceback as tb
 import uuid
 from typing import Protocol, Callable
-from pathlib import Path
 
 from quest import step, alias
 
@@ -74,6 +73,7 @@ class DuckOrchestrator:
             initial_message['author_mention'],
             initial_message['content']
         )
+
         context = DuckContext(
             guild_id=initial_message['guild_id'],
             parent_channel_id=initial_message['channel_id'],
