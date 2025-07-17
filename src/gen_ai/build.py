@@ -154,7 +154,7 @@ def build_agent_conversation_duck(
 
     genai_clients = {
         name: RetryableGenAI(
-            AgentClient(agent, bot.typing),
+            AgentClient(agent, bot.typing, armory),
             bot.send_message,
             ai_completion_retry_protocol
         )

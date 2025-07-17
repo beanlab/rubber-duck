@@ -1,14 +1,17 @@
 import asyncio
 import logging
+import os
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, ToolCallOutputItem
+from agents import Agent, FunctionTool, function_tool
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
+from openai.types.responses import Response
 from quest import step
 
-from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
+from ..armory.armory import Armory
+from ..utils.config_types import DuckContext, AgentMessage, GPTMessage
 from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
 
@@ -53,20 +56,6 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
-def _result_to_agent_message(result):
-    last_item = result.new_items[-1]
-    if isinstance(last_item, ToolCallOutputItem):
-        return AgentMessage(
-            agent_name=result.last_agent.name,
-            file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
-        )
-    else:
-        return AgentMessage(
-            agent_name=result.last_agent.name,
-            content=result.final_output
-        )
-
-
 async def _run_with_exception_handling(coroutine):
     try:
         return await coroutine
@@ -87,10 +76,14 @@ class AgentClient:
     def __init__(
             self,
             agent: Agent,
-            typing: IndicateTyping
+            typing: IndicateTyping,
+            armory: Armory
     ):
         self._agent = agent
         self._typing = typing
+        self._armory = armory
+        self._agent_handoff_tools = {}
+        self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def get_completion(
             self,
@@ -108,15 +101,88 @@ class AgentClient:
             message_history: list,
             **kwargs
     ) -> AgentMessage:
+        if self._agent.name not in self._agent_handoff_tools:
+            tools = self.create_handoff_tools(self._agent, message_history)
+            self._agent_handoff_tools[self._agent.name] = tools
+            self._agent.tools += tools
         async with self._typing(context.thread_id):
-            result = await Runner.run(
-                self._agent,
+            result = await self.run(
                 message_history,
-                context=context,
-                **kwargs
+                context=context
             )
 
-            return _result_to_agent_message(result)
+            return result
+
+    def _to_tool(self, tool: FunctionTool) -> dict:
+        return {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.params_json_schema,
+            "strict": True
+        }
+
+    async def get_agent_completion(self, agent: Agent, history: list) -> Response:
+        response = self._client.responses.create(
+            model=agent.model,
+            input=history,
+            tools=[self._to_tool(tool) for tool in agent.tools]
+        )
+        return response
+
+    def create_handoff_tools(self, agent: Agent, message_history) -> list[FunctionTool]:
+        handoff_tools = []
+        for handoff_agent in agent.handoffs:
+            if handoff_agent:
+                tool_name = f"transfer_to_{handoff_agent.name.replace(' ', '_').lower()}"
+                def create_handoff_closure(target_agent):
+                    async def handoff_tool(message: str):
+                        self._agent = target_agent
+                        message_history.append({"role": "user", "content": message})
+                        return f"Successfully transferred to {target_agent.name}"
+                    handoff_tool.__name__ = tool_name
+                    return handoff_tool
+
+                tool = self._armory.add_tool(create_handoff_closure(handoff_agent))
+                tool.description = handoff_agent.handoff_description or f"Transfer to {handoff_agent.name}"
+                handoff_tools.append(tool)
+
+        return handoff_tools
+
+    async def run(self, message_history: list, context: DuckContext) -> AgentMessage:
+        while True:
+            recent_messages = message_history[-5:]  # Last 5 messages
+            history = [{"role": "system", "content": self._agent.instructions}] + recent_messages
+            response = await self.get_agent_completion(self._agent, history)
+            output_item = response.output[0]
+            match output_item.type:
+                case "message":
+                    text_content = output_item.content[0].text
+                    return AgentMessage(agent_name=self._agent.name, content=text_content)
+
+                case "function_call":
+                    tool_name = output_item.name
+                    tool_args = output_item.arguments
+
+                    tool = self._armory.get_specific_tool(tool_name)
+
+                    result = await tool.on_invoke_tool(context, tool_args)
+
+                    history.append(output_item)
+                    message_history.append(output_item)
+
+                    history.append({
+                        "type": "function_call_output",
+                        "call_id": output_item.call_id,
+                        "output": str(result)
+                    })
+                    message_history.append({
+                        "type": "function_call_output",
+                        "call_id": output_item.call_id,
+                        "output": str(result)
+                    })
+
+                    continue
 
 
 class RetryableGenAI:
