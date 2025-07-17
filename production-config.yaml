@@ -30,6 +30,15 @@ agents_as_tools:
         prompt_files:
         - prompts/generate-code-complexity.md
         engine: gpt-4.1
+  - tool_name: ScrutinizeDuck
+    description: |
+      This tool will scrutinize the user's design approach and require the user to provide evidence for their design decisions.
+    agents:
+      - name: ScrutinizeDuck
+        engine: gpt-4.1
+        prompt_files:
+          - prompts/312-project-design/phd-duck.txt
+          - prompts/312-project-design/convex-hull/convex-hull-original.txt
 
 ducks:
   - name: standard-rubber-duck
@@ -285,18 +294,17 @@ servers:
             duck_type: agent_conversation
             settings:
               introduction: |
-                Welcome to the Design Experience Bot! My goal is to teach you questions you can use to think critically about your code. 
-                I'm trained to help you with the the Convex Hull design project.
-                Are you ready?
+                Welcome! This is the design experience for the convex hull project. Send a message to continue.
               agents:
                 - name: RubberDuck
                   engine: gpt-4.1
                   prompt_files:
-                    - prompts/312-project-design/phd-duck.txt
-                    - prompts/312-project-design/convex-hull/convex-hull-instructions.txt
+                    - prompts/312-project-design/director_duck.txt
                     - prompts/312-project-design/convex-hull/convex-hull-checklist.txt
                   max_iterations: 5
-              timeout: 3600 # 1 hour timeout for design discussions
+                  tools:
+                    - ScrutinizeDuck
+              timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
 
