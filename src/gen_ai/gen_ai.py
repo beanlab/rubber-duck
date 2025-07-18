@@ -4,7 +4,7 @@ import os
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, FunctionTool, function_tool
+from agents import Agent, FunctionTool
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
 from openai.types.responses import Response
@@ -79,7 +79,7 @@ class AgentClient:
             typing: IndicateTyping,
             armory: Armory
     ):
-        self._agent = agent
+        self._initial_agent = agent
         self._typing = typing
         self._armory = armory
         self._agent_handoff_tools = {}
@@ -98,19 +98,21 @@ class AgentClient:
     async def _get_completion(
             self,
             context: DuckContext,
-            message_history: list,
-            **kwargs
+            message_history: list
     ) -> AgentMessage:
-        if self._agent.name not in self._agent_handoff_tools:
-            tools = self.create_handoff_tools(self._agent, message_history)
-            self._agent_handoff_tools[self._agent.name] = tools
-            self._agent.tools += tools
+
+        agent = self._initial_agent
+        if agent.name not in self._agent_handoff_tools:
+            tools = self.create_handoff_tools(agent, message_history, context)
+            self._agent_handoff_tools[agent.name] = tools
+            agent.tools += tools
+
         async with self._typing(context.thread_id):
             result = await self.run(
+                agent,
                 message_history,
                 context=context
             )
-
             return result
 
     def _to_tool(self, tool: FunctionTool) -> dict:
@@ -130,16 +132,15 @@ class AgentClient:
         )
         return response
 
-    def create_handoff_tools(self, agent: Agent, message_history) -> list[FunctionTool]:
+    def create_handoff_tools(self, agent: Agent, message_history, context) -> list[FunctionTool]:
         handoff_tools = []
         for handoff_agent in agent.handoffs:
             if handoff_agent:
                 tool_name = f"transfer_to_{handoff_agent.name.replace(' ', '_').lower()}"
+
                 def create_handoff_closure(target_agent):
                     async def handoff_tool(message: str):
-                        self._agent = target_agent
-                        message_history.append({"role": "user", "content": message})
-                        return f"Successfully transferred to {target_agent.name}"
+                        await self.run(target_agent, message_history, context)
                     handoff_tool.__name__ = tool_name
                     return handoff_tool
 
@@ -149,16 +150,17 @@ class AgentClient:
 
         return handoff_tools
 
-    async def run(self, message_history: list, context: DuckContext) -> AgentMessage:
+    async def run(self, agent: Agent, message_history: list, context: DuckContext) -> AgentMessage:
+        current_agent = agent
         while True:
-            recent_messages = message_history[-5:]  # Last 5 messages
-            history = [{"role": "system", "content": self._agent.instructions}] + recent_messages
-            response = await self.get_agent_completion(self._agent, history)
+            recent_messages = message_history[-10:]
+            history = [{"role": "system", "content": current_agent.instructions}] + recent_messages
+            response = await self.get_agent_completion(current_agent, history)
             output_item = response.output[0]
             match output_item.type:
                 case "message":
                     text_content = output_item.content[0].text
-                    return AgentMessage(agent_name=self._agent.name, content=text_content)
+                    return AgentMessage(agent_name=current_agent.name, content=text_content)
 
                 case "function_call":
                     tool_name = output_item.name
@@ -168,14 +170,18 @@ class AgentClient:
 
                     result = await tool.on_invoke_tool(context, tool_args)
 
-                    history.append(output_item)
+                    # Check if this was a handoff tool
+                    if tool_name.startswith("transfer_to_") and isinstance(result, Agent):
+                        current_agent = result
+                        # Ensure handoff tools are created for the new agent
+                        if current_agent.name not in self._agent_handoff_tools:
+                            tools = self.create_handoff_tools(current_agent)
+                            self._agent_handoff_tools[current_agent.name] = tools
+                            current_agent.tools += tools
+                        result = f"Successfully transferred to {current_agent.name}"
+
                     message_history.append(output_item)
 
-                    history.append({
-                        "type": "function_call_output",
-                        "call_id": output_item.call_id,
-                        "output": str(result)
-                    })
                     message_history.append({
                         "type": "function_call_output",
                         "call_id": output_item.call_id,
