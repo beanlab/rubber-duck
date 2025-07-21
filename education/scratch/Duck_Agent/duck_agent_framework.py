@@ -16,7 +16,7 @@ class Response(BaseModel):
 
 
 class Message(TypedDict):
-    role: Literal['user', 'assistant', 'system']
+    role: Literal['system', 'developer', 'user', 'assistant']
     content: str
 
 
@@ -47,6 +47,22 @@ class Context:
     def get_items(self) -> List[Message | FunctionCall | FunctionCallOutput]:
         return self._items
 
+    def get_string_items(self) -> str:
+        lines = []
+        for item in self._items:
+            if isinstance(item, dict):
+                if item.get("role"):
+                    lines.append(f"{item['role'].upper()}: {item['content']}")
+                elif item.get("type") == "function_call":
+                    lines.append(f"FUNCTION CALL [{item['name']}] with args: {item['arguments']}")
+                elif item.get("type") == "function_output":
+                    lines.append(f"FUNCTION OUTPUT for call {item['call_id']}: {item['output']}")
+                else:
+                    lines.append(str(item))
+            else:
+                lines.append(str(item))
+        return "\n".join(lines)
+
     def __iter__(self):
         return iter(self._items)
 
@@ -68,14 +84,50 @@ class NodeAgent:
         self._prompt = prompt
         self._handoff_description = handoff_description
         self._tool_registry = tool_registry
-
         self.handoffs = handoffs or []
         self._tools = tools or []
         self._inner_context = Context()
         self._prompt_added = False
 
+        self._tools.append(self.create_talk_to_user_tool())
+
     def add_handoffs(self):
         self._tools.extend(self._create_handoffs())
+
+    def _summarize_context(self, agent_name: str) -> str:
+        conversation = self._inner_context.get_string_items()
+        response = self._client.responses.create(
+            model="gpt-4.1",
+            instructions=(
+                f"You are summarizing a conversation between a user and an assistant "
+                f"to help a new agent ({agent_name}) understand the context before continuing. "
+                f"Focus on the following:\n"
+                f"- What the user has asked or discussed so far\n"
+                f"- How the assistant has responded, including relevant conclusions, tools used, or next steps\n"
+                f"- Any unresolved questions, goals, or tasks that the new agent may need to address\n\n"
+                f"Write the summary in a clear, concise, and informative way. "
+                f"Do not omit important technical details or user intent. "
+                f"This summary should allow the {agent_name} agent to take over from the {self._name} agent to take over seamlessly.\n\n"
+                f"Conversation:\n{conversation}"
+            ),
+            input=conversation
+        )
+        return response.output_text
+
+    def create_talk_to_user_tool(self):
+        def talk_to_user(output: str) -> str:
+            """
+            A tool to interact with the user directly. Call this tool to continue the conversation with the user.
+            :param output: The agent's output to the user or in other words the assistants response to the last user response.
+            :return input: The user's response to the agent's output.
+            """
+            print(f"Agent: {output}")
+            inpt = input("You: ")
+            if inpt.lower() == "exit":
+                inpt = "The user has exited the conversation."
+            return inpt
+
+        return self._tool_registry.register(talk_to_user)
 
     def _create_handoffs(self):
         handoff_tools = []
@@ -86,15 +138,17 @@ class NodeAgent:
 
             tool_name = f"transfer_to_{handoff_agent._name.replace(' ', '_').lower()}"
 
-            def create_handoff_closure(target_agent):
+            def create_handoff_tool(target_agent):
                 def handoff_tool(message: str):
                     print(f"Transferring to {target_agent._name} with message: {message}")
+                    target_agent._inner_context.update(
+                        Message(role="system", content=self._summarize_context(target_agent._name)))
                     return target_agent.run(Message(role="user", content=message))
 
                 handoff_tool.__name__ = tool_name
                 return handoff_tool
 
-            tool_func = create_handoff_closure(handoff_agent)
+            tool_func = create_handoff_tool(handoff_agent)
             tool = self._tool_registry.register(tool_func)
             tool.description = handoff_agent._handoff_description or f"Transfer to {handoff_agent._name}"
             handoff_tools.append(tool)
@@ -126,9 +180,13 @@ class NodeAgent:
         context.update(function_call)
         context.update(function_call_output)
 
-    def run(self, message: Message) -> Response:
+    def run(self, message=None) -> Response:
+        if message is None:
+            message = Message(role='user', content="Hi")
         if not self._prompt_added:
             self._inner_context.update(Message(role='system', content=self._prompt))
+            self._inner_context.update(Message(role='developer',
+                                               content="It is mandatory to greet the user and talk to them using the talk_to_user tool."))
             self._prompt_added = True
         self._inner_context.update(message)
         while True:
@@ -138,7 +196,10 @@ class NodeAgent:
                 case "message":
                     # If the output is a message
                     text_content = output_item.content[0].text
-                    return Response(next_step='finished', output=text_content)
+                    self._inner_context.update(Message(role='assistant', content=text_content))
+                    print(f"Agent: {text_content}")
+                    self._inner_context.update(Message(role='developer',
+                                                       content="The agent has responded. Use the talk_to_user tool to continue the conversation."))
                 case "function_call":
                     # If the output is a handoff
                     if output_item.name.startswith("transfer_to_"):
@@ -150,6 +211,9 @@ class NodeAgent:
 
 
 def main():
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    tools = ToolRegistry()
+
     def add(a: int, b: int) -> int:
         """Adds two integers."""
         print("Adding two integers...")
@@ -160,46 +224,48 @@ def main():
         print("Rewriting sentence to be more concise...")
         return ' '.join(sentence.split())
 
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    tools = ToolRegistry()
     tools.register(add)
     tools.register(concise_sentence)
-    add_agent = NodeAgent(
-        client=client,
-        tool_registry=tools,
-        name="MathAgent",
-        model="gpt-4.1",
-        prompt="You are a math agent. You can perform addition operations.",
-        handoff_description="Handles math questions and addition operations.",
-        tools=[tools.tools['add']]
-    )
-    subtract_agent = NodeAgent(
-        client=client,
-        tool_registry=tools,
-        name="EnglishAgent",
-        model="gpt-4.1",
-        prompt="You are an english agent. You help rewrite sentences to be more concise.",
-        handoff_description="Handles english questions and rewrites sentences to be more concise.",
-        tools=[tools.tools['concise_sentence']]
-    )
-    head_agent = NodeAgent(
+
+    router_agent = NodeAgent(
         client=client,
         tool_registry=tools,
         name="RouterAgent",
         model="gpt-4.1",
-        prompt="You are a routing agent for math and english questions. You never answer questions directly. Instead, you route math questions to the math agent and english questions to the english agent.",
-        handoff_description="Routes math questions to the math agent and english questions to the english agent."
+        prompt="IMMEDIATELY greet the user and talk to them using the talk_to_user tool. You are a routing agent for math and english questions. Continue talking back and forth with the user until the user mentions \
+        a question regarding math or english subjects, then hand off. You answer any question that does not have to do with math or english. \
+        If a question is about math, you route it to the math agent. If a question is about english, you route it to the english agent.",
+        handoff_description="When the user asks about math or english, hand off to the correct agent.",
     )
 
-    head_agent.handoffs = [add_agent, subtract_agent]
-    add_agent.handoffs = [head_agent]
-    subtract_agent.handoffs = [head_agent]
+    math_agent = NodeAgent(
+        client=client,
+        tool_registry=tools,
+        name="MathAgent",
+        model="gpt-4.1",
+        prompt="You are a math agent. IMMEDIATELY greet the user and talk to them using the talk_to_user tool. You can perform addition operations.",
+        tools=[tools.tools['add']],
+        handoff_description="If the user asks a question that does not relate to math, hand off to the routing agent.",
+    )
+    english_agent = NodeAgent(
+        client=client,
+        tool_registry=tools,
+        name="EnglishAgent",
+        model="gpt-4.1",
+        prompt="You are an english agent. IMMEDIATELY greet the user and talk to them using the talk_to_user tool.You help rewrite sentences to be more concise.",
+        tools=[tools.tools['concise_sentence']],
+        handoff_description="If the user asks a question that does not relate to english, hand off to the routing agent.",
+    )
 
-    head_agent.add_handoffs()
-    add_agent.add_handoffs()
-    subtract_agent.add_handoffs()
+    router_agent.handoffs = [math_agent, english_agent]
+    math_agent.handoffs = [router_agent]
+    english_agent.handoffs = [router_agent]
 
-    print(head_agent.run(Message(role='user', content='Tell me about sine and cosine')).output)
+    router_agent.add_handoffs()
+    math_agent.add_handoffs()
+    english_agent.add_handoffs()
+
+    print("Agent: " + router_agent.run().output)
 
 
 if __name__ == "__main__":
