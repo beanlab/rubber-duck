@@ -102,7 +102,6 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
             for tool in settings.get('tools', [])
             if tool in armory.get_all_tool_names()
         ]
-
         agent.tools = tools
         agent.tool_use_behavior = {
             "stop_at_tool_names": [
