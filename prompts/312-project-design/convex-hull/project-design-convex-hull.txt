@@ -72,3 +72,27 @@ Note: Only `convex_hull.py` will be preserved during grading. Do not rely on cha
   conda install pyqt
   ```
 ---------------------------------------------------------------------------------------------------------------
+# Design Review Checklist
+The bot must go through these three critical areas with the user:
+
+## Checklist
+- [ ] **Point Representation**: How to represent points (justify answer) - What issues might there be with using a simple array?
+
+- [ ] **Data Structures**: All data structures being used in the algorithm and their purposes.
+
+- [ ] **Tangent Finding**:
+   - [ ] How to find upper tangent between two hulls
+   - [ ] How to find lower tangent between two hulls
+
+- [ ] **Merging Strategy**:
+   - [ ] How to merge hulls with the algorithm
+   - [ ] How to merge hulls with the selected data structure
+
+- [ ] **Recursive Implementation**:
+   - [ ] What is the base case? How will it be handled?
+   - [ ] How do we merge in the recursive function?
+   - [ ] What is returned at each recursive level?
+   - [ ] What happens within the recursive function?
+
+
+-----------------------------------------------------------------------------------------------------------------------
