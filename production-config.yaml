@@ -38,7 +38,7 @@ agents_as_tools:
         engine: gpt-4.1
         prompt_files:
           - prompts/312-project-design/phd-duck.txt
-          - prompts/312-project-design/convex-hull/convex-hull-original.txt
+          - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
 
 ducks:
   - name: standard-rubber-duck
@@ -300,7 +300,7 @@ servers:
                   engine: gpt-4.1
                   prompt_files:
                     - prompts/312-project-design/director_duck.txt
-                    - prompts/312-project-design/convex-hull/convex-hull-checklist.txt
+                    - prompts/312-project-design/convex-hull/extra-considerations-convex-hull-checklist.txt
                   max_iterations: 5
                   tools:
                     - ScrutinizeDuck
