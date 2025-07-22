@@ -1,15 +1,9 @@
-# This workflow is used to build, push, and deploy the Docker image to AWS Infrastructure.
-# It also updates the environment file and production config in S3.
-# It also sends a notification to Discord when the build and push are complete.
-# It also sends a notification to Discord when the environment file and production config are updated.
-
 name: Build, Push, and Deploy to AWS Infrastructure
 
 on:
   push:
     branches:
       - master
-      - 241-config-sha-deployment
   workflow_dispatch:
     inputs:
       local_config:
