@@ -2,8 +2,7 @@ import inspect
 import json
 from typing import get_origin, Callable, get_type_hints
 
-from openai.types.responses import ResponseFunctionToolCall
-
+from openai.types.responses import ResponseFunctionToolCall, FunctionToolParam
 
 PYTHON_TO_JSON_TYPES = {
     int: "integer",
@@ -48,7 +47,7 @@ class Tool:
             "additionalProperties": False
         }
 
-    def to_openai_tool(self) -> dict:
+    def to_openai_tool(self) -> FunctionToolParam:
         return {
             "type": "function",
             "name": self.name,
@@ -76,6 +75,11 @@ class ToolRegistry:
             raise ValueError(f"Tool '{name}' not registered")
         args = json.loads(args_json or "{}")
         return self.tools[name].run(**args)
+
+    def get_tool(self, name: str) -> Tool:
+        if name not in self.tools:
+            raise ValueError(f"Tool '{name}' not found")
+        return self.tools[name]
 
 
 

@@ -4,7 +4,8 @@ import os
 from typing import Literal, Optional, List, TypedDict
 
 from openai import OpenAI
-from openai.types.responses import ResponseFunctionToolCall
+from openai.types.responses import ResponseFunctionToolCall, ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 
 from education.scratch.Duck_Agent.tools import Tool, ToolRegistry
@@ -28,23 +29,18 @@ class FunctionCall(TypedDict):
     arguments: str
 
 
-class FunctionCallOutput(TypedDict):
-    type: str
-    call_id: str
-    output: str
-
 
 class Context:
     def __init__(self, ):
-        self._items: List[Message | FunctionCall | FunctionCallOutput] = []
+        self._items: List[Message | ResponseFunctionToolCallParam | FunctionCallOutput] = []
 
-    def update(self, new_item: Message | FunctionCall | FunctionCallOutput):
+    def update(self, new_item: Message | ResponseFunctionToolCallParam | FunctionCallOutput):
         self._items.append(new_item)
 
-    def pop(self, index: int = -1) -> Message | FunctionCall | FunctionCallOutput:
+    def pop(self, index: int = -1) -> Message | ResponseFunctionToolCallParam | FunctionCallOutput:
         return self._items.pop(index)
 
-    def get_items(self) -> List[Message | FunctionCall | FunctionCallOutput]:
+    def get_items(self) -> List[Message | ResponseFunctionToolCallParam | FunctionCallOutput]:
         return self._items
 
     def get_string_items(self) -> str:
@@ -108,9 +104,8 @@ class NodeAgent:
                 f"Write the summary in a clear, concise, and informative way. "
                 f"Do not omit important technical details or user intent. "
                 f"This summary should allow the {agent_name} agent to take over from the {self._name} agent to take over seamlessly.\n\n"
-                f"Conversation:\n{conversation}"
             ),
-            input=conversation
+            input=conversation if conversation else "No conversation history available.",
         )
         return response.output_text
 
@@ -156,6 +151,7 @@ class NodeAgent:
         return handoff_tools
 
     def _get_completion(self):
+        print(f"Context for {self._name} agent:\n{self._inner_context.get_string_items()}")
         return self._client.responses.create(
             model=self._model,
             input=self._inner_context.get_items(),
@@ -196,10 +192,10 @@ class NodeAgent:
                 case "message":
                     # If the output is a message
                     text_content = output_item.content[0].text
+                    response = self._tool_registry.get_tool("talk_to_user").run(output=text_content)
                     self._inner_context.update(Message(role='assistant', content=text_content))
-                    print(f"Agent: {text_content}")
-                    self._inner_context.update(Message(role='developer',
-                                                       content="The agent has responded. Use the talk_to_user tool to continue the conversation."))
+                    self._inner_context.update(Message(role='user', content=response))
+
                 case "function_call":
                     # If the output is a handoff
                     if output_item.name.startswith("transfer_to_"):
@@ -265,8 +261,7 @@ def main():
     math_agent.add_handoffs()
     english_agent.add_handoffs()
 
-    print("Agent: " + router_agent.run().output)
-
+    router_agent.run()
 
 if __name__ == "__main__":
     main()
