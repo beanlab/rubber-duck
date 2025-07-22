@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 241-config-sha-deployment
   workflow_dispatch:
     inputs:
       local_config:
@@ -152,7 +153,11 @@ jobs:
 
       - name: Upload secrets to S3
         run: |
-          aws s3 cp secrets.env "s3://rubber-duck-config/production-secrets.env" --no-progress
+          SHORT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
+          DEST_FILE="production-secrets-${SHORT_SHA}.env"
+          cp secrets.env "$DEST_FILE"
+          S3_DEST_PATH="${{ secrets.S3_BUCKET_PRODUCTION_SECRETS_DIRECTORY }}production-secrets-${SHORT_SHA}.env"
+          bash .github/scripts/upload-file-s3.sh "$DEST_FILE" "$S3_DEST_PATH"
 
       - name: Send notification to Discord
         run: |
@@ -183,7 +188,13 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Upload Production Config
-        run: bash .github/scripts/upload-config.sh ${{secrets.S3_BUCKET_NAME}} ${{secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH_YAML}}
+        run: |
+          SHORT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
+          SRC_PATH="${{ secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH_YAML }}"
+          DEST_FILE="production-config-${SHORT_SHA}.yaml"
+          cp "$SRC_PATH" "$DEST_FILE"
+          S3_DEST_PATH="${{ secrets.S3_BUCKET_PRODUCTION_CONFIG_DIRECTORY }}production-config-${SHORT_SHA}.yaml"
+          bash .github/scripts/upload-file-s3.sh "$DEST_FILE" "$S3_DEST_PATH"
 
       - name: Send notification to Discord
         run: |
