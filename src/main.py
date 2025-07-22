@@ -328,7 +328,7 @@ async def main(config: Config, log_dir: Path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json', help='Path to config file (.json or .yaml)')
+    parser.add_argument('--config', type=str, default='config.json', help='Path to config file (.json or .yaml, or s3://...)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
 
@@ -353,11 +353,14 @@ if __name__ == '__main__':
     # Add console handler to the duck logger
     add_console_handler()
 
-    # Try fetching the config from S3 first
-    config = fetch_config_from_s3()
+    config = None
+    if args.config.startswith('s3://'):
+        os.environ['CONFIG_FILE_S3_PATH'] = args.config
+        config = fetch_config_from_s3()
+    else:
+        config = load_local_config(Path(args.config))
 
     if config is None:
-        # If fetching from S3 failed, load from local file
-        config = load_local_config(args.config)
+        raise RuntimeError("Failed to load configuration from S3 or local file.")
 
     asyncio.run(main(config, args.log_path))
