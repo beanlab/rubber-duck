@@ -97,12 +97,12 @@ _armory: Armory = None
 
 def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], armory: Armory):
     for agent, settings in agents:
-        tools = []
-        for tool_name in settings.get('tools', []):
-            if tool_name in armory.get_all_tool_names():
-                tool = armory.get_specific_tool(tool_name)
-                duck_logger.debug(f"Adding tool '{tool_name}' to agent '{agent.name}'", extra={"task": "tool_assignment"})
-                tools.append(tool)
+        tools = [
+            armory.get_specific_tool(tool)
+            for tool in settings.get('tools', [])
+            if tool in armory.get_all_tool_names()
+        ]
+
         agent.tools = tools
         agent.tool_use_behavior = {
             "stop_at_tool_names": [
@@ -117,8 +117,6 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
-
-
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
