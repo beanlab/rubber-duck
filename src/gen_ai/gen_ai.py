@@ -7,7 +7,7 @@ from typing import TypedDict, Protocol, Optional, Literal
 from agents import Agent, Runner, ToolCallOutputItem, FunctionTool
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
-from openai.types.responses import Response, ResponseFunctionToolCallParam
+from openai.types.responses import Response, ResponseFunctionToolCallParam, FunctionToolParam, ResponseFunctionToolCall
 from openai.types.responses.response_input_item import FunctionCallOutput
 from quest import step
 
@@ -86,137 +86,6 @@ async def _run_with_exception_handling(coroutine):
         raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                  "for more details on how to resolve this error") from ex
 
-class Message(TypedDict):
-    role: Literal['system', 'developer', 'user', 'assistant']
-    content: str
-
-
-
-class Context:
-    def __init__(self):
-        self._items: list[Message | ResponseFunctionToolCallParam | FunctionCallOutput] = []
-
-    def update(self, new_item: Message | ResponseFunctionToolCallParam | FunctionCallOutput):
-        self._items.append(new_item)
-
-    def get_items(self) -> list[Message | ResponseFunctionToolCallParam | FunctionCallOutput]:
-        return self._items
-
-    def get_string_items(self) -> str:
-        lines = []
-        for item in self._items:
-            if isinstance(item, dict):
-                if item.get("role"):
-                    lines.append(f"{item['role'].upper()}: {item['content']}")
-                elif item.get("type") == "function_call":
-                    lines.append(f"FUNCTION CALL [{item['name']}] with args: {item['arguments']}")
-                elif item.get("type") == "function_output":
-                    lines.append(f"FUNCTION OUTPUT for call {item['call_id']}: {item['output']}")
-                else:
-                    lines.append(str(item))
-            else:
-                lines.append(str(item))
-        return "\n".join(lines)
-
-    def __iter__(self):
-        return iter(self._items)
-
-class ConversationSession:
-    def __init__(self):
-        self.agent_contexts: dict[str, Context] = {}
-        self.current_agent_name: Optional[str] = None
-        self.conversation_active: bool = True
-
-    def get_context(self, agent_name: str) -> Context:
-        if agent_name not in self.agent_contexts:
-            self.agent_contexts[agent_name] = Context()
-        return self.agent_contexts[agent_name]
-
-    def reset(self):
-        self.agent_contexts.clear()
-        self.current_agent_name = None
-        self.conversation_active = True
-
-
-class AgentCoordinator:
-    def __init__(self):
-        self.agents = {}
-
-    def register_agent(self, agent: Agent):
-        self.agents[agent.get_agent_name()] = agent
-
-    def setup_handoffs(self, tool_registry: ToolRegistry):
-        for agent_name, agent in self.agents.items():
-            handoff_tools = []
-            for target_agent_name in agent.handoff_agent_names:
-                if target_agent_name in self.agents:
-                    target_agent = self.agents[target_agent_name]
-                    handoff_tool = agent._create_handoff_tool(
-                        target_agent_name,
-                        target_agent._handoff_description,
-                        tool_registry
-                    )
-                    handoff_tools.append(handoff_tool)
-
-            agent.add_handoff_tools(handoff_tools)
-
-    def get_initialized_context(self, agent_name: str, session: ConversationSession) -> Context:
-        context = session.get_context(agent_name)
-        agent = self.agents[agent_name]
-
-        if not context.get_items():
-            context.update(Message(role='system', content=agent._prompt))
-            context.update(Message(role='developer',
-                                   content="It is mandatory to greet the user and talk to them using the talk_to_user tool."))
-            context.update(Message(role='user', content="Hi"))
-
-        return context
-
-    def start_conversation(self, initial_agent, message=None) -> ConversationSession:
-        session = ConversationSession()
-        session.current_agent_name = initial_agent.get_agent_name()
-        current_message = message or Message(role='user', content="Hi")
-
-        while session.conversation_active:
-            current_agent = self.agents[session.current_agent_name]
-            context = self.get_initialized_context(session.current_agent_name, session)
-
-            result = current_agent.run_single_iteration(current_message, context)
-
-            if result.type == "end":
-                print(f"Conversation ended: {result.message}")
-                break
-            elif result.type == "handoff":
-                self._handle_handoff(result, session)
-                current_message = Message(role='user', content=result.handoff_message)
-            elif result.type == "continue":
-                current_message = None
-
-        return session
-
-    def _handle_handoff(self, handoff_result, session: ConversationSession):
-        old_agent_name = session.current_agent_name
-        new_agent_name = handoff_result.target_agent
-
-        old_agent = self.agents[old_agent_name]
-
-        old_context = session.get_context(old_agent_name)
-        new_context = self.get_initialized_context(new_agent_name, session)
-
-        handoff_summary = old_agent.summarize_context_for_handoff(old_context, new_agent_name)
-        new_context.update(Message(role="system", content=handoff_summary))
-
-        session.current_agent_name = new_agent_name
-
-
-class Result:
-    def __init__(self, result_type: Literal["continue", "handoff", "end"], message: str = "", target_agent: str = "",
-                 handoff_message: str = ""):
-        self.type = result_type
-        self.message = message
-        self.target_agent = target_agent
-        self.message = handoff_message
-
 class AgentClient:
     def __init__(
             self,
@@ -260,7 +129,7 @@ class AgentClient:
             )
             return result
 
-    def _to_tool(self, tool: FunctionTool) -> dict:
+    def _to_tool(self, tool: FunctionTool) -> FunctionToolParam:
         return {
             "type": "function",
             "name": tool.name,
@@ -285,7 +154,7 @@ class AgentClient:
 
                 def create_handoff_closure(target_agent):
                     async def handoff_tool(message: str):
-                        await self.run(target_agent, message_history, context)
+                        return target_agent, message
                     handoff_tool.__name__ = tool_name
                     return handoff_tool
 
@@ -294,6 +163,23 @@ class AgentClient:
                 handoff_tools.append(tool)
 
         return handoff_tools
+
+    def _add_function_call_context(self, result: str, call: ResponseFunctionToolCall, message_history: list):
+        function_call = ResponseFunctionToolCallParam(
+            type="function_call",
+            id=call.id,
+            call_id=call.call_id,
+            name=call.name,
+            arguments=call.arguments
+        )
+
+        function_call_output = FunctionCallOutput(
+            type="function_call_output",
+            call_id=call.call_id,
+            output=str(result)
+        )
+        message_history.append(function_call)
+        message_history.append(function_call_output)
 
     async def run(self, agent: Agent, message_history: list, context: DuckContext) -> AgentMessage:
         current_agent = agent
@@ -315,25 +201,13 @@ class AgentClient:
 
                     result = await tool.on_invoke_tool(context, tool_args)
 
-                    # Check if this was a handoff tool
-                    if tool_name.startswith("transfer_to_") and isinstance(result, Agent):
-                        current_agent = result
-                        # Ensure handoff tools are created for the new agent
-                        if current_agent.name not in self._agent_handoff_tools:
-                            tools = self.create_handoff_tools(current_agent)
-                            self._agent_handoff_tools[current_agent.name] = tools
-                            current_agent.tools += tools
-                        result = f"Successfully transferred to {current_agent.name}"
+                    if tool_name.startswith("transfer_to_"):
+                        new_agent, message = result
+                        current_agent = new_agent
+                        self._add_function_call_context(f"Handed of to {new_agent.name}", output_item, message_history)
+                    else:
+                        self._add_function_call_context(result, output_item, message_history)
 
-                    message_history.append(output_item)
-
-                    message_history.append({
-                        "type": "function_call_output",
-                        "call_id": output_item.call_id,
-                        "output": str(result)
-                    })
-
-                    continue
 
 class RetryableGenAI:
     def __init__(self,
