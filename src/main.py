@@ -191,7 +191,7 @@ def build_ducks(
 
         if duck_type == 'agent_conversation':
             ducks[name] = build_agent_conversation_duck(
-                name, config, settings, bot, metrics_handler.record_message, metrics_handler.record_usage
+                name, config, settings, bot, metrics_handler.record_message
             )
 
         elif duck_type == 'conversation_review':

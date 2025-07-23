@@ -65,6 +65,19 @@ class ToolRegistry:
         self.register(self.create_talk_to_user_tool())
         self.register(self.create_end_conversation_tool())
 
+    def scrub_tools(self, tool_instance: object):
+        for attr_name in dir(tool_instance):
+            if attr_name.startswith("_"):
+                continue
+
+            method = getattr(tool_instance, attr_name)
+            if not callable(method):
+                continue
+
+            if not hasattr(method, "is_tool"):
+                continue
+
+            self.register(method)
 
     def register(self, func: Callable):
         tool = Tool(func)
@@ -85,7 +98,6 @@ class ToolRegistry:
         return self.tools[name]
 
     def get_all_tool_names(self) -> list[str]:
-
         return list(self.tools.keys())
 
     def create_talk_to_user_tool(self):
