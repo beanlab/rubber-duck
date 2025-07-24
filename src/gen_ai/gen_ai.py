@@ -58,7 +58,7 @@ def _result_to_agent_message(result):
     if isinstance(last_item, ToolCallOutputItem):
         return AgentMessage(
             agent_name=result.last_agent.name,
-            file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
+            content=last_item.output
         )
     else:
         return AgentMessage(
@@ -115,7 +115,6 @@ class AgentClient:
                 context=context,
                 **kwargs
             )
-
             return _result_to_agent_message(result)
 
 
