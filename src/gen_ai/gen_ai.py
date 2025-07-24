@@ -96,7 +96,7 @@ class AgentClient:
         self._initial_agent = agent
         self._typing = typing
         self._armory = armory
-        self._agent_handoff_tools = {}
+        self._agent_histories = {}
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def get_completion(
@@ -114,13 +114,7 @@ class AgentClient:
             context: DuckContext,
             message_history: list
     ) -> AgentMessage:
-
         agent = self._initial_agent
-        if agent.name not in self._agent_handoff_tools:
-            tools = self.create_handoff_tools(agent, message_history, context)
-            self._agent_handoff_tools[agent.name] = tools
-            agent.tools += tools
-
         async with self._typing(context.thread_id):
             result = await self.run(
                 agent,
@@ -146,7 +140,7 @@ class AgentClient:
         )
         return response
 
-    def create_handoff_tools(self, agent: Agent, message_history, context) -> list[FunctionTool]:
+    def create_handoff_tools(self, agent: Agent) -> list[FunctionTool]:
         handoff_tools = []
         for handoff_agent in agent.handoffs:
             if handoff_agent:
@@ -183,16 +177,16 @@ class AgentClient:
 
     async def run(self, agent: Agent, message_history: list, context: DuckContext) -> AgentMessage:
         current_agent = agent
+        history = []
         while True:
-            recent_messages = message_history[-10:]
-            history = [{"role": "system", "content": current_agent.instructions}] + recent_messages
+            history.append(GPTMessage(role="system", content=current_agent.instructions))
+            history.append(message_history[-1])
             response = await self.get_agent_completion(current_agent, history)
             output_item = response.output[0]
             match output_item.type:
                 case "message":
                     text_content = output_item.content[0].text
                     return AgentMessage(agent_name=current_agent.name, content=text_content)
-
                 case "function_call":
                     tool_name = output_item.name
                     tool_args = output_item.arguments
@@ -204,7 +198,8 @@ class AgentClient:
                     if tool_name.startswith("transfer_to_"):
                         new_agent, message = result
                         current_agent = new_agent
-                        self._add_function_call_context(f"Handed of to {new_agent.name}", output_item, message_history)
+                        history = []
+                        self._add_function_call_context(f"Handed off to {new_agent.name} with message {message}", output_item, history)
                     else:
                         self._add_function_call_context(result, output_item, message_history)
 
