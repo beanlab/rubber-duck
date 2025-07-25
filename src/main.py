@@ -163,7 +163,9 @@ def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     # Look for inline duck configs
     for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
-            for item in channel_config['ducks']:
+            if not isinstance(channel_config.get('ducks'), list):
+                duck_logger.error(f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
+            for item in channel_config.get('ducks') or []:
                 if isinstance(item, DUCK_NAME):
                     continue
                 elif isinstance(item, dict):
