@@ -1,25 +1,29 @@
 import asyncio
-import logging
+import os
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, ToolCallOutputItem
+from agents import Agent, ToolCallOutputItem, FunctionTool
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
+from openai.types.responses import Response, ResponseFunctionToolCallParam, FunctionToolParam, ResponseFunctionToolCall
+from openai.types.responses.response_input_item import FunctionCallOutput
 from quest import step
 
+from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
-
+HistoryItem =  GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput
 
 class GenAIClient(Protocol):
+    def get_initial_agent(self) -> Agent: ...
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage],
+            message_history: list[HistoryItem],
     ) -> AgentMessage: ...
 
 
@@ -58,7 +62,7 @@ def _result_to_agent_message(result):
     if isinstance(last_item, ToolCallOutputItem):
         return AgentMessage(
             agent_name=result.last_agent.name,
-            content=last_item.output
+            file=FileData(filename=last_item.output[0], bytes=last_item.output[1])
         )
     else:
         return AgentMessage(
@@ -82,20 +86,25 @@ async def _run_with_exception_handling(coroutine):
         raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
                                  "for more details on how to resolve this error") from ex
 
-
 class AgentClient:
     def __init__(
             self,
             agent: Agent,
-            typing: IndicateTyping
+            typing: IndicateTyping,
+            armory: Armory
     ):
-        self._agent = agent
+        self._initial_agent = agent
         self._typing = typing
+        self._armory = armory
+        self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def get_initial_agent(self):
+        return self._initial_agent
 
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list,
+            message_history: list[HistoryItem],
     ) -> AgentMessage:
         return await _run_with_exception_handling(self._get_completion(
             context,
@@ -105,17 +114,74 @@ class AgentClient:
     async def _get_completion(
             self,
             context: DuckContext,
-            message_history: list,
-            **kwargs
+            message_history: list[HistoryItem]
     ) -> AgentMessage:
+        agent = self._initial_agent
         async with self._typing(context.thread_id):
-            result = await Runner.run(
-                self._agent,
+            result = await self.run(
+                agent,
                 message_history,
-                context=context,
-                **kwargs
+                context=context
             )
-            return _result_to_agent_message(result)
+            return result
+
+    def _to_tool(self, tool: FunctionTool) -> FunctionToolParam:
+        return {
+            "type": "function",
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.params_json_schema,
+            "strict": True
+        }
+
+    async def get_agent_completion(self, agent: Agent, history: list) -> Response:
+        response = self._client.responses.create(
+            model=agent.model,
+            input=history,
+            tools=[self._to_tool(tool) for tool in agent.tools]
+        )
+        return response
+
+    def _add_function_call_context(self, result: str, call: ResponseFunctionToolCall, message_history: list):
+        function_call = ResponseFunctionToolCallParam(
+            type="function_call",
+            id=call.id,
+            call_id=call.call_id,
+            name=call.name,
+            arguments=call.arguments
+        )
+
+        function_call_output = FunctionCallOutput(
+            type="function_call_output",
+            call_id=call.call_id,
+            output=str(result)
+        )
+        message_history.append(function_call)
+        message_history.append(function_call_output)
+
+    async def run(self, agent: Agent, agent_history: list[HistoryItem], context: DuckContext) -> AgentMessage:
+        while True:
+            response = await self.get_agent_completion(agent, agent_history)
+            output_item = response.output[0]
+            match output_item.type:
+                case "message":
+                    text_content = output_item.content[0].text
+                    return AgentMessage(agent_name=agent.name, content=text_content)
+                case "function_call":
+                    tool_name = output_item.name
+                    tool_args = output_item.arguments
+
+                    tool = self._armory.get_specific_tool(tool_name)
+                    result = await tool.on_invoke_tool(context, tool_args)
+
+                    if tool_name.startswith("transfer_to_"):
+                        new_agent = result
+                        last_message = agent_history[-1]
+                        self._add_function_call_context("Transfer to " + new_agent.name, output_item, agent_history)
+                        message = last_message["content"] if "content" in last_message else f"User has requested to talk to {new_agent.name}."
+                        return AgentMessage(agent_name=new_agent.name, content=message)
+                    else:
+                        self._add_function_call_context(result, output_item, agent_history)
 
 
 class RetryableGenAI:
@@ -128,10 +194,13 @@ class RetryableGenAI:
         self._retry_config = retry_config
         self._genai = genai
 
+    def get_initial_agent(self):
+        return self._genai.get_initial_agent()
+
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage],
+            message_history: list[HistoryItem],
     ):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
@@ -150,7 +219,7 @@ class RetryableGenAI:
                 if retries > max_retries:
                     raise GenAIException(ex, 'Retry limit exceeded')
 
-                logging.warning(
+                duck_logger.debug(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff
