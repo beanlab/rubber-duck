@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import TypedDict, NotRequired
 
+from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
+
 CHANNEL_ID = int
 DUCK_WEIGHT = float
 DUCK_NAME = str
@@ -21,6 +24,7 @@ class GPTMessage(TypedDict):
     role: str
     content: str
 
+HistoryItem =  GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput
 
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
@@ -75,7 +79,6 @@ class AgentAsToolSettings(MultiAgentSettings):
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
-    sub_conversation: NotRequired[list[str]]
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]

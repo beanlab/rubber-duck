@@ -1,10 +1,9 @@
 import asyncio
-import logging
 import os
 from io import BytesIO
-from typing import TypedDict, Protocol, Optional, Literal
+from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, ToolCallOutputItem, FunctionTool
+from agents import Agent, ToolCallOutputItem, FunctionTool
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
 from openai.types.responses import Response, ResponseFunctionToolCallParam, FunctionToolParam, ResponseFunctionToolCall
@@ -17,14 +16,14 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
-
+HistoryItem =  GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput
 
 class GenAIClient(Protocol):
     def get_initial_agent(self) -> Agent: ...
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
+            message_history: list[HistoryItem],
     ) -> AgentMessage: ...
 
 
@@ -105,7 +104,7 @@ class AgentClient:
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
+            message_history: list[HistoryItem],
     ) -> AgentMessage:
         return await _run_with_exception_handling(self._get_completion(
             context,
@@ -115,7 +114,7 @@ class AgentClient:
     async def _get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput]
+            message_history: list[HistoryItem]
     ) -> AgentMessage:
         agent = self._initial_agent
         async with self._typing(context.thread_id):
@@ -160,7 +159,7 @@ class AgentClient:
         message_history.append(function_call)
         message_history.append(function_call_output)
 
-    async def run(self, agent: Agent, agent_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput], context: DuckContext) -> AgentMessage:
+    async def run(self, agent: Agent, agent_history: list[HistoryItem], context: DuckContext) -> AgentMessage:
         while True:
             response = await self.get_agent_completion(agent, agent_history)
             output_item = response.output[0]
@@ -182,7 +181,6 @@ class AgentClient:
                         message = last_message["content"] if "content" in last_message else f"User has requested to talk to {new_agent.name}."
                         return AgentMessage(agent_name=new_agent.name, content=message)
                     else:
-                        # Append function call and result to history
                         if len(result) == 2:
                             return AgentMessage(
                                 agent_name=agent.name,
@@ -208,7 +206,7 @@ class RetryableGenAI:
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
+            message_history: list[HistoryItem],
     ):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
@@ -227,7 +225,7 @@ class RetryableGenAI:
                 if retries > max_retries:
                     raise GenAIException(ex, 'Retry limit exceeded')
 
-                logging.warning(
+                duck_logger.debug(
                     f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
                 await asyncio.sleep(delay)
                 delay *= backoff

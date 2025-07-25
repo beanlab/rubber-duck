@@ -10,12 +10,13 @@ from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
+HistoryItem =  GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput
 
 class BasicSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
 
-    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]:
+    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[HistoryItem]:
         message_history = [GPTMessage(role='system', content=prompt)]
         user_id = initial_message['author_id']
         guild_id = initial_message['guild_id']
@@ -29,7 +30,7 @@ class AgentSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
 
-    async def __call__(self, thread_id: int, initial_message: Message) -> list[GPTMessage]:
+    async def __call__(self, thread_id: int, initial_message: Message) -> list[HistoryItem]:
         message_history = [GPTMessage(role='system',
                                       content="Introduce yourself and what you can do to the user using the talk_to_user tool"),
                            GPTMessage(role='user', content="Hi")]
@@ -86,7 +87,7 @@ class AgentConversation:
             self,
             context: DuckContext,
             agent_name: str,
-            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput]
+            message_history: list[HistoryItem]
     ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
         duck_logger.debug(f"Processing with agent: {agent_name} (Thread: {context.thread_id})")

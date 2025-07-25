@@ -1,9 +1,8 @@
-import asyncio
 from pathlib import Path
-from typing import Any, Iterable, Callable
+from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper, FunctionTool
-from quest import step, queue
+from quest import step
 
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
@@ -14,7 +13,6 @@ from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config, MultiAgentSettings
 from ..utils.logger import duck_logger
-from ..utils.protocols import Message
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):

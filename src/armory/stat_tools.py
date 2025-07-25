@@ -9,7 +9,7 @@ from seaborn.external.kde import gaussian_kde
 
 from .cache import cache_result
 from .tools import register_tool, direct_send_message
-from src.armory.data_store import DataStore
+from ..armory.data_store import DataStore
 from ..utils.logger import duck_logger
 
 
