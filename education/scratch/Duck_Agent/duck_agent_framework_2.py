@@ -21,14 +21,12 @@ def main():
         print("Rewriting sentence to be more concise...")
         return ' '.join(sentence.split())
 
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     registry = ToolRegistry()
 
     registry.register(add)
     registry.register(concise_sentence)
 
     router_agent = Agent(
-        client=client,
         tool_registry=registry,
         name="RouterAgent",
         model="gpt-4.1",
@@ -38,7 +36,6 @@ def main():
     )
 
     math_agent = Agent(
-        client=client,
         tool_registry=registry,
         name="MathAgent",
         model="gpt-4.1",
@@ -49,7 +46,6 @@ def main():
     )
 
     english_agent = Agent(
-        client=client,
         tool_registry=registry,
         name="EnglishAgent",
         model="gpt-4.1",
