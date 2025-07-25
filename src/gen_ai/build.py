@@ -3,7 +3,6 @@ from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper, FunctionTool
 from quest import step
-
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
@@ -124,10 +123,10 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
         agent.tools += tools
 
 
-def _get_armory(config: Config) -> Armory:
+def _get_armory(config: Config, send_message) -> Armory:
     global _armory
     if _armory is None:
-        _armory = Armory()
+        _armory = Armory(send_message)
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
@@ -149,7 +148,7 @@ def build_agent_conversation_duck(
         record_usage: RecordUsage
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config)
+    armory = _get_armory(config, bot.send_message)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'], armory)
     _add_tools_to_agents(conversation_agents.values(), armory)

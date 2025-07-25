@@ -8,6 +8,6 @@ def register_tool(func):
     return func
 
 
-def direct_send_message(func):
-    func.direct_send_message = True
+def sends_image(func):
+    func.sends_image = True
     return func
