@@ -178,6 +178,7 @@ class AgentClient:
                     if tool_name.startswith("transfer_to_"):
                         new_agent = result
                         last_message = agent_history[-1]
+                        self._add_function_call_context("Transfer to " + new_agent.name, output_item, agent_history)
                         message = last_message["content"] if "content" in last_message else f"User has requested to talk to {new_agent.name}."
                         return AgentMessage(agent_name=new_agent.name, content=message)
                     else:

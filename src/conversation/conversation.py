@@ -102,6 +102,7 @@ class AgentConversation:
 
         if content := response.get('content'):
             if response['agent_name'] != agent_name:
+                duck_logger.debug("Agent handoff detected, switching to new agent: %s", response['agent_name'])
                 if response['agent_name'] not in self._agent_histories:
                     actual_agent = self._ai_clients[response['agent_name']].get_initial_agent()
                     self._agent_histories[response['agent_name']] = [
