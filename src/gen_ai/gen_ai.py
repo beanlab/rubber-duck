@@ -183,7 +183,13 @@ class AgentClient:
                         return AgentMessage(agent_name=new_agent.name, content=message)
                     else:
                         # Append function call and result to history
-                        self._add_function_call_context(result, output_item, agent_history)
+                        if len(result) == 2:
+                            return AgentMessage(
+                                agent_name=agent.name,
+                                file=FileData(filename=result[0], bytes=result[1])
+                            )
+                        else:
+                            self._add_function_call_context(result, output_item, agent_history)
 
 
 class RetryableGenAI:
