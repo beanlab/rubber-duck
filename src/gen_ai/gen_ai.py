@@ -181,13 +181,7 @@ class AgentClient:
                         message = last_message["content"] if "content" in last_message else f"User has requested to talk to {new_agent.name}."
                         return AgentMessage(agent_name=new_agent.name, content=message)
                     else:
-                        if len(result) == 2:
-                            return AgentMessage(
-                                agent_name=agent.name,
-                                file=FileData(filename=result[0], bytes=result[1])
-                            )
-                        else:
-                            self._add_function_call_context(result, output_item, agent_history)
+                        self._add_function_call_context(result, output_item, agent_history)
 
 
 class RetryableGenAI:

@@ -78,7 +78,7 @@ class Armory:
                 result = func(**call_args)
 
             name, _ = result
-            await self.send_message(wrapper_arg.context.thread_id, file=result)
+            await self.send_message(wrapper_arg.thread_id, file=result)
             return name
 
         wrapper.__signature__ = new_sig
