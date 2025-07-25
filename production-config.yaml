@@ -292,7 +292,7 @@ servers:
                     description: Lab section number (e.g. lab-section-002)
 
       - channel_id: 1384678077694480434
-        channel_name: designer-duck
+        channel_name: convex-hull
         ducks:
           - name: designer-duck
             duck_type: agent_conversation
@@ -305,7 +305,25 @@ servers:
                 - name: DesignerDuck
                   engine: gpt-4.1
                   prompt_files:
-                  - prompts/designer-duck.txt
+                  - prompts/312-design-experiences/convex_hull-designer-duck.txt
+                  max_iterations: 5
+              timeout: 600
+
+      - channel_id: 1387118578607587389
+        channel_name: gene-sequencing
+        ducks:
+          - name: designer-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
+                I'm specialized with helping you on Project 4: Gene Sequencing.
+                Let's work on this together! How is data stored in your project?
+              agents:
+                - name: DesignerDuck
+                  engine: gpt-4.1
+                  prompt_files:
+                    - prompts/312-design-experiences/gene-sequencing-designer-duck
                   max_iterations: 5
               timeout: 600
 
