@@ -75,6 +75,7 @@ class AgentAsToolSettings(MultiAgentSettings):
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
+    sub_conversation: NotRequired[list[str]]
     timeout: int
     file_size_limit: int
     file_type_ext: list[str]

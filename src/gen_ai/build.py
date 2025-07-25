@@ -1,8 +1,9 @@
+import asyncio
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Callable
 
 from agents import Agent, AgentHooks, RunContextWrapper, FunctionTool
-from quest import step
+from quest import step, queue
 
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
@@ -13,6 +14,7 @@ from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, DuckContext, \
     SingleAgentSettings, Config, MultiAgentSettings
 from ..utils.logger import duck_logger
+from ..utils.protocols import Message
 
 
 class UsageAgentHooks(AgentHooks[DuckContext]):
@@ -70,8 +72,8 @@ def create_handoff_tools(handoffs: list[Agent], armory: Armory) -> list[Function
             tool_name = f"transfer_to_{handoff_agent.name.replace(' ', '_').lower()}"
 
             def create_handoff_closure(target_agent):
-                async def handoff_tool(message: str):
-                    return target_agent, message
+                async def handoff_tool():
+                    return target_agent
                 handoff_tool.__name__ = tool_name
                 return handoff_tool
 
@@ -124,7 +126,7 @@ def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], ar
         agent.tools += tools
 
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
+def _get_armory(config: Config) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory()
@@ -136,16 +138,8 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks) -> Armory:
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-    all_tool_agents = []
-    for agent_settings in config.get('agents_as_tools', []):
-        agents = _build_agents(usage_hooks, agent_settings['agents'])
-        all_tool_agents.extend(agents.values())
-        head_agent = agents[_get_starting_agent(agent_settings)][0]
-        _armory.add_agent_as_tool(head_agent, agent_settings['tool_name'], agent_settings['description'])
-
-    _add_tools_to_agents(all_tool_agents, _armory)
-
     return _armory
+
 
 
 def build_agent_conversation_duck(
@@ -157,7 +151,7 @@ def build_agent_conversation_duck(
         record_usage: RecordUsage
 ) -> DuckConversation:
     usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks)
+    armory = _get_armory(config)
 
     conversation_agents = _build_agents(usage_hooks, settings['agents'], armory)
     _add_tools_to_agents(conversation_agents.values(), armory)

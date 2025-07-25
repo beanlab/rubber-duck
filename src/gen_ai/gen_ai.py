@@ -20,10 +20,11 @@ Sendable = str | tuple[str, BytesIO]
 
 
 class GenAIClient(Protocol):
+    def get_initial_agent(self) -> Agent: ...
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage],
+            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
     ) -> AgentMessage: ...
 
 
@@ -96,13 +97,15 @@ class AgentClient:
         self._initial_agent = agent
         self._typing = typing
         self._armory = armory
-        self._agent_histories = {}
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def get_initial_agent(self):
+        return self._initial_agent
 
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list,
+            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
     ) -> AgentMessage:
         return await _run_with_exception_handling(self._get_completion(
             context,
@@ -112,7 +115,7 @@ class AgentClient:
     async def _get_completion(
             self,
             context: DuckContext,
-            message_history: list
+            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput]
     ) -> AgentMessage:
         agent = self._initial_agent
         async with self._typing(context.thread_id):
@@ -140,24 +143,6 @@ class AgentClient:
         )
         return response
 
-    def create_handoff_tools(self, agent: Agent) -> list[FunctionTool]:
-        handoff_tools = []
-        for handoff_agent in agent.handoffs:
-            if handoff_agent:
-                tool_name = f"transfer_to_{handoff_agent.name.replace(' ', '_').lower()}"
-
-                def create_handoff_closure(target_agent):
-                    async def handoff_tool(message: str):
-                        return target_agent, message
-                    handoff_tool.__name__ = tool_name
-                    return handoff_tool
-
-                tool = self._armory.add_tool(create_handoff_closure(handoff_agent))
-                tool.description = handoff_agent.handoff_description or f"Transfer to {handoff_agent.name}"
-                handoff_tools.append(tool)
-
-        return handoff_tools
-
     def _add_function_call_context(self, result: str, call: ResponseFunctionToolCall, message_history: list):
         function_call = ResponseFunctionToolCallParam(
             type="function_call",
@@ -175,33 +160,29 @@ class AgentClient:
         message_history.append(function_call)
         message_history.append(function_call_output)
 
-    async def run(self, agent: Agent, message_history: list, context: DuckContext) -> AgentMessage:
-        current_agent = agent
-        history = []
+    async def run(self, agent: Agent, agent_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput], context: DuckContext) -> AgentMessage:
         while True:
-            history.append(GPTMessage(role="system", content=current_agent.instructions))
-            history.append(message_history[-1])
-            response = await self.get_agent_completion(current_agent, history)
+            response = await self.get_agent_completion(agent, agent_history)
             output_item = response.output[0]
             match output_item.type:
                 case "message":
                     text_content = output_item.content[0].text
-                    return AgentMessage(agent_name=current_agent.name, content=text_content)
+                    return AgentMessage(agent_name=agent.name, content=text_content)
                 case "function_call":
                     tool_name = output_item.name
                     tool_args = output_item.arguments
 
                     tool = self._armory.get_specific_tool(tool_name)
-
                     result = await tool.on_invoke_tool(context, tool_args)
 
                     if tool_name.startswith("transfer_to_"):
-                        new_agent, message = result
-                        current_agent = new_agent
-                        history = []
-                        self._add_function_call_context(f"Handed off to {new_agent.name} with message {message}", output_item, history)
+                        new_agent = result
+                        last_message = agent_history[-1]
+                        message = last_message["content"] if "content" in last_message else f"User has requested to talk to {new_agent.name}."
+                        return AgentMessage(agent_name=new_agent.name, content=message)
                     else:
-                        self._add_function_call_context(result, output_item, message_history)
+                        # Append function call and result to history
+                        self._add_function_call_context(result, output_item, agent_history)
 
 
 class RetryableGenAI:
@@ -214,10 +195,13 @@ class RetryableGenAI:
         self._retry_config = retry_config
         self._genai = genai
 
+    def get_initial_agent(self):
+        return self._genai.get_initial_agent()
+
     async def get_completion(
             self,
             context: DuckContext,
-            message_history: list[GPTMessage],
+            message_history: list[GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput],
     ):
         max_retries = self._retry_config['max_retries']
         delay = self._retry_config['delay']
