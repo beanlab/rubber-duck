@@ -70,7 +70,7 @@ class StatsTools:
 
     @register_tool
     def explain_capabilities(self):
-        """Returns a description of the bots capabilites."""
+        """Returns a description of the bots capabilities."""
         duck_logger.debug("Used explain_capabilities")
         return (
             "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
