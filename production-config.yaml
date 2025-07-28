@@ -30,15 +30,6 @@ agents_as_tools:
         prompt_files:
           - prompts/generate-code-complexity.md
         engine: gpt-4.1
-  - tool_name: PhdDuck
-    description: |
-      This tool will scrutinize the user's design approach and require the user to provide evidence for their design decisions.
-    agents:
-      - name: PhdDuck
-        engine: gpt-4.1
-        prompt_files:
-          - prompts/phd-duck.txt
-          - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
 
 
 ducks:
