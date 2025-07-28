@@ -1,7 +1,7 @@
 # Anchors
 file_size_limit: &file_size_limit 4096 # 4KB limit
-file_type_ext: &file_type_ext
-  [
+file_type_ext:
+  &file_type_ext [
     "txt",
     "py",
     "java",
@@ -28,7 +28,7 @@ agents_as_tools:
     agents:
       - name: CodeComplexityAgent
         prompt_files:
-        - prompts/generate-code-complexity.md
+          - prompts/generate-code-complexity.md
         engine: gpt-4.1
 
 
@@ -42,7 +42,7 @@ ducks:
         - name: RubberDuck
           engine: gpt-4.1
           prompt_files:
-          - prompts/standard-rubber-duck.txt
+            - prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
       file_size_limit: *file_size_limit
@@ -240,7 +240,7 @@ servers:
                 You can also ask me questions about Big-O analysis.
               timeout: 600
               file_size_limit: 5100
-              file_type_ext: [ 'py', 'java', 'cpp', 'c', 'h', 'hpp', 'ts', 'js' ]
+              file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
               agents:
                 - name: ComplexityDuck
                   prompt: |
@@ -266,7 +266,7 @@ servers:
               agents:
                 - name: socrates
                   prompt_files:
-                  - prompts/socratic-duck.txt
+                    - prompts/socratic-duck.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
@@ -294,20 +294,21 @@ servers:
       - channel_id: 1384678077694480434
         channel_name: designer-duck
         ducks:
-          - name: designer-duck
+          - name: phd-duck
             duck_type: agent_conversation
             settings:
               introduction: |
-                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
-                I'm specialized with helping you on Project 2: Convex Hull.
-                Let's work on this together! How is data stored in your project?
+                Welcome! This is the design experience for the convex hull project. Send a message to continue.
               agents:
-                - name: DesignerDuck
+                - name: PhdDuck
                   engine: gpt-4.1
                   prompt_files:
-                  - prompts/designer-duck.txt
+                    - prompts/phd-duck.txt
+                    - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
                   max_iterations: 5
               timeout: 600
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool
@@ -335,12 +336,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [ 0.03, 0.06 ]
-    "gpt-4o": [ 0.0025, 0.01 ]
-    "gpt-4-1106-preview": [ 0.01, 0.03 ]
-    "gpt-4-0125-preview": [ 0.01, 0.03 ]
-    "o4-mini": [ 0.000150, 0.0006 ]
-    "gpt-4-turbo": [ 0.01, 0.03 ]
-    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
-    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
-    "gpt-3.5-turbo": [ 0.001, 0.003 ]
+    "gpt-4": [0.03, 0.06]
+    "gpt-4o": [0.0025, 0.01]
+    "gpt-4-1106-preview": [0.01, 0.03]
+    "gpt-4-0125-preview": [0.01, 0.03]
+    "o4-mini": [0.000150, 0.0006]
+    "gpt-4-turbo": [0.01, 0.03]
+    "gpt-4-turbo-preview": [0.01, 0.03]
+    "gpt-3.5-turbo-1106": [0.001, 0.002]
+    "gpt-3.5-turbo": [0.001, 0.003]
