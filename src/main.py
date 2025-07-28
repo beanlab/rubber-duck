@@ -1,14 +1,10 @@
 import argparse
 import asyncio
-import io
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Iterable
 
-import boto3
-import yaml  # Added import for YAML support
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
@@ -26,6 +22,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
     DUCK_NAME, DuckConfig
 from .utils.feedback_notifier import FeedbackNotifier
@@ -34,63 +31,6 @@ from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
 
-
-def fetch_config_from_s3() -> Config | None:
-    try:
-        # Initialize S3 client
-        s3 = boto3.client('s3')
-
-        # Add a section to your env file to allow for local and production environment
-        environment = os.environ.get('ENVIRONMENT')
-        if not environment or environment == 'LOCAL':
-            duck_logger.info("Using local environment")
-            return None
-
-        # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-        s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-        if not s3_path:
-            duck_logger.warning("No S3 path configured")
-            return None
-
-        # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-        bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-        duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-        duck_logger.info(f"Config key: {key}")
-
-        # Download file from S3
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-
-        # Read the content of the file and parse it as JSON
-        content = response['Body'].read().decode('utf-8')
-        config = load_config('.' + key.split('.')[-1], content)
-        duck_logger.info("Successfully loaded config from S3")
-        return config
-
-    except Exception as e:
-        duck_logger.error(f"Failed to fetch config from S3: {e}")
-        return None
-
-
-def read_yaml(content):
-    return yaml.safe_load(io.StringIO(content))
-
-
-def read_json(content):
-    return json.loads(content)
-
-
-def load_config(file_type, content):
-    if file_type == '.json':
-        return read_json(content)
-    elif file_type == '.yaml':
-        return read_yaml(content)
-    else:
-        raise NotImplementedError(f'Unsupported config extension: {file_type}')
-
-
-def load_local_config(config_path: Path):
-    return load_config(config_path.suffix, config_path.read_text())
 
 
 def setup_workflow_manager(
@@ -353,14 +293,6 @@ if __name__ == '__main__':
     # Add console handler to the duck logger
     add_console_handler()
 
-    config = None
-    if args.config.startswith('s3://'):
-        os.environ['CONFIG_FILE_S3_PATH'] = args.config
-        config = fetch_config_from_s3()
-    else:
-        config = load_local_config(Path(args.config))
-
-    if config is None:
-        raise RuntimeError("Failed to load configuration from S3 or local file.")
+    config: Config = load_configuration(args.config)
 
     asyncio.run(main(config, args.log_path))
