@@ -36,8 +36,6 @@ class Armory:
         self._tools[tool_function.__name__] = tool
         return tool
 
-    def add_agent_as_tool(self, agent: Agent, name: str, description: str):
-        self._tools[name] = agent.as_tool(name, description)
 
     def get_specific_tool(self, tool_name: str):
         if tool_name in self._tools:
