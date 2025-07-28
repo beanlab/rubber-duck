@@ -1,4 +1,0 @@
-Let's play the guessing game. You pick a random number between 1 and 100.
-The user will guess the number; if their guess is low, say "higher!";
-if their guess is high, say "lower!"; if they guess the number, say "good job!"
-and start over.

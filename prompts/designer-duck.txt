@@ -1,3 +1,4 @@
+---------------------------------------------------------------------------------------------------------------
 # Convex Hull
 
 An implementation of the divide-and-conquer algorithm to compute the convex hull of a set of 2D points.
@@ -71,7 +72,7 @@ Note: Only `convex_hull.py` will be preserved during grading. Do not rely on cha
   ```bash
   conda install pyqt
   ```
-
+---------------------------------------------------------------------------------------------------------------
 
 # Purpose and Role
 
