@@ -90,11 +90,11 @@ class StatsTools:
         return f"Available datasets: {', '.join(datasets)}"
 
     @register_tool
-    async def get_variable_names(self, dataset: str) -> str:
-        """Returns a list of all variable names in the dataset."""
+    def get_variable_names(self, dataset: str) -> str:
+        """Returns a list of all variable/column names in the dataset."""
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
         data = self._datastore.get_dataset(dataset)
-        return f"Variable names in {dataset}: {', '.join(data)}"
+        return f"Variable names in {dataset}: {', '.join(data.columns)}"
 
     @register_tool
     @sends_image
@@ -146,7 +146,6 @@ class StatsTools:
 
         return name, buf.read()
 
-    # Tools for dataset statistics and visualizations
     @register_tool
     @sends_image
     @cache_result

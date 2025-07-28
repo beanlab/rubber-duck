@@ -61,6 +61,7 @@ class SingleAgentSettings(TypedDict):
     tools: list[str]
     handoff_prompt: str
     handoffs: list[str]
+    tool_required: NotRequired[bool]
 
 
 class MultiAgentSettings(TypedDict):
