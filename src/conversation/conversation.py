@@ -1,5 +1,7 @@
 import asyncio
 
+from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
 from quest import step, queue
 
 from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
@@ -8,12 +10,13 @@ from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
+HistoryItem =  GPTMessage | ResponseFunctionToolCallParam | FunctionCallOutput
 
 class BasicSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
 
-    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[GPTMessage]:
+    async def __call__(self, thread_id: int, prompt: str, initial_message: Message) -> list[HistoryItem]:
         message_history = [GPTMessage(role='system', content=prompt)]
         user_id = initial_message['author_id']
         guild_id = initial_message['guild_id']
@@ -27,7 +30,7 @@ class AgentSetupConversation:
     def __init__(self, record_message):
         self._record_message = step(record_message)
 
-    async def __call__(self, thread_id: int, initial_message: Message) -> list[GPTMessage]:
+    async def __call__(self, thread_id: int, initial_message: Message) -> list[HistoryItem]:
         message_history = [GPTMessage(role='system',
                                       content="Introduce yourself and what you can do to the user using the talk_to_user tool"),
                            GPTMessage(role='user', content="Hi")]
@@ -64,6 +67,8 @@ class AgentConversation:
         self._introduction = introduction
         self._ai_clients = ai_agents
         self._starting_agent = starting_agent
+        self._agent_histories = {}
+
 
         self._record_message = step(record_message)
 
@@ -82,7 +87,7 @@ class AgentConversation:
             self,
             context: DuckContext,
             agent_name: str,
-            message_history: list[GPTMessage]
+            message_history: list[HistoryItem]
     ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
         duck_logger.debug(f"Processing with agent: {agent_name} (Thread: {context.thread_id})")
@@ -97,21 +102,28 @@ class AgentConversation:
             return agent_name, f"Sent file: {file['filename']}"
 
         if content := response.get('content'):
-            await self._send_message(context.thread_id, content)
-            # Log if the agent decided to hand off to another agent
             if response['agent_name'] != agent_name:
-                duck_logger.info(f"Agent {agent_name} decided to hand off to {response['agent_name']} (Thread: {context.thread_id})")
-            return response['agent_name'], content
+                duck_logger.debug("Agent handoff detected, switching to new agent: %s", response['agent_name'])
+                if response['agent_name'] not in self._agent_histories:
+                    actual_agent = self._ai_clients[response['agent_name']].get_initial_agent()
+                    self._agent_histories[response['agent_name']] = [
+                        GPTMessage(role='system', content=actual_agent.instructions),
+                        GPTMessage(role='user', content=content)
+                    ]
+                else:
+                    self._agent_histories[response['agent_name']].append(
+                        GPTMessage(role='user', content=content))
+                return await self._get_and_send_ai_response(context, response['agent_name'], self._agent_histories[response['agent_name']])
+
+            else:
+                await self._send_message(context.thread_id, content)
+                return response['agent_name'], content
 
         raise NotImplementedError(f'AI completion had neither content nor file.')
 
     async def __call__(self, context: DuckContext):
 
         agent_name = self._starting_agent
-        message_history = []
-
-        # Reset previous agent name for new conversation
-        self._previous_agent_name = None
 
         duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
@@ -120,7 +132,11 @@ class AgentConversation:
 
         async with queue('messages', None) as messages:
             while True:
-                try:  # catch GenAIException
+                try:
+                    if agent_name not in self._agent_histories:
+                        actual_agent = self._ai_clients[agent_name].get_initial_agent()
+                        self._agent_histories[agent_name] = [
+                            GPTMessage(role='system', content=actual_agent.instructions)]
                     try:  # Timeout
                         message: Message = await asyncio.wait_for(
                             messages.get(),
@@ -131,56 +147,19 @@ class AgentConversation:
                         break
 
                     if message['content']:
-                        message_history.append(GPTMessage(role='user', content=message['content']))
+                        self._agent_histories[agent_name].append(GPTMessage(role='user', content=message['content']))
                         await self._record_message(
-                            context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
-                            message_history[-1]['content']
+                            context.guild_id, context.thread_id, context.author_id, self._agent_histories[agent_name][-1]['role'],
+                            self._agent_histories[agent_name][-1]['content']
                         )
 
-                    errors = []
-                    for attachment in message['files']:
-                        if attachment['size'] > self._file_size_limit:
-                            errors.append(
-                                f"File {attachment['filename']} is too large. "
-                                f"Please upload a file smaller than {self._file_size_limit / 1024 / 1024:.2f} MB."
-                            )
-                            continue
-
-                        if attachment['filename'].split('.')[-1] not in self._file_type_ext:
-                            errors.append(
-                                f"File {attachment['filename']} is not an allowed type. "
-                                f"Allowed types are: {', '.join(self._file_type_ext)}."
-                            )
-                            continue
-
-                        file_content = await self._read_url(attachment['url'])
-                        if file_content:
-                            file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
-                            message_history.append(GPTMessage(role='user', content=file_content))
-                            await self._record_message(
-                                context.guild_id, context.thread_id, context.author_id, "user", file_content
-                            )
-
-                    if errors:
-                        message_history.append(GPTMessage(role='assistant', content='\n'.join(errors)))
-                        await self._send_message(context.thread_id, '\n'.join(errors))
-                        continue  # wait for the user to respond
-
-                    agent_name, response = await self._get_and_send_ai_response(
+                    agent_name, response= await self._get_and_send_ai_response(
                         context,
                         agent_name,
-                        message_history
+                        self._agent_histories[agent_name]
                     )
 
-                    # Log agent handoff if the agent changed
-                    if hasattr(self, '_previous_agent_name') and self._previous_agent_name != agent_name:
-                        duck_logger.debug(f"Agent handoff: {self._previous_agent_name} -> {agent_name}")
-                    elif not hasattr(self, '_previous_agent_name'):
-                        duck_logger.debug(f"Starting with agent: {agent_name} (Thread: {context.thread_id})")
-                    
-                    self._previous_agent_name = agent_name
-
-                    message_history.append(GPTMessage(role='assistant', content=response))
+                    self._agent_histories[agent_name].append(GPTMessage(role='assistant', content=response))
 
                 except GenAIException:
                     await self._send_message(context.thread_id,

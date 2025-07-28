@@ -34,9 +34,8 @@ class Armory:
         tool = function_tool(tool_function)
 
         self._tools[tool_function.__name__] = tool
+        return tool
 
-    def add_agent_as_tool(self, agent: Agent, name: str, description: str):
-        self._tools[name] = agent.as_tool(name, description)
 
     def get_specific_tool(self, tool_name: str):
         if tool_name in self._tools:
@@ -77,7 +76,7 @@ class Armory:
                 result = func(**call_args)
 
             name, _ = result
-            await self.send_message(wrapper_arg.context.thread_id, file=result)
+            await self.send_message(wrapper_arg.thread_id, file=result)
             return name
 
         wrapper.__signature__ = new_sig

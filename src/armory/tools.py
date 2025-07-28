@@ -4,7 +4,7 @@ _tools: dict[str, FunctionTool] = {}
 
 
 def register_tool(func):
-    setattr(func, "is_tool", True)
+    func.is_tool = True
     return func
 
 
