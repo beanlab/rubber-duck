@@ -20,8 +20,10 @@ def fetch_config_from_s3() -> Config | None:
         # Add a section to your env file to allow for local and production environment
         environment = os.environ.get('ENVIRONMENT')
         if not environment or environment == 'LOCAL':
-            duck_logger.info("Using local environment")
+            duck_logger.info("Using LOCAL environment")
             return None
+        else:
+            duck_logger.info(f"Using PRODUCTION environment")
 
         # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
         s3_path = os.environ.get('CONFIG_FILE_S3_PATH')

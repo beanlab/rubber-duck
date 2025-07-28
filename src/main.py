@@ -270,7 +270,7 @@ async def main(config: Config, log_dir: Path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, default='config.json', help='Path to config file (.json or .yaml, or s3://...)')
+    parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
 
