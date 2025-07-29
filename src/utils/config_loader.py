@@ -79,13 +79,10 @@ def load_local_config(config_path: Path) -> Config:
 
 def load_configuration(config_arg: str | None = None) -> Config:
     """
-    Load configuration with fallback logic:
     1. Check command line argument
     2. Check environment variable CONFIG_FILE_S3_PATH
-    3. Fall back to default config.json
-    4. Handle S3 and local file loading with proper error handling
+    3. Handle S3 and local file loading with proper error handling
     """
-    # Determine config path using match-case
     match (config_arg, os.environ.get('CONFIG_FILE_S3_PATH')):
         case (arg, _) if arg:
             config_path = arg
@@ -95,7 +92,6 @@ def load_configuration(config_arg: str | None = None) -> Config:
             config_path = 'config.json'
     
     try:
-        # Handle different path types using match-case
         match config_path:
             case path if path.startswith('s3://'):
                 config = fetch_config_from_s3()
@@ -108,6 +104,5 @@ def load_configuration(config_arg: str | None = None) -> Config:
                     raise RuntimeError(f"Failed to load configuration from local file: {path}")
                 return config
             
-    except Exception as e:
-        duck_logger.error(f"Configuration loading failed: {e}")
-        raise RuntimeError(f"Failed to load configuration from {config_path}: {e}") 
+    except Exception:
+        raise
