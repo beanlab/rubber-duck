@@ -1,6 +1,6 @@
-from agents import FunctionTool
+from typing import Callable
 
-_tools: dict[str, FunctionTool] = {}
+_tools: dict[str, Callable] = {}
 
 
 def register_tool(func):

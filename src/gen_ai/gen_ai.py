@@ -5,14 +5,38 @@ from typing import TypedDict, Protocol
 
 from agents import Agent, Runner, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, api_key, OpenAI
+from openai.types.responses import Response, ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput, Message
 from quest import step
 
+from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
 
 Sendable = str | tuple[str, BytesIO]
+
+class AgentClients:
+    def __init__(self, armory: Armory):
+        self._armory = armory
+        self._client = OpenAI(api_key="OPENAI_API_KEY")
+
+    def get_completion(self, prompt: str, history: list[Message | FunctionCallOutput | ResponseFunctionToolCallParam], tools: list[str]) -> Response:
+        tools_json = []
+        for tool in tools:
+            tools_json.append(self._armory.get_specific_tool(tool))
+
+        return self._client.responses.create(
+            model="gpt-4",
+            input= history,
+            tools=tools
+        )
+
+    def run(self, prompt: str, tools: list[str]):
+        history = []
+        while True:
+            response = self.get_completion(prompt, history, tools)
 
 
 class GenAIClient(Protocol):
