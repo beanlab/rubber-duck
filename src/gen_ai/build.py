@@ -51,10 +51,10 @@ def _build_agent(
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 
-    tool_required = config.get("tool_required", False)
+    tool_required = config.get("tool_required", "")
     if tool_required:
         model_settings = ModelSettings(
-            tool_choice="required"
+            tool_choice=tool_required
         )
     else:
         model_settings = ModelSettings(

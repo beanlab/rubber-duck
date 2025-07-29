@@ -28,4 +28,12 @@ Can you show me a histogram of engine sizes?
 **PlottingAgent:**
  - Uses the plotting tool to generate the histogram.
  - Tool sends the image directly to the user.
-"his.png"
+ - Outputs "Cars_EngineSize_histogram.png"
+
+**User:**
+Can you show me a pie chart of amount of sodium?
+
+**PlottingAgent:**
+ - Uses the plotting tool to generate the pie chart.
+ - Recognizes that amount of sodium is a numeric variable.
+ - Outputs "Amount of sodium is a numeric variable, so a pie chart is not appropriate. Would you like a histogram instead?"
