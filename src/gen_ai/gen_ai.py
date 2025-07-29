@@ -22,21 +22,23 @@ class AgentClients:
         self._armory = armory
         self._client = OpenAI(api_key="OPENAI_API_KEY")
 
-    def get_completion(self, prompt: str, history: list[Message | FunctionCallOutput | ResponseFunctionToolCallParam], tools: list[str]) -> Response:
+    def get_completion(self, prompt: str, history: list[Message | FunctionCallOutput | ResponseFunctionToolCallParam], tools: list[str], context) -> Response:
         tools_json = []
         for tool in tools:
-            tools_json.append(self._armory.get_specific_tool(tool))
+            tool_schema, _ = self._armory.get_tool_schema(tool)
 
         return self._client.responses.create(
             model="gpt-4",
+            instructions=prompt,
             input= history,
-            tools=tools
+            tools=tools_json
         )
 
-    def run(self, prompt: str, tools: list[str]):
+    def run(self, prompt: str, tools: list[str], context: DuckContext):
         history = []
         while True:
-            response = self.get_completion(prompt, history, tools)
+            response = self.get_completion(prompt, history, tools, context)
+            output_item = response.output[0]
 
 
 class GenAIClient(Protocol):

@@ -1,18 +1,13 @@
-import inspect
-from inspect import Parameter
-from functools import wraps
 from typing import Callable
 
-
-from ..utils.config_types import DuckContext
+from .tools import generate_openai_function_schema, get_needs_context
 
 
 class Armory:
+
     def __init__(self, send_message):
         self._tools: dict[str, Callable] = {}
         self.send_message = send_message
-
-    def
 
     def scrub_tools(self, tool_instance: object):
         for attr_name in dir(tool_instance):
@@ -35,6 +30,14 @@ class Armory:
         if tool_name in self._tools:
             return self._tools[tool_name]
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
+
+    def get_tool_schema(self, tool_name: str) -> dict:
+        tool_function = self.get_specific_tool(tool_name)
+        return generate_openai_function_schema(tool_function)
+
+    def get_tool_needs_context(self, tool_name: str) -> bool:
+        tool_function = self.get_specific_tool(tool_name)
+        return get_needs_context(tool_function)
 
     def get_all_tool_names(self):
         return list(self._tools.keys())
