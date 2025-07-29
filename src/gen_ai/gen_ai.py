@@ -1,4 +1,6 @@
 import asyncio
+import inspect
+import json
 import logging
 from io import BytesIO
 from typing import TypedDict, Protocol
@@ -34,11 +36,34 @@ class AgentClients:
             tools=tools_json
         )
 
-    def run(self, prompt: str, tools: list[str], context: DuckContext):
+    async def run(self, prompt: str, tools: list[str], context: DuckContext):
         history = []
         while True:
             response = self.get_completion(prompt, history, tools, context)
             output_item = response.output[0]
+            match output_item.type:
+                case "function_call":
+                    tool_name = output_item.name
+                    raw_args = output_item.arguments  # JSON string
+                    tool_args = json.loads(raw_args)  # Dict
+
+                    tool = self._armory.get_specific_tool(tool_name)
+                    needs_context = self._armory.get_tool_needs_context(tool_name)
+
+                    if inspect.iscoroutinefunction(tool):
+                        if needs_context:
+                            value = await tool(context, **tool_args)
+                        else:
+                            value = await tool(**tool_args)
+                    else:
+                        if needs_context:
+                            value = tool(context, **tool_args)
+                        else:
+                            value = tool(**tool_args)
+
+                case "message":
+                    text_content = output_item.content[0].text
+                    return AgentMessage(agent_name=agent.name, content=text_content)
 
 
 class GenAIClient(Protocol):
