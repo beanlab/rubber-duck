@@ -2,7 +2,7 @@ import asyncio
 
 from quest import step, queue
 
-from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient, Agent
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
 from ..utils.logger import duck_logger
@@ -48,8 +48,7 @@ class AgentConversation:
     def __init__(self,
                  name: str,
                  introduction: str,
-                 ai_agents: dict[str, GenAIClient],
-                 starting_agent: str,
+                 ai_agent: Agent,
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
@@ -62,8 +61,8 @@ class AgentConversation:
         self.name = name
 
         self._introduction = introduction
-        self._ai_clients = ai_agents
-        self._starting_agent = starting_agent
+
+        self._ai_agent = ai_agent
 
         self._record_message = step(record_message)
 
@@ -76,21 +75,15 @@ class AgentConversation:
         self._file_size_limit = file_size_limit
         self._file_type_ext = file_type_ext or []
 
-# Make a read function in discord bot that will read files.
+
     @step
     async def _get_and_send_ai_response(
             self,
             context: DuckContext,
-            agent_name: str,
             message_history: list[GPTMessage]
     ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
-        duck_logger.debug(f"Processing with agent: {agent_name} (Thread: {context.thread_id})")
-
-        response: AgentMessage = await self._ai_clients[agent_name].get_completion(
-            context,
-            message_history,
-        )
+        response: AgentMessage = await self._ai_agent.run(context, )
 
         if file := response.get('file'):
             await self._send_message(context.thread_id, file=file)
@@ -107,11 +100,7 @@ class AgentConversation:
 
     async def __call__(self, context: DuckContext):
 
-        agent_name = self._starting_agent
         message_history = []
-
-        # Reset previous agent name for new conversation
-        self._previous_agent_name = None
 
         duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
@@ -164,11 +153,10 @@ class AgentConversation:
                     if errors:
                         message_history.append(GPTMessage(role='assistant', content='\n'.join(errors)))
                         await self._send_message(context.thread_id, '\n'.join(errors))
-                        continue  # wait for the user to respond
+                        continue
 
                     agent_name, response = await self._get_and_send_ai_response(
                         context,
-                        agent_name,
                         message_history
                     )
 

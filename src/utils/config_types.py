@@ -56,11 +56,12 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
+    tools: list[str]
+    handoffs: NotRequired[list[str]]
+    max_iterations: NotRequired[int]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
-    tools: list[str]
-    handoff_prompt: str
-    handoffs: list[str]
+
 
 
 class MultiAgentSettings(TypedDict):

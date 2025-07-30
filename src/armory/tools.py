@@ -1,6 +1,9 @@
 
 import inspect
 from typing import Any, Callable, get_type_hints, get_origin, get_args, Literal
+
+from openai.types.responses import FunctionToolParam
+
 _tools: dict[str, Callable] = {}
 
 
@@ -30,7 +33,7 @@ def get_strict_json_schema_type(annotation) -> dict:
 
 def generate_openai_function_schema(
     func: Callable[..., Any]
-) -> dict:
+) -> FunctionToolParam:
     sig = inspect.signature(func)
     type_hints = get_type_hints(func)
 
@@ -57,14 +60,17 @@ def generate_openai_function_schema(
 
         params[name] = schema_entry
 
-    function_schema = {
+    function_schema: FunctionToolParam = {
+        "type": "function",
         "name": func.__name__,
         "description": func.__doc__ or "",
         "parameters": {
             "type": "object",
             "properties": params,
             "required": required
-        }
+        },
+        "strict": True,
+
     }
 
     return function_schema

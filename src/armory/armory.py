@@ -1,5 +1,7 @@
 from typing import Callable
 
+from openai.types.responses import FunctionToolParam
+
 from .tools import generate_openai_function_schema, get_needs_context
 
 
@@ -10,6 +12,17 @@ class Armory:
         self.send_message = send_message
 
     def scrub_tools(self, tool_instance: object):
+        if hasattr(tool_instance, "run") and hasattr(tool_instance, "get_name") and hasattr(tool_instance, "get_description"):
+            name = tool_instance.get_name()
+            description = tool_instance.get_description()
+
+            async def agent_runner(ctx, query, _agent=tool_instance):
+                return await _agent.run(ctx, query)
+
+            agent_runner.__name__ = f"run_{name}"
+            agent_runner.__doc__ = description
+            self.add_tool(agent_runner)
+
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue
@@ -31,7 +44,7 @@ class Armory:
             return self._tools[tool_name]
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
 
-    def get_tool_schema(self, tool_name: str) -> dict:
+    def get_tool_schema(self, tool_name: str) -> FunctionToolParam:
         tool_function = self.get_specific_tool(tool_name)
         return generate_openai_function_schema(tool_function)
 
