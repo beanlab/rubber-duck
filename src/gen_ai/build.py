@@ -38,9 +38,8 @@ def _build_agents(
         settings: list[SingleAgentSettings],
         armory: Armory,
         starting_agent: str
-) -> dict[str, tuple[Agent, SingleAgentSettings]]:
+) -> Agent:
     agents = {}
-
     # Initial agent setup
     for agent_settings in settings:
         agent = _build_agent(agent_settings, armory)
@@ -73,7 +72,6 @@ def build_agent_conversation_duck(
         config: Config,
         settings: AgentConversationSettings,
         bot,
-        record_message: RecordMessage
 ) -> DuckConversation:
     armory = _get_armory(config, bot.send_message)
     starting_agent = settings.get('starting_agent')

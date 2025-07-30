@@ -111,7 +111,7 @@ class Agent:
             output=str(result)
         ))
 
-    async def run(self, ctx: DuckContext, query: str) -> str:
+    async def run(self, ctx: DuckContext, query: str) -> AgentMessage:
         history = [GPTMessage(role="user", content=query)]
         iterations = 0
         while iterations < self._max_iterations:
@@ -133,6 +133,9 @@ class Agent:
                     self._add_function_call_context(value, output_item, history)
 
                 case "message":
-                    return output_item.content[0].text
+                    return AgentMessage(agent_name=self._name, content=output_item.content[0].text)
 
-        return f"Agent '{self._name}' reached maximum iterations ({self._max_iterations}) without completion."
+        return AgentMessage(
+            agent_name=self._name,
+            content="I have reached the maximum number of iterations without a valid response."
+        )
