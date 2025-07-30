@@ -127,6 +127,10 @@ class Agent:
             match output_item.type:
                 case "function_call":
                     tool_name = output_item.name
+
+                    if tool_name.startswith("run_"):
+                        duck_logger.debug(f"Agent {self._name} is calling a handoff tool: {tool_name}")
+
                     tool_args = json.loads(output_item.arguments)
                     tool = self._armory.get_specific_tool(tool_name)
                     needs_context = self._armory.get_tool_needs_context(tool_name)

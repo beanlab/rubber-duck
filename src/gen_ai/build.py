@@ -4,6 +4,7 @@ from .gen_ai import RecordMessage, Agent
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
+from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config
@@ -68,6 +69,9 @@ def _get_armory(config: Config, send_message) -> Armory:
             _armory.scrub_tools(stat_tools)
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
+
+        talk_tool = TalkTool(send_message, 30)
+        _armory.scrub_tools(talk_tool)
 
     return _armory
 
