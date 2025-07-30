@@ -3,6 +3,7 @@ from typing import Callable
 from openai.types.responses import FunctionToolParam
 
 from .tools import generate_openai_function_schema, get_needs_context
+from ..utils.config_types import DuckContext
 
 
 class Armory:
@@ -11,18 +12,19 @@ class Armory:
         self._tools: dict[str, Callable] = {}
         self.send_message = send_message
 
+    def scrub_agent(self, agent_instance: object) -> str:
+        name = agent_instance.get_name()
+        description = agent_instance.get_description()
+
+        async def agent_runner(ctx: DuckContext, query: str):
+            return await agent_instance.run(ctx, query)
+
+        function_name = f"run_{name}"
+        agent_runner.__name__ = function_name
+        agent_runner.__doc__ = description
+        self.add_tool(agent_runner)
+
     def scrub_tools(self, tool_instance: object):
-        if hasattr(tool_instance, "run") and hasattr(tool_instance, "get_name") and hasattr(tool_instance, "get_description"):
-            name = tool_instance.get_name()
-            description = tool_instance.get_description()
-
-            async def agent_runner(ctx, query, _agent=tool_instance):
-                return await _agent.run(ctx, query)
-
-            agent_runner.__name__ = f"run_{name}"
-            agent_runner.__doc__ = description
-            self.add_tool(agent_runner)
-
         for attr_name in dir(tool_instance):
             if attr_name.startswith("_"):
                 continue

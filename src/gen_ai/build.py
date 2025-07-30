@@ -24,15 +24,15 @@ def _build_agent(
 
     agent = Agent(
         name=config["name"],
+        description=config["description"],
         prompt=prompt,
-        tools=config["tools"],
+        tools=[tool for tool in config["tools"] if not tool.startswith("run_")],
         model=config["engine"],
         armory=armory,
         max_iterations=config.get('max_iterations', 10),
     )
-    armory.scrub_tools(agent)
+    armory.scrub_agent(agent)
     return agent
-
 
 def _build_agents(
         settings: list[SingleAgentSettings],
@@ -40,11 +40,16 @@ def _build_agents(
         starting_agent: str
 ) -> Agent:
     agents = {}
-    # Initial agent setup
+
     for agent_settings in settings:
         agent = _build_agent(agent_settings, armory)
-        agents[agent_settings['name']] = agent, agent_settings
+        agents[agent_settings['name']] = agent
 
+    for agent_settings in settings:
+        agent = agents[agent_settings['name']]
+        handoffs = [tool for tool in agent_settings.get('tools', []) if tool.startswith("run_")]
+        for handoff in handoffs:
+            agent.add_tool(handoff)
     return agents[starting_agent]
 
 
@@ -71,6 +76,7 @@ def build_agent_conversation_duck(
         name: str,
         config: Config,
         settings: AgentConversationSettings,
+        record_message: RecordMessage,
         bot,
 ) -> DuckConversation:
     armory = _get_armory(config, bot.send_message)

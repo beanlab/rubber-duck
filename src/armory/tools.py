@@ -19,8 +19,16 @@ def sends_image(func):
 def get_strict_json_schema_type(annotation) -> dict:
     origin = get_origin(annotation) or annotation
 
-    if origin in [str, int, float, bool]:
-        return {"type": origin.__name__}
+    # Map Python types to JSON Schema types
+    type_map = {
+        str: "string",
+        int: "integer",
+        float: "number",
+        bool: "boolean",
+    }
+
+    if origin in type_map:
+        return {"type": type_map[origin]}
 
     if origin is Literal:
         values = get_args(annotation)
@@ -31,17 +39,16 @@ def get_strict_json_schema_type(annotation) -> dict:
 
     raise TypeError(f"Unsupported parameter type: {annotation}")
 
-def generate_openai_function_schema(
-    func: Callable[..., Any]
-) -> FunctionToolParam:
+
+def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
     sig = inspect.signature(func)
     type_hints = get_type_hints(func)
 
     params = {}
     required = []
 
-    for i, (name, param) in enumerate(sig.parameters.items()):
-        if name == "self":
+    for name, param in sig.parameters.items():
+        if name in {"self", "ctx"}:
             continue
 
         ann = type_hints.get(name, param.annotation)
@@ -67,13 +74,14 @@ def generate_openai_function_schema(
         "parameters": {
             "type": "object",
             "properties": params,
-            "required": required
+            "required": required,
+            "additionalProperties": False,
         },
         "strict": True,
-
     }
 
     return function_schema
+
 
 def get_needs_context(tool_function: Callable) -> bool:
     sig = inspect.signature(tool_function)

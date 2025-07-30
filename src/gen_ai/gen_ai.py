@@ -16,6 +16,7 @@ from ..armory.tools import register_tool
 from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import IndicateTyping, SendMessage
+from ..utils.validation import is_agent_message
 
 Sendable = str | tuple[str, BytesIO]
 
@@ -89,6 +90,11 @@ class Agent:
     def get_description(self) -> str:
         return self._description
 
+    def add_tool(self, tool: str):
+        if tool not in self._tools:
+            self._tools.append(tool)
+            self._tools_json.append(self._armory.get_tool_schema(tool))
+
     def _get_completion(self, history: list[GPTMessage | FunctionCallOutput | ResponseFunctionToolCallParam]) -> Response:
         return self._client.responses.create(
             model=self._model,
@@ -130,7 +136,10 @@ class Agent:
                     else:
                         value = tool(ctx, **tool_args) if needs_context else tool(**tool_args)
 
-                    self._add_function_call_context(value, output_item, history)
+                    if is_agent_message(value):
+                        return value
+                    else:
+                        self._add_function_call_context(value, output_item, history)
 
                 case "message":
                     return AgentMessage(agent_name=self._name, content=output_item.content[0].text)

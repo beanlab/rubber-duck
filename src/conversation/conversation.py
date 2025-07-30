@@ -85,7 +85,7 @@ class AgentConversation:
 
         response: AgentMessage = await self._ai_agent.run(context, user_message)
 
-        content= response.get("content")
+        content= response.content
         await self._send_message(context.thread_id, content)
         return content
 
