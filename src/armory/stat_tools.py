@@ -74,12 +74,15 @@ class StatsTools:
         duck_logger.debug("Used explain_capabilities")
         return (
             "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
-            "- Generate visualizations: histograms, boxplots, dotplots, barplots, pie charts, and proportion barplots.\n"
-            "- Compute statistics: mean, median, mode (via KDE), standard deviation, skewness, and five-number summaries.\n"
-            "- Summarize categorical data with frequency tables and proportions.\n"
-            "- List available datasets and variable names within datasets.\n"
-            "- Provide descriptions and metadata for datasets.\n\n"
-            "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
+            "- Generate a variety of visualizations such as histograms, boxplots, dotplots, barplots, pie charts, proportion barplots, and normal distribution plots.\n"
+            "- Compute key summary statistics including mean, median, mode, standard deviation, skewness, five-number summaries, and z-scores.\n"
+            "- Summarize categorical data using frequency tables and proportion calculations.\n"
+            "- Perform statistical inference such as confidence intervals, t-tests, ANOVA, and proportion z-tests.\n"
+            "- Calculate probabilities and percentiles from the normal distribution.\n"
+            "- Provide descriptions and metadata for datasets, including variable names and dataset previews.\n"
+            "- Support both numeric and categorical data, and handle mismatched data types with informative messages.\n"
+            "- List available datasets and explore the variables they contain.\n"
+            "- Explain its own capabilities and how they relate to user queries."
         )
 
     @register_tool
