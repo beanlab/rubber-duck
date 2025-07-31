@@ -2,7 +2,7 @@ from typing import Callable
 
 from openai.types.responses import FunctionToolParam
 
-from .tools import generate_openai_function_schema, get_needs_context
+from .tools import generate_openai_function_schema, needs_context, needs_history
 from ..utils.config_types import DuckContext
 
 
@@ -16,8 +16,8 @@ class Armory:
         name = agent_instance.get_name()
         description = agent_instance.get_description()
 
-        async def agent_runner(ctx: DuckContext, query: str):
-            return await agent_instance.run(ctx, query)
+        async def agent_runner(ctx: DuckContext, message_history: list):
+            return await agent_instance.run(ctx, message_history)
 
         function_name = f"run_{name}"
         agent_runner.__name__ = function_name
@@ -52,7 +52,11 @@ class Armory:
 
     def get_tool_needs_context(self, tool_name: str) -> bool:
         tool_function = self.get_specific_tool(tool_name)
-        return get_needs_context(tool_function)
+        return needs_context(tool_function)
+
+    def get_tool_needs_history(self, tool_name: str) -> bool:
+        tool_function = self.get_specific_tool(tool_name)
+        return needs_history(tool_function)
 
     def get_all_tool_names(self):
         return list(self._tools.keys())

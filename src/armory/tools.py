@@ -48,7 +48,7 @@ def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolPar
     required = []
 
     for name, param in sig.parameters.items():
-        if name in {"self", "ctx"}:
+        if name in {"self", "ctx", "message_history"}:
             continue
 
         ann = type_hints.get(name, param.annotation)
@@ -83,10 +83,18 @@ def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolPar
     return function_schema
 
 
-def get_needs_context(tool_function: Callable) -> bool:
+def needs_context(tool_function: Callable) -> bool:
     sig = inspect.signature(tool_function)
     params = list(sig.parameters.values())
     if not params:
         return False
     first_param_name = params[0].name
     return first_param_name in ("ctx", "context")
+
+def needs_history(tool_function: Callable) -> bool:
+    sig = inspect.signature(tool_function)
+    params = list(sig.parameters.values())
+    if not params:
+        return False
+    second_param_name = params[1].name
+    return second_param_name in ("message_history", "history")

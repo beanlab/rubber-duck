@@ -80,10 +80,10 @@ class AgentConversation:
     async def _get_and_send_ai_response(
             self,
             context: DuckContext,
-            user_message: str
+            message_history: list
     ) -> str:
 
-        response: AgentMessage = await self._ai_agent.run(context, user_message)
+        response: AgentMessage = await self._ai_agent.run(context, message_history)
 
         content= response.content
         await self._send_message(context.thread_id, content)
@@ -119,7 +119,7 @@ class AgentConversation:
 
                     response = await self._get_and_send_ai_response(
                         context,
-                        message["content"]
+                        message_history
                     )
 
                     message_history.append(GPTMessage(role='assistant', content=response))

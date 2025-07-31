@@ -14,7 +14,7 @@ class TalkTool:
 
     @register_tool
     async def talk_to_user(self, ctx: DuckContext, query: str) -> str:
-        self.send_message(ctx.thread_id, query)
+        await self.send_message(ctx.thread_id, query)
         async with queue('messages', None) as messages:
             try:
                 message: Message = await asyncio.wait_for(
@@ -24,4 +24,4 @@ class TalkTool:
                 return message['content']
 
             except asyncio.TimeoutError:
-                self.send_message(ctx.thread_id, "Conversation timed out. Please try again.")
+                await self.send_message(ctx.thread_id, "Conversation timed out. Please try again.")

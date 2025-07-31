@@ -1,3 +1,4 @@
+import copy
 import inspect
 import json
 import os
@@ -117,13 +118,18 @@ class Agent:
             output=str(result)
         ))
 
-    async def run(self, ctx: DuckContext, query: str) -> AgentMessage:
-        history = [GPTMessage(role="user", content=query)]
+    async def run(self, ctx: DuckContext, message_history: list) -> AgentMessage:
+        """
+        This method runs a new agent.
+        """
+        history = message_history
         iterations = 0
+
         while iterations < self._max_iterations:
             iterations += 1
             response = self._get_completion(history)
             output_item = response.output[0]
+
             match output_item.type:
                 case "function_call":
                     tool_name = output_item.name
@@ -134,11 +140,18 @@ class Agent:
                     tool_args = json.loads(output_item.arguments)
                     tool = self._armory.get_specific_tool(tool_name)
                     needs_context = self._armory.get_tool_needs_context(tool_name)
+                    needs_history = self._armory.get_tool_needs_history(tool_name)
+
+                    call_args = []
+                    if needs_context:
+                        call_args.append(ctx)
+                    if needs_history:
+                        call_args.append(history)
 
                     if inspect.iscoroutinefunction(tool):
-                        value = await tool(ctx, **tool_args) if needs_context else await tool(**tool_args)
+                        value = await tool(*call_args, **tool_args)
                     else:
-                        value = tool(ctx, **tool_args) if needs_context else tool(**tool_args)
+                        value = tool(*call_args, **tool_args)
 
                     if is_agent_message(value):
                         return value
