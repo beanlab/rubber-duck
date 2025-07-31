@@ -1,16 +1,18 @@
-import asyncio
-import logging
+import inspect
+import json
+import os
 from io import BytesIO
 from typing import TypedDict, Protocol
 
-from agents import Agent, Runner, ToolCallOutputItem
+from agents import ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
-from quest import step
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
+from openai.types.responses import Response, ResponseFunctionToolCallParam, ResponseFunctionToolCall, FunctionToolParam
+from openai.types.responses.response_input_item import FunctionCallOutput
 
-from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
-from ..utils.logger import duck_logger
-from ..utils.protocols import IndicateTyping, SendMessage
+from ..armory.armory import Armory
+from ..utils.config_types import DuckContext, AgentMessage, GPTMessage
+from ..utils.validation import is_agent_message
 
 Sendable = str | tuple[str, BytesIO]
 
@@ -66,91 +68,90 @@ def _result_to_agent_message(result):
             content=result.final_output
         )
 
+class Agent:
+    def __init__(self, name: str, description: str, prompt: str, model: str, tools: list[str], armory: Armory, max_iterations: int = 10):
+        self._name = name
+        self._description = description
+        self._prompt = prompt
+        self._model = model
+        self._tools = tools
+        self._tools_json: list[FunctionToolParam] = [armory.get_tool_schema(tool) for tool in tools]
+        self._armory = armory
+        self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._max_iterations = max_iterations
 
-async def _run_with_exception_handling(coroutine):
-    try:
-        return await coroutine
-    except (
-            APITimeoutError, InternalServerError,
-            UnprocessableEntityError) as ex:
-        raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                     'please open up a separate conversation and try again') from ex
-    except (APIConnectionError, BadRequestError,
-            AuthenticationError, ConflictError, NotFoundError,
-            RateLimitError) as ex:
-        duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
-        raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                 "for more details on how to resolve this error") from ex
+    def get_name(self) -> str:
+        return self._name
 
+    def get_description(self) -> str:
+        return self._description
 
-class AgentClient:
-    def __init__(
-            self,
-            agent: Agent,
-            typing: IndicateTyping
-    ):
-        self._agent = agent
-        self._typing = typing
+    def add_tool(self, tool: str):
+        if tool not in self._tools:
+            self._tools.append(tool)
+            self._tools_json.append(self._armory.get_tool_schema(tool))
 
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list,
-    ) -> AgentMessage:
-        return await _run_with_exception_handling(self._get_completion(
-            context,
-            message_history
+    def _get_completion(self, history: list[GPTMessage | FunctionCallOutput | ResponseFunctionToolCallParam]) -> Response:
+        return self._client.responses.create(
+            model=self._model,
+            instructions=self._prompt,
+            input=history,
+            tools=self._tools_json
+        )
+
+    def _add_function_call_context(self, result: str, call: ResponseFunctionToolCall, message_history: list):
+        message_history.append(ResponseFunctionToolCallParam(
+            type="function_call",
+            id=call.id,
+            call_id=call.call_id,
+            name=call.name,
+            arguments=call.arguments
+        ))
+        message_history.append(FunctionCallOutput(
+            type="function_call_output",
+            call_id=call.call_id,
+            output=str(result)
         ))
 
-    async def _get_completion(
-            self,
-            context: DuckContext,
-            message_history: list,
-            **kwargs
-    ) -> AgentMessage:
-        async with self._typing(context.thread_id):
-            result = await Runner.run(
-                self._agent,
-                message_history,
-                context=context,
-                **kwargs
+    async def run(self, ctx: DuckContext, query: str) -> AgentMessage:
+        """
+        This method runs a new agent with a given query from the user.
+        """
+        try:
+            history = [GPTMessage(role="user", content=query)]
+            iterations = 0
+            while iterations < self._max_iterations:
+                iterations += 1
+                response = self._get_completion(history)
+                output_item = response.output[0]
+
+                match output_item.type:
+                    case "function_call":
+                        tool_name = output_item.name
+
+                        tool_args = json.loads(output_item.arguments)
+                        tool = self._armory.get_specific_tool(tool_name)
+                        needs_context = self._armory.get_tool_needs_context(tool_name)
+
+                        if inspect.iscoroutinefunction(tool):
+                            value = await tool(ctx, **tool_args) if needs_context else await tool(**tool_args)
+                        else:
+                            value = tool(ctx, **tool_args) if needs_context else tool(**tool_args)
+
+                        if is_agent_message(value):
+                            return value
+                        else:
+                            self._add_function_call_context(value, output_item, history)
+
+                    case "message":
+                        return AgentMessage(agent_name=self._name, content=output_item.content[0].text)
+
+            return AgentMessage(
+                agent_name=self._name,
+                content="I have reached the maximum number of iterations without a valid response."
             )
-            return _result_to_agent_message(result)
-
-
-class RetryableGenAI:
-    def __init__(self,
-                 genai: GenAIClient,
-                 send_message: SendMessage,
-                 retry_config: RetryConfig
-                 ):
-        self._send_message = step(send_message)
-        self._retry_config = retry_config
-        self._genai = genai
-
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list[GPTMessage],
-    ):
-        max_retries = self._retry_config['max_retries']
-        delay = self._retry_config['delay']
-        backoff = self._retry_config['backoff']
-        retries = 0
-        while True:
-            try:
-                return await self._genai.get_completion(
-                    context, message_history
-                )
-
-            except RetryableException as ex:
-                if retries == 0:
-                    await self._send_message(context.thread_id, 'Trying to contact servers...')
-                retries += 1
-                if retries > max_retries:
-                    raise GenAIException(ex, 'Retry limit exceeded')
-
-                logging.warning(
-                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                await asyncio.sleep(delay)
-                delay *= backoff
+        except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
+                BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
+            raise GenAIException(e, f"An error occurred while processing the query: {query}") from e
+        except Exception as e:
+            raise GenAIException(e, f"An unexpected error occurred while processing the query: {query}") from e

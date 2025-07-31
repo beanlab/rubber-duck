@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import NotRequired, Optional
+from typing_extensions import TypedDict
+
+from pydantic import BaseModel
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -11,11 +14,11 @@ class FileData(TypedDict):
     bytes: bytes
 
 
-class AgentMessage(TypedDict):
-    content: NotRequired[str]
-    file: NotRequired[FileData]
-    agent_name: str
 
+class AgentMessage(BaseModel):
+    agent_name: str
+    content: Optional[str] = None
+    file: Optional[FileData] = None
 
 class GPTMessage(TypedDict):
     role: str
@@ -56,11 +59,13 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
+    tools: list[str]
+    description: str
+    handoffs: NotRequired[list[str]]
+    max_iterations: NotRequired[int]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
-    tools: list[str]
-    handoff_prompt: str
-    handoffs: list[str]
+
 
 
 class MultiAgentSettings(TypedDict):
