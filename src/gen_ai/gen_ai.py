@@ -1,4 +1,3 @@
-import copy
 import inspect
 import json
 import os
@@ -7,16 +6,12 @@ from typing import TypedDict, Protocol
 
 from agents import ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, api_key, OpenAI
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, OpenAI
 from openai.types.responses import Response, ResponseFunctionToolCallParam, ResponseFunctionToolCall, FunctionToolParam
-from openai.types.responses.response_input_item import FunctionCallOutput, Message
-from quest import step
+from openai.types.responses.response_input_item import FunctionCallOutput
 
 from ..armory.armory import Armory
-from ..armory.tools import register_tool
-from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
-from ..utils.logger import duck_logger
-from ..utils.protocols import IndicateTyping, SendMessage
+from ..utils.config_types import DuckContext, AgentMessage, GPTMessage
 from ..utils.validation import is_agent_message
 
 Sendable = str | tuple[str, BytesIO]
@@ -118,50 +113,45 @@ class Agent:
             output=str(result)
         ))
 
-    async def run(self, ctx: DuckContext, message_history: list) -> AgentMessage:
+    async def run(self, ctx: DuckContext, query: str) -> AgentMessage:
         """
-        This method runs a new agent.
+        This method runs a new agent with a given query from the user.
         """
-        history = message_history
-        iterations = 0
+        try:
+            history = [GPTMessage(role="user", content=query)]
+            iterations = 0
+            while iterations < self._max_iterations:
+                iterations += 1
+                response = self._get_completion(history)
+                output_item = response.output[0]
 
-        while iterations < self._max_iterations:
-            iterations += 1
-            response = self._get_completion(history)
-            output_item = response.output[0]
+                match output_item.type:
+                    case "function_call":
+                        tool_name = output_item.name
 
-            match output_item.type:
-                case "function_call":
-                    tool_name = output_item.name
+                        tool_args = json.loads(output_item.arguments)
+                        tool = self._armory.get_specific_tool(tool_name)
+                        needs_context = self._armory.get_tool_needs_context(tool_name)
 
-                    if tool_name.startswith("run_"):
-                        duck_logger.debug(f"Agent {self._name} is calling a handoff tool: {tool_name}")
+                        if inspect.iscoroutinefunction(tool):
+                            value = await tool(ctx, **tool_args) if needs_context else await tool(**tool_args)
+                        else:
+                            value = tool(ctx, **tool_args) if needs_context else tool(**tool_args)
 
-                    tool_args = json.loads(output_item.arguments)
-                    tool = self._armory.get_specific_tool(tool_name)
-                    needs_context = self._armory.get_tool_needs_context(tool_name)
-                    needs_history = self._armory.get_tool_needs_history(tool_name)
+                        if is_agent_message(value):
+                            return value
+                        else:
+                            self._add_function_call_context(value, output_item, history)
 
-                    call_args = []
-                    if needs_context:
-                        call_args.append(ctx)
-                    if needs_history:
-                        call_args.append(history)
+                    case "message":
+                        return AgentMessage(agent_name=self._name, content=output_item.content[0].text)
 
-                    if inspect.iscoroutinefunction(tool):
-                        value = await tool(*call_args, **tool_args)
-                    else:
-                        value = tool(*call_args, **tool_args)
-
-                    if is_agent_message(value):
-                        return value
-                    else:
-                        self._add_function_call_context(value, output_item, history)
-
-                case "message":
-                    return AgentMessage(agent_name=self._name, content=output_item.content[0].text)
-
-        return AgentMessage(
-            agent_name=self._name,
-            content="I have reached the maximum number of iterations without a valid response."
-        )
+            return AgentMessage(
+                agent_name=self._name,
+                content="I have reached the maximum number of iterations without a valid response."
+            )
+        except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
+                BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
+            raise GenAIException(e, f"An error occurred while processing the query: {query}") from e
+        except Exception as e:
+            raise GenAIException(e, f"An unexpected error occurred while processing the query: {query}") from e
