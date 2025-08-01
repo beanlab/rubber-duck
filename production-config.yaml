@@ -31,6 +31,14 @@ agents_as_tools:
           - prompts/generate-code-complexity.md
         engine: gpt-4.1
 
+  - tool_name: determine_tool_call
+    description: |
+      This tool is used to determine which tool to call based on the user's input. |
+    agents:
+      - name: DetermineToolCall
+        prompt_files:
+          - prompts/determine_tool_call_stats.txt
+        engine: gpt-4.1
 
 ducks:
   - name: standard-rubber-duck
@@ -52,28 +60,24 @@ ducks:
     duck_type: agent_conversation
     settings:
       introduction: |
-        I'm an exploratory data analysis assistant. 
-        I can help you with basic statistics and data visualization. 
-        You can ask me to:
-        1. Perform various statistical calculations. 
-        2. Create visualizations.
-        3. Provide insights based on your data.
-      timeout: 60
+          Hello! I can help answer your questions about statistics.
       agents:
-        - name: Standard_Rubber_Duck
+        - name: stats_duck
+          engine: gpt-4.1
           prompt_files:
             - prompts/stats.txt
-          engine: gpt-4.1
           tools:
-            - find_closest_match
-            - explain_capabilities
+            - determine_tool_call
             - describe_dataset
+            - list_categories
+            - explain_capabilities
             - get_dataset_names
             - get_variable_names
-            - plot_barplot
+            - show_dataset_head
             - plot_histogram
             - plot_boxplot
             - plot_dotplot
+            - plot_barplot
             - plot_pie_chart
             - plot_proportion_barplot
             - calculate_mean
@@ -84,19 +88,19 @@ ducks:
             - calculate_five_number_summary
             - calculate_table_of_counts
             - calculate_proportions
-            - show_dataset_head
+            - calculate_z_score
             - calculate_probability_from_normal_distribution
             - calculate_percentiles_from_normal_distribution
             - plot_normal_distribution
-            - plot_confidence_interval_and_t_distribution
             - calculate_confidence_interval_and_t_test
+            - plot_confidence_interval_and_t_distribution
             - calculate_two_mean_t_test
             - calculate_one_way_anova
             - calculate_one_sample_proportion_z_test
             - calculate_two_sample_proportion_z_test
-            - calculate_chi_squared_test
-            - simple_linear_regression
+          tool_required: determine_tool_call
           max_iterations: 5
+      timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 

@@ -74,12 +74,15 @@ class StatsTools:
         duck_logger.debug("Used explain_capabilities")
         return (
             "This bot can perform a wide range of statistical and visualization tasks on datasets, including:\n"
-            "- Generate visualizations: histograms, boxplots, dotplots, barplots, pie charts, and proportion barplots.\n"
-            "- Compute statistics: mean, median, mode (via KDE), standard deviation, skewness, and five-number summaries.\n"
-            "- Summarize categorical data with frequency tables and proportions.\n"
-            "- List available datasets and variable names within datasets.\n"
-            "- Provide descriptions and metadata for datasets.\n\n"
-            "It supports both numeric and categorical columns, and handles inappropriate column types with informative fallback messages."
+            "- Generate a variety of visualizations such as histograms, boxplots, dotplots, barplots, pie charts, proportion barplots, and normal distribution plots.\n"
+            "- Compute key summary statistics including mean, median, mode, standard deviation, skewness, five-number summaries, and z-scores.\n"
+            "- Summarize categorical data using frequency tables and proportion calculations.\n"
+            "- Perform statistical inference such as confidence intervals, t-tests, ANOVA, and proportion z-tests.\n"
+            "- Calculate probabilities and percentiles from the normal distribution.\n"
+            "- Provide descriptions and metadata for datasets, including variable names and dataset previews.\n"
+            "- Support both numeric and categorical data, and handle mismatched data types with informative messages.\n"
+            "- List available datasets and explore the variables they contain.\n"
+            "- Explain its own capabilities and how they relate to user queries."
         )
 
     @register_tool
@@ -90,11 +93,11 @@ class StatsTools:
         return f"Available datasets: {', '.join(datasets)}"
 
     @register_tool
-    async def get_variable_names(self, dataset: str) -> str:
-        """Returns a list of all variable names in the dataset."""
+    def get_variable_names(self, dataset: str) -> str:
+        """Returns a list of all variable/column names in the dataset."""
         duck_logger.debug(f"Used get_variable_names on dataset={dataset}")
         data = self._datastore.get_dataset(dataset)
-        return f"Variable names in {dataset}: {', '.join(data)}"
+        return f"Variable names in {dataset}: {', '.join(data.columns)}"
 
     @register_tool
     @sends_image
@@ -146,7 +149,6 @@ class StatsTools:
 
         return name, buf.read()
 
-    # Tools for dataset statistics and visualizations
     @register_tool
     @sends_image
     @cache_result
@@ -413,9 +415,16 @@ class StatsTools:
         return proportions.to_dict(orient="records")
 
     # Tools for distribution statistics and visualizations
+    @register_tool
+    def calculate_z_score(self, value: float, mean: float = 0, std: float = 1) -> str:
+        """Calculates the z-score for a given value from a normal distribution."""
+        duck_logger.debug(f"Calculating z-score for value={value}, mean={mean}, std={std}")
+        if std == 0:
+            return "Standard deviation cannot be zero."
+        z = (value - mean) / std
+        return f"The z-score is {round(z, 4)}"
 
     @register_tool
-    @sends_image
     def calculate_probability_from_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates the probability for one or two z-scores from a normal distribution. Can handle upper tail, lower tail, or between two z-scores."""
         duck_logger.debug(f"Calculating probability for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
@@ -433,7 +442,6 @@ class StatsTools:
             return "Invalid input for tail or missing z2"
 
     @register_tool
-    @sends_image
     def calculate_percentiles_from_normal_distribution(self, p1: float, p2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates z-score values corresponding to given percentiles from a normal distribution."""
         duck_logger.debug(f"Calculating percentiles for p1={p1}, p2={p2}, mean={mean}, std={std}, tail={tail}")
@@ -479,7 +487,6 @@ class StatsTools:
 
 
     @register_tool
-    @sends_image
     async def calculate_confidence_interval_and_t_test(self, dataset: str, variable: str, alternative: Literal[
         "greater", "less", "two.sided"] = "two.sided", mu: float = 0, conf_level: float = 0.95) -> str:
         """Performs a one-sample t-test and returns a formatted summary string of the test results."""
@@ -592,7 +599,6 @@ class StatsTools:
 
     # Tools for Two Mean EDA
     @register_tool
-    @sends_image
     async def calculate_two_mean_t_test(self, dataset: str, column1: str, column2: str,
                                         alternative: Literal["greater", "less", "two.sided"] = "two.sided",
                                         conf_level: float = 0.95) -> str:
@@ -672,7 +678,6 @@ class StatsTools:
         return summary
 
     @register_tool
-    @sends_image
     async def calculate_one_way_anova(self, dataset: str, group_column: str, value_column: str,
                                       conf_level: float = 0.95) -> str:
         """Performs a one-way ANOVA test on a numeric variable across groups defined by a categorical variable."""
@@ -776,7 +781,6 @@ class StatsTools:
 
 
     @register_tool
-    @sends_image
     async def calculate_one_sample_proportion_z_test(self, dataset: str, variable: str, category: str,
                                                      p_null: float = 0.5,
                                                      alternative: Literal["greater", "less", "two.sided"] = "two.sided",
@@ -834,7 +838,6 @@ class StatsTools:
         return summary
 
     @register_tool
-    @sends_image
     async def calculate_two_sample_proportion_z_test(self, dataset: str, response_variable: str, response_category: str,
                                                      group_variable: str, group1: str, group2: str,
                                                      alternative: Literal["greater", "less", "two.sided"] = "two.sided",
@@ -924,7 +927,6 @@ class StatsTools:
         return summary
 
     @register_tool
-    @sends_image
     async def calculate_chi_squared_test(self, dataset: str, row_variable: str, col_variable: str) -> str:
         """
         Performs a Chi-squared test of independence between two categorical variables.
@@ -968,7 +970,6 @@ class StatsTools:
         return summary
 
     @register_tool
-    @sends_image
     async def simple_linear_regression(
             self,
             dataset: str,
