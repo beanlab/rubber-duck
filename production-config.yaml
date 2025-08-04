@@ -123,6 +123,23 @@ servers:
         ducks:
           - standard-rubber-duck
 
+      - channel_id: 1399777118380097648
+        channel_name: join-the-server
+        ducks:
+          - name: Registration-Workflow
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              roles:
+                patterns:
+                  - name: Teacher Sections
+                    pattern: "-section-"
+                    description: Sorted by teacher's name (e.g. smith-section-000)
+
+
+
   747510855536738336:
     server_name: CS 235
     channels:
@@ -140,6 +157,22 @@ servers:
         channel_name: student-text-channels/duck-pond
         ducks:
           - standard-rubber-duck
+
+      - channel_id: 1399788047981351042
+        channel_name: join-the-server
+        ducks:
+          - name: Registration-Workflow
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              roles:
+                patterns:
+                  - name: Teacher Sections
+                    pattern: "-section-"
+                    description: Sorted by teacher name (e.g. smith-section-001)
+
 
   1235303213796691998:
     server_name: CS 111
@@ -296,7 +329,7 @@ servers:
               file_type_ext: *file_type_ext
 
       - channel_id: 1379959992110546995
-        channel_name: registration-duck
+        channel_name: join-the-server
         ducks:
           - name: Registration-Workflow
             duck_type: registration
