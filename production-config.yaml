@@ -233,6 +233,24 @@ servers:
         ducks:
           - standard-rubber-duck
 
+      - channel_id: 1401960218870419647
+        channel_name: emoji-duck
+        ducks:
+          - name: emoji-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Hello! I'm Emoji Duck. Do you want me to describe a movie or a book using only emojis?
+              agents:
+                - name: emoji-duck
+                  engine: gpt-4.1
+                  prompt_files:
+                    - prompts/emoji.txt
+                  max_iterations: 5
+              timeout: 2000
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
+
       - channel_id: 1385293810782965830
         channel_name: code-complexity-analysis-duck
         ducks:
