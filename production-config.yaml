@@ -120,7 +120,7 @@ servers:
           - standard-rubber-duck
 
       - channel_id: 1399777118380097648
-        channel_name: registration-duck
+        channel_name: join-the-server
         ducks:
           - name: Registration-Workflow
             duck_type: registration
@@ -155,7 +155,7 @@ servers:
           - standard-rubber-duck
 
       - channel_id: 1399788047981351042
-        channel_name: registration-duck
+        channel_name: join-the-server
         ducks:
           - name: Registration-Workflow
             duck_type: registration
@@ -307,7 +307,7 @@ servers:
               file_type_ext: *file_type_ext
 
       - channel_id: 1379959992110546995
-        channel_name: registration-duck
+        channel_name: join-the-server
         ducks:
           - name: Registration-Workflow
             duck_type: registration
