@@ -30,9 +30,51 @@ agents_as_tools:
         prompt_files:
         - prompts/generate-code-complexity.md
         engine: gpt-4.1
-  - tool_name: explainer_duck_tool
+  
+  - tool_name: generate_code_example
     description: |
-      This tool provides clear, concise explanations for programming concepts and problems.
+      This tool provides code examples for the requested topic. 
+      When calling the tool, provide a description of the topic that needs to be demonstrated and the programming language that should be used.
+
+      ## Arguments
+      topic: str - the topic you want to demonstrate with a code example
+
+      ## Returns
+      str - a code example formatted in markdown
+
+      ## Usage
+      >>> generate_code_example('Demonstrate how to use enumerate in python')
+      """
+      ```python
+      for i, item in enumerate(['chair', 'bag', 'car']):
+        print(f'{i}: {item}')
+      ```
+      """
+      
+    agents:
+      - name: explainer
+        engine: gpt-4.1
+        prompt_files:
+          - prompts/explainer-duck.txt
+        max_iterations: 5
+
+    - tool_name: explain_idea
+      description: |
+        This tool provides brief explanations of the provided topic or code.
+        When calling this tool, provide the code that needs to be explained or a description of the programming concept that needs to be explained.
+        
+        ## Arguments
+        topic: str - the topic description or code you want to explain
+  
+        ## Returns
+        str - a markdown string containing the explanation
+  
+        ## Usage
+        >>> explain_idea('What is encapsulation in programming?')
+        """
+        ...fill me in...
+        """
+      
     agents:
       - name: explainer
         engine: gpt-4.1
