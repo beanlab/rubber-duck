@@ -11,29 +11,20 @@ from .config_types import Config
 from .logger import duck_logger
 
 
-def fetch_config_from_s3() -> Config | None:
+def fetch_config_from_s3(config_path) -> Config | None:
     """Fetch configuration from S3 bucket"""
     try:
         # Initialize S3 client
         s3 = boto3.client('s3')
 
-        # Add a section to your env file to allow for local and production environment
-        environment = os.environ.get('ENVIRONMENT')
-        if not environment or environment == 'LOCAL':
-            duck_logger.info("Using LOCAL environment")
-            return None
-        else:
-            duck_logger.info(f"Using PRODUCTION environment")
-
-        # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-        s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-        if not s3_path:
-            duck_logger.warning("No S3 path configured")
-            return None
+        # Use the config_path parameter instead of environment variable
+        if not config_path:
+            raise ValueError("S3 config path is required but not provided")
+        
+        duck_logger.info(f"Fetching config from S3 path: {config_path}")
 
         # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-        bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
+        bucket_name, key = config_path.replace('s3://', '').split('/', 1)
         duck_logger.info(f"Fetching config from bucket: {bucket_name}")
         duck_logger.info(f"Config key: {key}")
 
@@ -86,7 +77,7 @@ def load_configuration(config_arg: str | None = None) -> Config:
     if config_arg:
         config_path = config_arg
     else:
-        env_path = os.environ.get('CONFIG_FILE_S3_PATH')
+        env_path = os.environ.get('CONFIG_FILE_S3_PATH') or 'config.json'
         if env_path:
             config_path = env_path
         else:
@@ -94,7 +85,7 @@ def load_configuration(config_arg: str | None = None) -> Config:
 
     try:
         if config_path.startswith('s3://'):
-            config = fetch_config_from_s3()
+            config = fetch_config_from_s3(config_path)
             if config is None:
                 raise RuntimeError(f"Failed to load configuration from S3: {config_path}")
         else:
