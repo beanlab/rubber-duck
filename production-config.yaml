@@ -103,7 +103,7 @@ ducks:
     duck_type: agent_conversation
     settings:
       introduction: |
-        Hello! I'm Socratic Duck. If you have a problem to solve or code to debug, I'm here to help!
+        Hello! How can I help you?
       agents:
         - name: socrates-duck
           engine: gpt-4.1
