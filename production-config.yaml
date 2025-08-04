@@ -1,7 +1,7 @@
 # Anchors
 file_size_limit: &file_size_limit 4096 # 4KB limit
-file_type_ext: &file_type_ext
-  [
+file_type_ext:
+  &file_type_ext [
     "txt",
     "py",
     "java",
@@ -28,9 +28,18 @@ agents_as_tools:
     agents:
       - name: CodeComplexityAgent
         prompt_files:
-        - prompts/generate-code-complexity.md
+          - prompts/generate-code-complexity.md
         engine: gpt-4.1
-  
+
+  - tool_name: determine_tool_call
+    description: |
+      This tool is used to determine which tool to call based on the user's input. |
+    agents:
+      - name: DetermineToolCall
+        prompt_files:
+          - prompts/determine_tool_call_stats.txt
+        engine: gpt-4.1
+
   - tool_name: generate_code_example
     description: |
       This tool provides code examples for the requested topic. 
@@ -50,7 +59,7 @@ agents_as_tools:
         print(f'{i}: {item}')
       ```
       """
-      
+
     agents:
       - name: explainer
         engine: gpt-4.1
@@ -74,7 +83,7 @@ agents_as_tools:
         """
         ...fill me in...
         """
-      
+
     agents:
       - name: explainer
         engine: gpt-4.1
@@ -93,7 +102,7 @@ ducks:
         - name: RubberDuck
           engine: gpt-4.1
           prompt_files:
-          - prompts/standard-rubber-duck.txt
+            - prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
       file_size_limit: *file_size_limit
@@ -121,28 +130,24 @@ ducks:
     duck_type: agent_conversation
     settings:
       introduction: |
-        I'm an exploratory data analysis assistant. 
-        I can help you with basic statistics and data visualization. 
-        You can ask me to:
-        1. Perform various statistical calculations. 
-        2. Create visualizations.
-        3. Provide insights based on your data.
-      timeout: 60
+          Hello! I can help answer your questions about statistics.
       agents:
-        - name: Standard_Rubber_Duck
+        - name: stats_duck
+          engine: gpt-4.1
           prompt_files:
             - prompts/stats.txt
-          engine: gpt-4.1
           tools:
-            - find_closest_match
-            - explain_capabilities
+            - determine_tool_call
             - describe_dataset
+            - list_categories
+            - explain_capabilities
             - get_dataset_names
             - get_variable_names
-            - plot_barplot
+            - show_dataset_head
             - plot_histogram
             - plot_boxplot
             - plot_dotplot
+            - plot_barplot
             - plot_pie_chart
             - plot_proportion_barplot
             - calculate_mean
@@ -153,19 +158,19 @@ ducks:
             - calculate_five_number_summary
             - calculate_table_of_counts
             - calculate_proportions
-            - show_dataset_head
+            - calculate_z_score
             - calculate_probability_from_normal_distribution
             - calculate_percentiles_from_normal_distribution
             - plot_normal_distribution
-            - plot_confidence_interval_and_t_distribution
             - calculate_confidence_interval_and_t_test
+            - plot_confidence_interval_and_t_distribution
             - calculate_two_mean_t_test
             - calculate_one_way_anova
             - calculate_one_sample_proportion_z_test
             - calculate_two_sample_proportion_z_test
-            - calculate_chi_squared_test
-            - simple_linear_regression
+          tool_required: determine_tool_call
           max_iterations: 5
+      timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -188,6 +193,23 @@ servers:
         ducks:
           - standard-rubber-duck
 
+      - channel_id: 1399777118380097648
+        channel_name: join-the-server
+        ducks:
+          - name: Registration-Workflow
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              roles:
+                patterns:
+                  - name: Teacher Sections
+                    pattern: "-section-"
+                    description: Sorted by teacher's name (e.g. smith-section-000)
+
+
+
   747510855536738336:
     server_name: CS 235
     channels:
@@ -205,6 +227,22 @@ servers:
         channel_name: student-text-channels/duck-pond
         ducks:
           - standard-rubber-duck
+
+      - channel_id: 1399788047981351042
+        channel_name: join-the-server
+        ducks:
+          - name: Registration-Workflow
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              roles:
+                patterns:
+                  - name: Teacher Sections
+                    pattern: "-section-"
+                    description: Sorted by teacher name (e.g. smith-section-001)
+
 
   1235303213796691998:
     server_name: CS 111
@@ -303,6 +341,24 @@ servers:
         ducks:
           - standard-rubber-duck
 
+      - channel_id: 1401960218870419647
+        channel_name: emoji-duck
+        ducks:
+          - name: emoji-duck
+            duck_type: agent_conversation
+            settings:
+              introduction: |
+                Hello! I'm Emoji Duck. Do you want me to describe a movie or a book using only emojis?
+              agents:
+                - name: emoji-duck
+                  engine: gpt-4.1
+                  prompt_files:
+                    - prompts/emoji.txt
+                  max_iterations: 5
+              timeout: 2000
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
+
       - channel_id: 1385293810782965830
         channel_name: code-complexity-analysis-duck
         ducks:
@@ -314,7 +370,7 @@ servers:
                 You can also ask me questions about Big-O analysis.
               timeout: 600
               file_size_limit: 5100
-              file_type_ext: [ 'py', 'java', 'cpp', 'c', 'h', 'hpp', 'ts', 'js' ]
+              file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
               agents:
                 - name: ComplexityDuck
                   prompt: |
@@ -340,7 +396,7 @@ servers:
               agents:
                 - name: socrates
                   prompt_files:
-                  - prompts/socratic-duck-old.txt
+                    - prompts/socratic-duck-old.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
@@ -348,7 +404,7 @@ servers:
               file_type_ext: *file_type_ext
 
       - channel_id: 1379959992110546995
-        channel_name: registration-duck
+        channel_name: join-the-server
         ducks:
           - name: Registration-Workflow
             duck_type: registration
@@ -368,20 +424,21 @@ servers:
       - channel_id: 1384678077694480434
         channel_name: designer-duck
         ducks:
-          - name: designer-duck
+          - name: phd-duck
             duck_type: agent_conversation
             settings:
               introduction: |
-                Hello, My name is Designer Duck! I'm here to help you think critically about your design ideas.
-                I'm specialized with helping you on Project 2: Convex Hull.
-                Let's work on this together! How is data stored in your project?
+                Welcome! This is the design experience for the convex hull project. Send a message to continue.
               agents:
-                - name: DesignerDuck
+                - name: PhdDuck
                   engine: gpt-4.1
                   prompt_files:
-                  - prompts/designer-duck.txt
+                    - prompts/phd-duck.txt
+                    - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
                   max_iterations: 5
               timeout: 600
+              file_size_limit: *file_size_limit
+              file_type_ext: *file_type_ext
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool
@@ -409,12 +466,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [ 0.03, 0.06 ]
-    "gpt-4o": [ 0.0025, 0.01 ]
-    "gpt-4-1106-preview": [ 0.01, 0.03 ]
-    "gpt-4-0125-preview": [ 0.01, 0.03 ]
-    "o4-mini": [ 0.000150, 0.0006 ]
-    "gpt-4-turbo": [ 0.01, 0.03 ]
-    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
-    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
-    "gpt-3.5-turbo": [ 0.001, 0.003 ]
+    "gpt-4": [0.03, 0.06]
+    "gpt-4o": [0.0025, 0.01]
+    "gpt-4-1106-preview": [0.01, 0.03]
+    "gpt-4-0125-preview": [0.01, 0.03]
+    "o4-mini": [0.000150, 0.0006]
+    "gpt-4-turbo": [0.01, 0.03]
+    "gpt-4-turbo-preview": [0.01, 0.03]
+    "gpt-3.5-turbo-1106": [0.001, 0.002]
+    "gpt-3.5-turbo": [0.001, 0.003]

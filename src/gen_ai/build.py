@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Iterable
 
-from agents import Agent, AgentHooks, RunContextWrapper
+from agents import Agent, AgentHooks, RunContextWrapper, ModelSettings
 from quest import step
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
@@ -51,7 +51,17 @@ def _build_agent(
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 
+    tool_required = config.get("tool_required", "")
+    if tool_required:
+        model_settings = ModelSettings(
+            tool_choice=tool_required
+        )
+    else:
+        model_settings = ModelSettings(
+            tool_choice="auto"
+        )
     return Agent[DuckContext](
+        model_settings=model_settings,
         name=config["name"],
         handoff_description=config.get("handoff_prompt", ""),
         instructions=prompt,
@@ -158,7 +168,7 @@ def build_agent_conversation_duck(
 
     agent_conversation = AgentConversation(
         name,
-        settings['introduction'],
+        settings.get('introduction'),
         genai_clients,
         starting_agent,
         record_message,
