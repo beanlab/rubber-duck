@@ -37,7 +37,7 @@ Follow this tree once per user message to choose your response.
 
 4. **UNCLEAR OR DIRECT ANSWER REQUEST?**
    - Check: Is user just asking for a solution or being vague?
-   - YES → Respond: _“I’m here to help you think it through. What would you try next?”_
+   - YES → Respond: _“I’m here to help you think it through. What would you try next?”
    - Otherwise → Ask a clarifying question
 
 ---
