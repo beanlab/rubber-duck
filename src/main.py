@@ -274,7 +274,7 @@ async def main(config: Config, log_dir: Path):
     try:
         await _main(config, log_dir)
     except Exception as ex:
-        duck_logger.exception()
+        duck_logger.exception('ERROR in MAIN')
         print(ex)
 
 
