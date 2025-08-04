@@ -52,36 +52,17 @@ ducks:
     duck_type: agent_conversation
     settings:
       introduction: |
-        Hello! I can help you by asking questions (Socratic), 
-        or by explaining concepts (Explainer),
-        or by teaching you how to debug your code (Debugger).
+        Hello! I'm Socratic Duck. If you have a problem to solve or code to debug, I'm here to help!
       agents:
-        - name: socratic
+        - name: socrates-duck
           engine: gpt-4.1
           prompt_files:
-            - prompts/problem-solving-explainer-prompts/problem-solving-duck.txt
-          handoffs:
-            - explainer
-            - debugger
+            - prompts/socrates-duck.txt
           max_iterations: 5
-        - name: explainer
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/problem-solving-explainer-prompts/explainer-duck.txt
-          handoffs:
-            - socratic
-            - debugger
-          max_iterations: 5
-        - name: debugger
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/problem-solving-explainer-prompts/debugger-duck.txt
-          handoffs:
-            - socratic
-            - explainer
-          max_iterations: 5
-      starting_agent: socratic
-      timeout: 600
+          tools:
+            - explainer_duck_tool
+      starting_agent: socrates-duck
+      timeout: 2000
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
