@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 241-config-sha-deployment
   workflow_dispatch:
     inputs:
       local_config:
