@@ -1,5 +1,9 @@
+from asyncio import Queue
 from dataclasses import dataclass
-from typing import NotRequired, Optional
+from typing import NotRequired, Optional, Union
+
+from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
 from typing_extensions import TypedDict
 
 from pydantic import BaseModel
@@ -20,10 +24,11 @@ class AgentMessage(BaseModel):
     content: Optional[str] = None
     file: Optional[FileData] = None
 
-class GPTMessage(TypedDict):
+class GPTMessage(BaseModel):
     role: str
     content: str
 
+HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam]
 
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
@@ -62,7 +67,6 @@ class SingleAgentSettings(TypedDict):
     tools: list[str]
     description: str
     handoffs: NotRequired[list[str]]
-    max_iterations: NotRequired[int]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
 

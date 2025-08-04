@@ -2,27 +2,13 @@ from typing import Callable
 
 from openai.types.responses import FunctionToolParam
 
-from .tools import generate_openai_function_schema, needs_context
-from ..utils.config_types import DuckContext
+from .tools import generate_openai_function_schema, needs_context, needs_history
 
 
 class Armory:
 
-    def __init__(self, send_message):
+    def __init__(self):
         self._tools: dict[str, Callable] = {}
-        self.send_message = send_message
-
-    def scrub_agent(self, agent_instance: object) -> str:
-        name = agent_instance.get_name()
-        description = agent_instance.get_description()
-
-        async def agent_runner(ctx: DuckContext, query: str):
-            return await agent_instance.run(ctx, query)
-
-        function_name = f"run_{name}"
-        agent_runner.__name__ = function_name
-        agent_runner.__doc__ = description
-        self.add_tool(agent_runner)
 
     def scrub_tools(self, tool_instance: object):
         for attr_name in dir(tool_instance):
@@ -53,6 +39,10 @@ class Armory:
     def get_tool_needs_context(self, tool_name: str) -> bool:
         tool_function = self.get_specific_tool(tool_name)
         return needs_context(tool_function)
+
+    def get_tool_needs_history(self, tool_name: str) -> bool:
+        tool_function = self.get_specific_tool(tool_name)
+        return needs_history(tool_function)
 
     def get_all_tool_names(self):
         return list(self._tools.keys())

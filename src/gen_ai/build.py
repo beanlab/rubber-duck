@@ -1,19 +1,34 @@
 from pathlib import Path
 
-from .gen_ai import RecordMessage, Agent
+from .gen_ai import RecordMessage, Agent, AIClient
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
 from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
-from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config
+from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext, HistoryType
 from ..utils.logger import duck_logger
+
+def build_agent_handoff_tool(agent_instance: Agent, client: AIClient):
+    name = agent_instance.name
+    description = agent_instance.description
+
+    async def agent_runner(ctx: DuckContext, history: list[HistoryType]):
+        duck_logger.debug(f"Handoff to agent: {name}")
+        return await client.run_agent(ctx, history, agent_instance)
+
+    function_name = f"{name}"
+    agent_runner.__name__ = function_name
+    agent_runner.__doc__ = description
+    return agent_runner
 
 
 def _build_agent(
         config: SingleAgentSettings,
-        armory: Armory
+        armory: Armory,
+        ai_client: AIClient,
+
 ) -> Agent:
     prompt = config.get('prompt')
     if not prompt:
@@ -27,30 +42,26 @@ def _build_agent(
         name=config["name"],
         description=config["description"],
         prompt=prompt,
-        tools=[tool for tool in config["tools"] if not tool.startswith("run_")],
         model=config["engine"],
-        armory=armory,
-        max_iterations=config.get('max_iterations', 10),
+        tools=config["tools"]
     )
-    armory.scrub_agent(agent)
+
+    armory.add_tool(build_agent_handoff_tool(agent, ai_client))
     return agent
+
 
 def _build_agents(
         settings: list[SingleAgentSettings],
         armory: Armory,
-        starting_agent: str
+        starting_agent: str,
+        ai_client: AIClient
 ) -> Agent:
     agents = {}
 
     for agent_settings in settings:
-        agent = _build_agent(agent_settings, armory)
+        agent = _build_agent(agent_settings, armory, ai_client)
         agents[agent_settings['name']] = agent
 
-    for agent_settings in settings:
-        agent = agents[agent_settings['name']]
-        handoffs = [tool for tool in agent_settings.get('tools', []) if tool.startswith("run_")]
-        for handoff in handoffs:
-            agent.add_tool(handoff)
     return agents[starting_agent]
 
 
@@ -58,10 +69,10 @@ def _build_agents(
 _armory: Armory = None
 
 
-def _get_armory(config: Config, send_message) -> Armory:
+def _get_armory(config: Config, bot, record_message) -> Armory:
     global _armory
     if _armory is None:
-        _armory = Armory(send_message)
+        _armory = Armory()
 
         if 'dataset_folder_locations' in config:
             data_store = DataStore(config['dataset_folder_locations'])
@@ -70,7 +81,7 @@ def _get_armory(config: Config, send_message) -> Armory:
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-        talk_tool = TalkTool(send_message, 30)
+        talk_tool = TalkTool(bot.send_message, record_message, 30)
         _armory.scrub_tools(talk_tool)
 
     return _armory
@@ -83,22 +94,15 @@ def build_agent_conversation_duck(
         record_message: RecordMessage,
         bot,
 ) -> DuckConversation:
-    armory = _get_armory(config, bot.send_message)
-    starting_agent = settings.get('starting_agent')
-    start = _build_agents(settings['agents'], armory, starting_agent)
+    armory = _get_armory(config, bot, record_message)
+    ai_client = AIClient(armory)
+    starting= settings.get('starting_agent')
+    starting_agent = _build_agents(settings['agents'], armory, starting, ai_client)
 
     agent_conversation = AgentConversation(
         name,
-        settings.get('introduction'),
-        start,
-        record_message,
-        bot.send_message,
-        bot.add_reaction,
-        bot.read_url,
-        settings.get('timeout', 60 * 5),
-        armory,
-        settings.get('file_size_limit', 0),
-        settings.get('file_type_ext', []),
+        starting_agent,
+        ai_client,
     )
 
     return agent_conversation

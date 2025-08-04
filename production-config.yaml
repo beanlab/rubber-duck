@@ -100,6 +100,45 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
+  - name: cat-dog-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        Hello! I can help answer your questions about dogs or cats.
+      agents:
+        - name: dispatch
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/dog-cat-scratch/router.txt
+          tools:
+            - cat
+            - dog
+          description: |
+            This agent routes the conversation to either the dog or cat agent based on the user's input.
+        - name: dog
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/dog-cat-scratch/dog.txt
+          tools:
+            - dispatch
+            - cat
+          description: |
+            This agent handles questions about dogs. It can answer questions about dog breeds, care, and behavior.
+        - name: cat
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/dog-cat-scratch/cat.txt
+          tools:
+            - dispatch
+            - dog
+          description: |
+            This agent handles questions about cats. It can answer questions about cat breeds, care, and behavior.
+      starting_agent: dispatch
+      timeout: 600
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
+
+
 servers:
   927616651409649675:
     server_name: CS 110

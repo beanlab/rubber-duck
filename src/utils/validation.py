@@ -1,11 +1,11 @@
-from typing import Any
+from pydantic import ValidationError
 
-from .config_types import AgentMessage
+from src.utils.config_types import GPTMessage
 
 
-def is_agent_message(value: Any) -> bool:
+def is_gpt_message(data: dict) -> bool:
     try:
-        AgentMessage.model_validate(value)
+        GPTMessage.model_validate(data)
         return True
-    except Exception:
+    except ValidationError:
         return False
