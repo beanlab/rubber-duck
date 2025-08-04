@@ -11,35 +11,26 @@ from .config_types import Config
 from .logger import duck_logger
 
 
-def fetch_config_from_s3(config_path) -> Config | None:
+def fetch_config_from_s3(config_path) -> Config:
     """Fetch configuration from S3 bucket"""
-    try:
-        # Initialize S3 client
-        s3 = boto3.client('s3')
+    s3 = boto3.client('s3')
 
-        # Use the config_path parameter instead of environment variable
-        if not config_path:
-            raise ValueError("S3 config path is required but not provided")
-        
-        duck_logger.info(f"Fetching config from S3 path: {config_path}")
+    if not config_path:
+        duck_logger.error("No S3 config path provided.")
+        raise
 
-        # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-        bucket_name, key = config_path.replace('s3://', '').split('/', 1)
-        duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-        duck_logger.info(f"Config key: {key}")
+    duck_logger.info(f"Fetching config from S3 path: {config_path}")
 
-        # Download file from S3
-        response = s3.get_object(Bucket=bucket_name, Key=key)
+    bucket_name, key = config_path.replace('s3://', '').split('/', 1)
+    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.info(f"Config key: {key}")
 
-        # Read the content of the file and parse it
-        content = response['Body'].read().decode('utf-8')
-        config = load_config('.' + key.split('.')[-1], content)
-        duck_logger.info("Successfully loaded config from S3")
-        return config
+    response = s3.get_object(Bucket=bucket_name, Key=key)
 
-    except Exception as e:
-        duck_logger.error(f"Failed to fetch config from S3: {e}")
-        return None
+    content = response['Body'].read().decode('utf-8')
+    config = load_config('.' + key.split('.')[-1], content)
+    duck_logger.info("Successfully loaded config from S3")
+    return config
 
 
 def read_yaml(content: str) -> Config:
