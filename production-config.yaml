@@ -30,6 +30,15 @@ agents_as_tools:
         prompt_files:
         - prompts/generate-code-complexity.md
         engine: gpt-4.1
+  - tool_name: explainer_duck_tool
+    description: |
+      This tool provides clear, concise explanations for programming concepts and problems.
+    agents:
+      - name: explainer
+        engine: gpt-4.1
+        prompt_files:
+          - prompts/explainer-duck.txt
+        max_iterations: 5
 
 
 ducks:
@@ -289,7 +298,7 @@ servers:
               agents:
                 - name: socrates
                   prompt_files:
-                  - prompts/socratic-duck.txt
+                  - prompts/socratic-duck-old.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
