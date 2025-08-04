@@ -164,7 +164,8 @@ def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
             if not isinstance(channel_config.get('ducks'), list):
-                duck_logger.error(f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
+                duck_logger.error(
+                    f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
             for item in channel_config.get('ducks') or []:
                 if isinstance(item, DUCK_NAME):
                     continue
@@ -270,6 +271,14 @@ def _build_feedback_queues(config: Config, sql_session):
 
 
 async def main(config: Config, log_dir: Path):
+    try:
+        await _main(config, log_dir)
+    except Exception as ex:
+        duck_logger.exception('ERROR in MAIN')
+        print(ex)
+
+
+async def _main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -339,7 +348,7 @@ if __name__ == '__main__':
     # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        # quest_logger.setLevel(logging.DEBUG)
+        quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
