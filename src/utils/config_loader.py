@@ -59,31 +59,17 @@ def load_local_config(config_path: Path) -> Config:
     return load_config(config_path.suffix, config_path.read_text())
 
 
-def load_configuration(config_arg: str | None = None) -> Config:
+def load_configuration(config_arg: str | None) -> Config:
     """
     1. Check command line argument
     2. Check environment variable CONFIG_FILE_S3_PATH
     3. Handle S3 and local file loading with proper error handling
     """
-    if config_arg:
-        config_path = config_arg
+    
+    config_path = os.environ.get('CONFIG_FILE_S3_PATH', config_arg) or 'config.json'
+
+    if config_path.startswith('s3://'):
+        return fetch_config_from_s3(config_path)
+        
     else:
-        env_path = os.environ.get('CONFIG_FILE_S3_PATH') or 'config.json'
-        if env_path:
-            config_path = env_path
-        else:
-            config_path = 'config.json'
-
-    try:
-        if config_path.startswith('s3://'):
-            config = fetch_config_from_s3(config_path)
-            if config is None:
-                raise RuntimeError(f"Failed to load configuration from S3: {config_path}")
-        else:
-            config = load_local_config(Path(config_path))
-            if config is None:
-                raise RuntimeError(f"Failed to load configuration from local file: {config_path}")
-        return config
-
-    except Exception:
-        raise
+        return load_local_config(Path(config_path))
