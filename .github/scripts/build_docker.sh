@@ -13,7 +13,7 @@ set -e
 # Build the Docker image
 docker build -t ${IMAGE_NAME}:latest -f - . <<EOF
 FROM python:3.11.9
-LABEL authors="Wiley Welch, Bryce Martin, Gordon Bean"
+LABEL authors="Gordon Bean"
 COPY src /app/src
 COPY prompts /app/prompts
 COPY datasets /app/datasets
