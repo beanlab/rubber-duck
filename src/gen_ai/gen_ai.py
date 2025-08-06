@@ -14,6 +14,7 @@ from quest import step
 
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType
+from ..utils.logger import duck_logger
 
 Sendable = str | tuple[str, BytesIO]
 
@@ -100,7 +101,7 @@ class AIClient:
             input=f"This is the goal: {goal}\n\nThis is the conversation history: {stringify_conversation_history(history)}\n",
             text_format=GoalCheckResult
         )
-        return response
+        return response.output_parsed
 
     @step
     async def _get_completion(self, prompt: str, history, model: str, tools: list[FunctionToolParam],
@@ -151,7 +152,6 @@ class AIClient:
 
                     if agent.goal:
                         check = await self._check_against_goal(agent.goal, history)
-                        check = check.output_parsed
                         if check.accomplished is False:
                             history.append(GPTMessage(role='developer', content=f"Goal not accomplished for the following reason: {check.description}"))
                         elif check.accomplished is True:
@@ -171,3 +171,13 @@ class AIClient:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
+
+
+    def build_agent_tool(self, agent: Agent, name: str, description: str) -> callable:
+        async def agent_runner(ctx: DuckContext, query: str):
+            duck_logger.debug(f"Talking to agent: {name}")
+            return await self.run_agent(ctx, agent, query)
+        function_name = name
+        agent_runner.__name__ = function_name
+        agent_runner.__doc__ = description
+        return agent_runner

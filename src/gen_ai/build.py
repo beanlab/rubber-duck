@@ -10,20 +10,6 @@ from ..duck_orchestrator import DuckConversation
 from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext
 from ..utils.logger import duck_logger
 
-def _build_agent_tool(agent_instance: Agent, client: AIClient):
-    name = agent_instance.name
-    description = agent_instance.description
-
-    async def agent_runner(ctx: DuckContext, query: str):
-        duck_logger.debug(f"Talking to agent: {name}")
-        return await client.run_agent(ctx, agent_instance, query)
-
-    function_name = name
-    agent_runner.__name__ = function_name
-    if description:
-        agent_runner.__doc__ = description
-    return agent_runner
-
 def _build_agent(
         config: SingleAgentSettings
 ) -> Agent:
@@ -61,7 +47,7 @@ def _build_main_agent(
     if agent_tool_settings:
         for agent_settings in agent_tool_settings:
             agent = _build_agent(agent_settings)
-            armory.add_tool(_build_agent_tool(agent, ai_client))
+            armory.add_tool(ai_client.build_agent_tool(agent, agent.name, agent.description))
 
     return main_agent
 
@@ -90,7 +76,7 @@ def _get_armory(config: Config, bot, record_message) -> Armory:
 def _add_agent_tools(config: Config, client: AIClient) -> None:
     for agent_settings in config['agents_as_tools']:
         agent = _build_agent(agent_settings)
-        _armory.add_tool(_build_agent_tool(agent, client))
+        _armory.add_tool(client.build_agent_tool(agent, agent.name, agent.description))
 
 
 def build_agent_conversation_duck(
