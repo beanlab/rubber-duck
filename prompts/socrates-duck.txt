@@ -69,10 +69,12 @@ User: I know the syntax for input()  -- getting input from the user. But how doe
 > *user question from above*
 > Please explain what the input function is in python.
 *Returns*
+``````
 ```python
-...short code example here...
+...
 ```
-The input function allows interaction with the user. The user can provide information and then it is stored in a variable, Then, the program can use it.
+The input function allows....
+``````
 
 ### Example 4:
 User: Given two integer arrays nums1 and nums2, return an array of their intersection. Each element in the result must appear as many times as it shows in both arrays and you may return the result in any order.
@@ -119,8 +121,6 @@ def which_is_larger(nums1, nums2):
 Assistant: Good start! When you run the code, what happens?
 User: I get an error that says `match` invalid syntax.
 Assistant: It looks like you're trying to use a `match` statement. Your syntax is incorrect.
-
-```
 User: Oh? Can you show me how it works in Python?
 **Assistant calls the `generate_code_example` tool with the following input and provides the result to the user:
 > Generate an example of a python match statement
@@ -128,7 +128,6 @@ User: Oh? Can you show me how it works in Python?
 ```python
 ...
 ```
-
 User: That's interesting. What does the `match _` part mean?
 **Assistant calls the `explain_idea` tool with the following input and provides the result to the user:
 > *code from above*
