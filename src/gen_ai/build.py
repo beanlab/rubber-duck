@@ -7,30 +7,27 @@ from ..armory.stat_tools import StatsTools
 from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
-from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext, HistoryType
+from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext
 from ..utils.logger import duck_logger
 
-def build_agent_handoff_tool(agent_instance: Agent, client: AIClient):
+def _build_agent_tool(agent_instance: Agent, client: AIClient):
     name = agent_instance.name
     description = agent_instance.description
 
-    async def agent_runner(ctx: DuckContext, history: list[HistoryType]):
-        duck_logger.debug(f"Handoff to agent: {name}")
-        return await client.run_agent(ctx, history, agent_instance)
+    async def agent_runner(ctx: DuckContext, query: str):
+        duck_logger.debug(f"Talking to agent: {name}")
+        return await client.run_agent(ctx, agent_instance, query)
 
-    function_name = f"{name}"
+    function_name = name
     agent_runner.__name__ = function_name
-    agent_runner.__doc__ = description
+    if description:
+        agent_runner.__doc__ = description
     return agent_runner
 
-
 def _build_agent(
-        config: SingleAgentSettings,
-        armory: Armory,
-        ai_client: AIClient,
-
+        config: SingleAgentSettings
 ) -> Agent:
-    prompt = config.get('prompt')
+    prompt = config.get('prompt', None)
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
@@ -38,31 +35,35 @@ def _build_agent(
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 
+    tool_required = config.get("tool_required", "auto")
+    if tool_required not in ["auto", "required", "none"]:
+        tool_required = {"type": "function", "name": tool_required}
     agent = Agent(
         name=config["name"],
-        description=config["description"],
+        description=config.get("description", None),
         prompt=prompt,
         model=config["engine"],
-        tools=config["tools"]
+        tools=config["tools"],
+        tool_settings=tool_required,
+        goal=config.get("goal", None),
     )
-
-    armory.add_tool(build_agent_handoff_tool(agent, ai_client))
     return agent
 
 
-def _build_agents(
-        settings: list[SingleAgentSettings],
+def _build_main_agent(
+        agent_settings: SingleAgentSettings,
+        agent_tool_settings: list[SingleAgentSettings] | None,
         armory: Armory,
-        starting_agent: str,
         ai_client: AIClient
 ) -> Agent:
-    agents = {}
+    main_agent = _build_agent(agent_settings)
 
-    for agent_settings in settings:
-        agent = _build_agent(agent_settings, armory, ai_client)
-        agents[agent_settings['name']] = agent
+    if agent_tool_settings:
+        for agent_settings in agent_tool_settings:
+            agent = _build_agent(agent_settings)
+            armory.add_tool(_build_agent_tool(agent, ai_client))
 
-    return agents[starting_agent]
+    return main_agent
 
 
 # noinspection PyTypeChecker
@@ -86,6 +87,11 @@ def _get_armory(config: Config, bot, record_message) -> Armory:
 
     return _armory
 
+def _add_agent_tools(config: Config, client: AIClient) -> None:
+    for agent_settings in config['agents_as_tools']:
+        agent = _build_agent(agent_settings)
+        _armory.add_tool(_build_agent_tool(agent, client))
+
 
 def build_agent_conversation_duck(
         name: str,
@@ -96,8 +102,8 @@ def build_agent_conversation_duck(
 ) -> DuckConversation:
     armory = _get_armory(config, bot, record_message)
     ai_client = AIClient(armory)
-    starting= settings.get('starting_agent')
-    starting_agent = _build_agents(settings['agents'], armory, starting, ai_client)
+    _add_agent_tools(config, ai_client)
+    starting_agent = _build_main_agent(settings['agent'], settings.get('agents_as_tools', None), armory, ai_client)
 
     agent_conversation = AgentConversation(
         name,

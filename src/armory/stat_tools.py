@@ -422,7 +422,6 @@ class StatsTools:
         z = (z1 - mean) / std
         if z2 is not None:
             z2 = (z2 - mean) / std
-
         if tail == "Upper Tail":
             return f"The probability is {round(norm.sf(z), 4)}"
         elif tail == "Lower Tail":

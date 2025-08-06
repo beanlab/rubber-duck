@@ -2,7 +2,7 @@ from typing import Callable
 
 from openai.types.responses import FunctionToolParam
 
-from .tools import generate_openai_function_schema, needs_context, needs_history
+from .tools import needs_context, generate_function_schema
 
 
 class Armory:
@@ -34,15 +34,11 @@ class Armory:
 
     def get_tool_schema(self, tool_name: str) -> FunctionToolParam:
         tool_function = self.get_specific_tool(tool_name)
-        return generate_openai_function_schema(tool_function)
+        return generate_function_schema(tool_function)
 
     def get_tool_needs_context(self, tool_name: str) -> bool:
         tool_function = self.get_specific_tool(tool_name)
         return needs_context(tool_function)
-
-    def get_tool_needs_history(self, tool_name: str) -> bool:
-        tool_function = self.get_specific_tool(tool_name)
-        return needs_history(tool_function)
 
     def get_all_tool_names(self):
         return list(self._tools.keys())

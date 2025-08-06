@@ -1,8 +1,4 @@
-
-import inspect
-from typing import Any, Callable, get_type_hints, get_origin, get_args, Literal
-
-from openai.types.responses import FunctionToolParam
+from typing import Callable
 
 _tools: dict[str, Callable] = {}
 
@@ -16,10 +12,28 @@ def sends_image(func):
     func.sends_image = True
     return func
 
-def get_strict_json_schema_type(annotation) -> dict:
-    origin = get_origin(annotation) or annotation
 
-    # Map Python types to JSON Schema types
+import inspect
+from typing import Any, Callable, get_type_hints, Literal, Union, get_origin, get_args
+
+
+def is_optional(annotation) -> bool:
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    return origin is Union and type(None) in args
+
+
+def get_strict_json_schema_type(annotation) -> dict:
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    # Handle Optional[T]
+    if is_optional(annotation):
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        if len(non_none_args) == 1:
+            return get_strict_json_schema_type(non_none_args[0])
+        raise TypeError(f"Unsupported Union with multiple non-None values: {annotation}")
+
     type_map = {
         str: "string",
         int: "integer",
@@ -27,20 +41,21 @@ def get_strict_json_schema_type(annotation) -> dict:
         bool: "boolean",
     }
 
+    if annotation in type_map:
+        return {"type": type_map[annotation]}
     if origin in type_map:
         return {"type": type_map[origin]}
 
     if origin is Literal:
-        values = get_args(annotation)
+        values = args
         if all(isinstance(v, (str, int, bool)) for v in values):
-            return {"enum": list(values)}
-        else:
-            raise TypeError("Unsupported Literal type")
+            return {"type": "string" if all(isinstance(v, str) for v in values) else "number", "enum": list(values)}
+        raise TypeError("Unsupported Literal values in annotation")
 
     raise TypeError(f"Unsupported parameter type: {annotation}")
 
 
-def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
+def generate_function_schema(func: Callable[..., Any]) -> dict:
     sig = inspect.signature(func)
     type_hints = get_type_hints(func)
 
@@ -48,26 +63,20 @@ def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolPar
     required = []
 
     for name, param in sig.parameters.items():
-        if name in {"self", "ctx", "context", "history", "message_history"}:
+        if name in {"self", "ctx", "context"}:
             continue
 
         ann = type_hints.get(name, param.annotation)
         if ann is inspect._empty:
             raise TypeError(f"Missing type annotation for parameter: {name}")
 
-        try:
-            schema_entry = get_strict_json_schema_type(ann)
-        except TypeError as e:
-            raise TypeError(f"Error in parameter '{name}': {e}")
+        schema_entry = get_strict_json_schema_type(ann)
 
-        if param.default != inspect.Parameter.empty:
-            schema_entry["default"] = param.default
-        else:
-            required.append(name)
-
+        # Always require the field (OpenAI requires all keys listed)
+        required.append(name)
         params[name] = schema_entry
 
-    function_schema: FunctionToolParam = {
+    return {
         "type": "function",
         "name": func.__name__,
         "description": func.__doc__ or "",
@@ -75,13 +84,10 @@ def generate_openai_function_schema(func: Callable[..., Any]) -> FunctionToolPar
             "type": "object",
             "properties": params,
             "required": required,
-            "additionalProperties": False,
+            "additionalProperties": False
         },
-        "strict": True,
+        "strict": True
     }
-
-    return function_schema
-
 
 def needs_context(tool_function: Callable) -> bool:
     sig = inspect.signature(tool_function)
@@ -90,11 +96,3 @@ def needs_context(tool_function: Callable) -> bool:
         return False
     first_param_name = params[0].name
     return first_param_name in ("ctx", "context")
-
-def needs_history(tool_function: Callable) -> bool:
-    sig = inspect.signature(tool_function)
-    params = list(sig.parameters.values())
-    if not params:
-        return False
-    second_param_name = params[1].name
-    return second_param_name in ("history", "message_history")

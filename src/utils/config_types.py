@@ -1,12 +1,10 @@
-from asyncio import Queue
 from dataclasses import dataclass
 from typing import NotRequired, Optional, Union
 
 from openai.types.responses import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
-from typing_extensions import TypedDict
-
 from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -18,17 +16,19 @@ class FileData(TypedDict):
     bytes: bytes
 
 
-
 class AgentMessage(BaseModel):
     agent_name: str
     content: Optional[str] = None
     file: Optional[FileData] = None
 
+
 class GPTMessage(BaseModel):
     role: str
     content: str
 
+
 HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam]
+
 
 class FeedbackNotifierSettings(TypedDict):
     feedback_check_hour: int
@@ -66,20 +66,15 @@ class SingleAgentSettings(TypedDict):
     engine: str
     tools: list[str]
     description: str
-    handoffs: NotRequired[list[str]]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
-
+    tool_required: NotRequired[str]
+    goal: NotRequired[str]
 
 
 class MultiAgentSettings(TypedDict):
-    agents: list[SingleAgentSettings]
-    starting_agent: str | None  # If not set, will use first agent listed in `gen_ai`
-
-
-class AgentAsToolSettings(MultiAgentSettings):
-    tool_name: str
-    description: str
+    agent: SingleAgentSettings
+    agents_as_tools: list[SingleAgentSettings]
 
 
 class AgentConversationSettings(MultiAgentSettings):
@@ -155,7 +150,7 @@ class ReporterConfig(TypedDict):
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
-    agents_as_tools: list[AgentAsToolSettings]
+    agents_as_tools: list[SingleAgentSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
