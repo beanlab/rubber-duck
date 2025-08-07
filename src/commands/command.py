@@ -65,7 +65,6 @@ class FeedbackMetricsCommand(Command):
         self.feedback_summarizer = feedback_summarizer
 
     def get_feedback_proportions(self, scores, max_per_channel=50):
-        # Step 1: Collect raw counts of scores per channel
         raw_counts = defaultdict(lambda: defaultdict(int))
         total_counts = defaultdict(int)
 
@@ -78,7 +77,6 @@ class FeedbackMetricsCommand(Command):
             except (ValueError, TypeError):
                 continue
 
-        # Step 2: Proportional sampling allocation
         sample_distribution = {}
 
         for channel_id, score_counts in raw_counts.items():
