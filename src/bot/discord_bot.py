@@ -1,12 +1,25 @@
 import io
+from pathlib import Path
 
 import discord
+import requests
 
 from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import Attachment, Message
 
 
+def as_attachment(attachment):
+    return Attachment(
+        attachment_id=attachment.id,
+        description=attachment.description,
+        filename=attachment.filename,
+        size=attachment.size,
+        url=attachment.url
+    )
+
+
+# make this comprehension
 def as_message(message: discord.Message) -> Message:
     return Message(
         guild_id=message.guild.id,
@@ -17,15 +30,7 @@ def as_message(message: discord.Message) -> Message:
         author_mention=message.author.mention,
         message_id=message.id,
         content=message.content,
-        file=[as_attachment(attachment) for attachment in message.attachments]
-    )
-
-
-def as_attachment(attachment):
-    return Attachment(
-        attachment_id=attachment.id,
-        description=attachment.description,
-        filename=attachment.filename
+        files=[as_attachment(a) for a in message.attachments]
     )
 
 
@@ -135,9 +140,9 @@ class DiscordBot(discord.Client):
         if isinstance(file, discord.File):
             return file
         if isinstance(file, tuple):
-            return discord.File(io.BytesIO(file[1]), file[0])
+            return discord.File(io.BytesIO(file[1]), filename=file[0])
         if isinstance(file, dict):
-            return discord.File(file['bytes'], file['filename'])
+            return discord.File(io.BytesIO(file['bytes']), filename=file['filename'])
 
         raise NotImplementedError(f"Unsupported file type: {file}")
 
@@ -147,8 +152,8 @@ class DiscordBot(discord.Client):
         if channel is None:
             try:
                 channel = await self.fetch_channel(channel_id)
-            except Exception as e:
-                duck_logger.error(f'Tried to send message on {channel_id}, but no channel found.')
+            except Exception:
+                duck_logger.exception(f'Tried to send message on {channel_id}, but no channel found.')
                 raise
 
         if message:
@@ -222,4 +227,14 @@ class DiscordBot(discord.Client):
             auto_archive_duration=60
         )
         return thread.id
-    
+
+
+    async def read_url(self, url: str) -> str:
+        """
+        Read a URL and return its content as a string.
+        """
+        try:
+            return requests.get(url).text
+        except Exception:
+            duck_logger.exception(f"Error reading URL {url}")
+            raise

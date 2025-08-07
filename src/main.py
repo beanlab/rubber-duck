@@ -1,23 +1,20 @@
 import argparse
 import asyncio
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Iterable
 
-import boto3
-import yaml  # Added import for YAML support
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.agents.build import build_agent_conversation_duck
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .gen_ai.build import build_agent_conversation_duck
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -25,6 +22,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
     DUCK_NAME, DuckConfig
 from .utils.feedback_notifier import FeedbackNotifier
@@ -33,60 +31,6 @@ from .utils.persistent_queue import PersistentQueue
 from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
 
-
-def fetch_config_from_s3() -> Config | None:
-    # Initialize S3 client
-    s3 = boto3.client('s3')
-
-    # Add a section to your env file to allow for local and production environment
-    environment = os.environ.get('ENVIRONMENT')
-    if not environment or environment == 'LOCAL':
-        duck_logger.info("Using local environment")
-        return None
-
-    # Get the S3 path from environment variables (CONFIG_FILE_S3_PATH should be set)
-    s3_path = os.environ.get('CONFIG_FILE_S3_PATH')
-
-    if not s3_path:
-        duck_logger.warning("No S3 path configured")
-        return None
-
-    # Parse bucket name and key from the S3 path (s3://bucket-name/key)
-    bucket_name, key = s3_path.replace('s3://', '').split('/', 1)
-    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-    duck_logger.info(f"Config key: {key}")
-
-    try:
-        # Download file from S3
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-
-        # Read the content of the file and parse it as JSON
-        config = json.loads(response['Body'].read().decode('utf-8'))
-        duck_logger.info("Successfully loaded config from S3")
-        return config
-
-    except Exception as e:
-        duck_logger.error(f"Failed to fetch config from S3: {e}")
-        return None
-
-
-def load_yaml_config(config_path):
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
-
-
-def load_json_config(config_path):
-    with open(config_path, 'r') as f:
-        return json.load(f)
-
-
-def load_local_config(config_path):
-    if config_path.suffix == '.json':
-        return load_json_config(config_path)
-    elif config_path.suffix == '.yaml':
-        return load_yaml_config(config_path)
-    else:
-        raise ValueError("Config file must be either .json or .yaml")
 
 
 def setup_workflow_manager(
@@ -144,9 +88,9 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, settings: RegistrationSettings
+        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
 ):
-    email_confirmation = EmailSender(settings['sender_email'])
+    email_confirmation = EmailSender(config['sender_email'])
 
     registration_workflow = RegistrationWorkflow(
         name,
@@ -166,7 +110,10 @@ def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
     # Look for inline duck configs
     for server_config in config['servers'].values():
         for channel_config in server_config['channels']:
-            for item in channel_config['ducks']:
+            if not isinstance(channel_config.get('ducks'), list):
+                duck_logger.error(
+                    f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
+            for item in channel_config.get('ducks') or []:
                 if isinstance(item, DUCK_NAME):
                     continue
                 elif isinstance(item, dict):
@@ -203,7 +150,7 @@ def build_ducks(
             )
 
         elif duck_type == 'registration':
-            ducks[name] = build_registration_duck(name, bot, settings)
+            ducks[name] = build_registration_duck(name, bot, config, settings)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -271,6 +218,14 @@ def _build_feedback_queues(config: Config, sql_session):
 
 
 async def main(config: Config, log_dir: Path):
+    try:
+        await _main(config, log_dir)
+    except Exception as ex:
+        duck_logger.exception('ERROR in MAIN')
+        print(ex)
+
+
+async def _main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -332,7 +287,7 @@ async def main(config: Config, log_dir: Path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=Path, default='config.json', help='Path to config file (.json or .yaml)')
+    parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
 
@@ -357,11 +312,6 @@ if __name__ == '__main__':
     # Add console handler to the duck logger
     add_console_handler()
 
-    # Try fetching the config from S3 first
-    config = fetch_config_from_s3()
-
-    if config is None:
-        # If fetching from S3 failed, load from local file
-        config = load_local_config(args.config)
+    config: Config = load_configuration(args.config)
 
     asyncio.run(main(config, args.log_path))

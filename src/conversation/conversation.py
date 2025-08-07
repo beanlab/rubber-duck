@@ -2,9 +2,10 @@ import asyncio
 
 from quest import step, queue
 
-from ..agents.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
+from ..gen_ai.gen_ai import GPTMessage, RecordMessage, GenAIException, GenAIClient
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, AgentMessage
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message, SendMessage, AddReaction
 
 
@@ -52,8 +53,11 @@ class AgentConversation:
                  record_message: RecordMessage,
                  send_message: SendMessage,
                  add_reaction: AddReaction,
+                 read_url,
                  wait_for_user_timeout,
-                 armory: Armory
+                 armory: Armory,
+                 file_size_limit: int,
+                 file_type_ext: list[str] = None,
                  ):
         self.name = name
 
@@ -65,10 +69,14 @@ class AgentConversation:
 
         self._send_message = step(send_message)
         self._add_reaction: AddReaction = step(add_reaction)
+        self._read_url = step(read_url)
 
         self._wait_for_user_timeout = wait_for_user_timeout
         self._armory = armory
+        self._file_size_limit = file_size_limit
+        self._file_type_ext = file_type_ext or []
 
+# Make a read function in discord bot that will read files.
     @step
     async def _get_and_send_ai_response(
             self,
@@ -77,6 +85,8 @@ class AgentConversation:
             message_history: list[GPTMessage]
     ) -> tuple[AGENT_NAME, AGENT_MESSAGE]:
 
+        duck_logger.debug(f"Processing with agent: {agent_name} (Thread: {context.thread_id})")
+
         response: AgentMessage = await self._ai_clients[agent_name].get_completion(
             context,
             message_history,
@@ -84,10 +94,13 @@ class AgentConversation:
 
         if file := response.get('file'):
             await self._send_message(context.thread_id, file=file)
-            return file['filename']
+            return agent_name, f"Sent file: {file['filename']}"
 
         if content := response.get('content'):
             await self._send_message(context.thread_id, content)
+            # Log if the agent decided to hand off to another agent
+            if response['agent_name'] != agent_name:
+                duck_logger.info(f"Agent {agent_name} decided to hand off to {response['agent_name']} (Thread: {context.thread_id})")
             return response['agent_name'], content
 
         raise NotImplementedError(f'AI completion had neither content nor file.')
@@ -96,6 +109,11 @@ class AgentConversation:
 
         agent_name = self._starting_agent
         message_history = []
+
+        # Reset previous agent name for new conversation
+        self._previous_agent_name = None
+
+        duck_logger.info(f"Starting conversation with agent: {agent_name} (Thread: {context.thread_id})")
 
         introduction = self._introduction or "Hi, how can I help you?"
         await self._send_message(context.thread_id, introduction)
@@ -112,26 +130,55 @@ class AgentConversation:
                     except asyncio.TimeoutError:
                         break
 
-                    if len(message['file']) > 0:
-                        await self._send_message(
-                            context.thread_id,
-                            "I'm sorry, I can't read file attachments. "
-                            "Please resend your message with the relevant parts of your file included in the message."
+                    if message['content']:
+                        message_history.append(GPTMessage(role='user', content=message['content']))
+                        await self._record_message(
+                            context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
+                            message_history[-1]['content']
                         )
-                        continue
 
-                    message_history.append(GPTMessage(role='user', content=message['content']))
+                    errors = []
+                    for attachment in message['files']:
+                        if attachment['size'] > self._file_size_limit:
+                            errors.append(
+                                f"File {attachment['filename']} is too large. "
+                                f"Please upload a file smaller than {self._file_size_limit / 1024 / 1024:.2f} MB."
+                            )
+                            continue
 
-                    await self._record_message(
-                        context.guild_id, context.thread_id, context.author_id, message_history[-1]['role'],
-                        message_history[-1]['content']
-                    )
+                        if attachment['filename'].split('.')[-1] not in self._file_type_ext:
+                            errors.append(
+                                f"File {attachment['filename']} is not an allowed type. "
+                                f"Allowed types are: {', '.join(self._file_type_ext)}."
+                            )
+                            continue
+
+                        file_content = await self._read_url(attachment['url'])
+                        if file_content:
+                            file_content = f'**{attachment["filename"]}**\n--------\n{file_content}\n--------\n'
+                            message_history.append(GPTMessage(role='user', content=file_content))
+                            await self._record_message(
+                                context.guild_id, context.thread_id, context.author_id, "user", file_content
+                            )
+
+                    if errors:
+                        message_history.append(GPTMessage(role='assistant', content='\n'.join(errors)))
+                        await self._send_message(context.thread_id, '\n'.join(errors))
+                        continue  # wait for the user to respond
 
                     agent_name, response = await self._get_and_send_ai_response(
                         context,
                         agent_name,
                         message_history
                     )
+
+                    # Log agent handoff if the agent changed
+                    if hasattr(self, '_previous_agent_name') and self._previous_agent_name != agent_name:
+                        duck_logger.debug(f"Agent handoff: {self._previous_agent_name} -> {agent_name}")
+                    elif not hasattr(self, '_previous_agent_name'):
+                        duck_logger.debug(f"Starting with agent: {agent_name} (Thread: {context.thread_id})")
+                    
+                    self._previous_agent_name = agent_name
 
                     message_history.append(GPTMessage(role='assistant', content=response))
 

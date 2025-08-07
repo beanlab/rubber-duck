@@ -5,7 +5,7 @@ import uuid
 from discord import Guild
 from quest import step, queue
 
-from ..utils.config_types import RegistrationSettings
+from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 from ..utils.send_email import EmailSender
@@ -28,19 +28,21 @@ class RegistrationWorkflow:
         self._email_sender = email_sender
         self._settings = settings
 
-    async def __call__(self, thread_id: int, initial_message: Message):
+    async def __call__(self, context: DuckContext):
         # Start the registration process
+        thread_id = context.thread_id
         net_id = await self._get_net_id(thread_id)
+        server_id = context.guild_id
+        author_id = context.author_id
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, settings['email_domain']):
+        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain']):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
-        server_id = initial_message['guild_id']
-        await self._assign_roles(server_id, thread_id, initial_message['author_id'], self._settings)
+        await self._assign_roles(server_id, thread_id, author_id, self._settings)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -92,8 +94,8 @@ class RegistrationWorkflow:
             # Wait for user response
             response = await self._wait_for_message()
             if not response:
-                await self._send_message(thread_id, "No response received. Please try again.")
-                raise TimeoutError("Timeout, please start a new chat.")
+                await self._send_message(thread_id, "No response received. Please start a new chat.")
+                raise TimeoutError("Timeout waiting for user email verification")
 
             if response == 'resend':
                 token = self._email_sender.send_email(email, token)
@@ -119,41 +121,48 @@ class RegistrationWorkflow:
 
     @step
     async def _select_roles(self, thread_id, available_roles, settings):
-        # Display available roles
-        role_list = "\n".join([f"{i + 1}. {role['name']}"
-                               for i, role in enumerate(available_roles)])
-        await self._send_message(thread_id,
-                                 "Please select your roles:\n\n"
-                                 "1. Find your lecture section and lab section in BYU MyMap\n"
-                                 "2. Enter the numbers of your roles separated by commas\n"
-                                 "   Example: '1,3,4'\n\n"
-                                 f"Available roles:\n{role_list}")
+        while True:
+            # Display available roles
+            role_list = "\n".join([f"{i + 1}. {role['name']}"
+                                   for i, role in enumerate(available_roles)])
+            await self._send_message(thread_id,
+                                     "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
+                                     "- These may include lecture section or lab section\n\n"
+                                     "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
+                                     "**Example: '1,3,4'**\n\n"
+                                     f"Available roles:\n{role_list}")
 
-        # Wait for user response
-        response = await self._wait_for_message()
-        if not response:
-            await self._send_message(thread_id, "No response received. Please try again.")
-            return []
+            # Wait for user response
+            response = await self._wait_for_message()
+            if response is None or not response.strip():
+                await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
+                return []
 
-        # Split by comma and convert to integers
-        selected_indices = []
-        for idx in response.split(','):
-            try:
-                num = int(idx.strip())
-                if 1 <= num <= len(available_roles):
-                    selected_indices.append(num - 1)
-            except ValueError:
+            if 'skip' in response:
+                await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
+                return []
+                
+            # Split by comma and convert to integers
+            selected_indices = []
+            errors = []
+            for idx in response.split(','):
+                try:
+                    num = int(idx.strip())
+                    if 1 <= num <= len(available_roles):
+                        selected_indices.append(num - 1)
+                except ValueError:
+                    errors.append(f'"{idx}" is not a valid role number')
+
+            if errors:
+                await self._send_message(thread_id, "\n".join(errors))
                 continue
-
-        selected_roles = []
-        for idx in selected_indices:
-            selected_roles.append(available_roles[idx]['id'])
-
-        if not selected_roles:
-            await self._send_message(thread_id, "No valid roles selected. Please try again.")
-            return []
-
-        return selected_roles
+            
+            selected_roles = [
+                available_roles[idx]['id']
+                for idx in selected_indices
+            ]
+            
+            return selected_roles
 
     @step
     async def _get_available_roles(
@@ -199,7 +208,7 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: dict):
+    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings):
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
         try:
             # Get roles and selection

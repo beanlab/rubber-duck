@@ -15,7 +15,7 @@ formatter = logging.Formatter(
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
-quest_logger.setLevel(logging.DEBUG)
+quest_logger.setLevel(logging.INFO)
 
 
 def add_console_handler():
@@ -71,4 +71,5 @@ async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
         try:
             await send_message(channel_id, f"[{record.levelname}] {message}")
         except Exception as e:
-            print(f"Failed to send log message to Discord: {e}")
+            duck_logger.debug(f"Failed to send log message to Discord: {e}")
+            duck_logger.debug(f"[{record.levelname}] {message}")

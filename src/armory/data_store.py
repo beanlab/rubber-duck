@@ -153,5 +153,12 @@ class DataStore:
         raise FileNotFoundError(
             f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}")
 
+    def get_column(self, dataset: pd.DataFrame, column: str) -> pd.Series:
+        try:
+            return dataset[column]
+        except KeyError:
+            raise KeyError(
+                f"Column '{column}' not found in dataset. Available columns are: {dataset.columns.tolist()}")
+
     def clear_cache(self):
         self._loaded_datasets = {}
