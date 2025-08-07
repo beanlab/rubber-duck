@@ -67,29 +67,29 @@ agents_as_tools:
           - prompts/explainer-duck.txt
         max_iterations: 5
 
-    - tool_name: explain_idea
-      description: |
-        This tool provides brief explanations of the provided topic or code.
-        When calling this tool, provide the code that needs to be explained or a description of the programming concept that needs to be explained.
-        
-        ## Arguments
-        topic: str - the topic description or code you want to explain
-  
-        ## Returns
-        str - a markdown string containing the explanation
-  
-        ## Usage
-        >>> explain_idea('What is encapsulation in programming?')
-        """
-        ...fill me in...
-        """
+      - tool_name: explain_idea
+        description: |
+          This tool provides brief explanations of the provided topic or code.
+          When calling this tool, provide the code that needs to be explained or a description of the programming concept that needs to be explained.
+          
+          ## Arguments
+          topic: str - the topic description or code you want to explain
+    
+          ## Returns
+          str - a markdown string containing the explanation
+    
+          ## Usage
+          >>> explain_idea('What is encapsulation in programming?')
+          """
+          ...fill me in...
+          """
 
-    agents:
-      - name: explainer
-        engine: gpt-4.1
-        prompt_files:
-          - prompts/explainer-duck.txt
-        max_iterations: 5
+        agents:
+          - name: explainer
+            engine: gpt-4.1
+            prompt_files:
+              - prompts/explainer-duck.txt
+            max_iterations: 5
 
 
 ducks:
