@@ -3,7 +3,6 @@ from typing import NotRequired, Optional, Union
 
 from openai.types.responses import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
-from pydantic import BaseModel
 from typing_extensions import TypedDict
 
 CHANNEL_ID = int
@@ -16,13 +15,13 @@ class FileData(TypedDict):
     bytes: bytes
 
 
-class AgentMessage(BaseModel):
+class AgentMessage(TypedDict):
+    content: NotRequired[str]
+    file: NotRequired[FileData]
     agent_name: str
-    content: Optional[str] = None
-    file: Optional[FileData] = None
 
 
-class GPTMessage(BaseModel):
+class GPTMessage(TypedDict):
     role: str
     content: str
 
@@ -61,11 +60,6 @@ class RegistrationSettings(TypedDict):
     sender_email: str
 
 
-class Goal(TypedDict):
-    name: str
-    description: str
-
-
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
@@ -74,7 +68,6 @@ class SingleAgentSettings(TypedDict):
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     tool_required: NotRequired[str]
-    goal: NotRequired[Goal]
 
 
 class MultiAgentSettings(TypedDict):
