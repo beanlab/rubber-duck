@@ -41,14 +41,13 @@ ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | T
 
 class Agent:
     def __init__(self, name: str, description: str | None, prompt: str, model: str, tools: list[str],
-                 tool_settings: ToolChoiceTypes = "auto", goal: str | None = None):
+                 tool_settings: ToolChoiceTypes = "auto"):
         self.name = name
         self.description = description
         self.prompt = prompt
         self.model = model
         self.tools = tools
         self.tool_settings = tool_settings
-        self.goal = goal
 
 
 class Response(TypedDict):
@@ -75,15 +74,6 @@ def format_function_call_history_items(result: str, call: Response):
             output=str(result)
         )
     ]
-
-def stringify_conversation_history(history: list[HistoryType]) -> str:
-    return "\n".join(
-        json.dumps(dict(entry), ensure_ascii=False) for entry in history
-    )
-
-class GoalCheckResult(BaseModel):
-    accomplished: bool
-    description: str
 
 class AIClient:
     def __init__(self, armory: Armory):
@@ -135,17 +125,13 @@ class AIClient:
                     if inspect.isawaitable(result):
                         result = await result
 
-                    if result is True:
-                        return
-
                     history.extend(format_function_call_history_items(result, output))
 
                     continue
 
                 elif output['type'] == "message":
-                    message = f"Use the talk_to_user tool to respond with this message {output['message']}"
-                    history.append(GPTMessage(role='system', content=message))
-                    continue
+                    return output['message']
+
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
@@ -161,10 +147,3 @@ class AIClient:
         agent_runner.__name__ = agent.name
         agent_runner.__doc__ = agent.description
         return agent_runner
-
-    def build_goal_accomplished_tool(self, agent: Agent, name: str) -> callable:
-        async def goal_accomplished(accomplished: bool):
-            return accomplished
-        goal_accomplished.__name__ = name
-        goal_accomplished.__doc__ = f"Check if the goal {agent.goal} for {agent.name} is accomplished. If the goal is accomplished, return True, otherwise False."
-        return goal_accomplished

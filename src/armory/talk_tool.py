@@ -17,7 +17,8 @@ class TalkTool:
     async def talk_to_user(self, ctx: DuckContext, query: str) -> str:
         """
         The only way to talk to the user or to continue a conversation with them. This tool must be used
-        to communicate. If you want to share information with the user, you must use this tool.
+        to communicate. If you want to share information with the user, you must use this tool. When you have nothing left
+        to tell the user, you do not have to call this tool.
         :param query: str: The message to send to the user.
         :return: responses: str: The response from the user.
         """
