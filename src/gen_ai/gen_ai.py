@@ -90,19 +90,6 @@ class AIClient:
         self._armory = armory
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
-    async def _check_against_goal(self, goal: str, history: list[HistoryType]) -> GoalCheckResult:
-        response = self._client.responses.parse(
-            model="gpt-4.1-mini",
-            instructions=f"You are a goal-checking professional. Your task is to determine if a conversation history \
-            meets a required goal if it does meet the goal you return true and your description is how the goal was met. \
-            If it does not meet the goal you return false and your description is how it did not meet the goal. In either case \
-            your description should be concise and to the point.",
-            input=f"This is the goal: {goal}\n\nThis is the conversation history: {stringify_conversation_history(history)}\n",
-            text_format=GoalCheckResult
-        )
-        return response.output_parsed
-
     @step
     async def _get_completion(self, prompt: str, history, model: str, tools: list[FunctionToolParam],
                               tool_settings: ToolChoiceTypes) -> Response:
@@ -148,22 +135,16 @@ class AIClient:
                     if inspect.isawaitable(result):
                         result = await result
 
-                    history.extend(format_function_call_history_items(result, output))
+                    if result is True:
+                        return
 
-                    if agent.goal:
-                        check = await self._check_against_goal(agent.goal, history)
-                        if check.accomplished is False:
-                            history.append(GPTMessage(role='developer', content=f"Goal not accomplished for the following reason: {check.description}"))
-                        elif check.accomplished is True:
-                            return (f"The user has finished using the {agent.name} tool, and has indicated they would like to talk about another subject. \""
-                                    f"use the talk_to_user tool to determine how they would like to continue the conversation.")
-                        continue
+                    history.extend(format_function_call_history_items(result, output))
 
                     continue
 
                 elif output['type'] == "message":
                     message = f"Use the talk_to_user tool to respond with this message {output['message']}"
-                    history.append(GPTMessage(role='developer', content=message))
+                    history.append(GPTMessage(role='system', content=message))
                     continue
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
@@ -173,11 +154,17 @@ class AIClient:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
 
-    def build_agent_tool(self, agent: Agent, name: str, description: str) -> callable:
+    def build_agent_tool(self, agent: Agent) -> callable:
         async def agent_runner(ctx: DuckContext, query: str):
-            duck_logger.debug(f"Talking to agent: {name}")
+            duck_logger.debug(f"Talking to agent: {agent.name}")
             return await self.run_agent(ctx, agent, query)
-        function_name = name
-        agent_runner.__name__ = function_name
-        agent_runner.__doc__ = description
+        agent_runner.__name__ = agent.name
+        agent_runner.__doc__ = agent.description
         return agent_runner
+
+    def build_goal_accomplished_tool(self, agent: Agent, name: str) -> callable:
+        async def goal_accomplished(accomplished: bool):
+            return accomplished
+        goal_accomplished.__name__ = name
+        goal_accomplished.__doc__ = f"Check if the goal {agent.goal} for {agent.name} is accomplished. If the goal is accomplished, return True, otherwise False."
+        return goal_accomplished

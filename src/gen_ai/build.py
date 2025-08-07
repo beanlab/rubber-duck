@@ -24,6 +24,12 @@ def _build_agent(
     tool_required = config.get("tool_required", "auto")
     if tool_required not in ["auto", "required", "none"]:
         tool_required = {"type": "function", "name": tool_required}
+
+    goal_config = config.get("goal", None)
+    if goal_config:
+        goal = goal_config["description"]
+    else:
+        goal = None
     agent = Agent(
         name=config["name"],
         description=config.get("description", None),
@@ -31,7 +37,7 @@ def _build_agent(
         model=config["engine"],
         tools=config["tools"],
         tool_settings=tool_required,
-        goal=config.get("goal", None),
+        goal=goal
     )
     return agent
 
@@ -40,15 +46,16 @@ def _build_main_agent(
         agent_settings: SingleAgentSettings,
         agent_tool_settings: list[SingleAgentSettings] | None,
         armory: Armory,
-        ai_client: AIClient
+        client: AIClient
 ) -> Agent:
     main_agent = _build_agent(agent_settings)
 
     if agent_tool_settings:
         for agent_settings in agent_tool_settings:
             agent = _build_agent(agent_settings)
-            armory.add_tool(ai_client.build_agent_tool(agent, agent.name, agent.description))
-
+            armory.add_tool(client.build_agent_tool(agent))
+            if goal_config := agent_settings.get("goal", None):
+                _armory.add_tool(client.build_goal_accomplished_tool(agent, goal_config['name']))
     return main_agent
 
 
@@ -76,7 +83,9 @@ def _get_armory(config: Config, bot, record_message) -> Armory:
 def _add_agent_tools(config: Config, client: AIClient) -> None:
     for agent_settings in config['agents_as_tools']:
         agent = _build_agent(agent_settings)
-        _armory.add_tool(client.build_agent_tool(agent, agent.name, agent.description))
+        _armory.add_tool(client.build_agent_tool(agent))
+        if goal_config := agent_settings.get("goal", None):
+            _armory.add_tool(client.build_goal_accomplished_tool(agent, goal_config['name']))
 
 
 def build_agent_conversation_duck(

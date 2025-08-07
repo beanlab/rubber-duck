@@ -61,6 +61,11 @@ class RegistrationSettings(TypedDict):
     sender_email: str
 
 
+class Goal(TypedDict):
+    name: str
+    description: str
+
+
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
@@ -69,7 +74,7 @@ class SingleAgentSettings(TypedDict):
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     tool_required: NotRequired[str]
-    goal: NotRequired[str]
+    goal: NotRequired[Goal]
 
 
 class MultiAgentSettings(TypedDict):
