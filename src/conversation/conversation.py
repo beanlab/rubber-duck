@@ -18,5 +18,4 @@ class AgentConversation:
 
     async def __call__(self, context: DuckContext):
         duck_logger.info(f"Starting conversation with agent: {self._starting_agent.name} (Thread: {context.thread_id})")
-
         await self._ai_client.run_agent(context, self._starting_agent, "Hi")

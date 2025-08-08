@@ -2,7 +2,7 @@ import inspect
 import json
 import os
 from io import BytesIO
-from typing import TypedDict, Protocol, Literal, NotRequired
+from typing import TypedDict, Protocol, Literal, NotRequired, Type
 
 from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
@@ -41,17 +41,19 @@ ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | T
 
 class Agent:
     def __init__(self, name: str, description: str | None, prompt: str, model: str, tools: list[str],
-                 tool_settings: ToolChoiceTypes = "auto"):
+                 tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None):
         self.name = name
         self.description = description
         self.prompt = prompt
         self.model = model
         self.tools = tools
         self.tool_settings = tool_settings
+        self.output_format = output_format
 
 
 class Response(TypedDict):
     type: Literal["function_call", "message"]
+    structured_output: NotRequired[bool]
     name: NotRequired[str]
     arguments: NotRequired[str]
     message: NotRequired[str]
@@ -75,22 +77,42 @@ def format_function_call_history_items(result: str, call: Response):
         )
     ]
 
+
 class AIClient:
     def __init__(self, armory: Armory):
         self._armory = armory
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @step
-    async def _get_completion(self, prompt: str, history, model: str, tools: list[FunctionToolParam],
-                              tool_settings: ToolChoiceTypes) -> Response:
-        response = self._client.responses.create(
-            model=model,
-            instructions=prompt,
-            input=history,
-            tools=tools,
-            tool_choice=tool_settings
-        )
+    async def _get_completion(
+            self,
+            prompt: str,
+            history,
+            model: str,
+            tools: list[FunctionToolParam],
+            tool_settings: ToolChoiceTypes,
+            output_format: Type[BaseModel] | None
+    ) -> Response:
+        if output_format:
+            response = self._client.responses.parse(
+                model=model,
+                instructions=prompt,
+                input=history,
+                tools=tools,
+                tool_choice=tool_settings,
+                text_format=output_format
+            )
+        else:
+            response = self._client.responses.create(
+                model=model,
+                instructions=prompt,
+                input=history,
+                tools=tools,
+                tool_choice=tool_settings
+            )
+
         output_item = response.output[0]
+
         if output_item.type == "function_call":
             return Response(
                 type="function_call",
@@ -99,11 +121,15 @@ class AIClient:
                 call_id=output_item.call_id,
                 id=output_item.id
             )
+
+        if output_format:
+            message = str(response.output_parsed)
+            structured_output = True
         else:
-            return Response(
-                type="message",
-                message=output_item.content[0].text
-            )
+            message = output_item.content[0].text
+            structured_output = False
+
+        return Response(type="message", message=message, structured_output=structured_output)
 
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
@@ -111,7 +137,8 @@ class AIClient:
         history: list[HistoryType] = [GPTMessage(role='user', content=query)]
         try:
             while True:
-                output = await self._get_completion(agent.prompt, history, agent.model, tools_json, agent.tool_settings)
+                output = await self._get_completion(agent.prompt, history, agent.model, tools_json,
+                                                    agent.tool_settings, agent.output_format)
                 if output['type'] == "function_call":
                     tool_name = output["name"]
                     tool_args = json.loads(output["arguments"])
@@ -130,7 +157,12 @@ class AIClient:
                     continue
 
                 elif output['type'] == "message":
-                    return output['message']
+                    if output.get('structured_output'):
+                        tool = self._armory.get_specific_tool("send_file")
+                        await tool(ctx, output['message'])
+                        return output['message']
+                    else:
+                        return output['message']
 
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
@@ -139,11 +171,11 @@ class AIClient:
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
-
     def build_agent_tool(self, agent: Agent) -> callable:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent.name}")
             return await self.run_agent(ctx, agent, query)
+
         agent_runner.__name__ = agent.name
         agent_runner.__doc__ = agent.description
         return agent_runner

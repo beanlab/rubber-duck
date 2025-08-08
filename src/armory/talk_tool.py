@@ -39,3 +39,12 @@ class TalkTool:
             return message['content']
         except asyncio.TimeoutError:
             return "Conversation timed out. Please try again."
+
+    @register_tool
+    async def send_file(self, ctx: DuckContext, output: str):
+        filename = "structured_output.txt"
+        file_data = (filename, output.encode("utf-8"))
+        await self._send_message(ctx.thread_id, message="Structured Output: ")
+        await self._send_message(ctx.thread_id, file=file_data)
+        await self._send_message(ctx.thread_id, message="Output: ")
+

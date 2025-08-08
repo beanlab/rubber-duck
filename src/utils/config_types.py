@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NotRequired, Optional, Union
+from typing import NotRequired, Optional, Union, Any
 
 from openai.types.responses import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
@@ -68,6 +68,7 @@ class SingleAgentSettings(TypedDict):
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     tool_required: NotRequired[str]
+    output: NotRequired[str]
 
 
 class MultiAgentSettings(TypedDict):
@@ -144,10 +145,14 @@ class AdminSettings(TypedDict):
 class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
+class StructuredOutput(TypedDict):
+    name: str
+    fields: dict[str, Any]
 
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
+    structured_outputs: list[StructuredOutput]
     agents_as_tools: list[SingleAgentSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

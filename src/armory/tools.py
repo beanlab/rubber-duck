@@ -1,5 +1,7 @@
 from typing import Callable
 
+from openai.types.responses import FunctionToolParam
+
 _tools: dict[str, Callable] = {}
 
 
@@ -55,7 +57,7 @@ def get_strict_json_schema_type(annotation) -> dict:
     raise TypeError(f"Unsupported parameter type: {annotation}")
 
 
-def generate_function_schema(func: Callable[..., Any]) -> dict:
+def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
     sig = inspect.signature(func)
     type_hints = get_type_hints(func)
 
@@ -63,7 +65,7 @@ def generate_function_schema(func: Callable[..., Any]) -> dict:
     required = []
 
     for name, param in sig.parameters.items():
-        if name in {"self", "ctx", "context"}:
+        if name in {"self", "ctx"}:
             continue
 
         ann = type_hints.get(name, param.annotation)
@@ -95,4 +97,4 @@ def needs_context(tool_function: Callable) -> bool:
     if not params:
         return False
     first_param_name = params[0].name
-    return first_param_name in ("ctx", "context")
+    return first_param_name =="ctx"
