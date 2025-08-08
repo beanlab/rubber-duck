@@ -10,6 +10,7 @@ from ..duck_orchestrator import DuckConversation
 from ..outputs.structured_outputs import StructuredOutputs
 from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext
 from ..utils.logger import duck_logger
+from ..utils.protocols import SendMessage
 
 
 def _build_agent(
@@ -82,7 +83,7 @@ def _get_structured_outputs(config: Config) -> StructuredOutputs:
             duck_logger.warning("**No structured outputs provided in config**")
     return _outputs
 
-def _get_armory(config: Config, send_message, record_message) -> Armory:
+def _get_armory(config: Config, send_message, typing, record_message) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory(send_message)
@@ -94,7 +95,7 @@ def _get_armory(config: Config, send_message, record_message) -> Armory:
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-        talk_tool = TalkTool(send_message, record_message, 30)
+        talk_tool = TalkTool(send_message, typing, record_message, 30)
         _armory.scrub_tools(talk_tool)
 
     return _armory
@@ -111,10 +112,11 @@ def build_agent_conversation_duck(
         config: Config,
         settings: AgentConversationSettings,
         record_message: RecordMessage,
-        bot,
+        send_message: SendMessage,
+        typing
 ) -> DuckConversation:
     # Same for each duck
-    armory = _get_armory(config, bot.send_message, record_message)
+    armory = _get_armory(config, send_message, typing, record_message)
     outputs = _get_structured_outputs(config)
     ai_client = _get_ai_client(armory)
 
@@ -126,6 +128,7 @@ def build_agent_conversation_duck(
         name,
         starting_agent,
         ai_client,
+        typing,
     )
 
     return agent_conversation

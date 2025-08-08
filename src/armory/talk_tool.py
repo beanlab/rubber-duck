@@ -8,8 +8,9 @@ from ..utils.protocols import Message
 
 
 class TalkTool:
-    def __init__(self, send_message, record_message, wait_for_user_timeout: int = 60):
+    def __init__(self, send_message, typing, record_message, wait_for_user_timeout: int = 60):
         self._send_message = send_message
+        self._typing = typing
         self._wait_for_user_timeout = wait_for_user_timeout
         self._record_message = record_message
 
@@ -22,6 +23,7 @@ class TalkTool:
         :param query: str: The message to send to the user.
         :return: responses: str: The response from the user.
         """
+        await self._typing.stop()
         await self._send_message(ctx.thread_id, query)
         await self._record_message(
             ctx.guild_id, ctx.thread_id, ctx.author_id, "assistant", query
@@ -36,6 +38,7 @@ class TalkTool:
                 ctx.guild_id, ctx.thread_id, ctx.author_id, "user",
                 message['content']
             )
+            await self._typing.start(ctx.thread_id)
             return message['content']
         except asyncio.TimeoutError:
             return "Conversation timed out. Please try again."

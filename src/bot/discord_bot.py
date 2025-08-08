@@ -214,6 +214,9 @@ class DiscordBot(discord.Client):
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             await self.stop()
 
+    def typing(self) -> ChannelTyping:
+        return self.ChannelTyping(self.fetch_channel)
+
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread
         # Users/roles with "Manage Threads" will be able to see the private threads
