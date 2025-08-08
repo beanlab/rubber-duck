@@ -193,26 +193,31 @@ class DiscordBot(discord.Client):
     class ChannelTyping:
         def __init__(self, fetch_channel):
             self._fetch_channel = fetch_channel
-            self._typing = None
-            self._channel_id = None
+            self._typings = {}  # channel_id -> typing context
 
         async def start(self, channel_id: int):
-            self._channel_id = channel_id
-            channel = await self._fetch_channel(channel_id)
-            self._typing = channel.typing()
-            await self._typing.__aenter__()
+            if channel_id in self._typings:
+                # Already typing in this channel, ignore or log if you want
+                return
 
-        async def stop(self):
-            if self._typing:
-                await self._typing.__aexit__(None, None, None)
-                self._typing = None
-                self._channel_id = None
+            channel = await self._fetch_channel(channel_id)
+            typing_ctx = channel.typing()
+            await typing_ctx.__aenter__()
+            self._typings[channel_id] = typing_ctx
+
+        async def stop(self, channel_id: int):
+            typing_ctx = self._typings.pop(channel_id, None)
+            if typing_ctx:
+                await typing_ctx.__aexit__(None, None, None)
 
         async def __aenter__(self):
             raise RuntimeError("Use 'start(channel_id)' instead of 'async with' if channel_id isn't passed at init.")
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):
-            await self.stop()
+            # Optionally stop all typings when context exits (or leave empty)
+            for typing_ctx in self._typings.values():
+                await typing_ctx.__aexit__(exc_type, exc_val, exc_tb)
+            self._typings.clear()
 
     def typing(self) -> ChannelTyping:
         return self.ChannelTyping(self.fetch_channel)

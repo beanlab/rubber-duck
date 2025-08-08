@@ -2,10 +2,6 @@ from ..gen_ai.gen_ai import GPTMessage, Agent, AIClient
 from ..utils.config_types import DuckContext, HistoryType
 from ..utils.logger import duck_logger
 
-
-AGENT_NAME, AGENT_MESSAGE = str, str
-
-
 class AgentConversation:
     def __init__(self,
                  name: str,

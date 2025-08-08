@@ -23,7 +23,7 @@ class TalkTool:
         :param query: str: The message to send to the user.
         :return: responses: str: The response from the user.
         """
-        await self._typing.stop()
+        await self._typing.stop(ctx.thread_id)
         await self._send_message(ctx.thread_id, query)
         await self._record_message(
             ctx.guild_id, ctx.thread_id, ctx.author_id, "assistant", query
