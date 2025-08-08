@@ -191,20 +191,28 @@ class DiscordBot(discord.Client):
         await message.add_reaction(reaction)
 
     class ChannelTyping:
-        def __init__(self, fetch_channel, channel_id):
+        def __init__(self, fetch_channel):
             self._fetch_channel = fetch_channel
+            self._typing = None
+            self._channel_id = None
+
+        async def start(self, channel_id: int):
             self._channel_id = channel_id
+            channel = await self._fetch_channel(channel_id)
+            self._typing = channel.typing()
+            await self._typing.__aenter__()
+
+        async def stop(self):
+            if self._typing:
+                await self._typing.__aexit__(None, None, None)
+                self._typing = None
+                self._channel_id = None
 
         async def __aenter__(self):
-            channel = await self._fetch_channel(self._channel_id)
-            self._typing = channel.typing()
-            return await self._typing.__aenter__()
+            raise RuntimeError("Use 'start(channel_id)' instead of 'async with' if channel_id isn't passed at init.")
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):
-            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
-
-    def typing(self, channel_id: int):
-        return self.ChannelTyping(self.fetch_channel, channel_id)
+            await self.stop()
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread

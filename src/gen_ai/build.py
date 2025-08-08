@@ -10,7 +10,6 @@ from ..duck_orchestrator import DuckConversation
 from ..outputs.structured_outputs import StructuredOutputs
 from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext
 from ..utils.logger import duck_logger
-from ..utils.protocols import SendMessage
 
 
 def _build_agent(
