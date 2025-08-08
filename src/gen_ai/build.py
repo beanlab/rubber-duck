@@ -1,49 +1,23 @@
 from pathlib import Path
-from typing import Any, Iterable
 
-from agents import Agent, AgentHooks, RunContextWrapper, ModelSettings
-from quest import step
-from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
+from .gen_ai import RecordMessage, Agent, AIClient
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
+from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
 from ..duck_orchestrator import DuckConversation
-from ..utils.config_types import AgentConversationSettings, DuckContext, \
-    SingleAgentSettings, Config, MultiAgentSettings
+from ..outputs.structured_outputs import StructuredOutputs
+from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, DuckContext
 from ..utils.logger import duck_logger
-
-
-class UsageAgentHooks(AgentHooks[DuckContext]):
-    def __init__(self, record_usage):
-        self._record_usage = step(record_usage)
-
-    async def on_end(
-            self,
-            context: RunContextWrapper[DuckContext],
-            agent: Agent[DuckContext],
-            output: Any,
-    ) -> None:
-        usage = context.usage
-        context = context.context
-        await self._record_usage(
-            context.guild_id,
-            context.parent_channel_id,
-            context.thread_id,
-            context.author_id,
-            agent.model,
-            usage.input_tokens,
-            usage.output_tokens,
-            usage.input_tokens_cached if hasattr(usage, 'input_tokens_cached') else 0,
-            usage.reasoning_tokens if hasattr(usage, 'reasoning_tokens') else 0
-        )
+from ..utils.protocols import SendMessage
 
 
 def _build_agent(
         config: SingleAgentSettings,
-        agent_hooks: AgentHooks[DuckContext],
-) -> Agent[DuckContext]:
-    prompt = config.get('prompt')
+        outputs: StructuredOutputs
+) -> Agent:
+    prompt = config.get('prompt', None)
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
@@ -51,69 +25,65 @@ def _build_agent(
 
         prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
 
-    tool_required = config.get("tool_required", "")
-    if tool_required:
-        model_settings = ModelSettings(
-            tool_choice=tool_required
-        )
-    else:
-        model_settings = ModelSettings(
-            tool_choice="auto"
-        )
-    return Agent[DuckContext](
-        model_settings=model_settings,
+    tool_required = config.get("tool_required", "auto")
+    if tool_required not in ["auto", "required", "none"]:
+        tool_required = {"type": "function", "name": tool_required}
+
+    output = config.get("output", None)
+
+    agent = Agent(
         name=config["name"],
-        handoff_description=config.get("handoff_prompt", ""),
-        instructions=prompt,
-        tools=[],
-        tool_use_behavior={},
+        description=config.get("description", None),
+        prompt=prompt,
         model=config["engine"],
-        hooks=agent_hooks,
-        handoffs=[]
+        tools=config["tools"],
+        tool_settings=tool_required,
+        output_format=outputs.get(output) if output else None
     )
+    return agent
 
 
-def _build_agents(
-        agent_hooks: AgentHooks[DuckContext],
-        settings: list[SingleAgentSettings],
-) -> dict[str, tuple[Agent[DuckContext], SingleAgentSettings]]:
-    agents = {}
+def _build_main_agent(
+        agent_settings: SingleAgentSettings,
+        agent_tool_settings: list[SingleAgentSettings] | None,
+        armory: Armory,
+        client: AIClient,
+        outputs: StructuredOutputs
+) -> Agent:
+    main_agent = _build_agent(agent_settings, outputs)
 
-    # Initial agent setup
-    for agent_settings in settings:
-        agent = _build_agent(agent_settings, agent_hooks)
-        agents[agent_settings['name']] = agent, agent_settings
-
-    # Add on agent handoffs
-    for agent_settings in settings:
-        agent_name = agent_settings['name']
-        agent = agents[agent_name][0]
-        handoff_targets = agent_settings.get('handoffs', [])
-
-        handoffs = [agents[target][0] for target in handoff_targets]
-        agent.handoffs = handoffs
-
-    return agents
-
-
-def _get_starting_agent(settings: MultiAgentSettings):
-    return settings.get('starting_agent', settings['agents'][0]['name'])
+    if agent_tool_settings:
+        for agent_settings in agent_tool_settings:
+            agent = _build_agent(agent_settings, outputs)
+            armory.add_tool(client.build_agent_tool(agent))
+    return main_agent
 
 
 # noinspection PyTypeChecker
 _armory: Armory = None
+# noinspection PyTypeChecker
+_outputs: StructuredOutputs = None
+# noinspection PyTypeChecker
+_ai_client: AIClient = None
+
+def _get_ai_client(armory) -> AIClient:
+    global _ai_client
+    if _ai_client is None:
+        _ai_client = AIClient(armory)
+
+    return _ai_client
 
 
-def _add_tools_to_agents(agents: Iterable[tuple[Agent, SingleAgentSettings]], armory: Armory):
-    for agent, settings in agents:
-        tools = [
-            armory.get_specific_tool(tool)
-            for tool in settings.get('tools', [])
-            if tool in armory.get_all_tool_names()
-        ]
-        agent.tools = tools
+def _get_structured_outputs(config: Config) -> StructuredOutputs:
+    global _outputs
+    if _outputs is None:
+        if 'structured_outputs' in config:
+            _outputs = StructuredOutputs(config['structured_outputs'])
+        else:
+            duck_logger.warning("**No structured outputs provided in config**")
+    return _outputs
 
-def _get_armory(config: Config, usage_hooks: UsageAgentHooks, send_message) -> Armory:
+def _get_armory(config: Config, send_message, typing, record_message) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory(send_message)
@@ -125,60 +95,40 @@ def _get_armory(config: Config, usage_hooks: UsageAgentHooks, send_message) -> A
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-    all_tool_agents = []
-    for agent_settings in config.get('agents_as_tools', []):
-        agents = _build_agents(usage_hooks, agent_settings['agents'])
-        all_tool_agents.extend(agents.values())
-        head_agent = agents[_get_starting_agent(agent_settings)][0]
-        _armory.add_agent_as_tool(head_agent, agent_settings['tool_name'], agent_settings['description'])
-
-    _add_tools_to_agents(all_tool_agents, _armory)
+        talk_tool = TalkTool(send_message, typing, record_message, 30)
+        _armory.scrub_tools(talk_tool)
 
     return _armory
+
+def _add_agent_tools(config: Config, client: AIClient, outputs: StructuredOutputs) -> None:
+    for agent_settings in config['agents_as_tools']:
+        agent = _build_agent(agent_settings, outputs)
+        _armory.add_tool(client.build_agent_tool(agent))
+
 
 
 def build_agent_conversation_duck(
         name: str,
         config: Config,
         settings: AgentConversationSettings,
-        bot,
         record_message: RecordMessage,
-        record_usage: RecordUsage
+        send_message: SendMessage,
+        typing
 ) -> DuckConversation:
-    usage_hooks = UsageAgentHooks(record_usage)
-    armory = _get_armory(config, usage_hooks, bot.send_message)
+    # Same for each duck
+    armory = _get_armory(config, send_message, typing, record_message)
+    outputs = _get_structured_outputs(config)
+    ai_client = _get_ai_client(armory)
 
-    conversation_agents = _build_agents(usage_hooks, settings['agents'])
-    _add_tools_to_agents(conversation_agents.values(), armory)
-
-    ai_completion_retry_protocol = config['ai_completion_retry_protocol']
-
-    genai_clients = {
-        name: RetryableGenAI(
-            AgentClient(agent, bot.typing),
-            bot.send_message,
-            ai_completion_retry_protocol
-        )
-        for name, (agent, _) in conversation_agents.items()
-    }
-
-    starting_agent = settings.get('starting_agent')
-    if not starting_agent:
-        starting_agent = next(iter(genai_clients.keys()))
+    # Different for each duck
+    _add_agent_tools(config, ai_client, outputs)
+    starting_agent = _build_main_agent(settings['agent'], settings.get('agents_as_tools', None), armory, ai_client, outputs)
 
     agent_conversation = AgentConversation(
         name,
-        settings.get('introduction'),
-        genai_clients,
         starting_agent,
-        record_message,
-        bot.send_message,
-        bot.add_reaction,
-        bot.read_url,
-        settings.get('timeout', 60 * 5),
-        armory,
-        settings.get('file_size_limit', 0),
-        settings.get('file_type_ext', []),
+        ai_client,
+        typing,
     )
 
     return agent_conversation
