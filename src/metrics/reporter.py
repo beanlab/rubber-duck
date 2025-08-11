@@ -81,7 +81,7 @@ class Reporter:
     # tuple[0]: string required to run the code
     # tuple[1]: description of the graph
     pre_baked = {
-        # 'all': (None, 'All the following charts.'),
+        'all': (None, 'All the following charts.'),
         'ftrend percent': (None, "What percent of threads are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
@@ -385,9 +385,8 @@ class Reporter:
         try:
             if arg_string == '!report all':
                 return self.get_all_prebaked()
-            if arg_string == '!report help' or arg_string == '!report h':
+            if arg_string == '!report help' or arg_string == '!report h' or arg_string == '!report':
                 return self.help_menu()
-
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
                 title, image = feed_fancy_graph(self._channels, self.SQLMetricsHandler.get_feedback(), arg_string, self.show_fig)
                 return [(title, image)]
