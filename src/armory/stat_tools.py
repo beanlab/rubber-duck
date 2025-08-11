@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import statsmodels.formula.api as smf
 from scipy import stats
 from scipy.stats import skew, norm, ttest_1samp, chi2_contingency
 from seaborn.external.kde import gaussian_kde
-from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
-import statsmodels.formula.api as smf
+from sklearn.model_selection import KFold
 
 from .cache import cache_result
 from .tools import register_tool, sends_image
@@ -43,7 +43,6 @@ class StatsTools:
             formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
             raise KeyError(f"Column '{column}' not found in dataset '{dataset}'. Available columns:\n{formatted}")
         return data[column]
-
 
     @register_tool
     def describe_dataset(self, dataset: str) -> str:
@@ -425,7 +424,9 @@ class StatsTools:
         return f"The z-score is {round(z, 4)}"
 
     @register_tool
-    def calculate_probability_from_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
+    def calculate_probability_from_normal_distribution(self, z1: float, z2: Optional[float] = None, mean: float = 0,
+                                                       std: float = 1, tail: Literal[
+                "Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates the probability for one or two z-scores from a normal distribution. Can handle upper tail, lower tail, or between two z-scores."""
         duck_logger.debug(f"Calculating probability for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
         z = (z1 - mean) / std
@@ -441,7 +442,9 @@ class StatsTools:
             return "Invalid input for tail or missing z2"
 
     @register_tool
-    def calculate_percentiles_from_normal_distribution(self, p1: float, p2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
+    def calculate_percentiles_from_normal_distribution(self, p1: float, p2: Optional[float] = None, mean: float = 0,
+                                                       std: float = 1, tail: Literal[
+                "Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates z-score values corresponding to given percentiles from a normal distribution."""
         duck_logger.debug(f"Calculating percentiles for p1={p1}, p2={p2}, mean={mean}, std={std}, tail={tail}")
         p1 = p1 / 100 if p1 > 1 else p1
@@ -462,7 +465,9 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    def plot_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Upper Tail") -> tuple[str, bytes]:
+    def plot_normal_distribution(self, z1: float, z2: Optional[float] = None, mean: float = 0, std: float = 1,
+                                 tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Upper Tail") -> tuple[
+        str, bytes]:
         """Plots a normal distribution with shaded areas for specified z-scores. If only one z-score is provided, it will shade the area for that z-score."""
         duck_logger.debug(f"Plotting normal distribution for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
         x = np.linspace(mean - 4 * std, mean + 4 * std, 1000)
@@ -483,7 +488,6 @@ class StatsTools:
         plt.ylabel('Density')
         plt.grid(True)
         return self._save_plot(name)
-
 
     @register_tool
     async def calculate_confidence_interval_and_t_test(self, dataset: str, variable: str, alternative: Literal[
@@ -526,8 +530,9 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative: Literal["greater", "less", "two.sided"] = "two.sided", mu: float= 0,
-                                                    conf_level: float = 0.95) -> tuple[str, bytes] | str:
+    async def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative: Literal[
+        "greater", "less", "two.sided"] = "two.sided", mu: float = 0,
+                                                          conf_level: float = 0.95) -> tuple[str, bytes] | str:
         """
         Plots the t-distribution with the test statistic and confidence interval.
         Returns a message and the image buffer of the plot.
@@ -778,7 +783,6 @@ class StatsTools:
 
         return summary
 
-
     @register_tool
     async def calculate_one_sample_proportion_z_test(self, dataset: str, variable: str, category: str,
                                                      p_null: float = 0.5,
@@ -796,7 +800,8 @@ class StatsTools:
         variable_val = self._datastore.get_column(data, variable)
 
         if category not in variable_val.unique():
-            raise ValueError(f"Column '{category}' not found in dataset '{dataset}'. Available categories: {data[variable].unique()}")
+            raise ValueError(
+                f"Column '{category}' not found in dataset '{dataset}'. Available categories: {data[variable].unique()}")
 
         series = data[variable].dropna()
 
@@ -856,7 +861,6 @@ class StatsTools:
 
         response_series = self._datastore.get_column(data, response_variable)
         group_series = self._datastore.get_column(data, group_variable)
-
 
         if response_category not in response_series.unique():
             return (
@@ -936,7 +940,6 @@ class StatsTools:
 
         data = self._datastore.get_dataset(dataset)
 
-
         self._datastore.get_column(data, row_variable)
         self._datastore.get_column(data, col_variable)
 
@@ -989,10 +992,8 @@ class StatsTools:
         # Load dataset
         data = self._datastore.get_dataset(dataset)
 
-
         response_series = self._datastore.get_column(data, response)
         explanatory_series = self._datastore.get_column(data, explanatory)
-
 
         df = pd.concat([response_series, explanatory_series], axis=1).dropna()
         if df.empty:

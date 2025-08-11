@@ -40,10 +40,9 @@ ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | T
 
 
 class Agent:
-    def __init__(self, name: str, description: str | None, prompt: str, model: str, tools: list[str],
+    def __init__(self, name: str, prompt: str, model: str, tools: list[str],
                  tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None):
         self.name = name
-        self.description = description
         self.prompt = prompt
         self.model = model
         self.tools = tools
@@ -93,23 +92,18 @@ class AIClient:
             tool_settings: ToolChoiceTypes,
             output_format: Type[BaseModel] | None
     ) -> Response:
+        params = dict(
+            model=model,
+            instructions=prompt,
+            input=history,
+            tools=tools,
+            tool_choice=tool_settings
+        )
+
         if output_format:
-            response = self._client.responses.parse(
-                model=model,
-                instructions=prompt,
-                input=history,
-                tools=tools,
-                tool_choice=tool_settings,
-                text_format=output_format
-            )
-        else:
-            response = self._client.responses.create(
-                model=model,
-                instructions=prompt,
-                input=history,
-                tools=tools,
-                tool_choice=tool_settings
-            )
+            params["text_format"] = output_format
+
+        response = self._client.responses.parse(**params)
 
         output_item = response.output[0]
 
@@ -121,15 +115,9 @@ class AIClient:
                 call_id=output_item.call_id,
                 id=output_item.id
             )
-
-        if output_format:
-            message = str(response.output_parsed)
-            structured_output = True
-        else:
-            message = output_item.content[0].text
-            structured_output = False
-
-        return Response(type="message", message=message, structured_output=structured_output)
+        return Response(type="message",
+                        message=str(response.output_parsed) if output_format else output_item.content[0].text,
+                        structured_output=bool(output_format))
 
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
@@ -145,9 +133,7 @@ class AIClient:
 
                     tool = self._armory.get_specific_tool(tool_name)
 
-                    needs_context = self._armory.get_tool_needs_context(tool_name)
-
-                    result = tool(ctx, **tool_args) if needs_context else tool(**tool_args)
+                    result = tool(ctx, **tool_args)
 
                     if inspect.isawaitable(result):
                         result = await result
@@ -164,6 +150,9 @@ class AIClient:
                     else:
                         return output['message']
 
+                else:
+                    raise NotImplementedError(f"Unknown response type: {output['type']}")
+
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
@@ -171,11 +160,11 @@ class AIClient:
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
-    def build_agent_tool(self, agent: Agent) -> callable:
+    def build_agent_tool(self, agent: Agent, tool_name: str, tool_description: str) -> callable:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent.name}")
             return await self.run_agent(ctx, agent, query)
 
-        agent_runner.__name__ = agent.name
-        agent_runner.__doc__ = agent.description
+        agent_runner.__name__ = tool_name
+        agent_runner.__doc__ = tool_description
         return agent_runner

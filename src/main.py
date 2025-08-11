@@ -32,7 +32,6 @@ from .utils.send_email import EmailSender
 from .workflows.registration_workflow import RegistrationWorkflow
 
 
-
 def setup_workflow_manager(
         config: Config,
         duck_orchestrator,

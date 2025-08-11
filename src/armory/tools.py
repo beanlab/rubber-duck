@@ -1,4 +1,7 @@
-from typing import Callable
+
+
+import inspect
+from typing import Any, Callable, get_type_hints, Literal, Union, get_origin, get_args
 
 from openai.types.responses import FunctionToolParam
 
@@ -15,9 +18,6 @@ def sends_image(func):
     return func
 
 
-import inspect
-from typing import Any, Callable, get_type_hints, Literal, Union, get_origin, get_args
-
 
 def is_optional(annotation) -> bool:
     origin = get_origin(annotation)
@@ -29,7 +29,6 @@ def get_strict_json_schema_type(annotation) -> dict:
     origin = get_origin(annotation)
     args = get_args(annotation)
 
-    # Handle Optional[T]
     if is_optional(annotation):
         non_none_args = [arg for arg in args if arg is not type(None)]
         if len(non_none_args) == 1:
@@ -74,7 +73,6 @@ def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
 
         schema_entry = get_strict_json_schema_type(ann)
 
-        # Always require the field (OpenAI requires all keys listed)
         required.append(name)
         params[name] = schema_entry
 
@@ -90,11 +88,3 @@ def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
         },
         "strict": True
     }
-
-def needs_context(tool_function: Callable) -> bool:
-    sig = inspect.signature(tool_function)
-    params = list(sig.parameters.values())
-    if not params:
-        return False
-    first_param_name = params[0].name
-    return first_param_name =="ctx"

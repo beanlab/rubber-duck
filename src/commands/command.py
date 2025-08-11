@@ -1,8 +1,8 @@
+import io
 import subprocess
+import zipfile
 from datetime import datetime
 from pathlib import Path
-import zipfile
-import io
 
 import discord
 import pytz
@@ -286,6 +286,6 @@ def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Co
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message,log_dir),
+        LogCommand(send_message, log_dir),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics)
     ]

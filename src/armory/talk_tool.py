@@ -50,4 +50,3 @@ class TalkTool:
         await self._send_message(ctx.thread_id, message="Structured Output: ")
         await self._send_message(ctx.thread_id, file=file_data)
         await self._send_message(ctx.thread_id, message="Output: ")
-
