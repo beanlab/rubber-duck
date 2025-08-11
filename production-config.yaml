@@ -20,25 +20,41 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+structured_outputs:
+  - name: test_questions
+    fields:
+      Question_1: str
+      Question_2: str
+      Question_3: str
+      Question_4: str
+      Question_5: str
+
 agents_as_tools:
-  - tool_name: generate_code_complexity_analysis
+  - name: CodeComplexityAgent
+    prompt_files:
+      - prompts/generate-code-complexity.md
+    engine: gpt-4.1
+    tools: []
     description: |
       This tool takes source code as a string and returns a string describing 
       the order of complexity (Big-O analysis) of the provided code.
-    agents:
-      - name: CodeComplexityAgent
-        prompt_files:
-          - prompts/generate-code-complexity.md
-        engine: gpt-4.1
 
-  - tool_name: determine_tool_call
+  - name: DetermineToolCall
+    prompt_files:
+      - prompts/determine_tool_call_stats.txt
+    engine: gpt-4.1
+    tools: []
     description: |
       This tool is used to determine which tool to call based on the user's input. |
-    agents:
-      - name: DetermineToolCall
-        prompt_files:
-          - prompts/determine_tool_call_stats.txt
-        engine: gpt-4.1
+
+  - name: generate_five_test_questions
+    prompt: |
+      You are a test question generator. 
+      Generate 5 test questions based on the provided text.
+    engine: gpt-4.1
+    tools: []
+    description: Generates 5 test questions based on the provided prompt.
+    output: test_questions
 
 ducks:
   - name: standard-rubber-duck
