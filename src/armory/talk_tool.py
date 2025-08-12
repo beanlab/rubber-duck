@@ -1,6 +1,6 @@
 import asyncio
 
-from quest import queue
+from quest import queue, step
 
 from .tools import register_tool
 from ..utils.config_types import DuckContext
@@ -9,7 +9,7 @@ from ..utils.protocols import Message
 
 class TalkTool:
     def __init__(self, send_message, typing, record_message, wait_for_user_timeout: int = 60):
-        self._send_message = send_message
+        self._send_message = step(send_message)
         self._typing = typing
         self._wait_for_user_timeout = wait_for_user_timeout
         self._record_message = record_message
