@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import TypedDict, NotRequired, Literal
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -62,6 +62,7 @@ class SingleAgentSettings(TypedDict):
     handoff_prompt: str
     handoffs: list[str]
     tool_required: NotRequired[str]
+    reasoning: NotRequired[Literal["low", "medium", "high", "minimal"]]
 
 
 class MultiAgentSettings(TypedDict):
