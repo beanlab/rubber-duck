@@ -37,6 +37,7 @@ def _build_agent(
         prompt=prompt,
         model=config["engine"],
         tools=config["tools"],
+        usage=config["usage"],
         tool_settings=tool_required,
         output_format=output_model
     )

@@ -40,12 +40,13 @@ ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | T
 
 
 class Agent:
-    def __init__(self, name: str, prompt: str, model: str, tools: list[str],
+    def __init__(self, name: str, prompt: str, model: str, tools: list[str], usage: str,
                  tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None):
         self.name = name
         self.prompt = prompt
         self.model = model
         self.tools = tools
+        self.usage = usage
         self.tool_settings = tool_settings
         self.output_format = output_format
 
@@ -164,7 +165,6 @@ class AIClient:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent.name}")
             return await self.run_agent(ctx, agent, query)
-
         agent_runner.__name__ = tool_name
-        agent_runner.__doc__ = tool_description
+        agent_runner.__doc__ = f"Description: {tool_description}\n\nUsage: {agent.usage}"
         return agent_runner

@@ -16,58 +16,74 @@ file_type_ext:
     "md",
   ]
 
-sql:
-  db_type: sqlite
-  database: /rubber-duck.db
-
 structured_outputs:
-  - name: test_questions
-    fields:
+  - quiz_schema: &quiz_schema
       Question_1: str
       Question_2: str
       Question_3: str
       Question_4: str
       Question_5: str
 
+sql:
+  db_type: sqlite
+  database: /rubber-duck.db
+
+
 agents_as_tools:
-  - name: CodeComplexityAgent
-    prompt_files:
-      - prompts/generate-code-complexity.md
-    engine: gpt-4.1
-    tools: []
+  - tool_name: code_complexity_agent
     description: |
-      This tool takes source code as a string and returns a string describing 
-      the order of complexity (Big-O analysis) of the provided code.
+      This tool analyzes the complexity of source code and returns a string describing the order of complexity.
+    agent:
+      name: CodeComplexityAgent
+      prompt_files:
+        - prompts/generate-code-complexity.md
+      engine: gpt-4.1
+      tools: []
+      usage: |
+        This tool takes source code as a string and returns a string describing 
+        the order of complexity (Big-O analysis) of the provided code.
 
-  - name: DetermineToolCall
-    prompt_files:
-      - prompts/determine_tool_call_stats.txt
-    engine: gpt-4.1
-    tools: []
+  - tool_name: determine_tool_call
     description: |
-      This tool is used to determine which tool to call based on the user's input. |
+      This tool determines which tool to call based on the user's input.
+    agent:
+      name: DetermineToolCall
+      prompt_files:
+        - prompts/determine_tool_call_stats.txt
+      engine: gpt-4.1
+      tools: []
+      usage: |
+        This tool is used to determine which tool to call based on the user's input. 
 
-  - name: generate_five_test_questions
-    prompt: |
-      You are a test question generator. 
-      Generate 5 test questions based on the provided text.
-    engine: gpt-4.1
-    tools: []
-    description: Generates 5 test questions based on the provided prompt.
-    output: test_questions
+  - tool_name: question_generator_agent
+    description: |
+      This tool generates 5 test questions based on the provided text.
+    agent:
+      name: GenerateFiveQuestions
+      prompt: |
+        You are a test question generator. 
+        Generate 5 test questions based on the provided text.
+      engine: gpt-4.1
+      tools: []
+      usage: |
+        Use this tool to generate test questions for a given text.
+        The output will be a dictionary with keys "Question_1", "Question_2", etc.
+      output_format: *quiz_schema
+
 
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
     settings:
-      introduction: |
-        Hello! How can I help you?
-      agents:
-        - name: RubberDuck
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/standard-rubber-duck.txt
-          max_iterations: 5
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - prompts/standard-rubber-duck.txt
+        engine: gpt-4.1
+        tools: []
+        usage: |
+          This duck is a general-purpose rubber duck that can help with a wide range of questions.
+          It can answer questions about programming, statistics, and general knowledge.
       timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
@@ -75,47 +91,44 @@ ducks:
   - name: stats-duck
     duck_type: agent_conversation
     settings:
-      introduction: |
-          Hello! I can help answer your questions about statistics.
-      agents:
-        - name: stats_duck
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/stats.txt
-          tools:
-            - determine_tool_call
-            - describe_dataset
-            - list_categories
-            - explain_capabilities
-            - get_dataset_names
-            - get_variable_names
-            - show_dataset_head
-            - plot_histogram
-            - plot_boxplot
-            - plot_dotplot
-            - plot_barplot
-            - plot_pie_chart
-            - plot_proportion_barplot
-            - calculate_mean
-            - calculate_skewness
-            - calculate_std
-            - calculate_median
-            - calculate_mode
-            - calculate_five_number_summary
-            - calculate_table_of_counts
-            - calculate_proportions
-            - calculate_z_score
-            - calculate_probability_from_normal_distribution
-            - calculate_percentiles_from_normal_distribution
-            - plot_normal_distribution
-            - calculate_confidence_interval_and_t_test
-            - plot_confidence_interval_and_t_distribution
-            - calculate_two_mean_t_test
-            - calculate_one_way_anova
-            - calculate_one_sample_proportion_z_test
-            - calculate_two_sample_proportion_z_test
-          tool_required: determine_tool_call
-          max_iterations: 5
+      agent:
+        name: stats_duck
+        engine: gpt-4.1
+        prompt_files:
+          - prompts/stats2.txt
+        tools:
+          - talk_to_user
+          - determine_tool_call
+          - describe_dataset
+          - list_categories
+          - explain_capabilities
+          - get_dataset_names
+          - get_variable_names
+          - show_dataset_head
+          - plot_histogram
+          - plot_boxplot
+          - plot_dotplot
+          - plot_barplot
+          - plot_pie_chart
+          - plot_proportion_barplot
+          - calculate_mean
+          - calculate_skewness
+          - calculate_std
+          - calculate_median
+          - calculate_mode
+          - calculate_five_number_summary
+          - calculate_table_of_counts
+          - calculate_proportions
+          - calculate_probability_from_normal_distribution
+          - calculate_percentiles_from_normal_distribution
+          - plot_normal_distribution
+          - calculate_confidence_interval_and_t_test
+          - plot_confidence_interval_and_t_distribution
+          - calculate_two_mean_t_test
+          - calculate_one_way_anova
+          - calculate_one_sample_proportion_z_test
+          - calculate_two_sample_proportion_z_test
+        tool_required: required
       timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
@@ -123,8 +136,6 @@ ducks:
   - name: cat-dog-duck
     duck_type: agent_conversation
     settings:
-      introduction: |
-        Hello! I can help answer your questions about dogs or cats.
       agent:
         name: dispatch
         engine: gpt-4.1
@@ -135,7 +146,7 @@ ducks:
           - talk_about_dogs
           - talk_to_user
         tool_required: required
-        description: |
+        usage: |
           This agent routes the conversation to either the dog or cat agent based on the user's input.
       agents_as_tools:
         - name: talk_about_dogs
@@ -144,7 +155,7 @@ ducks:
             - prompts/dog-cat-scratch/dog.txt
           tools:
             - talk_to_user
-          description: |
+          usage: |
             This agent handles questions about dogs. It can answer questions about dog breeds, care, and behavior.
         - name: talk_about_cats
           engine: gpt-4.1
@@ -152,7 +163,7 @@ ducks:
             - prompts/dog-cat-scratch/cat.txt
           tools:
             - talk_to_user
-          description: |
+          usage: |
             This agent handles questions about cats. It can answer questions about cat breeds, care, and behavior.
       starting_agent: dispatch
       timeout: 600
@@ -329,14 +340,14 @@ servers:
           - name: emoji-duck
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Hello! I'm Emoji Duck. Do you want me to describe a movie or a book using only emojis?
-              agents:
-                - name: emoji-duck
-                  engine: gpt-4.1
-                  prompt_files:
-                    - prompts/emoji.txt
-                  max_iterations: 5
+              agent:
+                name: emoji-duck
+                engine: gpt-4.1
+                prompt_files:
+                  - prompts/emoji.txt
+                tools: []
+                usage: |
+                  This duck is a fun emoji-based agent that can respond to user queries with emojis.
               timeout: 2000
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -347,24 +358,21 @@ servers:
           - name: code-complexity-duck
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Upload a code file and I'll analyze it for you. 
-                You can also ask me questions about Big-O analysis.
               timeout: 600
               file_size_limit: 5100
               file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
-              agents:
-                - name: ComplexityDuck
-                  prompt: |
-                    You are a helpful CS assistant.
-                    You explain Big-O analysis. 
-                    You can use the provided tools to generate a complexity analysis report
-                    when the user provides a code file.
-                    Keep your responses brief and clear. Provide the tool output to the user verbatim.
-                  engine: gpt-4.1
-                  max_iterations: 15
-                  tools:
-                    - generate_code_complexity_analysis
+              agent:
+                name: ComplexityDuck
+                prompt: |
+                  You are a helpful CS assistant.
+                  You explain Big-O analysis. 
+                  You can use the provided tools to generate a complexity analysis report
+                  when the user provides a code file.
+                  Keep your responses brief and clear. Provide the tool output to the user verbatim.
+                tools:
+                  - generate_code_complexity_analysis
+                engine: gpt-4.1
+
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
@@ -375,12 +383,15 @@ servers:
               introduction: |
                 I'm a Socratic-style rubber duck. 
                 I can help you think through your problems by asking questions.
-              agents:
-                - name: socrates
-                  prompt_files:
-                    - prompts/socratic-duck.txt
-                  engine: gpt-4.1
-                  max_iterations: 5
+              agent:
+                name: socrates
+                prompt_files:
+                  - prompts/socratic-duck.txt
+                engine: gpt-4.1
+                tools: []
+                usage: |
+                  This duck uses the Socratic method to help you think through your problems.
+                  It will ask you questions to guide you to your own answers.
               timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -411,13 +422,16 @@ servers:
             settings:
               introduction: |
                 Welcome! This is the design experience for the convex hull project. Send a message to continue.
-              agents:
-                - name: PhdDuck
-                  engine: gpt-4.1
-                  prompt_files:
-                    - prompts/phd-duck.txt
-                    - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
-                  max_iterations: 5
+              agent:
+                name: PhdDuck
+                engine: gpt-4.1
+                prompt_files:
+                  - prompts/phd-duck.txt
+                  - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
+                tools: []
+                usage: |
+                    This duck is designed to help you with the convex hull project design.
+                    It will guide you through the design process and answer your questions.
               timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext

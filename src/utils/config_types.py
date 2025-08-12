@@ -64,6 +64,7 @@ class SingleAgentSettings(TypedDict):
     name: str
     engine: str
     tools: list[str]
+    usage: str
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     tool_required: NotRequired[str]
