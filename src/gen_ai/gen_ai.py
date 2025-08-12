@@ -11,7 +11,6 @@ from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolPa
 from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step
-from statsmodels.iolib.summary import summary
 
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType
@@ -152,7 +151,6 @@ class AIClient:
 
                     if inspect.isawaitable(result):
                         result = await result
-
 
                     history.extend(format_function_call_history_items(result, output))
 
