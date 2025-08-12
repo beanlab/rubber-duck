@@ -69,6 +69,7 @@ class SingleAgentSettings(TypedDict):
     prompt_files: NotRequired[list[str]]
     tool_required: NotRequired[str]
     output_format: NotRequired[dict]
+    reasoning: NotRequired[str]
 
 
 class AgentAsToolSettings(TypedDict):

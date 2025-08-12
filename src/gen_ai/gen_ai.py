@@ -42,7 +42,7 @@ ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | T
 
 class Agent:
     def __init__(self, name: str, prompt: str, model: str, tools: list[str], usage: str,
-                 tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None):
+                 tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None, reasoning: str | None = None):
         self.name = name
         self.prompt = prompt
         self.model = model
@@ -50,7 +50,7 @@ class Agent:
         self.usage = usage
         self.tool_settings = tool_settings
         self.output_format = output_format
-
+        self.reasoning = reasoning
 
 class Response(TypedDict):
     type: Literal["function_call", "message"]
@@ -92,7 +92,8 @@ class AIClient:
             model: str,
             tools: list[FunctionToolParam],
             tool_settings: ToolChoiceTypes,
-            output_format: Type[BaseModel] | None
+            output_format: Type[BaseModel] | None,
+            reasoning: str | None = None
     ) -> Response:
         params = dict(
             model=model,
@@ -104,6 +105,8 @@ class AIClient:
 
         if output_format:
             params["text_format"] = output_format
+        if reasoning:
+            params["reasoning"] = {"effort": reasoning}
 
         response = self._client.responses.parse(**params)
 
@@ -138,7 +141,7 @@ class AIClient:
         try:
             while True:
                 output = await self._get_completion(agent.prompt, history, agent.model, tools_json,
-                                                    agent.tool_settings, agent.output_format)
+                                                    agent.tool_settings, agent.output_format, agent.reasoning)
                 if output['type'] == "function_call":
                     tool_name = output["name"]
                     tool_args = json.loads(output["arguments"])

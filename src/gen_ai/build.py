@@ -39,7 +39,8 @@ def _build_agent(
         tools=config["tools"],
         usage=config["usage"],
         tool_settings=tool_required,
-        output_format=output_model
+        output_format=output_model,
+        reasoning=config.get("reasoning", None)
     )
     return agent
 
