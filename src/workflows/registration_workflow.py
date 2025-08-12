@@ -178,7 +178,7 @@ class RegistrationWorkflow:
             # Get role patterns from config
             role_patterns = settings.get("roles", {}).get("patterns", [])
             if not role_patterns:
-                raise ValueError("No role patterns configured")
+                duck_logger.warning("No role patterns configured for this server")
 
             # Filter roles based on patterns
             available_roles = []
@@ -188,13 +188,15 @@ class RegistrationWorkflow:
                     authenticated_user_role_id = role.id
                     continue
 
-                for pattern_info in role_patterns:
-                    if re.search(pattern_info["pattern"], role.name):
-                        available_roles.append({
-                            "id": role.id,
-                            "name": role.name
-                        })
-                        break
+                # If no patterns are configured, skip additional role filtering
+                if role_patterns:
+                    for pattern_info in role_patterns:
+                        if re.search(pattern_info["pattern"], role.name):
+                            available_roles.append({
+                                "id": role.id,
+                                "name": role.name
+                            })
+                            break
 
             if authenticated_user_role_id is None:
                 raise ValueError('No authenticated_user_role_name configured for this server '
@@ -212,32 +214,38 @@ class RegistrationWorkflow:
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
         try:
             # Get roles and selection
-            available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
-            if available_roles:
-                selected_role_ids = await self._select_roles(thread_id, available_roles, settings)
+            if settings.get('roles') is None:
+                duck_logger.warning("No roles configured for this server. Using authenticated user role only.")
+                selected_roles = settings['authenticated_user_role_name']
+            #     fix this
             else:
-                selected_role_ids = []
+                available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
+                if available_roles:
+                    selected_role_ids = await self._select_roles(thread_id, available_roles, settings)
+                else:
+                    selected_role_ids = []
 
-            selected_role_ids.append(authenticated_role_id)
+                selected_role_ids.append(authenticated_role_id)
 
-            # Get Discord guild and member
-            guild: Guild = await self._get_guild(server_id)
-            member = await guild.fetch_member(user_id)
+                # Get Discord guild and member
+                guild: Guild = await self._get_guild(server_id)
+                member = await guild.fetch_member(user_id)
 
-            # Get the role objects
-            selected_roles = []
-            for role_id in selected_role_ids:
-                role = guild.get_role(role_id)
-                if role:
-                    selected_roles.append(role)
+                # Get the role objects
+                selected_roles = []
+                for role_id in selected_role_ids:
+                    role = guild.get_role(role_id)
+                    if role:
+                        selected_roles.append(role)
 
-            if not selected_roles:  # sanity check
-                raise ValueError('Could not lookup role objects from the selected role IDs.')
+                if not selected_roles:  # sanity check
+                    raise ValueError('Could not lookup role objects from the selected role IDs.')
 
-            # Assign roles
-            new_roles = [role for role in selected_roles if role not in member.roles]
-            if new_roles:
-                await member.add_roles(*new_roles, reason="User registration")
+                # Assign roles
+                new_roles = [role for role in selected_roles if role not in member.roles]
+                if new_roles:
+                    await member.add_roles(*new_roles, reason="User registration")
+
 
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)
