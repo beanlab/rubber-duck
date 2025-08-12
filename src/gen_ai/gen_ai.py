@@ -11,6 +11,7 @@ from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolPa
 from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step
+from statsmodels.iolib.summary import summary
 
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType
@@ -106,19 +107,29 @@ class AIClient:
 
         response = self._client.responses.parse(**params)
 
-        output_item = response.output[0]
+        for item in response.output:
+            if item.type == "function_call":
+                return Response(
+                    type="function_call",
+                    name=item.name,
+                    arguments=item.arguments,
+                    call_id=item.call_id,
+                    id=item.id
+                )
+            elif item.type == "message":
+                return Response(type="message",
+                                message=str(response.output_parsed) if output_format else response.output_text,
+                                structured_output=bool(output_format))
+            elif item.type == "reasoning":
+                history.append({
+                    'id': item.id,
+                    'type': 'reasoning',
+                    'summary': item.summary
+                })
+                continue
 
-        if output_item.type == "function_call":
-            return Response(
-                type="function_call",
-                name=output_item.name,
-                arguments=output_item.arguments,
-                call_id=output_item.call_id,
-                id=output_item.id
-            )
-        return Response(type="message",
-                        message=str(response.output_parsed) if output_format else output_item.content[0].text,
-                        structured_output=bool(output_format))
+        raise NotImplementedError(f"Unknown response type")
+
 
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
@@ -138,6 +149,7 @@ class AIClient:
 
                     if inspect.isawaitable(result):
                         result = await result
+
 
                     history.extend(format_function_call_history_items(result, output))
 
