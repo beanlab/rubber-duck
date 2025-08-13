@@ -189,14 +189,13 @@ class RegistrationWorkflow:
                     continue
 
                 # If no patterns are configured, skip additional role filtering
-                if role_patterns:
-                    for pattern_info in role_patterns:
-                        if re.search(pattern_info["pattern"], role.name):
-                            available_roles.append({
-                                "id": role.id,
-                                "name": role.name
-                            })
-                            break
+                for pattern_info in role_patterns:
+                    if re.search(pattern_info["pattern"], role.name):
+                        available_roles.append({
+                            "id": role.id,
+                            "name": role.name
+                        })
+                        break
 
             if authenticated_user_role_id is None:
                 raise ValueError('No authenticated_user_role_name configured for this server '
