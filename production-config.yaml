@@ -208,6 +208,17 @@ servers:
                 - 1374066971523678279
               timeout: 300
 
+      - channel_id: 1404899692210553033
+        channel_name: join-the-server
+        ducks:
+          - name: Registration-Workflow
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              sender_email: byu-cs-course-ops@cs.byu.edu
+
       - channel_id: 1371951696061661215
         channel_name: duck-pond
         ducks:
