@@ -2,7 +2,7 @@ import asyncio
 import re
 import uuid
 
-from discord import Guild
+from discord import Guild,utils
 from quest import step, queue
 
 from ..utils.config_types import RegistrationSettings, DuckContext
@@ -215,9 +215,19 @@ class RegistrationWorkflow:
         try:
             # Get roles and selection
             if settings.get('roles') is None:
-                duck_logger.warning("No roles configured for this server. Using authenticated user role only.")
-                selected_roles = settings['authenticated_user_role_name']
-            #     fix this
+                duck_logger.debug("No roles configured for this server. Using authenticated user role only.")
+                role_name = settings['authenticated_user_role_name']
+                guild: Guild = await self._get_guild(server_id)
+                member = await guild.fetch_member(user_id)
+
+                # Find role by name instead of ID
+                role = utils.get(guild.roles, name=role_name) # This function is from the discord.utils module
+                if not role:
+                    raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
+
+                selected_roles = [role]
+                await member.add_roles(role, reason="User registration")
+
             else:
                 available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
                 if available_roles:
