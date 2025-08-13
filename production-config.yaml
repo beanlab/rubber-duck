@@ -38,7 +38,8 @@ agents_as_tools:
       - name: DetermineToolCall
         prompt_files:
           - prompts/determine_tool_call_stats.txt
-        engine: gpt-4.1
+        engine: gpt-5
+        reasoning: minimal
 
 ducks:
   - name: standard-rubber-duck
@@ -63,7 +64,8 @@ ducks:
           Hello! I can help answer your questions about statistics.
       agents:
         - name: stats_duck
-          engine: gpt-4.1
+          engine: gpt-5
+          reasoning: minimal
           prompt_files:
             - prompts/stats.txt
           tools:

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from agents import Agent, AgentHooks, RunContextWrapper, ModelSettings
+from openai.types import Reasoning
 from quest import step
 from .gen_ai import RecordUsage, AgentClient, RetryableGenAI, RecordMessage
 from ..armory.armory import Armory
@@ -60,6 +61,11 @@ def _build_agent(
         model_settings = ModelSettings(
             tool_choice="auto"
         )
+
+    reasoning = config.get("reasoning", None)
+    if reasoning:
+        model_settings.reasoning = {"effort": reasoning}
+
     return Agent[DuckContext](
         model_settings=model_settings,
         name=config["name"],
