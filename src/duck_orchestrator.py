@@ -81,7 +81,7 @@ class DuckOrchestrator:
             author_mention=initial_message['author_mention'],
             content=initial_message['content'],
             message_id=initial_message['message_id'],
-            thread_id=thread_id
+            thread_id=thread_id,
         )
 
         async with alias(str(thread_id)):

@@ -1,5 +1,9 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired
+from typing import NotRequired, Union, Any
+
+from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
+from typing_extensions import TypedDict
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -20,6 +24,9 @@ class AgentMessage(TypedDict):
 class GPTMessage(TypedDict):
     role: str
     content: str
+
+
+HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam]
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -56,22 +63,24 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
+    tools: list[str]
+    usage: str
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
-    tools: list[str]
-    handoff_prompt: str
-    handoffs: list[str]
     tool_required: NotRequired[str]
+    output_format: NotRequired[dict]
+    reasoning: NotRequired[str]
+
+
+class AgentAsToolSettings(TypedDict):
+    tool_name: str
+    description: str
+    agent: SingleAgentSettings
 
 
 class MultiAgentSettings(TypedDict):
-    agents: list[SingleAgentSettings]
-    starting_agent: str | None  # If not set, will use first agent listed in `gen_ai`
-
-
-class AgentAsToolSettings(MultiAgentSettings):
-    tool_name: str
-    description: str
+    agent: SingleAgentSettings
+    agents_as_tools: list[AgentAsToolSettings]
 
 
 class AgentConversationSettings(MultiAgentSettings):
@@ -144,9 +153,15 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
 
+class StructuredOutput(TypedDict):
+    name: str
+    fields: dict[str, Any]
+
+
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
+    structured_outputs: list[StructuredOutput]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
