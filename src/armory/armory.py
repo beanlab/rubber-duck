@@ -66,9 +66,9 @@ class Armory:
         @wraps(func)
         async def wrapper(ctx, *args, **kwargs):
             if inspect.iscoroutinefunction(func):
-                result = await func(*args, **kwargs)
+                result = await func(ctx, *args, **kwargs)
             else:
-                result = func(*args, **kwargs)
+                result = func(ctx, *args, **kwargs)
 
             name, _ = result
             await self._send_message(ctx.thread_id, file=result)
