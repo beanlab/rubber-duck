@@ -48,7 +48,7 @@ agents_as_tools:
       ## Arguments
       topic: str - the topic you want to demonstrate with a code example
 
-      ## Returns
+      ## Returns  
       str - a code example formatted in markdown
 
       ## Usage
