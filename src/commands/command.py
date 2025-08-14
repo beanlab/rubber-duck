@@ -98,6 +98,20 @@ class StatusCommand(Command):
         channel_id = message['channel_id']
         await self.send_message(channel_id, 'I am alive. 🦆')
 
+class KickCommand(Command):
+    name = "!kick"
+    help_msg = "kick a user from the channel"
+
+    def __init__(self, send_message):
+        self.send_message = send_message
+
+    @step
+    async def execute(self, message: Message):
+        channel_id = message['channel_id']
+        user_id = message['user_id']
+        # Here you would implement the logic to kick the user from the channel
+        await self.send_message(channel_id, f'User {user_id} has been kicked from the channel.')
+
 
 class ReportCommand(Command):
     name = "!report"
