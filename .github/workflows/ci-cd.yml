@@ -151,7 +151,7 @@ jobs:
           ENVIRONMENT=pre-production
           CONFIG_FILE_S3_PATH=${{ secrets.S3_BUCKET_PRODUCTION_CONFIG_DIRECTORY }}production-config-${{ needs.Extract_SHA.outputs.short_sha }}.yaml
           EOL
-
+#
       - name: Upload secrets to S3
         run: |
           SHORT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
