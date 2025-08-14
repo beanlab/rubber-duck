@@ -113,7 +113,7 @@ servers:
       - channel_id: 1296158078017736725
         channel_name: review-cs-110
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-cs110
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -128,7 +128,7 @@ servers:
       - channel_id: 1399777118380097648
         channel_name: join-the-server
         ducks:
-          - name: Registration-Workflow
+          - name: Registration-Workflow-CS110
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -148,7 +148,7 @@ servers:
       - channel_id: 1327385245036838912
         channel_name: review-cs-235
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-CS235
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -163,7 +163,7 @@ servers:
       - channel_id: 1399788047981351042
         channel_name: join-the-server
         ducks:
-          - name: Registration-Workflow
+          - name: Registration-Workflow-CS235
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -182,7 +182,7 @@ servers:
       - channel_id: 1329934513333338244
         channel_name: review-cs-111
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-CS111
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -200,7 +200,7 @@ servers:
       - channel_id: 1371951756149260298
         channel_name: ta-review
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-Stats
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -211,7 +211,7 @@ servers:
       - channel_id: 1404899692210553033
         channel_name: join-the-server
         ducks:
-          - name: Registration-Workflow
+          - name: Registration-Workflow-Stats
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -235,7 +235,7 @@ servers:
       - channel_id: 1363949553102880869
         channel_name: review-phys-230
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-Phys-230
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -250,7 +250,7 @@ servers:
       - channel_id: 1359587713749094700
         channel_name: review-phys-430
         ducks:
-          - name: conversation_review
+          - name: Conversation-Review-Phys-430
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -268,7 +268,7 @@ servers:
       - channel_id: 1338619665789751337
         channel_name: vintage-duck-review
         ducks:
-          - name: review
+          - name: Conversation-Review-Demo
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -282,7 +282,7 @@ servers:
       - channel_id: 1401960218870419647
         channel_name: emoji-duck
         ducks:
-          - name: emoji-duck
+          - name: Emoji-Duck-Demo
             duck_type: agent_conversation
             settings:
               introduction: |
@@ -300,7 +300,7 @@ servers:
       - channel_id: 1385293810782965830
         channel_name: code-complexity-analysis-duck
         ducks:
-          - name: code-complexity-duck
+          - name: Code-Complexity-Duck-Demo
             duck_type: agent_conversation
             settings:
               introduction: |
@@ -325,7 +325,7 @@ servers:
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
         ducks:
-          - name: socratic-rubber-duck
+          - name: Socratic-Rubber-Duck-Demo
             duck_type: agent_conversation
             settings:
               introduction: |
@@ -344,7 +344,7 @@ servers:
       - channel_id: 1379959992110546995
         channel_name: join-the-server
         ducks:
-          - name: Registration-Workflow
+          - name: Registration-Workflow-Demo
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -362,7 +362,7 @@ servers:
       - channel_id: 1384678077694480434
         channel_name: designer-duck
         ducks:
-          - name: phd-duck
+          - name: Phd-Duck-Demo
             duck_type: agent_conversation
             settings:
               introduction: |
