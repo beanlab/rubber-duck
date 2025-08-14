@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - 256-repair-config-loading-logic
   workflow_dispatch:
     inputs:
       local_config:
@@ -148,6 +149,7 @@ jobs:
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           ENVIRONMENT=pre-production
+          CONFIG_FILE_S3_PATH=s3://${{ secrets.S3_BUCKET_PRODUCTION_CONFIG_DIRECTORY }}/production-configs/${{ needs.Extract_SHA.outputs.short_sha }}.yaml
           EOL
 
       - name: Upload secrets to S3

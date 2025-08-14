@@ -66,7 +66,9 @@ def load_configuration(config_arg: str | None) -> Config:
     3. Handle S3 and local file loading with proper error handling
     """
     
-    config_path = os.environ.get('CONFIG_FILE_S3_PATH', config_arg) or 'config.json'
+    config_path = config_arg or os.environ.get('CONFIG_FILE_S3_PATH') or 'config.json'
+
+    duck_logger.info(f"Loading config from: {config_path}")
 
     if config_path.startswith('s3://'):
         return fetch_config_from_s3(config_path)
