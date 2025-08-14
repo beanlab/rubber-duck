@@ -195,7 +195,6 @@ class RegistrationWorkflow:
                             "id": role.id,
                             "name": role.name
                         })
-                        break
 
             if authenticated_user_role_id is None:
                 raise ValueError('No authenticated_user_role_name configured for this server '
