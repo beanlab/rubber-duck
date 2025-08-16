@@ -1,6 +1,6 @@
 import pytest
 
-from ..storage.sql_metrics import SQLMetricsHandler
+from src.metrics.sql_metrics import SQLMetricsHandler
 
 
 class TestSQLMetrics:

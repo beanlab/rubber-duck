@@ -1,10 +1,12 @@
+import random
+from collections import defaultdict
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Column, Integer, String, BigInteger
 from sqlalchemy.orm import declarative_base, Session
 
-from ..utils.logger import duck_logger
+from src.utils.logger import duck_logger
 
 MetricsBase = declarative_base()
 
@@ -137,6 +139,54 @@ class SQLMetricsHandler:
             duck_logger.exception(f"An error occurred: {e}")
             raise
 
+    def get_feedback_sample_distribution(self):
+        try:
+            results = (
+                self.session.query(
+                    FeedbackModel.parent_channel_id,
+                    FeedbackModel.feedback_score
+                )
+                .filter(
+                    FeedbackModel.feedback_score.isnot(None),
+                    FeedbackModel.feedback_score != "nan"
+                )
+                .all()
+            )
+            return results
+
+        except Exception as e:
+            duck_logger.exception(f"Failed to calculate feedback sampling distribution: {e}")
+            raise
+
+    def get_sampled_feedback(self, sample_distribution: dict[int, dict[int, int]]) -> dict[int, list[str]]:
+        try:
+            channel_feedback = defaultdict(list)
+            for channel_id, score_map in sample_distribution.items():
+                for score, amount_to_pull in score_map.items():
+                    if amount_to_pull <= 0:
+                        continue
+
+                    query = (
+                        self.session.query(FeedbackModel.written_feedback)
+                        .filter(
+                            FeedbackModel.parent_channel_id == channel_id,
+                            FeedbackModel.feedback_score == str(score),
+                            FeedbackModel.written_feedback.isnot(None),
+                            FeedbackModel.written_feedback != "",
+                            FeedbackModel.written_feedback != "-"
+                        )
+                        .limit(amount_to_pull * 3)
+                    )
+                    results = [row[0] for row in query.all() if row[0] and row[0] != "-"]
+
+                    selected = random.sample(results, min(amount_to_pull, len(results)))
+                    channel_feedback[channel_id].extend(selected)
+
+            return dict(channel_feedback)
+
+        except Exception as e:
+            duck_logger.exception(f"Failed to fetch sampled feedback: {e}")
+            raise
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)
 
