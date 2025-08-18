@@ -186,10 +186,10 @@ servers:
             duck_type: conversation_review
             settings:
               target_channel_ids:
-                - 1365456542287269919
+                - 1406039546721730582
               timeout: 300
 
-      - channel_id: 1365456542287269919
+      - channel_id: 1406039546721730582
         channel_name: Student Text Channels/duck-pond
         ducks:
           - standard-rubber-duck
