@@ -31,33 +31,31 @@ sql:
 
 agents_as_tools:
   - tool_name: code_complexity_agent
-    description: |
-      This tool analyzes the complexity of source code and returns a string describing the order of complexity.
+    doc_string: |
+      This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
+      This tool takes source code as a string and returns a string describing the order of complexity (Big-O analysis) of the provided code.
     agent:
       name: CodeComplexityAgent
       prompt_files:
         - prompts/generate-code-complexity.md
       engine: gpt-4.1
       tools: []
-      usage: |
-        This tool takes source code as a string and returns a string describing 
-        the order of complexity (Big-O analysis) of the provided code.
+
 
   - tool_name: determine_tool_call
-    description: |
-      This tool determines which tool to call based on the user's input.
+    doc_string: |
+      This tool determines which tool to call based on the user's input. This tool is used to determine which tool to call based on the user's input.
     agent:
       name: DetermineToolCall
       prompt_files:
         - prompts/determine_tool_call_stats.txt
       engine: gpt-4.1
       tools: []
-      usage: |
-        This tool is used to determine which tool to call based on the user's input. 
 
   - tool_name: question_generator_agent
-    description: |
-      This tool generates 5 test questions based on the provided text.
+    doc_string: |
+      This tool generates 5 test questions based on the provided text. Use this tool to generate test questions for a given text.
+        The output will be a dictionary with keys "Question_1", "Question_2", etc.
     agent:
       name: GenerateFiveQuestions
       prompt: |
@@ -65,9 +63,6 @@ agents_as_tools:
         Generate 5 test questions based on the provided text.
       engine: gpt-4.1
       tools: []
-      usage: |
-        Use this tool to generate test questions for a given text.
-        The output will be a dictionary with keys "Question_1", "Question_2", etc.
       output_format: *quiz_schema
 
 
@@ -81,10 +76,6 @@ ducks:
           - prompts/standard-rubber-duck.txt
         engine: gpt-4.1
         tools: []
-        usage: |
-          This duck is a general-purpose rubber duck that can help with a wide range of questions.
-          It can answer questions about programming, statistics, and general knowledge.
-      timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -129,7 +120,6 @@ ducks:
           - calculate_one_sample_proportion_z_test
           - calculate_two_sample_proportion_z_test
         tool_required: required
-      timeout: 600
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -142,31 +132,31 @@ ducks:
         prompt_files:
           - prompts/dog-cat-scratch/router.txt
         tools:
-          - talk_about_cats
-          - talk_about_dogs
           - talk_to_user
+          - talk_about_dogs
+          - talk_about_cats
         tool_required: required
-        usage: |
-          This agent routes the conversation to either the dog or cat agent based on the user's input.
       agents_as_tools:
-        - name: talk_about_dogs
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/dog-cat-scratch/dog.txt
-          tools:
-            - talk_to_user
-          usage: |
-            This agent handles questions about dogs. It can answer questions about dog breeds, care, and behavior.
-        - name: talk_about_cats
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/dog-cat-scratch/cat.txt
-          tools:
-            - talk_to_user
-          usage: |
-            This agent handles questions about cats. It can answer questions about cat breeds, care, and behavior.
-      starting_agent: dispatch
-      timeout: 600
+        - tool_name: talk_about_dogs
+          doc_string: |
+              This tool handles questions about dogs. It can answer questions about dog breeds, care, and behavior.
+          agent:
+            name: dog
+            engine: gpt-4.1
+            prompt_files:
+              - prompts/dog-cat-scratch/dog.txt
+            tools:
+              - talk_to_user
+        - tool_name: talk_about_cats
+          doc_string: |
+              This tool handles questions about cats. It can answer questions about cat breeds, care, and behavior.
+          agent:
+            name: cat
+            engine: gpt-4.1
+            prompt_files:
+              - prompts/dog-cat-scratch/cat.txt
+            tools:
+              - talk_to_user
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -346,8 +336,6 @@ servers:
                 prompt_files:
                   - prompts/emoji.txt
                 tools: []
-                usage: |
-                  This duck is a fun emoji-based agent that can respond to user queries with emojis.
               timeout: 2000
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -389,9 +377,6 @@ servers:
                   - prompts/socratic-duck.txt
                 engine: gpt-4.1
                 tools: []
-                usage: |
-                  This duck uses the Socratic method to help you think through your problems.
-                  It will ask you questions to guide you to your own answers.
               timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -429,9 +414,6 @@ servers:
                   - prompts/phd-duck.txt
                   - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
                 tools: []
-                usage: |
-                    This duck is designed to help you with the convex hull project design.
-                    It will guide you through the design process and answer your questions.
               timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -440,6 +422,8 @@ servers:
         channel_name: stats-tool
         ducks:
           - stats-duck
+
+timeout: 600
 
 feedback_notifier_settings:
   feedback_check_hour: 9
