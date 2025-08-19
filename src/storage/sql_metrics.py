@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String, BigInteger
+from sqlalchemy import Column, Integer, String, BigInteger, JSON
 from sqlalchemy.orm import declarative_base, Session
 
 from ..utils.logger import duck_logger
@@ -31,8 +31,8 @@ class MessagesModel(MetricsBase):
     guild_id = Column(BigInteger)
     thread_id = Column(BigInteger)
     user_id = Column(BigInteger)
-    role = Column(String(255))
-    message = Column(String(4096))
+    type = Column(String(255))
+    output = Column(JSON, nullable=False)
 
 
 @add_iter
@@ -73,14 +73,16 @@ class SQLMetricsHandler:
         MetricsBase.metadata.create_all(session.connection())
         self.session = session
 
-    async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str):
+    async def record_message(self, guild_id: int, thread_id: int, user_id: int, type_: str, output: dict):
         try:
-            new_message_row = MessagesModel(timestamp=get_timestamp(),
-                                            guild_id=guild_id,
-                                            thread_id=thread_id,
-                                            user_id=user_id,
-                                            role=role,
-                                            message=message)
+            new_message_row = MessagesModel(
+                timestamp=get_timestamp(),
+                guild_id=guild_id,
+                thread_id=thread_id,
+                user_id=user_id,
+                type=type_,
+                output=output
+            )
             self.session.add(new_message_row)
             self.session.commit()
         except Exception as e:

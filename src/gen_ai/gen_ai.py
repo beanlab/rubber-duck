@@ -1,9 +1,10 @@
 import inspect
 import json
 import os
-from io import BytesIO
-from typing import TypedDict, Protocol, Literal, NotRequired, Type
+from dataclasses import dataclass
+from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
+from discord.context_managers import Typing
 from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
@@ -15,8 +16,6 @@ from quest import step
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType
 from ..utils.logger import duck_logger
-
-Sendable = str | tuple[str, BytesIO]
 
 
 class GenAIException(Exception):
@@ -39,21 +38,19 @@ class RecordUsage(Protocol):
 ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | ToolChoiceFunctionParam
 
 
+@dataclass
 class Agent:
-    def __init__(self, name: str, prompt: str, model: str, tools: list[str], usage: str,
-                 tool_settings: ToolChoiceTypes = "auto", output_format: Type[BaseModel] | None = None, reasoning: str | None = None):
-        self.name = name
-        self.prompt = prompt
-        self.model = model
-        self.tools = tools
-        self.usage = usage
-        self.tool_settings = tool_settings
-        self.output_format = output_format
-        self.reasoning = reasoning
+    name: str
+    prompt: str
+    model: str
+    tools: list[str]
+    tool_settings: ToolChoiceTypes = "auto"
+    output_format: Optional[Type[BaseModel]] = None
+    reasoning: Optional[str] = None
+
 
 class Response(TypedDict):
     type: Literal["function_call", "message"]
-    structured_output: NotRequired[bool]
     name: NotRequired[str]
     arguments: NotRequired[str]
     message: NotRequired[str]
@@ -77,15 +74,25 @@ def format_function_call_history_items(result: str, call: Response):
         )
     ]
 
+def format_reasoning_history_item(id: str, summary: list):
+    return {
+        'id': id,
+        'type': 'reasoning',
+        'summary': summary
+    }
 
 class AIClient:
-    def __init__(self, armory: Armory):
+    def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage):
         self._armory = armory
+        self._typing = typing
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @step
     async def _get_completion(
             self,
+            ctx: DuckContext,
             prompt: str,
             history,
             model: str,
@@ -94,52 +101,66 @@ class AIClient:
             output_format: Type[BaseModel] | None,
             reasoning: str | None = None
     ) -> Response:
-        params = dict(
-            model=model,
-            instructions=prompt,
-            input=history,
-            tools=tools,
-            tool_choice=tool_settings
-        )
+        async with self._typing(ctx.thread_id):
+            params = dict(
+                model=model,
+                instructions=prompt,
+                input=history,
+                tools=tools,
+                tool_choice=tool_settings
+            )
 
-        if output_format:
-            params["text_format"] = output_format
-        if reasoning:
-            params["reasoning"] = {"effort": reasoning}
+            if output_format:
+                params["text_format"] = output_format
+            if reasoning:
+                params["reasoning"] = {"effort": reasoning}
 
-        response = self._client.responses.parse(**params)
+            response = self._client.responses.parse(**params)
 
-        for item in response.output:
-            if item.type == "function_call":
-                return Response(
-                    type="function_call",
-                    name=item.name,
-                    arguments=item.arguments,
-                    call_id=item.call_id,
-                    id=item.id
-                )
-            elif item.type == "message":
-                return Response(type="message",
-                                message=str(response.output_parsed) if output_format else response.output_text,
-                                structured_output=bool(output_format))
-            elif item.type == "reasoning":
-                history.append({
-                    'id': item.id,
-                    'type': 'reasoning',
-                    'summary': item.summary
-                })
-                continue
+            if response.usage:
+                usage = response.usage
+                await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
+                                   usage.input_tokens, usage.output_tokens, usage.input_tokens_details.cached_tokens,
+                                   usage.output_tokens_details.reasoning_tokens)
 
-        raise NotImplementedError(f"Unknown response type")
+            for item in response.output:
+                if item.type == "function_call":
+                    return Response(
+                        type="function_call",
+                        name=item.name,
+                        arguments=item.arguments,
+                        call_id=item.call_id,
+                        id=item.id
+                    )
+                elif item.type == "message":
+                    return Response(type="message",
+                                    message=response.output_parsed if output_format else response.output_text)
 
+                elif item.type == "reasoning":
+                    reasoning_item = format_reasoning_history_item(item.id, item.summary)
+                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning", str(reasoning_item))
+                    history.append(reasoning_item)
+                    continue
+
+            raise NotImplementedError(f"Unknown response type")
+
+    @step
+    async def _run_tool(self, tool, ctx, tool_args):
+        result = tool(ctx, **tool_args)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
         tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
+        user_message = GPTMessage(role='user', content=query)
+        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+                             json.dumps(user_message))
         history: list[HistoryType] = [GPTMessage(role='user', content=query)]
         try:
             while True:
-                output = await self._get_completion(agent.prompt, history, agent.model, tools_json,
+                output = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
                                                     agent.tool_settings, agent.output_format, agent.reasoning)
                 if output['type'] == "function_call":
                     tool_name = output["name"]
@@ -147,23 +168,22 @@ class AIClient:
 
                     tool = self._armory.get_specific_tool(tool_name)
 
-                    result = tool(ctx, **tool_args)
+                    result = await self._run_tool(tool, ctx, tool_args)
 
-                    if inspect.isawaitable(result):
-                        result = await result
-
-                    history.extend(format_function_call_history_items(result, output))
+                    function_items = format_function_call_history_items(result, output)
+                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
+                                         str(function_items[0]))
+                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
+                                         str(function_items[1]))
+                    history.extend(function_items)
 
                     continue
 
                 elif output['type'] == "message":
-                    if output.get('structured_output'):
-                        tool = self._armory.get_specific_tool("send_file")
-                        await tool(ctx, output['message'])
-                        return output['message']
-                    else:
-                        return output['message']
-
+                    message = output['message']
+                    if agent.output_format is not None:
+                        message = str(message)
+                    return message
                 else:
                     raise NotImplementedError(f"Unknown response type: {output['type']}")
 
@@ -174,10 +194,10 @@ class AIClient:
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
-    def build_agent_tool(self, agent: Agent, tool_name: str, tool_description: str) -> callable:
+    def build_agent_tool(self, agent, name: str, doc_string: str) -> callable:
         async def agent_runner(ctx: DuckContext, query: str):
-            duck_logger.debug(f"Talking to agent: {agent.name}")
+            duck_logger.debug(f"Talking to agent: {agent}")
             return await self.run_agent(ctx, agent, query)
-        agent_runner.__name__ = tool_name
-        agent_runner.__doc__ = f"Description: {tool_description}\n\nUsage: {agent.usage}"
+        agent_runner.__name__ = name
+        agent_runner.__doc__ = doc_string
         return agent_runner

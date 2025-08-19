@@ -74,7 +74,7 @@ class SingleAgentSettings(TypedDict):
 
 class AgentAsToolSettings(TypedDict):
     tool_name: str
-    description: str
+    doc_string: str
     agent: SingleAgentSettings
 
 
@@ -85,7 +85,6 @@ class MultiAgentSettings(TypedDict):
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
-    timeout: int
     file_size_limit: int
     file_type_ext: list[str]
 
@@ -161,7 +160,7 @@ class StructuredOutput(TypedDict):
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
-    structured_outputs: list[StructuredOutput]
+    timeout: int
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

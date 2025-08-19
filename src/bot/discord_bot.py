@@ -190,36 +190,20 @@ class DiscordBot(discord.Client):
         await message.add_reaction(reaction)
 
     class ChannelTyping:
-        def __init__(self, fetch_channel):
+        def __init__(self, fetch_channel, channel_id):
             self._fetch_channel = fetch_channel
-            self._typings = {}  # channel_id -> typing context
-
-        async def start(self, channel_id: int):
-            if channel_id in self._typings:
-                # Already typing in this channel, ignore or log if you want
-                return
-
-            channel = await self._fetch_channel(channel_id)
-            typing_ctx = channel.typing()
-            await typing_ctx.__aenter__()
-            self._typings[channel_id] = typing_ctx
-
-        async def stop(self, channel_id: int):
-            typing_ctx = self._typings.pop(channel_id, None)
-            if typing_ctx:
-                await typing_ctx.__aexit__(None, None, None)
+            self._channel_id = channel_id
 
         async def __aenter__(self):
-            raise RuntimeError("Use 'start(channel_id)' instead of 'async with' if channel_id isn't passed at init.")
+            channel = await self._fetch_channel(self._channel_id)
+            self._typing = channel.typing()
+            return await self._typing.__aenter__()
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):
-            # Optionally stop all typings when context exits (or leave empty)
-            for typing_ctx in self._typings.values():
-                await typing_ctx.__aexit__(exc_type, exc_val, exc_tb)
-            self._typings.clear()
+            await self._typing.__aexit__(exc_type, exc_val, exc_tb)
 
-    def typing(self) -> ChannelTyping:
-        return self.ChannelTyping(self.fetch_channel)
+    def typing(self, channel_id: int):
+        return self.ChannelTyping(self.fetch_channel, channel_id)
 
     async def create_thread(self, parent_channel_id: int, title: str) -> int:
         # Create the private thread

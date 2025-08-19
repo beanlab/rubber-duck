@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from .gen_ai import RecordMessage, Agent, AIClient
+from discord.context_managers import Typing
+
+from .gen_ai import RecordMessage, Agent, AIClient, RecordUsage
 from ..armory.armory import Armory
 from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
@@ -37,7 +39,6 @@ def _build_agent(
         prompt=prompt,
         model=config["engine"],
         tools=config["tools"],
-        usage=config["usage"],
         tool_settings=tool_required,
         output_format=output_model,
         reasoning=config.get("reasoning", None)
@@ -50,16 +51,13 @@ def _register_agent_tools(
         armory: Armory,
         client: AIClient
 ) -> None:
-    """Add agent tools to the armory."""
     for settings in agent_tool_settings:
-        tool_name = settings['tool_name']
-        tool_description = settings['description']
         agent = _build_agent(settings['agent'])
-        armory.add_tool(client.build_agent_tool(agent, tool_name, tool_description))
+        armory.add_tool(client.build_agent_tool(agent, settings['tool_name'], settings['doc_string']))
 
 
-def _add_agent_tools(config: Config, client: AIClient) -> None:
-    _register_agent_tools(config['agents_as_tools'], _armory, client)
+def _add_agent_tools(config: list[AgentAsToolSettings], client: AIClient) -> None:
+    _register_agent_tools(config, _armory, client)
 
 
 def _build_main_agent(
@@ -69,7 +67,6 @@ def _build_main_agent(
         client: AIClient
 ) -> Agent:
     main_agent = _build_agent(agent_settings)
-
     if agent_tool_settings:
         _register_agent_tools(agent_tool_settings, armory, client)
 
@@ -82,15 +79,15 @@ _armory: Armory = None
 _ai_client: AIClient = None
 
 
-def _get_ai_client(armory) -> AIClient:
+def _get_ai_client(armory, typing: Typing, record_message: RecordMessage, record_usage: RecordUsage) -> AIClient:
     global _ai_client
     if _ai_client is None:
-        _ai_client = AIClient(armory)
+        _ai_client = AIClient(armory, typing, record_message, record_usage)
 
     return _ai_client
 
 
-def _get_armory(config: Config, send_message, typing, record_message) -> Armory:
+def _get_armory(config: Config, send_message) -> Armory:
     global _armory
     if _armory is None:
         _armory = Armory(send_message)
@@ -102,7 +99,7 @@ def _get_armory(config: Config, send_message, typing, record_message) -> Armory:
         else:
             duck_logger.warning("**No dataset folder locations provided in config**")
 
-        talk_tool = TalkTool(send_message, typing, record_message, 30)
+        talk_tool = TalkTool(send_message, config.get("timeout", 300))
         _armory.scrub_tools(talk_tool)
 
     return _armory
@@ -114,14 +111,15 @@ def build_agent_conversation_duck(
         settings: AgentConversationSettings,
         record_message: RecordMessage,
         send_message: SendMessage,
+        record_usage: RecordUsage,
         typing
 ) -> DuckConversation:
     # Same for each duck
-    armory = _get_armory(config, send_message, typing, record_message)
-    ai_client = _get_ai_client(armory)
+    armory = _get_armory(config, send_message)
+    ai_client = _get_ai_client(armory, typing, record_message, record_usage)
 
     # Different for each duck
-    _add_agent_tools(config, ai_client)
+    _add_agent_tools(config['agents_as_tools'], ai_client)
     starting_agent = _build_main_agent(settings['agent'], settings.get('agents_as_tools', None), armory, ai_client)
 
     agent_conversation = AgentConversation(
