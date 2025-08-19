@@ -16,13 +16,13 @@ file_type_ext:
     "md",
   ]
 
-structured_outputs:
-  - quiz_schema: &quiz_schema
-      Question_1: str
-      Question_2: str
-      Question_3: str
-      Question_4: str
-      Question_5: str
+
+quiz_schema: &quiz_schema
+  Question_1: str
+  Question_2: str
+  Question_3: str
+  Question_4: str
+  Question_5: str
 
 sql:
   db_type: sqlite
