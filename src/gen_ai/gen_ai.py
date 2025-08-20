@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from quest import step
 
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext, GPTMessage, HistoryType
+from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
 from ..utils.logger import duck_logger
 
 
@@ -49,12 +49,13 @@ class Agent:
 
 
 class Response(TypedDict):
-    type: Literal["function_call", "message"]
+    type: Literal["function_call", "message", "reasoning"]
     name: NotRequired[str]
     arguments: NotRequired[str]
     message: NotRequired[str]
     id: NotRequired[str]
     call_id: NotRequired[str]
+    summary: NotRequired[list]
 
 
 def format_function_call_history_items(result: str, call: Response):
@@ -73,19 +74,21 @@ def format_function_call_history_items(result: str, call: Response):
         )
     ]
 
-def format_reasoning_history_item(id: str, summary: list):
+
+def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
     return {
         'id': id,
         'type': 'reasoning',
         'summary': summary
     }
 
+
 class AIClient:
     def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage):
         self._armory = armory
         self._typing = typing
-        self._record_message = step(record_message)
-        self._record_usage = step(record_usage)
+        self._record_message = record_message
+        self._record_usage = record_usage
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @step
@@ -99,7 +102,7 @@ class AIClient:
             tool_settings: ToolChoiceTypes,
             output_format: Type[BaseModel] | None,
             reasoning: str | None = None
-    ) -> Response:
+    ) -> list[Response]:
         async with self._typing(ctx.thread_id):
             params = dict(
                 model=model,
@@ -119,29 +122,34 @@ class AIClient:
             if response.usage:
                 usage = response.usage
                 await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
-                                   usage.input_tokens, usage.output_tokens, usage.input_tokens_details.cached_tokens,
-                                   usage.output_tokens_details.reasoning_tokens)
+                                         usage.input_tokens, usage.output_tokens,
+                                         usage.input_tokens_details.cached_tokens,
+                                         usage.output_tokens_details.reasoning_tokens)
 
+            responses = []
             for item in response.output:
                 if item.type == "function_call":
-                    return Response(
+                    responses.append(Response(
                         type="function_call",
                         name=item.name,
                         arguments=item.arguments,
                         call_id=item.call_id,
                         id=item.id
-                    )
+                    ))
                 elif item.type == "message":
-                    return Response(type="message",
-                                    message=str(response.output_parsed) if output_format else response.output_text)
+                    responses.append(Response(type="message",
+                                              message=str(
+                                                  response.output_parsed) if output_format else response.output_text))
 
                 elif item.type == "reasoning":
-                    reasoning_item = format_reasoning_history_item(item.id, item.summary)
-                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning", str(reasoning_item))
-                    history.append(reasoning_item)
-                    continue
-
-            raise NotImplementedError(f"Unknown response type")
+                    responses.append(Response(
+                        type="reasoning",
+                        id=item.id,
+                        summary=item.summary
+                    ))
+                else:
+                    raise NotImplementedError(f"Unknown response type")
+            return responses
 
     @step
     async def _run_tool(self, tool, ctx, tool_args):
@@ -153,39 +161,47 @@ class AIClient:
             result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
         return result
 
-
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
         tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
         user_message = GPTMessage(role='user', content=query)
         await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
-                             json.dumps(user_message))
+                                   json.dumps(user_message))
         history: list[HistoryType] = [GPTMessage(role='user', content=query)]
         try:
             while True:
-                output = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
-                                                    agent.tool_settings, agent.output_format, agent.reasoning)
-                if output['type'] == "function_call":
-                    tool_name = output["name"]
-                    tool_args = json.loads(output["arguments"])
+                outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
+                                                     agent.tool_settings, agent.output_format, agent.reasoning)
+                for output in outputs:
+                    if output['type'] == "reasoning":
+                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
+                                                   str(reasoning_item))
+                        history.append(reasoning_item)
+                        continue
 
-                    tool = self._armory.get_specific_tool(tool_name)
+                    if output['type'] == "function_call":
+                        tool_name = output["name"]
+                        tool_args = json.loads(output["arguments"])
 
-                    result = await self._run_tool(tool, ctx, tool_args)
+                        tool = self._armory.get_specific_tool(tool_name)
 
-                    function_items = format_function_call_history_items(result, output)
-                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
-                                         str(function_items[0]))
-                    await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
-                                         str(function_items[1]))
-                    history.extend(function_items)
+                        result = await self._run_tool(tool, ctx, tool_args)
 
-                    continue
+                        function_items = format_function_call_history_items(result, output)
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
+                                                   str(function_items[0]))
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
+                                                   str(function_items[1]))
+                        history.extend(function_items)
 
-                elif output['type'] == "message":
-                    return output['message']
-                else:
-                    raise NotImplementedError(f"Unknown response type: {output['type']}")
+                        continue
+
+                    elif output['type'] == "message":
+                        return output['message']
+
+                    else:
+                        raise NotImplementedError(f"Unknown response type: {output['type']}")
 
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
@@ -198,6 +214,7 @@ class AIClient:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent}")
             return await self.run_agent(ctx, agent, query)
+
         agent_runner.__name__ = name
         agent_runner.__doc__ = doc_string
         return agent_runner
