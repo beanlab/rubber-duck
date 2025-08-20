@@ -368,7 +368,6 @@ class StatsTools:
             return "Error calculating mode"
 
     @register_tool
-    @sends_image
     async def calculate_five_number_summary(self, dataset: str, column: str) -> str:
         """Returns the five-number summary (min, Q1, median, Q3, max) for a numeric column in the dataset."""
         duck_logger.debug(f"Calculating five-number summary for: {column} in dataset: {dataset}")
