@@ -9,7 +9,7 @@ from ..utils.protocols import Message
 
 class TalkTool:
     def __init__(self, send_message):
-        self._send_message = send_message
+        self._send_message = step(send_message)
 
     @register_tool
     async def talk_to_user(self, ctx: DuckContext, message_to_user: str) -> str:
