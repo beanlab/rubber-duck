@@ -17,13 +17,6 @@ file_type_ext:
   ]
 
 
-quiz_schema: &quiz_schema
-  Question_1: str
-  Question_2: str
-  Question_3: str
-  Question_4: str
-  Question_5: str
-
 sql:
   db_type: sqlite
   database: /rubber-duck.db
@@ -41,31 +34,6 @@ agents_as_tools:
       engine: gpt-4.1
       tools: []
 
-
-  - tool_name: determine_tool_call
-    doc_string: |
-      This tool determines which tool to call based on the user's input. This tool is used to determine which tool to call based on the user's input.
-    agent:
-      name: DetermineToolCall
-      prompt_files:
-        - prompts/determine_tool_call_stats.txt
-      engine: gpt-4.1
-      tools: []
-
-  - tool_name: question_generator_agent
-    doc_string: |
-      This tool generates 5 test questions based on the provided text. Use this tool to generate test questions for a given text.
-        The output will be a dictionary with keys "Question_1", "Question_2", etc.
-    agent:
-      name: GenerateFiveQuestions
-      prompt: |
-        You are a test question generator. 
-        Generate 5 test questions based on the provided text.
-      engine: gpt-4.1
-      tools: []
-      output_format: *quiz_schema
-
-
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
@@ -74,7 +42,8 @@ ducks:
         name: RubberDuck
         prompt_files:
           - prompts/standard-rubber-duck.txt
-        engine: gpt-4.1
+        engine: gpt-5-mini
+        reasoning: minimal
         tools: []
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
@@ -84,7 +53,8 @@ ducks:
     settings:
       agent:
         name: stats_duck
-        engine: gpt-4.1
+        engine: gpt-5
+        reasoning: minimal
         prompt_files:
           - prompts/stats2.txt
         tools:
@@ -123,45 +93,6 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
-  - name: cat-dog-duck
-    duck_type: agent_conversation
-    settings:
-      agent:
-        name: dispatch
-        engine: gpt-4.1
-        prompt_files:
-          - prompts/dog-cat-scratch/router.txt
-        tools:
-          - talk_to_user
-          - talk_about_dogs
-          - talk_about_cats
-        tool_required: required
-      agents_as_tools:
-        - tool_name: talk_about_dogs
-          doc_string: |
-              This tool handles questions about dogs. It can answer questions about dog breeds, care, and behavior.
-          agent:
-            name: dog
-            engine: gpt-4.1
-            prompt_files:
-              - prompts/dog-cat-scratch/dog.txt
-            tools:
-              - talk_to_user
-        - tool_name: talk_about_cats
-          doc_string: |
-              This tool handles questions about cats. It can answer questions about cat breeds, care, and behavior.
-          agent:
-            name: cat
-            engine: gpt-4.1
-            prompt_files:
-              - prompts/dog-cat-scratch/cat.txt
-            tools:
-              - talk_to_user
-      file_size_limit: *file_size_limit
-      file_type_ext: *file_type_ext
-
-
-
 servers:
   927616651409649675:
     server_name: CS 110
@@ -174,12 +105,13 @@ servers:
             settings:
               target_channel_ids:
                 - 1234556460453597276
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1234556460453597276
         channel_name: general/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1399777118380097648
         channel_name: join-the-server
@@ -209,12 +141,13 @@ servers:
             settings:
               target_channel_ids:
                 - 1195490291134779502
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1195490291134779502
         channel_name: student-text-channels/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1399788047981351042
         channel_name: join-the-server
@@ -243,12 +176,14 @@ servers:
             settings:
               target_channel_ids:
                 - 1365456542287269919
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1365456542287269919
         channel_name: Student Text Channels/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
+
 
   1371951485629370458:
     server_name: Stats
@@ -262,17 +197,20 @@ servers:
               target_channel_ids:
                 - 1371951696061661215
                 - 1374066971523678279
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1371951696061661215
         channel_name: duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1374066971523678279
         channel_name: stats-tool
         ducks:
           - stats-duck
+        timeout: 600
+
 
   1354902266246598928:
     server_name: Physics
@@ -285,7 +223,7 @@ servers:
             settings:
               target_channel_ids:
                 - 1363949528201564170
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1363949528201564170
         channel_name: physics-230-phys230
@@ -300,12 +238,14 @@ servers:
             settings:
               target_channel_ids:
                 - 1359587525605458030
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1359587525605458030
         channel_name: physics-430-phys430
         ducks:
           - standard-rubber-duck
+        timeout: 600
+
 
   1338616224858374287:
     server_name: Rubber Duck Demo Server
@@ -318,11 +258,14 @@ servers:
             settings:
               target_channel_ids:
                 - 1338616283671040000
+        timeout: 300
 
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
         ducks:
           - standard-rubber-duck
+        timeout: 600
+
 
       - channel_id: 1401960218870419647
         channel_name: emoji-duck
@@ -336,9 +279,10 @@ servers:
                 prompt_files:
                   - prompts/emoji.txt
                 tools: []
-              timeout: 2000
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 2000
+
 
       - channel_id: 1385293810782965830
         channel_name: code-complexity-analysis-duck
@@ -346,7 +290,6 @@ servers:
           - name: code-complexity-duck
             duck_type: agent_conversation
             settings:
-              timeout: 600
               file_size_limit: 5100
               file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
               agent:
@@ -359,7 +302,9 @@ servers:
                   Keep your responses brief and clear. Provide the tool output to the user verbatim.
                 tools:
                   - generate_code_complexity_analysis
-                engine: gpt-4.1
+                engine: gpt-5-mini
+                reasoning: minimal
+        timeout: 600
 
 
       - channel_id: 1379953844540407969
@@ -368,18 +313,15 @@ servers:
           - name: socratic-rubber-duck
             duck_type: agent_conversation
             settings:
-              introduction: |
-                I'm a Socratic-style rubber duck. 
-                I can help you think through your problems by asking questions.
               agent:
                 name: socrates
                 prompt_files:
                   - prompts/socratic-duck.txt
                 engine: gpt-4.1
                 tools: []
-              timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 600
 
       - channel_id: 1379959992110546995
         channel_name: join-the-server
@@ -405,8 +347,6 @@ servers:
           - name: phd-duck
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Welcome! This is the design experience for the convex hull project. Send a message to continue.
               agent:
                 name: PhdDuck
                 engine: gpt-4.1
@@ -414,16 +354,15 @@ servers:
                   - prompts/phd-duck.txt
                   - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
                 tools: []
-              timeout: 600
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 600
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
           - stats-duck
-
-timeout: 600
+        timeout: 600
 
 feedback_notifier_settings:
   feedback_check_hour: 9

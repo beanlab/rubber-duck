@@ -145,10 +145,14 @@ class AIClient:
 
     @step
     async def _run_tool(self, tool, ctx, tool_args):
-        result = tool(ctx, **tool_args)
-        if inspect.isawaitable(result):
-            result = await result
+        try:
+            result = tool(ctx, **tool_args)
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as error:
+            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
         return result
+
 
     @step
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
