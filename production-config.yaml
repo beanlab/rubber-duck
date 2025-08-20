@@ -61,7 +61,7 @@ ducks:
     duck_type: agent_conversation
     settings:
       introduction: |
-          Hello! I can help answer your questions about statistics.
+        Hello! I can help answer your questions about statistics.
       agents:
         - name: stats_duck
           engine: gpt-5
@@ -194,6 +194,24 @@ servers:
         ducks:
           - standard-rubber-duck
 
+  1407758127608365157:
+    server_name: BYU - CS 312
+    channels:
+      - channel_id: 1407761075226542120
+        channel_name: register
+        ducks:
+          - name: Registration-Workflow-CS312
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: student
+              email_domain: byu.edu
+              roles:
+                patterns:
+                  - name: Lecture Sections
+                    pattern: "lecture-"
+                    description: Who teaches your lecture?
+
   1371951485629370458:
     server_name: Stats
     channels:
@@ -308,7 +326,7 @@ servers:
                 You can also ask me questions about Big-O analysis.
               timeout: 600
               file_size_limit: 5100
-              file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
+              file_type_ext: [ "py", "java", "cpp", "c", "h", "hpp", "ts", "js" ]
               agents:
                 - name: ComplexityDuck
                   prompt: |
@@ -404,12 +422,12 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
-    "gpt-4": [0.03, 0.06]
-    "gpt-4o": [0.0025, 0.01]
-    "gpt-4-1106-preview": [0.01, 0.03]
-    "gpt-4-0125-preview": [0.01, 0.03]
-    "o4-mini": [0.000150, 0.0006]
-    "gpt-4-turbo": [0.01, 0.03]
-    "gpt-4-turbo-preview": [0.01, 0.03]
-    "gpt-3.5-turbo-1106": [0.001, 0.002]
-    "gpt-3.5-turbo": [0.001, 0.003]
+    "gpt-4": [ 0.03, 0.06 ]
+    "gpt-4o": [ 0.0025, 0.01 ]
+    "gpt-4-1106-preview": [ 0.01, 0.03 ]
+    "gpt-4-0125-preview": [ 0.01, 0.03 ]
+    "o4-mini": [ 0.000150, 0.0006 ]
+    "gpt-4-turbo": [ 0.01, 0.03 ]
+    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
+    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
+    "gpt-3.5-turbo": [ 0.001, 0.003 ]
