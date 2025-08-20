@@ -1,5 +1,3 @@
-
-
 import inspect
 from typing import Any, Callable, get_type_hints, Literal, Union, get_origin, get_args
 
@@ -16,7 +14,6 @@ def register_tool(func):
 def sends_image(func):
     func.sends_image = True
     return func
-
 
 
 def is_optional(annotation) -> bool:

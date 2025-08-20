@@ -98,6 +98,7 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
+    timeout: int
 
 
 class DuckConfig(TypedDict):
@@ -118,6 +119,7 @@ class ChannelConfig(TypedDict):
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
     ducks: list[DUCK_NAME | DuckConfig | WeightedDuck]
     "Either the name of the duck"
+    timeout: int
 
 
 class ServerConfig(TypedDict):
@@ -152,15 +154,9 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
 
-class StructuredOutput(TypedDict):
-    name: str
-    fields: dict[str, Any]
-
-
 class Config(TypedDict):
     sql: SQLConfig
     ducks: list[DuckConfig]
-    timeout: int
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings

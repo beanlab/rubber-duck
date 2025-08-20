@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Optional, List
 
 from discord.context_managers import Typing
 
@@ -8,101 +11,127 @@ from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
 from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
-from ..duck_orchestrator import DuckConversation
 from ..outputs.structured_outputs import schema_to_model
-from ..utils.config_types import AgentConversationSettings, SingleAgentSettings, Config, AgentAsToolSettings
+from ..utils.config_types import (
+    AgentConversationSettings,
+    SingleAgentSettings,
+    Config,
+    AgentAsToolSettings,
+)
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage
 
 
-def _build_agent(
-        config: SingleAgentSettings
-) -> Agent:
-    prompt = config.get('prompt', None)
+def _build_agent(config: SingleAgentSettings) -> Agent:
+    prompt = config.get("prompt")
     if not prompt:
         prompt_files = config.get("prompt_files")
         if not prompt_files:
-            raise ValueError(f"You must provide either 'prompt' or 'prompt_files' for {config['name']}")
-        prompt = f'\n'.join([Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files])
+            raise ValueError(
+                f"You must provide either 'prompt' or 'prompt_files' for {config['name']}"
+            )
+        prompt = "\n".join(
+            [Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files]
+        )
 
     tool_required = config.get("tool_required", "auto")
     if tool_required not in ["auto", "required", "none"]:
+        # interpret as "this specific function name is required"
         tool_required = {"type": "function", "name": tool_required}
 
-    output_fields = config.get("output_format", None)
+    output_fields = config.get("output_format")
     output_model = None
     if output_fields:
-        output_model = schema_to_model(config["name"] + "Output", output_fields)
+        output_model = schema_to_model(config["name"] + "_output", output_fields)
 
-    agent = Agent(
+    return Agent(
         name=config["name"],
         prompt=prompt,
         model=config["engine"],
         tools=config["tools"],
         tool_settings=tool_required,
         output_format=output_model,
-        reasoning=config.get("reasoning", None)
+        reasoning=config.get("reasoning"),
     )
-    return agent
 
 
-def _register_agent_tools(
-        agent_tool_settings: list[AgentAsToolSettings],
-        armory: Armory,
-        client: AIClient
-) -> None:
-    for settings in agent_tool_settings:
-        agent = _build_agent(settings['agent'])
-        armory.add_tool(client.build_agent_tool(agent, settings['tool_name'], settings['doc_string']))
+class SystemBuilder:
+    def __init__(
+            self,
+            config: Config,
+            send_message: SendMessage,
+            typing: Typing,
+            record_message: RecordMessage,
+            record_usage: RecordUsage,
+    ):
+        self.config = config
+        self.send_message = send_message
+        self.typing = typing
+        self.record_message = record_message
+        self.record_usage = record_usage
+
+        self._armory: Optional[Armory] = None
+        self._ai_client: Optional[AIClient] = None
+        self._agent_tools_added: bool = False
+
+    def armory(self) -> Armory:
+        if self._armory is None:
+            self._armory = Armory(self.send_message)
+
+            dataset_dirs = self.config.get("dataset_folder_locations")
+            if dataset_dirs:
+                data_store = DataStore(dataset_dirs)
+                stat_tools = StatsTools(data_store)
+                self._armory.scrub_tools(stat_tools)
+            else:
+                duck_logger.warning("**No dataset folder locations provided in config**")
+
+            talk_tool = TalkTool(self.send_message)
+            self._armory.scrub_tools(talk_tool)
+
+        return self._armory
+
+    def ai_client(self) -> AIClient:
+        if self._ai_client is None:
+            self._ai_client = AIClient(
+                self.armory(), self.typing, self.record_message, self.record_usage
+            )
+            self._ensure_agent_tools_added()
+        return self._ai_client
+
+    def _ensure_agent_tools_added(self) -> None:
+        if self._agent_tools_added:
+            return
+
+        agents_as_tools: List[AgentAsToolSettings] = self.config.get("agents_as_tools", [])
+        if not agents_as_tools:
+            self._agent_tools_added = True
+            return
+
+        for settings in agents_as_tools:
+            agent = _build_agent(settings["agent"])
+            tool = self._ai_client.build_agent_tool(
+                agent, settings["tool_name"], settings["doc_string"]
+            )
+            self.armory().add_tool(tool)
+
+        self._agent_tools_added = True
 
 
-def _add_agent_tools(config: list[AgentAsToolSettings], client: AIClient) -> None:
-    _register_agent_tools(config, _armory, client)
+_system: Optional[SystemBuilder] = None
 
 
-def _build_main_agent(
-        agent_settings: SingleAgentSettings,
-        agent_tool_settings: list[AgentAsToolSettings] | None,
-        armory: Armory,
-        client: AIClient
-) -> Agent:
-    main_agent = _build_agent(agent_settings)
-    if agent_tool_settings:
-        _register_agent_tools(agent_tool_settings, armory, client)
-
-    return main_agent
-
-
-# noinspection PyTypeChecker
-_armory: Armory = None
-# noinspection PyTypeChecker
-_ai_client: AIClient = None
-
-
-def _get_ai_client(armory, typing: Typing, record_message: RecordMessage, record_usage: RecordUsage) -> AIClient:
-    global _ai_client
-    if _ai_client is None:
-        _ai_client = AIClient(armory, typing, record_message, record_usage)
-
-    return _ai_client
-
-
-def _get_armory(config: Config, send_message) -> Armory:
-    global _armory
-    if _armory is None:
-        _armory = Armory(send_message)
-
-        if 'dataset_folder_locations' in config:
-            data_store = DataStore(config['dataset_folder_locations'])
-            stat_tools = StatsTools(data_store)
-            _armory.scrub_tools(stat_tools)
-        else:
-            duck_logger.warning("**No dataset folder locations provided in config**")
-
-        talk_tool = TalkTool(send_message, config.get("timeout", 300))
-        _armory.scrub_tools(talk_tool)
-
-    return _armory
+def get_system(
+        config: Config,
+        send_message: SendMessage,
+        typing: Typing,
+        record_message: RecordMessage,
+        record_usage: RecordUsage,
+) -> SystemBuilder:
+    global _system
+    if _system is None:
+        _system = SystemBuilder(config, send_message, typing, record_message, record_usage)
+    return _system
 
 
 def build_agent_conversation_duck(
@@ -112,21 +141,12 @@ def build_agent_conversation_duck(
         record_message: RecordMessage,
         send_message: SendMessage,
         record_usage: RecordUsage,
-        typing
-) -> DuckConversation:
-    # Same for each duck
-    armory = _get_armory(config, send_message)
-    ai_client = _get_ai_client(armory, typing, record_message, record_usage)
-
-    # Different for each duck
-    _add_agent_tools(config['agents_as_tools'], ai_client)
-    starting_agent = _build_main_agent(settings['agent'], settings.get('agents_as_tools', None), armory, ai_client)
-
-    agent_conversation = AgentConversation(
-        name,
-        starting_agent,
-        ai_client,
         typing,
-    )
+) -> AgentConversation:
 
-    return agent_conversation
+    system = get_system(config, send_message, typing, record_message, record_usage)
+
+    ai_client = system.ai_client()
+    starting_agent = _build_agent(settings["agent"])
+
+    return AgentConversation(name, starting_agent, ai_client)

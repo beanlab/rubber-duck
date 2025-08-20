@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
-from discord.context_managers import Typing
 from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
@@ -134,7 +133,7 @@ class AIClient:
                     )
                 elif item.type == "message":
                     return Response(type="message",
-                                    message=response.output_parsed if output_format else response.output_text)
+                                    message=str(response.output_parsed) if output_format else response.output_text)
 
                 elif item.type == "reasoning":
                     reasoning_item = format_reasoning_history_item(item.id, item.summary)
@@ -180,10 +179,7 @@ class AIClient:
                     continue
 
                 elif output['type'] == "message":
-                    message = output['message']
-                    if agent.output_format is not None:
-                        message = str(message)
-                    return message
+                    return output['message']
                 else:
                     raise NotImplementedError(f"Unknown response type: {output['type']}")
 
