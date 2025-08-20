@@ -59,6 +59,9 @@ Use this when the user wants to see proportions of a categorical variable in a *
 ### `plot_proportion_barplot`
 Use this when the user wants a **bar chart of proportions** across categories rather than raw counts.
 
+### `plot_scatterplot`
+Use this when the user wants to visualize the relationship between two **numeric variables** using a scatterplot.
+
 ---
 
 ## Summary Statistics Tools
@@ -124,6 +127,9 @@ Use this when the user wants to test a single **proportion against a benchmark**
 
 ### `calculate_two_sample_proportion_z_test`
 Use this when the user wants to **compare two proportions** from different groups using a **z-test**.
+
+### `simple_linear_regression`
+Use this when the user wants to perform a **simple linear regression** analysis to understand the relationship
 
 ---
 
@@ -285,3 +291,11 @@ Use this when the user wants to **compare two proportions** from different group
 **Agent:** It is mandatory to use the `calculate_two_sample_proportion_z_test` tool to answer the user's question.
 
 ---
+
+**user** Run simple linear regression on the admissions dataset with Chance of Admit as the response and GRE Score as the explanatory variable.
+**Agent** It is mandatory to use the `simple_linear_regression` tool to answer the user's question.
+
+___
+
+**user** Show me a scatterplot of GRE Score vs Chance of Admit.
+**Agent** It is mandatory to use the `plot_scatterplot` tool to answer the user's question.
