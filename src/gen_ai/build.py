@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Optional, List
 
@@ -96,10 +94,10 @@ class SystemBuilder:
             self._ai_client = AIClient(
                 self.armory(), self.typing, self.record_message, self.record_usage
             )
-            self._ensure_agent_tools_added()
+            self._agent_tools_add()
         return self._ai_client
 
-    def _ensure_agent_tools_added(self) -> None:
+    def _agent_tools_add(self) -> None:
         if self._agent_tools_added:
             return
 
