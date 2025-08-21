@@ -64,8 +64,7 @@ ducks:
         Hello! I can help answer your questions about statistics.
       agents:
         - name: stats_duck
-          engine: gpt-5
-          reasoning: minimal
+          engine: gpt-4.1
           prompt_files:
             - prompts/stats.txt
           tools:
@@ -82,6 +81,7 @@ ducks:
             - plot_barplot
             - plot_pie_chart
             - plot_proportion_barplot
+            - plot_scatterplot
             - calculate_mean
             - calculate_skewness
             - calculate_std
@@ -100,6 +100,7 @@ ducks:
             - calculate_one_way_anova
             - calculate_one_sample_proportion_z_test
             - calculate_two_sample_proportion_z_test
+            - simple_linear_regression
           tool_required: determine_tool_call
           max_iterations: 5
       timeout: 600
