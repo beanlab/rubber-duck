@@ -34,7 +34,6 @@ def _build_agent(config: SingleAgentSettings) -> Agent:
 
     tool_required = config.get("tool_required", "auto")
     if tool_required not in ["auto", "required", "none"]:
-        # interpret as "this specific function name is required"
         tool_required = {"type": "function", "name": tool_required}
 
     output_fields = config.get("output_format")
@@ -70,7 +69,6 @@ class SystemBuilder:
 
         self._armory: Optional[Armory] = None
         self._ai_client: Optional[AIClient] = None
-        self._agent_tools_added: bool = False
 
     def armory(self) -> Armory:
         if self._armory is None:
@@ -98,14 +96,7 @@ class SystemBuilder:
         return self._ai_client
 
     def _agent_tools_add(self) -> None:
-        if self._agent_tools_added:
-            return
-
         agents_as_tools: List[AgentAsToolSettings] = self.config.get("agents_as_tools", [])
-        if not agents_as_tools:
-            self._agent_tools_added = True
-            return
-
         for settings in agents_as_tools:
             agent = _build_agent(settings["agent"])
             tool = self._ai_client.build_agent_tool(

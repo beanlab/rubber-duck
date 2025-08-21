@@ -198,6 +198,7 @@ class AIClient:
                         continue
 
                     elif output['type'] == "message":
+                        duck_logger.debug("Going back to agent: main_agent")
                         return output['message']
 
                     else:
