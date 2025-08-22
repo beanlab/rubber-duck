@@ -41,6 +41,58 @@ agents_as_tools:
         engine: gpt-5
         reasoning: minimal
 
+  - tool_name: generate_code_example
+    description: |
+      This tool provides code examples for the requested topic. 
+      When calling the tool, provide a description of the topic that needs to be demonstrated and the programming language that should be used.
+
+      ## Arguments
+      topic: str - the topic you want to demonstrate with a code example
+
+      ## Returns  
+      str - a code example formatted in markdown
+
+      ## Usage
+      >>> generate_code_example('Demonstrate how to use enumerate in python')
+      """
+      ```python
+      for i, item in enumerate(['chair', 'bag', 'car']):
+        print(f'{i}: {item}')
+      ```
+      """
+
+    agents:
+      - name: explainer
+        engine: gpt-4.1
+        prompt_files:
+          - prompts/explainer-duck.txt
+        max_iterations: 5
+
+      - tool_name: explain_idea
+        description: |
+          This tool provides brief explanations of the provided topic or code.
+          When calling this tool, provide the code that needs to be explained or a description of the programming concept that needs to be explained.
+          
+          ## Arguments
+          topic: str - the topic description or code you want to explain
+    
+          ## Returns
+          str - a markdown string containing the explanation
+    
+          ## Usage
+          >>> explain_idea('What is encapsulation in programming?')
+          """
+          ...fill me in...
+          """
+
+        agents:
+          - name: explainer
+            engine: gpt-4.1
+            prompt_files:
+              - prompts/explainer-duck.txt
+            max_iterations: 5
+
+
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
@@ -54,6 +106,24 @@ ducks:
             - prompts/standard-rubber-duck.txt
           max_iterations: 5
       timeout: 600
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
+
+  - name: question-debug-explain-duck
+    duck_type: agent_conversation
+    settings:
+      introduction: |
+        Hello! How can I help you?
+      agents:
+        - name: socrates-duck
+          engine: gpt-4.1
+          prompt_files:
+            - prompts/socrates-duck.txt
+          max_iterations: 5
+          tools:
+            - explainer_duck_tool
+      starting_agent: socrates-duck
+      timeout: 2000
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -293,6 +363,11 @@ servers:
               target_channel_ids:
                 - 1338616283671040000
 
+      - channel_id: 1386813881716048044
+        channel_name: question-debug-explain-duck
+        ducks:
+          - question-debug-explain-duck
+
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
         ducks:
@@ -353,7 +428,7 @@ servers:
               agents:
                 - name: socrates
                   prompt_files:
-                    - prompts/socratic-duck.txt
+                    - prompts/socratic-duck-old.txt
                   engine: gpt-4.1
                   max_iterations: 5
               timeout: 600
