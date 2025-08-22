@@ -19,7 +19,9 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage
 
 
-def _build_agent(config: SingleAgentSettings) -> Agent:
+def _build_agent(config: SingleAgentSettings, hilt_tools: list[str] | None = None) -> Agent:
+    if hilt_tools is None:
+        hilt_tools = []
     prompt = config.get("prompt")
     if not prompt:
         prompt_files = config.get("prompt_files")
@@ -37,11 +39,16 @@ def _build_agent(config: SingleAgentSettings) -> Agent:
 
     output_schema = config.get("output_format", None)
 
+    if hilt_tools:
+        tools = list(config["tools"]) + hilt_tools
+    else:
+        tools = config["tools"]
+
     return Agent(
         name=config["name"],
         prompt=prompt,
         model=config["engine"],
-        tools=config["tools"],
+        tools=tools,
         tool_settings=tool_required,
         output_format=output_schema,
         reasoning=config.get("reasoning"),
@@ -119,6 +126,18 @@ def get_system(
     return _system
 
 
+def make_human_in_the_loop_tools(armory: Armory, hitl_tools: list[str]) -> list[str]:
+    tool_names = []
+    for tool_name in hitl_tools:
+        tool_function = armory.get_specific_tool(tool_name)
+        if tool_function is None:
+            duck_logger.warning(f"Human-in-the-loop tool '{tool_name}' not found in armory.")
+            continue
+        tool_names.append(armory.create_human_in_the_loop_tool(tool_function))
+    return tool_names
+
+
+
 def build_agent_conversation_duck(
         name: str,
         config: Config,
@@ -130,8 +149,9 @@ def build_agent_conversation_duck(
 ) -> AgentConversation:
 
     system = get_system(config, send_message, typing, record_message, record_usage)
-
     ai_client = system.ai_client()
-    starting_agent = _build_agent(settings["agent"])
+
+    hilt_tools = make_human_in_the_loop_tools(system.armory(), settings["agent"].get("hitl_tools", []))
+    starting_agent = _build_agent(settings["agent"], hilt_tools)
 
     return AgentConversation(name, starting_agent, ai_client)

@@ -9,6 +9,11 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.armory.armory import Armory
+from src.armory.data_store import DataStore
+from src.armory.stat_tools import StatsTools
+from src.armory.talk_tool import TalkTool
+from src.utils.protocols import SendMessage
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
