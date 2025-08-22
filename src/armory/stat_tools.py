@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import statsmodels.formula.api as smf
 from scipy import stats
 from scipy.stats import skew, norm, ttest_1samp, chi2_contingency
 from seaborn.external.kde import gaussian_kde
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
+
 
 from .cache import cache_result
 from .tools import register_tool, sends_image
@@ -43,6 +44,7 @@ class StatsTools:
             formatted = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(available))
             raise KeyError(f"Column '{column}' not found in dataset '{dataset}'. Available columns:\n{formatted}")
         return data[column]
+
 
     @register_tool
     def describe_dataset(self, dataset: str) -> str:
@@ -293,6 +295,43 @@ class StatsTools:
         return self._save_plot(name)
 
     @register_tool
+    @sends_image
+    @cache_result
+    async def plot_scatterplot(
+            self,
+            dataset: str,
+            explanatory: str,
+            response: str,
+            trend_line: bool = False
+    ) -> tuple[str, bytes] | str:
+        """Generate a scatterplot of two quantitative variables, with optional linear regression trend line."""
+
+        duck_logger.debug(
+            f"Generating scatterplot for {dataset}: {response} ~ {explanatory}, trend_line={trend_line}"
+        )
+
+        data = self._datastore.get_dataset(dataset)
+        name = self._photo_name(dataset, f"{response}_vs_{explanatory}", "scatterplot")
+
+        x_vals = self._datastore.get_column(data, explanatory)
+        y_vals = self._datastore.get_column(data, response)
+
+        if self._is_categorical(x_vals) or self._is_categorical(y_vals):
+            return f"Both '{explanatory}' and '{response}' must be quantitative for a scatterplot."
+
+        plt.figure(figsize=(8, 6))
+        sns.scatterplot(x=x_vals, y=y_vals)
+
+        if trend_line:
+            sns.regplot(x=x_vals, y=y_vals, scatter=False, ci=None, color="red")
+
+        plt.title(f"Scatterplot of {response} vs {explanatory}")
+        plt.xlabel(explanatory)
+        plt.ylabel(response)
+
+        return self._save_plot(name)
+
+    @register_tool
     async def calculate_mean(self, dataset: str, column: str) -> str:
         """Calculates the mean of a numeric column in the dataset, if not categorical."""
         duck_logger.debug(f"Calculating mean for: {column} in dataset: {dataset}")
@@ -423,14 +462,13 @@ class StatsTools:
         return f"The z-score is {round(z, 4)}"
 
     @register_tool
-    def calculate_probability_from_normal_distribution(self, z1: float, z2: Optional[float] = None, mean: float = 0,
-                                                       std: float = 1, tail: Literal[
-                "Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
+    def calculate_probability_from_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates the probability for one or two z-scores from a normal distribution. Can handle upper tail, lower tail, or between two z-scores."""
         duck_logger.debug(f"Calculating probability for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
         z = (z1 - mean) / std
         if z2 is not None:
             z2 = (z2 - mean) / std
+
         if tail == "Upper Tail":
             return f"The probability is {round(norm.sf(z), 4)}"
         elif tail == "Lower Tail":
@@ -441,9 +479,7 @@ class StatsTools:
             return "Invalid input for tail or missing z2"
 
     @register_tool
-    def calculate_percentiles_from_normal_distribution(self, p1: float, p2: Optional[float] = None, mean: float = 0,
-                                                       std: float = 1, tail: Literal[
-                "Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
+    def calculate_percentiles_from_normal_distribution(self, p1: float, p2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Lower Tail") -> str:
         """Calculates z-score values corresponding to given percentiles from a normal distribution."""
         duck_logger.debug(f"Calculating percentiles for p1={p1}, p2={p2}, mean={mean}, std={std}, tail={tail}")
         p1 = p1 / 100 if p1 > 1 else p1
@@ -464,9 +500,7 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    def plot_normal_distribution(self, z1: float, z2: Optional[float] = None, mean: float = 0, std: float = 1,
-                                 tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Upper Tail") -> tuple[
-        str, bytes]:
+    def plot_normal_distribution(self, z1: float, z2 : Optional[float]=None, mean: float=0, std: float=1, tail: Literal["Upper Tail", "Lower Tail", "Between"] = "Upper Tail") -> tuple[str, bytes]:
         """Plots a normal distribution with shaded areas for specified z-scores. If only one z-score is provided, it will shade the area for that z-score."""
         duck_logger.debug(f"Plotting normal distribution for z1={z1}, z2={z2}, mean={mean}, std={std}, tail={tail}")
         x = np.linspace(mean - 4 * std, mean + 4 * std, 1000)
@@ -487,6 +521,7 @@ class StatsTools:
         plt.ylabel('Density')
         plt.grid(True)
         return self._save_plot(name)
+
 
     @register_tool
     async def calculate_confidence_interval_and_t_test(self, dataset: str, variable: str, alternative: Literal[
@@ -529,9 +564,8 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
-    async def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative: Literal[
-        "greater", "less", "two.sided"] = "two.sided", mu: float = 0,
-                                                          conf_level: float = 0.95) -> tuple[str, bytes] | str:
+    async def plot_confidence_interval_and_t_distribution(self, dataset: str, column: str, alternative: Literal["greater", "less", "two.sided"] = "two.sided", mu: float= 0,
+                                                    conf_level: float = 0.95) -> tuple[str, bytes] | str:
         """
         Plots the t-distribution with the test statistic and confidence interval.
         Returns a message and the image buffer of the plot.
@@ -782,6 +816,7 @@ class StatsTools:
 
         return summary
 
+
     @register_tool
     async def calculate_one_sample_proportion_z_test(self, dataset: str, variable: str, category: str,
                                                      p_null: float = 0.5,
@@ -799,8 +834,7 @@ class StatsTools:
         variable_val = self._datastore.get_column(data, variable)
 
         if category not in variable_val.unique():
-            raise ValueError(
-                f"Column '{category}' not found in dataset '{dataset}'. Available categories: {data[variable].unique()}")
+            raise ValueError(f"Column '{category}' not found in dataset '{dataset}'. Available categories: {data[variable].unique()}")
 
         series = data[variable].dropna()
 
@@ -860,6 +894,7 @@ class StatsTools:
 
         response_series = self._datastore.get_column(data, response_variable)
         group_series = self._datastore.get_column(data, group_variable)
+
 
         if response_category not in response_series.unique():
             return (
@@ -939,6 +974,7 @@ class StatsTools:
 
         data = self._datastore.get_dataset(dataset)
 
+
         self._datastore.get_column(data, row_variable)
         self._datastore.get_column(data, col_variable)
 
@@ -971,102 +1007,102 @@ class StatsTools:
         return summary
 
     @register_tool
+    @cache_result
     async def simple_linear_regression(
             self,
             dataset: str,
             response: str,
             explanatory: str,
-            prediction_value: float = None,
-            interval_type: Literal["confidence", "prediction"] = "confidence",
+            prediction_value: float | None = None,
+            interval_type: Literal["confidence", "prediction"] | None = None,
             conf_level: float = 0.95,
-            cv_folds: int = 5
+            cv_folds: int | None = None,
     ) -> str:
-        """Performs simple linear regression with summary statistics, confidence intervals, prediction, and cross-validation."""
+        """Perform simple linear regression between two quantitative variables, with optional prediction."""
 
         duck_logger.debug(
-            f"Running SLR on {dataset}: {response} ~ {explanatory}, prediction_value={prediction_value}, "
-            f"interval_type={interval_type}, conf_level={conf_level}, cv_folds={cv_folds}"
+            f"Running simple linear regression: dataset={dataset}, response={response}, explanatory={explanatory}, "
+            f"prediction_value={prediction_value}, interval_type={interval_type}, conf_level={conf_level}, cv_folds={cv_folds}"
         )
 
         # Load dataset
-        data = self._datastore.get_dataset(dataset)
+        df = self._datastore.get_dataset(dataset)
 
-        response_series = self._datastore.get_column(data, response)
-        explanatory_series = self._datastore.get_column(data, explanatory)
+        # Clean column names (strip whitespace, replace spaces/dots with underscores)
+        df = df.rename(columns=lambda c: c.strip().replace(" ", "_").replace(".", "_"))
+        response_clean = response.strip().replace(" ", "_").replace(".", "_")
+        explanatory_clean = explanatory.strip().replace(" ", "_").replace(".", "_")
 
-        df = pd.concat([response_series, explanatory_series], axis=1).dropna()
-        if df.empty:
-            return "No valid data after removing missing values."
+        # Ensure variables exist
+        if response_clean not in df.columns or explanatory_clean not in df.columns:
+            return f"Could not find '{response}' or '{explanatory}' in dataset '{dataset}'."
 
-        # Ensure response is numeric
-        if not pd.api.types.is_numeric_dtype(df[response]):
-            try:
-                df[response] = pd.to_numeric(df[response], errors="coerce")
-                df = df.dropna(subset=[response])
-            except Exception:
-                return f"The response variable '{response}' could not be converted to numeric."
+        # Ensure both are quantitative
+        if not (
+                pd.api.types.is_numeric_dtype(df[response_clean]) and
+                pd.api.types.is_numeric_dtype(df[explanatory_clean])
+        ):
+            return f"Both response '{response}' and explanatory '{explanatory}' must be quantitative (numeric)."
 
-        if df.empty:
-            return "No valid rows remain after cleaning non-numeric or missing values."
+        # Drop rows with missing values
+        df = df[[response_clean, explanatory_clean]].dropna()
 
-        # Handle categorical or numeric explanatory variable
-        if self._is_categorical(df[explanatory]):
-            df[explanatory] = df[explanatory].astype("category")
-            formula = f"{response} ~ C({explanatory})"
-        else:
-            formula = f"{response} ~ {explanatory}"
-
-        # Fit regression model
+        # Build and fit model
+        formula = f"{response_clean} ~ {explanatory_clean}"
         try:
             model = smf.ols(formula=formula, data=df).fit()
         except Exception as e:
             return f"Failed to fit regression model: {str(e)}"
 
-        # Coefficients + CI
-        coef_summary = model.summary2().tables[1]
-        conf_ints = model.conf_int(alpha=1 - conf_level)
-        coef_summary["CI Lower Bound"] = conf_ints[0]
-        coef_summary["CI Upper Bound"] = conf_ints[1]
+        results = []
+        results.append(f"Regression of {response} on {explanatory}")
+        results.append(f"Slope: {model.params[1]:.4f}")
+        results.append(f"Intercept: {model.params[0]:.4f}")
+        results.append(f"R-squared: {model.rsquared:.4f}")
 
-        coef_summary = coef_summary[["Coef.", "t", "P>|t|", "CI Lower Bound", "CI Upper Bound"]]
-        coef_summary.columns = ["Estimate", "t value", "p-value", "CI Lower Bound", "CI Upper Bound"]
-
-        # Optional prediction
-        prediction_output = ""
+        # Prediction with interval
         if prediction_value is not None:
+            pred_df = pd.DataFrame({explanatory_clean: [prediction_value]})
             try:
-                new_data = pd.DataFrame({explanatory: [prediction_value]})
-                pred = model.get_prediction(new_data)
-                pred_summary = pred.summary_frame(alpha=1 - conf_level)
-                prediction = pred_summary.iloc[0]
-                prediction_output = (
-                    f"\nPrediction for {response} when {explanatory} = {prediction_value}:\n"
-                    f"Predicted value: {round(prediction['mean'], 4)}\n"
-                    f"{int(conf_level * 100)}% {interval_type.title()} Interval: "
-                    f"({round(prediction[f'{interval_type}_ci_lower'], 4)}, "
-                    f"{round(prediction[f'{interval_type}_ci_upper'], 4)})\n"
-                )
+                prediction = model.get_prediction(pred_df)
+                summary = prediction.summary_frame(alpha=1 - conf_level)
+
+                if interval_type == "confidence":
+                    low, high = summary["mean_ci_lower"].iloc[0], summary["mean_ci_upper"].iloc[0]
+                    results.append(
+                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f} "
+                        f"with {conf_level * 100:.1f}% CI [{low:.4f}, {high:.4f}]"
+                    )
+                elif interval_type == "prediction":
+                    low, high = summary["obs_ci_lower"].iloc[0], summary["obs_ci_upper"].iloc[0]
+                    results.append(
+                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f} "
+                        f"with {conf_level * 100:.1f}% PI [{low:.4f}, {high:.4f}]"
+                    )
+                else:
+                    results.append(
+                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f}"
+                    )
             except Exception as e:
-                prediction_output = f"\nPrediction could not be generated: {e}"
+                return f"Failed to compute prediction: {str(e)}"
 
-        # Cross-validation
-        kf = KFold(n_splits=cv_folds, shuffle=True, random_state=1)
-        rmse_scores = []
+        if cv_folds is not None and cv_folds > 1:
+            try:
+                X = sm.add_constant(df[explanatory_clean])
+                y = df[response_clean]
+                kf = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
+                mse_scores = []
 
-        for train_idx, test_idx in kf.split(df):
-            train_df, test_df = df.iloc[train_idx], df.iloc[test_idx]
-            cv_model = smf.ols(formula=formula, data=train_df).fit()
-            preds = cv_model.predict(test_df)
-            rmse = np.sqrt(mean_squared_error(test_df[response], preds))
-            rmse_scores.append(rmse)
+                for train_idx, test_idx in kf.split(X):
+                    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+                    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+                    model_cv = sm.OLS(y_train, X_train).fit()
+                    preds = model_cv.predict(X_test)
+                    mse_scores.append(((y_test - preds) ** 2).mean())
 
-        mean_rmse = round(np.mean(rmse_scores), 4)
+                avg_mse = np.mean(mse_scores)
+                results.append(f"{cv_folds}-fold CV Mean Squared Error: {avg_mse:.4f}")
+            except Exception as e:
+                results.append(f"Cross-validation failed: {str(e)}")
 
-        return (
-            f"Simple Linear Regression: {response} ~ {explanatory}\n"
-            f"R-squared: {round(model.rsquared, 4)}\n"
-            f"Residual standard error (sigma): {round(np.sqrt(model.scale), 4)}\n"
-            f"\nCoefficient Summary:\n{coef_summary.to_string()}\n"
-            f"\nCross-validated RMSE ({cv_folds}-fold): {mean_rmse}\n"
-            f"{prediction_output}"
-        )
+        return "\n".join(results)
