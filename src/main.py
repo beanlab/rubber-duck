@@ -9,12 +9,18 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .armory.armory import Armory
+from .armory.data_store import DataStore
+from .armory.stat_tools import StatsTools
+from .armory.talk_tool import TalkTool
+from .conversation.conversation import AgentConversation
+from .gen_ai.gen_ai import AIClient
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
-from .gen_ai.build import build_agent_conversation_duck
+from .gen_ai.build import build_agent
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -24,7 +30,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig
+    DUCK_NAME, DuckConfig, AgentAsToolSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -123,6 +129,7 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        ai_client,
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
@@ -132,10 +139,8 @@ def build_ducks(
         name = duck_config['name']
 
         if duck_type == 'agent_conversation':
-            ducks[name] = build_agent_conversation_duck(
-                name, config, settings, metrics_handler.record_message, bot.send_message, metrics_handler.record_usage,
-                bot.typing
-            )
+            starting_agent = build_agent(settings["agent"])
+            ducks[name] = AgentConversation(name, starting_agent, ai_client)
 
         elif duck_type == 'conversation_review':
             ducks[name] = build_conversation_review_duck(
@@ -159,11 +164,12 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
+        ai_client
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
 
     channel_ducks = {}
 
@@ -210,6 +216,33 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
+def build_armory(config: Config, send_message) -> Armory:
+    armory = Armory(send_message)
+
+    dataset_dirs = config.get("dataset_folder_locations")
+    if dataset_dirs:
+        data_store = DataStore(dataset_dirs)
+        stat_tools = StatsTools(data_store)
+        armory.scrub_tools(stat_tools)
+    else:
+        duck_logger.warning("**No dataset folder locations provided in config**")
+
+    talk_tool = TalkTool(send_message)
+    armory.scrub_tools(talk_tool)
+
+    return armory
+
+
+def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
+    agents_as_tools: list[AgentAsToolSettings] = config.get("agents_as_tools", [])
+    for settings in agents_as_tools:
+        agent = build_agent(settings["agent"])
+        tool = ai_client.build_agent_tool(
+            agent, settings["tool_name"], settings["doc_string"]
+        )
+        armory.add_tool(tool)
+
+
 async def main(config: Config, log_dir: Path):
     try:
         await _main(config, log_dir)
@@ -233,7 +266,11 @@ async def _main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager)
+            armory = build_armory(config, bot.send_message)
+            ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
+            add_agent_tools_to_armory(config, armory, ai_client)
+
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
