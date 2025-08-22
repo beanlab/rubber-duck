@@ -1,8 +1,9 @@
+import io
 import subprocess
+import zipfile
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-import zipfile
-import io
 
 import discord
 import pytz
@@ -58,16 +59,94 @@ class FeedbackMetricsCommand(Command):
     name = "!feedback"
     help_msg = "get a zip of the feedback data"
 
-    def __init__(self, send_message, metrics_handler):
+    def __init__(self, send_message, metrics_handler, feedback_summarizer):
         self.send_message = send_message
         self.metrics_handler = metrics_handler
+        self.feedback_summarizer = feedback_summarizer
+
+    def get_feedback_proportions(self, scores, max_per_channel=50):
+        raw_counts = defaultdict(lambda: defaultdict(int))
+        total_counts = defaultdict(int)
+
+        for parent_channel_id, score in scores:
+            try:
+                int_score = int(score)
+                if 1 <= int_score <= 5:
+                    raw_counts[parent_channel_id][int_score] += 1
+                    total_counts[parent_channel_id] += 1
+            except (ValueError, TypeError):
+                continue
+
+        sample_distribution = {}
+
+        for channel_id, score_counts in raw_counts.items():
+            total = total_counts[channel_id]
+
+            if total <= max_per_channel:
+                sample_distribution[channel_id] = {
+                    score: count for score, count in score_counts.items()
+                }
+                for s in range(1, 6):
+                    sample_distribution[channel_id].setdefault(s, 0)
+                continue
+
+            scaled_counts = {
+                score: int((count / total) * max_per_channel)
+                for score, count in score_counts.items()
+            }
+
+            shortfall = max_per_channel - sum(scaled_counts.values())
+
+            if shortfall > 0:
+                remainders = {
+                    score: ((count / total) * max_per_channel) - scaled_counts[score]
+                    for score, count in score_counts.items()
+                }
+                for score in sorted(remainders, key=remainders.get, reverse=True):
+                    if shortfall == 0:
+                        break
+                    scaled_counts[score] += 1
+                    shortfall -= 1
+
+            for s in range(1, 6):
+                scaled_counts.setdefault(s, 0)
+
+            sample_distribution[channel_id] = scaled_counts
+
+        return sample_distribution
+
+    def get_score_proportion_string(self, score_counts: dict[int, int]) -> str:
+
+        total = sum(score_counts.values())
+        if total == 0:
+            return "No feedback available."
+
+        parts = [
+            f"{score}: {round((score_counts.get(score, 0) / total) * 100, 1)}%"
+            for score in range(1, 6)
+        ]
+        return ", ".join(parts)
 
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        feedback_zip = zip_data_file(self.metrics_handler.get_feedback())
+        scores = self.metrics_handler.get_feedback_sample_distribution()
+        proportions = self.get_feedback_proportions(scores)
+        feedback_samples = self.metrics_handler.get_sampled_feedback(proportions)
+        feedback = self.metrics_handler.get_feedback()
+        feedback_zip = zip_data_file(feedback)
         discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
         await self.send_message(channel_id, "", file=discord_feedback_file)
+        for parent_channel_id, feedback_list in feedback_samples.items():
+            if not feedback_list:
+                continue
+            summarized_feedback = self.feedback_summarizer.summarize(
+                "\n".join(feedback_list), max_tokens=300
+            )
+            values = self.get_score_proportion_string(proportions[parent_channel_id])
+
+            await self.send_message(channel_id,
+                                    f"Summarized Feedback for Channel {parent_channel_id}:\n\nFeedback Numbers: {values}\n\n{summarized_feedback}")
 
 
 class MetricsCommand(Command):
@@ -274,7 +353,7 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
+def create_commands(send_message, metrics_handler, reporter, log_dir, feedback_summarizer) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
@@ -282,10 +361,10 @@ def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Co
     return [
         messages := MessagesMetricsCommand(send_message, metrics_handler),
         usage := UsageMetricsCommand(send_message, metrics_handler),
-        feedback := FeedbackMetricsCommand(send_message, metrics_handler),
+        feedback := FeedbackMetricsCommand(send_message, metrics_handler, feedback_summarizer),
         MetricsCommand(messages, usage, feedback),
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
-        LogCommand(send_message,log_dir),
+        LogCommand(send_message, log_dir),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics)
     ]

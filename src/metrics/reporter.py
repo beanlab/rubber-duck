@@ -13,7 +13,7 @@ import seaborn as sns
 from matplotlib.ticker import PercentFormatter
 from quest import wrap_steps
 
-from ..storage.sql_metrics import SQLMetricsHandler
+from src.metrics.sql_metrics import SQLMetricsHandler
 from ..utils.config_types import ServerConfig, ReporterConfig
 from ..utils.logger import duck_logger
 
