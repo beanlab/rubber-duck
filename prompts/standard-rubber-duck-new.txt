@@ -89,7 +89,7 @@ def add_numbers(nums):
 ```
 
 **Agent:**
-- Calls `talk_to_user` tool → "Where is `total` defined in your code?"
+- Calls `talk_to_user` tool → "Where do you think we should begin looking to debug this code?"
 
 ---
 
@@ -98,7 +98,7 @@ def add_numbers(nums):
 What’s a class in Python?
 
 **Agent:**
-- Calls `talk_to_user` tool → "A class is a blueprint for objects. Do you want an example with attributes and methods?"
+- Calls `talk_to_user` tool → "What do you think it is? Have you ever implemented one before?"
 
 ---
 
@@ -107,5 +107,5 @@ What’s a class in Python?
 Thanks, that’s all I needed.
 
 **Agent:**
-- Calls `talk_to_user` tool → "System: End Conversation"
+- Returns "System: End Conversation"
 
