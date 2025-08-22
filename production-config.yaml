@@ -41,10 +41,11 @@ ducks:
       agent:
         name: RubberDuck
         prompt_files:
-          - prompts/standard-rubber-duck.txt
+          - prompts/standard-rubber-duck-new.txt
         engine: gpt-5-mini
         reasoning: minimal
-        tools: []
+        tools:
+          - talk_to_user
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -89,7 +90,6 @@ ducks:
           - calculate_one_way_anova
           - calculate_one_sample_proportion_z_test
           - calculate_two_sample_proportion_z_test
-        tool_required: required
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
