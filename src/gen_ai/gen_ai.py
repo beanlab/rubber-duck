@@ -113,11 +113,12 @@ class AIClient:
             )
 
             if output_format:
-                params["text_format"] = output_format
+                params["text"] = output_format
+
             if reasoning:
                 params["reasoning"] = {"effort": reasoning}
 
-            response = self._client.responses.parse(**params)
+            response = self._client.responses.create(**params)
 
             if response.usage:
                 usage = response.usage
@@ -136,10 +137,10 @@ class AIClient:
                         call_id=item.call_id,
                         id=item.id
                     ))
+
                 elif item.type == "message":
                     responses.append(Response(type="message",
-                                              message=str(
-                                                  response.output_parsed) if output_format else response.output_text))
+                                              message=response.output_text))
 
                 elif item.type == "reasoning":
                     responses.append(Response(
@@ -147,8 +148,10 @@ class AIClient:
                         id=item.id,
                         summary=item.summary
                     ))
+
                 else:
                     raise NotImplementedError(f"Unknown response type")
+
             return responses
 
     @step
@@ -158,6 +161,8 @@ class AIClient:
             if inspect.isawaitable(result):
                 result = await result
         except Exception as error:
+            if isinstance(error, GenAIException):
+                raise error
             result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
         return result
 

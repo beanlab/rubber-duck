@@ -9,7 +9,6 @@ from ..armory.data_store import DataStore
 from ..armory.stat_tools import StatsTools
 from ..armory.talk_tool import TalkTool
 from ..conversation.conversation import AgentConversation
-from ..outputs.structured_outputs import schema_to_model
 from ..utils.config_types import (
     AgentConversationSettings,
     SingleAgentSettings,
@@ -36,10 +35,7 @@ def _build_agent(config: SingleAgentSettings) -> Agent:
     if tool_required not in ["auto", "required", "none"]:
         tool_required = {"type": "function", "name": tool_required}
 
-    output_fields = config.get("output_format")
-    output_model = None
-    if output_fields:
-        output_model = schema_to_model(config["name"] + "_output", output_fields)
+    output_schema = config.get("output_format", None)
 
     return Agent(
         name=config["name"],
@@ -47,7 +43,7 @@ def _build_agent(config: SingleAgentSettings) -> Agent:
         model=config["engine"],
         tools=config["tools"],
         tool_settings=tool_required,
-        output_format=output_model,
+        output_format=output_schema,
         reasoning=config.get("reasoning"),
     )
 
