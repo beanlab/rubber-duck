@@ -87,8 +87,8 @@ class AIClient:
     def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage):
         self._armory = armory
         self._typing = typing
-        self._record_message = record_message
-        self._record_usage = record_usage
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
         self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @step
