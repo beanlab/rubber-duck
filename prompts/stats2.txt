@@ -116,8 +116,7 @@ Repeat until the user ends the conversation:
 - "I think I'm done."
 
 **Agent**
-- Call the `send_message_to_user` tool with the message: "Okay, goodbye!"
-- Return "System: Interaction ended by user. End the conversation."
+- Return "SYSTEM: Interaction ended by user"
 ___
 
 
