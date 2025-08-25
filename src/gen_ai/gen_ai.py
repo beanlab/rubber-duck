@@ -1,45 +1,25 @@
-import asyncio
-import logging
-from io import BytesIO
-from typing import TypedDict, Protocol
+import inspect
+import json
+import os
+from dataclasses import dataclass
+from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
-from agents import Agent, Runner, ToolCallOutputItem
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
+from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
+    ToolChoiceFunctionParam
+from openai.types.responses.response_input_item import FunctionCallOutput
+from pydantic import BaseModel
 from quest import step
 
-from ..utils.config_types import DuckContext, AgentMessage, GPTMessage, FileData
+from ..armory.armory import Armory
+from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
 from ..utils.logger import duck_logger
-from ..utils.protocols import IndicateTyping, SendMessage
-
-Sendable = str | tuple[str, BytesIO]
-
-
-class GenAIClient(Protocol):
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list[GPTMessage],
-    ) -> AgentMessage: ...
-
 
 class GenAIException(Exception):
     def __init__(self, exception, web_mention):
         self.exception = exception
         self.web_mention = web_mention
-        super().__init__(self.exception.__str__())
-
-
-class RetryConfig(TypedDict):
-    max_retries: int
-    delay: int
-    backoff: int
-
-
-class RetryableException(Exception):
-    def __init__(self, exception, message):
-        self.exception = exception
-        self.message = message
         super().__init__(self.exception.__str__())
 
 
@@ -53,104 +33,193 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
-def _result_to_agent_message(result):
-    last_item = result.new_items[-1]
-    if isinstance(last_item, ToolCallOutputItem):
-        return AgentMessage(
-            agent_name=result.last_agent.name,
-            content=last_item.output
+ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | ToolChoiceFunctionParam
+
+
+@dataclass
+class Agent:
+    name: str
+    prompt: str
+    model: str
+    tools: list[str]
+    tool_settings: ToolChoiceTypes = "auto"
+    output_format: Optional[Type[BaseModel]] = None
+    reasoning: Optional[str] = None
+
+
+class Response(TypedDict):
+    type: Literal["function_call", "message", "reasoning"]
+    name: NotRequired[str]
+    arguments: NotRequired[str]
+    message: NotRequired[str]
+    id: NotRequired[str]
+    call_id: NotRequired[str]
+    summary: NotRequired[list]
+
+
+def format_function_call_history_items(result: str, call: Response):
+    return [
+        ResponseFunctionToolCallParam(
+            type="function_call",
+            id=call['id'],
+            call_id=call['call_id'],
+            name=call['name'],
+            arguments=call['arguments']
+        ),
+        FunctionCallOutput(
+            type="function_call_output",
+            call_id=call['call_id'],
+            output=str(result)
         )
-    else:
-        return AgentMessage(
-            agent_name=result.last_agent.name,
-            content=result.final_output
-        )
+    ]
 
 
-async def _run_with_exception_handling(coroutine):
-    try:
-        return await coroutine
-    except (
-            APITimeoutError, InternalServerError,
-            UnprocessableEntityError) as ex:
-        raise RetryableException(ex, 'I\'m having trouble connecting to the OpenAI servers, '
-                                     'please open up a separate conversation and try again') from ex
-    except (APIConnectionError, BadRequestError,
-            AuthenticationError, ConflictError, NotFoundError,
-            RateLimitError) as ex:
-        duck_logger.exception(f"AgentClient get_completion Exception: {ex}")
-        raise GenAIException(ex, "Visit https://platform.openai.com/docs/guides/error-codes/api-errors "
-                                 "for more details on how to resolve this error") from ex
+def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
+    return {
+        'id': id,
+        'type': 'reasoning',
+        'summary': summary
+    }
 
 
-class AgentClient:
-    def __init__(
-            self,
-            agent: Agent,
-            typing: IndicateTyping
-    ):
-        self._agent = agent
+class AIClient:
+    def __init__(self, armory: Armory, typing, record_message: RecordMessage, record_usage: RecordUsage):
+        self._armory = armory
         self._typing = typing
+        self._record_message = step(record_message)
+        self._record_usage = step(record_usage)
+        self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list,
-    ) -> AgentMessage:
-        return await _run_with_exception_handling(self._get_completion(
-            context,
-            message_history
-        ))
-
+    @step
     async def _get_completion(
             self,
-            context: DuckContext,
-            message_history: list,
-            **kwargs
-    ) -> AgentMessage:
-        async with self._typing(context.thread_id):
-            result = await Runner.run(
-                self._agent,
-                message_history,
-                context=context,
-                **kwargs
+            ctx: DuckContext,
+            prompt: str,
+            history,
+            model: str,
+            tools: list[FunctionToolParam],
+            tool_settings: ToolChoiceTypes,
+            output_format: Type[BaseModel] | None,
+            reasoning: str | None = None
+    ) -> list[Response]:
+        async with self._typing(ctx.thread_id):
+            params = dict(
+                model=model,
+                instructions=prompt,
+                input=history,
+                tools=tools,
+                tool_choice=tool_settings
             )
-            return _result_to_agent_message(result)
+
+            if output_format:
+                params["text"] = output_format
+
+            if reasoning:
+                params["reasoning"] = {"effort": reasoning}
+
+            response = await self._client.responses.create(**params)
+
+            if response.usage:
+                usage = response.usage
+                await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
+                                         usage.input_tokens, usage.output_tokens,
+                                         usage.input_tokens_details.cached_tokens,
+                                         usage.output_tokens_details.reasoning_tokens)
+
+            responses = []
+            for item in response.output:
+                if item.type == "function_call":
+                    responses.append(Response(
+                        type="function_call",
+                        name=item.name,
+                        arguments=item.arguments,
+                        call_id=item.call_id,
+                        id=item.id
+                    ))
+
+                elif item.type == "message":
+                    responses.append(Response(type="message",
+                                              message=response.output_text))
+
+                elif item.type == "reasoning":
+                    responses.append(Response(
+                        type="reasoning",
+                        id=item.id,
+                        summary=item.summary
+                    ))
+
+                else:
+                    raise NotImplementedError(f"Unknown response type")
+
+            return responses
+
+    @step
+    async def _run_tool(self, tool, ctx, tool_args):
+        try:
+            result = tool(ctx, **tool_args)
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as error:
+            if isinstance(error, GenAIException):
+                raise error
+            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
+        return result
+
+    @step
+    async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
+        tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
+        user_message = GPTMessage(role='user', content=query)
+        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+                                   json.dumps(user_message))
+        history: list[HistoryType] = [GPTMessage(role='user', content=query)]
+        try:
+            while True:
+                outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
+                                                     agent.tool_settings, agent.output_format, agent.reasoning)
+                for output in outputs:
+                    if output['type'] == "reasoning":
+                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
+                                                   str(reasoning_item))
+                        history.append(reasoning_item)
+                        continue
+
+                    if output['type'] == "function_call":
+                        tool_name = output["name"]
+                        tool_args = json.loads(output["arguments"])
+
+                        tool = self._armory.get_specific_tool(tool_name)
+
+                        result = await self._run_tool(tool, ctx, tool_args)
+
+                        function_items = format_function_call_history_items(result, output)
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
+                                                   str(function_items[0]))
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
+                                                   str(function_items[1]))
+                        history.extend(function_items)
+
+                        continue
+
+                    elif output['type'] == "message":
+                        duck_logger.debug("Going back to agent: main_agent")
+                        return output['message']
+
+                    else:
+                        raise NotImplementedError(f"Unknown response type: {output['type']}")
 
 
-class RetryableGenAI:
-    def __init__(self,
-                 genai: GenAIClient,
-                 send_message: SendMessage,
-                 retry_config: RetryConfig
-                 ):
-        self._send_message = step(send_message)
-        self._retry_config = retry_config
-        self._genai = genai
+        except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
+                BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
+            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
+        except Exception as e:
+            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
-    async def get_completion(
-            self,
-            context: DuckContext,
-            message_history: list[GPTMessage],
-    ):
-        max_retries = self._retry_config['max_retries']
-        delay = self._retry_config['delay']
-        backoff = self._retry_config['backoff']
-        retries = 0
-        while True:
-            try:
-                return await self._genai.get_completion(
-                    context, message_history
-                )
+    def build_agent_tool(self, agent, name: str, doc_string: str) -> callable:
+        async def agent_runner(ctx: DuckContext, query: str):
+            duck_logger.debug(f"Talking to agent: {agent}")
+            return await self.run_agent(ctx, agent, query)
 
-            except RetryableException as ex:
-                if retries == 0:
-                    await self._send_message(context.thread_id, 'Trying to contact servers...')
-                retries += 1
-                if retries > max_retries:
-                    raise GenAIException(ex, 'Retry limit exceeded')
-
-                logging.warning(
-                    f"Retrying due to {ex}, attempt {retries}/{max_retries}. Waiting {delay} seconds.")
-                await asyncio.sleep(delay)
-                delay *= backoff
+        agent_runner.__name__ = name
+        agent_runner.__doc__ = doc_string
+        return agent_runner

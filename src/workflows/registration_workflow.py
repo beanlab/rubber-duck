@@ -31,18 +31,18 @@ class RegistrationWorkflow:
     async def __call__(self, context: DuckContext):
         # Start the registration process
         thread_id = context.thread_id
-        net_id = await self._get_net_id(thread_id)
+        net_id = await self._get_net_id(thread_id, context.timeout)
         server_id = context.guild_id
         author_id = context.author_id
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain']):
+        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'], context.timeout):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return
 
         # Assign Discord roles
-        await self._assign_roles(server_id, thread_id, author_id, self._settings)
+        await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -57,12 +57,12 @@ class RegistrationWorkflow:
                 return None
 
     @step
-    async def _get_net_id(self, thread_id):
+    async def _get_net_id(self, thread_id, timeout: int = 300):
         try:
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
-            net_id = await self._wait_for_message()
+            net_id = await self._wait_for_message(timeout)
             if not net_id:
                 await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
                 raise ValueError("No Net ID provided")
@@ -75,7 +75,7 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str):
+    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str, timeout: int = 300) -> bool:
         email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
@@ -92,7 +92,7 @@ class RegistrationWorkflow:
                                      "or type *resend* to get a new code")
 
             # Wait for user response
-            response = await self._wait_for_message()
+            response = await self._wait_for_message(timeout)
             if not response:
                 await self._send_message(thread_id, "No response received. Please start a new chat.")
                 raise TimeoutError("Timeout waiting for user email verification")
@@ -120,7 +120,7 @@ class RegistrationWorkflow:
         return False
 
     @step
-    async def _select_roles(self, thread_id, available_roles, settings):
+    async def _select_roles(self, thread_id, available_roles, timeout: int = 300):
         while True:
             # Display available roles
             role_list = "\n".join([f"{i + 1}. {role['name']}"
@@ -133,7 +133,7 @@ class RegistrationWorkflow:
                                      f"Available roles:\n{role_list}")
 
             # Wait for user response
-            response = await self._wait_for_message()
+            response = await self._wait_for_message(timeout)
             if response is None or not response.strip():
                 await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
                 return []
@@ -208,7 +208,7 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings):
+    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings, timeout: int = 300):
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
         try:
             # Get roles and selection
@@ -229,7 +229,7 @@ class RegistrationWorkflow:
             else:
                 available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
                 if available_roles:
-                    selected_role_ids = await self._select_roles(thread_id, available_roles, settings)
+                    selected_role_ids = await self._select_roles(thread_id, available_roles, settings, timeout)
                 else:
                     selected_role_ids = []
 

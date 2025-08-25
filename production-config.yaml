@@ -21,89 +21,76 @@ sql:
   database: /rubber-duck.db
 
 agents_as_tools:
-  - tool_name: generate_code_complexity_analysis
-    description: |
-      This tool takes source code as a string and returns a string describing 
-      the order of complexity (Big-O analysis) of the provided code.
-    agents:
-      - name: CodeComplexityAgent
-        prompt_files:
-          - prompts/generate-code-complexity.md
-        engine: gpt-4.1
-
-  - tool_name: determine_tool_call
-    description: |
-      This tool is used to determine which tool to call based on the user's input. |
-    agents:
-      - name: DetermineToolCall
-        prompt_files:
-          - prompts/determine_tool_call_stats.txt
-        engine: gpt-5
-        reasoning: minimal
+  - tool_name: code_complexity_agent
+    doc_string: |
+      This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
+      This tool takes source code as a string and returns a string describing the order of complexity (Big-O analysis) of the provided code.
+    agent:
+      name: CodeComplexityAgent
+      prompt_files:
+        - prompts/generate-code-complexity.md
+      engine: gpt-4.1
+      tools: []
 
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
     settings:
-      introduction: |
-        Hello! How can I help you?
-      agents:
-        - name: RubberDuck
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/standard-rubber-duck.txt
-          max_iterations: 5
-      timeout: 600
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - prompts/standard-rubber-duck-new.txt
+        engine: gpt-5-mini
+        reasoning: minimal
+        tools:
+          - talk_to_user
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
   - name: stats-duck
     duck_type: agent_conversation
     settings:
-      introduction: |
-        Hello! I can help answer your questions about statistics.
-      agents:
-        - name: stats_duck
-          engine: gpt-4.1
-          prompt_files:
-            - prompts/stats.txt
-          tools:
-            - determine_tool_call
-            - describe_dataset
-            - list_categories
-            - explain_capabilities
-            - get_dataset_names
-            - get_variable_names
-            - show_dataset_head
-            - plot_histogram
-            - plot_boxplot
-            - plot_dotplot
-            - plot_barplot
-            - plot_pie_chart
-            - plot_proportion_barplot
-            - plot_scatterplot
-            - calculate_mean
-            - calculate_skewness
-            - calculate_std
-            - calculate_median
-            - calculate_mode
-            - calculate_five_number_summary
-            - calculate_table_of_counts
-            - calculate_proportions
-            - calculate_z_score
-            - calculate_probability_from_normal_distribution
-            - calculate_percentiles_from_normal_distribution
-            - plot_normal_distribution
-            - calculate_confidence_interval_and_t_test
-            - plot_confidence_interval_and_t_distribution
-            - calculate_two_mean_t_test
-            - calculate_one_way_anova
-            - calculate_one_sample_proportion_z_test
-            - calculate_two_sample_proportion_z_test
-            - simple_linear_regression
-          tool_required: determine_tool_call
-          max_iterations: 5
-      timeout: 600
+      agent:
+        name: stats_duck
+        prompt_files:
+          - prompts/stats2.txt
+        engine: gpt-5
+        reasoning: minimal
+        tools:
+          - send_message_to_user
+          - receive_message_from_user
+          - describe_dataset
+          - list_categories
+          - explain_capabilities
+          - get_dataset_names
+          - get_variable_names
+          - show_dataset_head
+          - plot_histogram
+          - plot_boxplot
+          - plot_dotplot
+          - plot_barplot
+          - plot_pie_chart
+          - plot_proportion_barplot
+          - plot_scatterplot
+          - calculate_mean
+          - calculate_skewness
+          - calculate_std
+          - calculate_median
+          - calculate_mode
+          - calculate_five_number_summary
+          - calculate_table_of_counts
+          - calculate_proportions
+          - calculate_z_score
+          - calculate_probability_from_normal_distribution
+          - calculate_percentiles_from_normal_distribution
+          - plot_normal_distribution
+          - calculate_confidence_interval_and_t_test
+          - plot_confidence_interval_and_t_distribution
+          - calculate_two_mean_t_test
+          - calculate_one_way_anova
+          - calculate_one_sample_proportion_z_test
+          - calculate_two_sample_proportion_z_test
+          - simple_linear_regression
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -119,12 +106,13 @@ servers:
             settings:
               target_channel_ids:
                 - 1234556460453597276
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1234556460453597276
         channel_name: general/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1399777118380097648
         channel_name: join-the-server
@@ -154,12 +142,13 @@ servers:
             settings:
               target_channel_ids:
                 - 1195490291134779502
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1195490291134779502
         channel_name: student-text-channels/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1399788047981351042
         channel_name: join-the-server
@@ -188,12 +177,13 @@ servers:
             settings:
               target_channel_ids:
                 - 1406039546721730582
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1406039546721730582
         channel_name: Student Text Channels/duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
   1407758127608365157:
     server_name: BYU - CS 312
@@ -225,7 +215,7 @@ servers:
               target_channel_ids:
                 - 1371951696061661215
                 - 1374066971523678279
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1404899692210553033
         channel_name: join-the-server
@@ -242,11 +232,14 @@ servers:
         channel_name: duck-pond
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1374066971523678279
         channel_name: stats-tool
         ducks:
           - stats-duck
+        timeout: 600
+
 
   1354902266246598928:
     server_name: Physics
@@ -259,7 +252,7 @@ servers:
             settings:
               target_channel_ids:
                 - 1363949528201564170
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1363949528201564170
         channel_name: physics-230-phys230
@@ -274,12 +267,14 @@ servers:
             settings:
               target_channel_ids:
                 - 1359587525605458030
-              timeout: 300
+        timeout: 300
 
       - channel_id: 1359587525605458030
         channel_name: physics-430-phys430
         ducks:
           - standard-rubber-duck
+        timeout: 600
+
 
   1338616224858374287:
     server_name: Rubber Duck Demo Server
@@ -292,11 +287,14 @@ servers:
             settings:
               target_channel_ids:
                 - 1338616283671040000
+        timeout: 300
 
       - channel_id: 1338616283671040000
         channel_name: vintage-duck
         ducks:
           - standard-rubber-duck
+        timeout: 600
+
 
       - channel_id: 1401960218870419647
         channel_name: emoji-duck
@@ -304,17 +302,16 @@ servers:
           - name: Emoji-Duck-Demo
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Hello! I'm Emoji Duck. Do you want me to describe a movie or a book using only emojis?
-              agents:
-                - name: emoji-duck
-                  engine: gpt-4.1
-                  prompt_files:
-                    - prompts/emoji.txt
-                  max_iterations: 5
-              timeout: 2000
+              agent:
+                name: emoji-duck
+                engine: gpt-4.1
+                prompt_files:
+                  - prompts/emoji.txt
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 2000
+
 
       - channel_id: 1385293810782965830
         channel_name: code-complexity-analysis-duck
@@ -322,24 +319,22 @@ servers:
           - name: Code-Complexity-Duck-Demo
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Upload a code file and I'll analyze it for you. 
-                You can also ask me questions about Big-O analysis.
-              timeout: 600
               file_size_limit: 5100
-              file_type_ext: [ "py", "java", "cpp", "c", "h", "hpp", "ts", "js" ]
-              agents:
-                - name: ComplexityDuck
-                  prompt: |
-                    You are a helpful CS assistant.
-                    You explain Big-O analysis. 
-                    You can use the provided tools to generate a complexity analysis report
-                    when the user provides a code file.
-                    Keep your responses brief and clear. Provide the tool output to the user verbatim.
-                  engine: gpt-4.1
-                  max_iterations: 15
-                  tools:
-                    - generate_code_complexity_analysis
+              file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
+              agent:
+                name: ComplexityDuck
+                prompt: |
+                  You are a helpful CS assistant.
+                  You explain Big-O analysis. 
+                  You can use the provided tools to generate a complexity analysis report
+                  when the user provides a code file.
+                  Keep your responses brief and clear. Provide the tool output to the user verbatim.
+                tools:
+                  - generate_code_complexity_analysis
+                engine: gpt-5-mini
+                reasoning: minimal
+        timeout: 600
+
 
       - channel_id: 1379953844540407969
         channel_name: socratic-duck
@@ -347,18 +342,15 @@ servers:
           - name: Socratic-Rubber-Duck-Demo
             duck_type: agent_conversation
             settings:
-              introduction: |
-                I'm a Socratic-style rubber duck. 
-                I can help you think through your problems by asking questions.
-              agents:
-                - name: socrates
-                  prompt_files:
-                    - prompts/socratic-duck.txt
-                  engine: gpt-4.1
-                  max_iterations: 5
-              timeout: 600
+              agent:
+                name: socrates
+                prompt_files:
+                  - prompts/socratic-duck.txt
+                engine: gpt-4.1
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 600
 
       - channel_id: 1379959992110546995
         channel_name: join-the-server
@@ -384,23 +376,22 @@ servers:
           - name: Phd-Duck-Demo
             duck_type: agent_conversation
             settings:
-              introduction: |
-                Welcome! This is the design experience for the convex hull project. Send a message to continue.
-              agents:
-                - name: PhdDuck
-                  engine: gpt-4.1
-                  prompt_files:
-                    - prompts/phd-duck.txt
-                    - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
-                  max_iterations: 5
-              timeout: 600
+              agent:
+                name: PhdDuck
+                engine: gpt-4.1
+                prompt_files:
+                  - prompts/phd-duck.txt
+                  - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
+        timeout: 600
 
       - channel_id: 1379955387587104829
         channel_name: stats-tool
         ducks:
           - stats-duck
+        timeout: 600
 
 feedback_notifier_settings:
   feedback_check_hour: 9
