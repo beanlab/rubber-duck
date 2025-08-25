@@ -1,4 +1,5 @@
 import csv
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +19,7 @@ class CSVMetricsHandler:
         self._messages_file = metrics_folder / 'messages.csv'
         if not self._messages_file.exists():
             self._messages_file.write_text(
-                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'role', 'message']) + '\n')
+                ','.join(['timestamp', 'guild_id', 'thread_id', 'user_id', 'type', 'output']) + '\n')
 
         self._usage_file = metrics_folder / 'usage.csv'
         if not self._usage_file.exists():
@@ -33,11 +34,18 @@ class CSVMetricsHandler:
                           'reviewer_role_id',
                           'feedback_score', 'written_feedback']) + '\n')
 
-    async def record_message(self, guild_id: int, thread_id: int, user_id: int, role: str,
-                             message: str):
+    async def record_message(self, guild_id: int, thread_id: int, user_id: int,
+                             type_: str, output: dict):
         with self._messages_file.open('at', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([get_timestamp(), guild_id, thread_id, user_id, role, message])
+            writer.writerow([
+                get_timestamp(),
+                guild_id,
+                thread_id,
+                user_id,
+                type_,
+                json.dumps(output, ensure_ascii=False)
+            ])
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         with self._usage_file.open('at', newline='') as file:

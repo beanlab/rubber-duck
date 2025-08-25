@@ -108,13 +108,12 @@ class HaveTAGradingConversation:
                     await self._add_reaction(thread_id, message_id, '❌')
                     raise
 
-    async def _serve_messages(self, thread_id):
+    async def _serve_messages(self, thread_id, timeout: int):
         target_channel_ids = self._settings['target_channel_ids']
         duck_logger.info(f"Serving messages for channels: {target_channel_ids}")
 
         for target_channel_id in target_channel_ids:
-            await self._flush_conversations_for_channel(thread_id, target_channel_id,
-                                                        self._settings.get('timeout', 60 * 5))
+            await self._flush_conversations_for_channel(thread_id, target_channel_id, timeout)
 
         await self._send_message(thread_id, "No more conversations to review.")
 
@@ -130,7 +129,7 @@ class HaveTAGradingConversation:
         )
 
         try:
-            await self._serve_messages(thread_id)
+            await self._serve_messages(thread_id, context.timeout)
 
         except asyncio.TimeoutError:
             duck_logger.warning(f"TA review session timed out in thread {thread_id}")

@@ -1,5 +1,9 @@
 from dataclasses import dataclass
-from typing import TypedDict, NotRequired, Literal
+from typing import NotRequired, Union, Any, Literal
+
+from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_item import FunctionCallOutput
+from typing_extensions import TypedDict
 
 CHANNEL_ID = int
 DUCK_WEIGHT = float
@@ -20,6 +24,14 @@ class AgentMessage(TypedDict):
 class GPTMessage(TypedDict):
     role: str
     content: str
+
+class ReasoningItem(TypedDict):
+    type: Literal["reasoning"]
+    id: NotRequired[str]
+    summary: NotRequired[list]
+
+
+HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam, ReasoningItem]
 
 
 class FeedbackNotifierSettings(TypedDict):
@@ -56,28 +68,27 @@ class RegistrationSettings(TypedDict):
 class SingleAgentSettings(TypedDict):
     name: str
     engine: str
+    tools: list[str]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
-    tools: list[str]
-    handoff_prompt: str
-    handoffs: list[str]
     tool_required: NotRequired[str]
-    reasoning: NotRequired[Literal["low", "medium", "high", "minimal"]]
+    output_format: NotRequired[dict]
+    reasoning: NotRequired[str]
+
+
+class AgentAsToolSettings(TypedDict):
+    tool_name: str
+    doc_string: str
+    agent: SingleAgentSettings
 
 
 class MultiAgentSettings(TypedDict):
-    agents: list[SingleAgentSettings]
-    starting_agent: str | None  # If not set, will use first agent listed in `gen_ai`
-
-
-class AgentAsToolSettings(MultiAgentSettings):
-    tool_name: str
-    description: str
+    agent: SingleAgentSettings
+    agents_as_tools: list[AgentAsToolSettings]
 
 
 class AgentConversationSettings(MultiAgentSettings):
     introduction: str
-    timeout: int
     file_size_limit: int
     file_type_ext: list[str]
 
@@ -91,6 +102,7 @@ class DuckContext:
     content: str
     message_id: int
     thread_id: int
+    timeout: int
 
 
 class DuckConfig(TypedDict):
@@ -111,6 +123,7 @@ class ChannelConfig(TypedDict):
     "The channel name is not used in the code. It is used to indicate the name of Discord channel."
     ducks: list[DUCK_NAME | DuckConfig | WeightedDuck]
     "Either the name of the duck"
+    timeout: int
 
 
 class ServerConfig(TypedDict):
