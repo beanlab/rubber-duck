@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
-from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
     ToolChoiceFunctionParam
@@ -15,7 +15,6 @@ from quest import step
 from ..armory.armory import Armory
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
 from ..utils.logger import duck_logger
-
 
 class GenAIException(Exception):
     def __init__(self, exception, web_mention):
@@ -84,7 +83,7 @@ def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
 
 
 class AIClient:
-    def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage):
+    def __init__(self, armory: Armory, typing, record_message: RecordMessage, record_usage: RecordUsage):
         self._armory = armory
         self._typing = typing
         self._record_message = step(record_message)
