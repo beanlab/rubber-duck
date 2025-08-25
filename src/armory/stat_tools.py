@@ -1018,7 +1018,7 @@ class StatsTools:
             conf_level: float = 0.95,
             cv_folds: int | None = None,
     ) -> str:
-        """Perform simple linear regression between two quantitative variables, with optional prediction."""
+        """Perform simple linear regression between two quantitative variables, with optional prediction and CV."""
 
         duck_logger.debug(
             f"Running simple linear regression: dataset={dataset}, response={response}, explanatory={explanatory}, "
@@ -1028,80 +1028,70 @@ class StatsTools:
         # Load dataset
         df = self._datastore.get_dataset(dataset)
 
-        # Clean column names (strip whitespace, replace spaces/dots with underscores)
+        # Clean column names
         df = df.rename(columns=lambda c: c.strip().replace(" ", "_").replace(".", "_"))
         response_clean = response.strip().replace(" ", "_").replace(".", "_")
         explanatory_clean = explanatory.strip().replace(" ", "_").replace(".", "_")
 
-        # Ensure variables exist
+        # Check existence and numeric type
         if response_clean not in df.columns or explanatory_clean not in df.columns:
             return f"Could not find '{response}' or '{explanatory}' in dataset '{dataset}'."
 
-        # Ensure both are quantitative
-        if not (
-                pd.api.types.is_numeric_dtype(df[response_clean]) and
-                pd.api.types.is_numeric_dtype(df[explanatory_clean])
-        ):
-            return f"Both response '{response}' and explanatory '{explanatory}' must be quantitative (numeric)."
+        if not (pd.api.types.is_numeric_dtype(df[response_clean]) and pd.api.types.is_numeric_dtype(df[explanatory_clean])):
+            return f"Both response '{response}' and explanatory '{explanatory}' must be numeric."
 
-        # Drop rows with missing values
+        # Drop missing values
         df = df[[response_clean, explanatory_clean]].dropna()
 
-        # Build and fit model
-        formula = f"{response_clean} ~ {explanatory_clean}"
+        # Fit model
         try:
-            model = smf.ols(formula=formula, data=df).fit()
+            import statsmodels.api as sm
+            X = sm.add_constant(df[explanatory_clean])
+            y = df[response_clean]
+            model = sm.OLS(y, X).fit()
         except Exception as e:
             return f"Failed to fit regression model: {str(e)}"
 
-        results = []
-        results.append(f"Regression of {response} on {explanatory}")
-        results.append(f"Slope: {model.params[1]:.4f}")
-        results.append(f"Intercept: {model.params[0]:.4f}")
-        results.append(f"R-squared: {model.rsquared:.4f}")
+        # Build results
+        results = [
+            f"Regression of {response} on {explanatory}",
+            f"Slope: {model.params[explanatory_clean]:.4f}",
+            f"Intercept: {model.params['const']:.4f}",
+            f"R-squared: {model.rsquared:.4f}",
+            f"P-value (slope): {model.pvalues[explanatory_clean]:.4g}",
+            f"Std error (slope): {model.bse[explanatory_clean]:.4f}"
+        ]
 
-        # Prediction with interval
+        # Prediction with CI or PI
         if prediction_value is not None:
             pred_df = pd.DataFrame({explanatory_clean: [prediction_value]})
-            try:
-                prediction = model.get_prediction(pred_df)
-                summary = prediction.summary_frame(alpha=1 - conf_level)
+            pred = model.get_prediction(sm.add_constant(pred_df))
+            summary = pred.summary_frame(alpha=1 - conf_level)
+            mean_pred = summary["mean"].iloc[0]
 
-                if interval_type == "confidence":
-                    low, high = summary["mean_ci_lower"].iloc[0], summary["mean_ci_upper"].iloc[0]
-                    results.append(
-                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f} "
-                        f"with {conf_level * 100:.1f}% CI [{low:.4f}, {high:.4f}]"
-                    )
-                elif interval_type == "prediction":
-                    low, high = summary["obs_ci_lower"].iloc[0], summary["obs_ci_upper"].iloc[0]
-                    results.append(
-                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f} "
-                        f"with {conf_level * 100:.1f}% PI [{low:.4f}, {high:.4f}]"
-                    )
-                else:
-                    results.append(
-                        f"Predicted {response} at {explanatory}={prediction_value}: {summary['mean'].iloc[0]:.4f}"
-                    )
-            except Exception as e:
-                return f"Failed to compute prediction: {str(e)}"
+            if interval_type == "confidence":
+                low, high = summary["mean_ci_lower"].iloc[0], summary["mean_ci_upper"].iloc[0]
+                results.append(f"Predicted {response} at {explanatory}={prediction_value}: {mean_pred:.4f} "
+                               f"with {conf_level*100:.1f}% CI [{low:.4f}, {high:.4f}]")
+            elif interval_type == "prediction":
+                low, high = summary["obs_ci_lower"].iloc[0], summary["obs_ci_upper"].iloc[0]
+                results.append(f"Predicted {response} at {explanatory}={prediction_value}: {mean_pred:.4f} "
+                               f"with {conf_level*100:.1f}% PI [{low:.4f}, {high:.4f}]")
+            else:
+                results.append(f"Predicted {response} at {explanatory}={prediction_value}: {mean_pred:.4f}")
 
+        # Optional cross-validation
         if cv_folds is not None and cv_folds > 1:
             try:
-                X = sm.add_constant(df[explanatory_clean])
-                y = df[response_clean]
-                kf = KFold(n_splits=cv_folds, shuffle=True, random_state=42)
-                mse_scores = []
+                from sklearn.model_selection import KFold, cross_val_score
+                from sklearn.linear_model import LinearRegression
+                import numpy as np
 
-                for train_idx, test_idx in kf.split(X):
-                    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-                    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-                    model_cv = sm.OLS(y_train, X_train).fit()
-                    preds = model_cv.predict(X_test)
-                    mse_scores.append(((y_test - preds) ** 2).mean())
-
-                avg_mse = np.mean(mse_scores)
-                results.append(f"{cv_folds}-fold CV Mean Squared Error: {avg_mse:.4f}")
+                lr = LinearRegression()
+                X_cv = df[[explanatory_clean]].values
+                y_cv = df[response_clean].values
+                scores = cross_val_score(lr, X_cv, y_cv, cv=cv_folds, scoring="r2")
+                results.append(f"{cv_folds}-fold CV R^2: {np.mean(scores):.4f} ± {np.std(scores):.4f}")
             except Exception as e:
                 results.append(f"Cross-validation failed: {str(e)}")
 
