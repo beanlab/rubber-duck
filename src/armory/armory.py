@@ -55,7 +55,7 @@ class Armory:
 
         self._tools[tool_function.__name__] = wrapped
 
-    def create_human_in_the_loop_tool(self, tool_function: Callable):
+    def add_human_in_the_loop_tool(self, tool_function: Callable):
         if self._tools.get("hitl_" + tool_function.__name__, None) is None:
             wrapped = self.human_in_the_loop(tool_function)
             wrapped.__name__ = "hitl_" + tool_function.__name__
@@ -103,6 +103,6 @@ class Armory:
                 await self._talk_tool.send_message_to_user(ctx,
                                                            f"What is the reason for not approving the {func.__name__} tool call?")
                 response = await self._talk_tool.receive_message_from_user(ctx)
-                result = f"The user did not approve the tool call for the following reason: {response}. Continue talking with the user or provide an alternative solution."
+                result = f"The user did not approve the **{func.__name__}** tool call for the following reason: {response}. **Continue talking** with the user or provide an alternative solution."
             return result
         return wrapper

@@ -6,9 +6,7 @@ from ..utils.config_types import (
 )
 
 
-def build_agent(config: SingleAgentSettings, hilt_tools: list[str] | None = None) -> Agent:
-    if hilt_tools is None:
-        hilt_tools = []
+def build_agent(config: SingleAgentSettings) -> Agent:
     prompt = config.get("prompt")
     if not prompt:
         prompt_files = config.get("prompt_files")
@@ -20,16 +18,14 @@ def build_agent(config: SingleAgentSettings, hilt_tools: list[str] | None = None
             [Path(prompt_path).read_text(encoding="utf-8") for prompt_path in prompt_files]
         )
 
+    hitl_tools = ["hitl_" + tool for tool in config.get("hitl_tools", [])]
+    tools = list(config["tools"]) + hitl_tools
+
     tool_required = config.get("tool_required", "auto")
     if tool_required not in ["auto", "required", "none"]:
         tool_required = {"type": "function", "name": tool_required}
 
     output_schema = config.get("output_format", None)
-
-    if hilt_tools:
-        tools = list(config["tools"]) + hilt_tools
-    else:
-        tools = config["tools"]
 
     return Agent(
         name=config["name"],

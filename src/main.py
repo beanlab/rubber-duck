@@ -30,7 +30,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig, AgentAsToolSettings
+    DUCK_NAME, DuckConfig, AgentAsToolSettings, SingleAgentSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -123,6 +123,13 @@ def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
                     else:
                         yield item
 
+def make_agent_hitl_tools(armory: Armory, settings: SingleAgentSettings):
+    for h_tool in settings.get("hitl_tools", []):
+        tool = armory.get_specific_tool(h_tool)
+        if tool is None:
+            raise ValueError(f"Hitl tool {h_tool} not found in armory")
+        armory.add_human_in_the_loop_tool(tool)
+
 
 def build_ducks(
         config: Config,
@@ -130,6 +137,7 @@ def build_ducks(
         metrics_handler,
         feedback_manager,
         ai_client,
+        armory
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
@@ -139,6 +147,7 @@ def build_ducks(
         name = duck_config['name']
 
         if duck_type == 'agent_conversation':
+            make_agent_hitl_tools(armory, settings["agent"])
             starting_agent = build_agent(settings["agent"])
             ducks[name] = AgentConversation(name, starting_agent, ai_client)
 
@@ -164,12 +173,13 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        ai_client
+        ai_client,
+        armory
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory)
 
     channel_ducks = {}
 
@@ -270,7 +280,7 @@ async def _main(config: Config, log_dir: Path):
             ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
             add_agent_tools_to_armory(config, armory, ai_client)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
