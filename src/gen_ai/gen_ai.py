@@ -4,10 +4,10 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
-from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
-from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
-    ToolChoiceFunctionParam
+from openai.types.responses import ResponseFunctionToolCallParam, ToolChoiceTypesParam, \
+    ToolChoiceFunctionParam, ToolParam, ResponseCodeInterpreterToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step
@@ -49,13 +49,17 @@ class Agent:
 
 
 class Response(TypedDict):
-    type: Literal["function_call", "message", "reasoning"]
+    type: Literal["function_call", "message", "reasoning", "code_interpreter_call"]
     name: NotRequired[str]
     arguments: NotRequired[str]
     message: NotRequired[str]
     id: NotRequired[str]
     call_id: NotRequired[str]
     summary: NotRequired[list]
+    code: NotRequired[str]
+    container_id: NotRequired[str]
+    outputs: NotRequired[list]
+    status: NotRequired[Literal["in_progress", "completed", "incomplete", "interpreting", "failed"]]
 
 
 def format_function_call_history_items(result: str, call: Response):
@@ -78,8 +82,19 @@ def format_function_call_history_items(result: str, call: Response):
 def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
     return {
         'id': id,
+        'summary': summary,
         'type': 'reasoning',
-        'summary': summary
+    }
+
+
+def format_code_interpreter_history_item(call: Response) -> ResponseCodeInterpreterToolCallParam:
+    return {
+        'id': call['id'],
+        'code': call['code'],
+        'container_id': call['container_id'],
+        'outputs': call['outputs'],
+        'status': call['status'],
+        'type': "code_interpreter_call",
     }
 
 
@@ -91,7 +106,6 @@ class AIClient:
         self._record_usage = step(record_usage)
         self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
     @step
     async def _get_completion(
             self,
@@ -99,7 +113,7 @@ class AIClient:
             prompt: str,
             history,
             model: str,
-            tools: list[FunctionToolParam],
+            tools: list[ToolParam],
             tool_settings: ToolChoiceTypes,
             output_format: Type[BaseModel] | None,
             reasoning: str | None = None
@@ -130,7 +144,24 @@ class AIClient:
 
             responses = []
             for item in response.output:
-                if item.type == "function_call":
+                if item.type == "reasoning":
+                    responses.append(Response(
+                        type="reasoning",
+                        id=item.id,
+                        summary=item.summary
+                    ))
+
+                elif item.type == "code_interpreter_call":
+                    responses.append(Response(
+                        type="code_interpreter_call",
+                        id=item.id,
+                        code=item.code,
+                        container_id=item.container_id,
+                        outputs=item.outputs,
+                        status=item.status
+                    ))
+
+                elif item.type == "function_call":
                     responses.append(Response(
                         type="function_call",
                         name=item.name,
@@ -142,13 +173,6 @@ class AIClient:
                 elif item.type == "message":
                     responses.append(Response(type="message",
                                               message=response.output_text))
-
-                elif item.type == "reasoning":
-                    responses.append(Response(
-                        type="reasoning",
-                        id=item.id,
-                        summary=item.summary
-                    ))
 
                 else:
                     raise NotImplementedError(f"Unknown response type")
@@ -184,6 +208,12 @@ class AIClient:
                         await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
                                                    str(reasoning_item))
                         history.append(reasoning_item)
+                        continue
+                    if output['type'] == "code_interpreter_call":
+                        code_interpreter_item = format_code_interpreter_history_item(output)
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "code_interpreter_call",
+                                                   str(code_interpreter_item))
+                        history.append(code_interpreter_item)
                         continue
 
                     if output['type'] == "function_call":

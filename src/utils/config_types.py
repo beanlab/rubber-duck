@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import NotRequired, Union, Any, Literal
 
-from openai.types.responses import ResponseFunctionToolCallParam
+from openai.types.responses import ResponseFunctionToolCallParam, ResponseCodeInterpreterToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
 from typing_extensions import TypedDict
 
@@ -31,7 +31,7 @@ class ReasoningItem(TypedDict):
     summary: NotRequired[list]
 
 
-HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam, ReasoningItem]
+HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam, ReasoningItem, ResponseCodeInterpreterToolCallParam]
 
 
 class FeedbackNotifierSettings(TypedDict):

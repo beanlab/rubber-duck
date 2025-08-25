@@ -2,7 +2,7 @@ import inspect
 from functools import wraps
 from typing import Callable
 
-from openai.types.responses import FunctionToolParam
+from openai.types.responses import ToolParam
 
 from .tools import generate_function_schema
 from ..utils.config_types import DuckContext
@@ -11,7 +11,17 @@ from ..utils.config_types import DuckContext
 class Armory:
     def __init__(self, send_message: Callable):
         self._tools: dict[str, Callable] = {}
+        self._builtin_tools: dict[str, ToolParam] = self._load_builtin_tools()
         self._send_message = send_message
+
+    def _load_builtin_tools(self) -> dict[str, ToolParam]:
+        return {
+            "code_interpreter": {
+                "type": "code_interpreter",
+                "container": {"type": "auto"}
+            },
+
+        }
 
     def scrub_tools(self, tool_instance: object):
         for attr_name in dir(tool_instance):
@@ -58,8 +68,13 @@ class Armory:
             return self._tools[tool_name]
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
 
-    def get_tool_schema(self, tool_name: str) -> FunctionToolParam:
-        tool_function = self.get_specific_tool(tool_name)
+    def get_tool_schema(self, tool_name: str) -> ToolParam:
+        try:
+            tool_function = self.get_specific_tool(tool_name)
+        except KeyError:
+            if tool_name in self._builtin_tools:
+                return self._builtin_tools[tool_name]
+            raise KeyError(f"Tool '{tool_name}' not found in any armory module or built-in tools.")
         return generate_function_schema(tool_function)
 
     def send_image_directly(self, func):
