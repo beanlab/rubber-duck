@@ -52,13 +52,13 @@ ducks:
     settings:
       agent:
         name: stats_duck
-        engine: gpt-5
-        reasoning: minimal
         prompt_files:
           - prompts/stats2.txt
+        engine: gpt-5
+        reasoning: minimal
         tools:
-          - talk_to_user
-          - determine_tool_call
+          - send_message_to_user
+          - receive_message_from_user
           - describe_dataset
           - list_categories
           - explain_capabilities
