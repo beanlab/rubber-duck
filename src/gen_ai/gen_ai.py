@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
 from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
-    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
     ToolChoiceFunctionParam
 from openai.types.responses.response_input_item import FunctionCallOutput
@@ -89,7 +89,7 @@ class AIClient:
         self._typing = typing
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
-        self._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     @step
     async def _get_completion(
@@ -118,7 +118,7 @@ class AIClient:
             if reasoning:
                 params["reasoning"] = {"effort": reasoning}
 
-            response = self._client.responses.create(**params)
+            response = await self._client.responses.create(**params)
 
             if response.usage:
                 usage = response.usage
