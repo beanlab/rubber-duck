@@ -28,7 +28,7 @@ def build_agent(config: SingleAgentSettings) -> Agent:
         name=config["name"],
         prompt=prompt,
         model=config["engine"],
-        tools=config["tools"],
+        tools=config.get("tools", []),
         tool_settings=tool_required,
         output_format=output_schema,
         reasoning=config.get("reasoning"),

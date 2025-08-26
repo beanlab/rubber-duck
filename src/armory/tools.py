@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Callable, get_type_hints, Literal, Union, get_origin, get_args
+from types import UnionType
+from typing import Any, Callable, get_type_hints, Literal, get_origin, get_args, Union
 
 from openai.types.responses import FunctionToolParam
 
@@ -19,7 +20,7 @@ def sends_image(func):
 def is_optional(annotation) -> bool:
     origin = get_origin(annotation)
     args = get_args(annotation)
-    return origin is Union and type(None) in args
+    return (origin is UnionType or origin is Union) and type(None) in args
 
 
 def get_strict_json_schema_type(annotation) -> dict:
@@ -41,6 +42,7 @@ def get_strict_json_schema_type(annotation) -> dict:
 
     if annotation in type_map:
         return {"type": type_map[annotation]}
+
     if origin in type_map:
         return {"type": type_map[origin]}
 

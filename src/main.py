@@ -336,7 +336,7 @@ if __name__ == '__main__':
 
         log_dir = add_file_handler(args.log_path)
     else:
-        duck_logger.warn("No log path provided. Logging to console only.")
+        duck_logger.warning("No log path provided. Logging to console only.")
 
     # Add console handler to the duck logger
     add_console_handler()
