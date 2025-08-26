@@ -1,6 +1,8 @@
 import asyncio
+import json
 import re
 import uuid
+from typing import Callable
 
 from discord import Guild,utils
 from quest import step, queue
@@ -18,7 +20,8 @@ class RegistrationWorkflow:
                  get_channel,
                  fetch_guild,
                  email_sender: EmailSender,
-                 settings: RegistrationSettings
+                 settings: RegistrationSettings,
+                 agent_suspicion_tool : Callable | None
                  ):
         self.name = name
 
@@ -27,6 +30,7 @@ class RegistrationWorkflow:
         self._get_guild = fetch_guild
         self._email_sender = email_sender
         self._settings = settings
+        self._suspicion_tool = agent_suspicion_tool
 
     async def __call__(self, context: DuckContext):
         # Start the registration process
@@ -44,6 +48,10 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
+        first_name, last_name = await self._get_names(thread_id, context.timeout)
+
+        await self._assign_nickname(context, server_id, author_id, first_name, last_name, self._settings['ta_channel_id'], thread_id)
+
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
         return code
@@ -55,6 +63,32 @@ class RegistrationWorkflow:
                 return message['content']
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
+    @step
+    async def _get_names(self, thread_id, timeout):
+        try:
+            await self._send_message(thread_id, "Please enter your preferred first name.")
+
+            # Wait for user response
+            first_name = await self._wait_for_message(timeout)
+            if not first_name:
+                await self._send_message(thread_id, "Registration failed: No first name provided. Please start over.")
+                raise ValueError("No First Name provided")
+
+            await self._send_message(thread_id, "Please enter your preferred last name.")
+
+            # Wait for user response
+            last_name = await self._wait_for_message(timeout)
+            if not last_name:
+                await self._send_message(thread_id, "Registration failed: No last name provided. Please start over.")
+                raise ValueError("No Last Name provided")
+
+            return first_name, last_name
+
+        except Exception as e:
+            duck_logger.error(f"Setup failed: {e}")
+            await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
+            raise
+
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
@@ -262,3 +296,68 @@ class RegistrationWorkflow:
         except Exception as e:
             duck_logger.exception(f"Error in role assignment process: {str(e)}")
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
+
+    @step
+    async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
+        if self._suspicion_tool:
+            try:
+                raw = await self._suspicion_tool(context, name)
+                result = json.loads(raw)
+                suspicious = bool(result.get("suspicious", False))
+                reason = result.get("reason", "No reason provided by tool")
+                return suspicious, reason
+            except Exception as e:
+                duck_logger.exception(f"Suspicion tool failed, falling back: {e}")
+
+        if len(name) < 3 or len(name) > 32:
+            return True, "Name length not typical"
+        if any(char.isdigit() for char in name):
+            return True, "Contains digits"
+        if any(char in "!@#$%^&*()_+=~`[]{};:'\",.<>?/\\|" for char in name):
+            return True, "Contains unusual symbols"
+        if any(ord(char) > 10000 for char in name):
+            return True, "Contains emojis/unicode"
+
+        return False, "Name looks normal"
+
+    @step
+    async def _assign_nickname(
+            self,
+            context: DuckContext,
+            server_id: int,
+            user_id: int,
+            first_name: str,
+            last_name: str,
+            ta_channel_id: int,
+            thread_id: int
+    ):
+        try:
+            guild: Guild = await self._get_guild(server_id)
+            member = await guild.fetch_member(user_id)
+            preferred_name = f"{first_name.strip()}_{last_name.strip()}"
+
+            try:
+                result = await self._is_suspicious(context, preferred_name)
+            except Exception as agent_err:
+                duck_logger.exception(f"Suspicion agent failed: {agent_err}")
+                result = {"suspicious": False, "reason": "Agent failed, default allow"}
+
+            if result[0]:
+                await self._send_message(ta_channel_id,
+                    f"⚠️ {member.mention} submitted unusual name: **{preferred_name}**\n"
+                    f"Reason: {result[1]}\n"
+                    f"Please confirm against Canvas before nickname is set."
+                )
+                await self._send_message(
+                    thread_id,
+                    "✅ Thanks! Your registration is nearly complete, but a TA needs to confirm your name before I can set it."
+                )
+                return
+
+            # Safe nickname → set it
+            await member.edit(nick=preferred_name, reason="Student registration")
+            await self._send_message(thread_id, f"✅ Your nickname has been set to **{preferred_name}**")
+
+        except Exception as e:
+            duck_logger.exception(f"Error assigning nickname: {e}")
+            await self._send_message(thread_id, "⚠️ I wasn’t able to set your nickname. Please contact a TA.")
