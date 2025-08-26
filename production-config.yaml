@@ -57,7 +57,7 @@ ducks:
         engine: gpt-5
         reasoning: minimal
         tools:
-          - send_message_to_user
+          - talk_to_user
           - receive_message_from_user
           - describe_dataset
           - list_categories
