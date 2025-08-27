@@ -32,8 +32,6 @@ agents_as_tools:
       engine: gpt-4.1
       tools: []
 
-
-
 ducks:
   - name: standard-rubber-duck
     duck_type: agent_conversation
@@ -130,6 +128,7 @@ servers:
                   - name: Teacher Sections
                     pattern: "-section-"
                     description: Sorted by teacher's name (e.g. smith-section-000)
+        timeout: 600
 
 
 
@@ -166,6 +165,7 @@ servers:
                   - name: Teacher Sections
                     pattern: "-section-"
                     description: Sorted by teacher name (e.g. smith-section-001)
+        timeout: 600
 
 
   1235303213796691998:
@@ -204,6 +204,8 @@ servers:
                   - name: Lecture Sections
                     pattern: "lecture-"
                     description: Who teaches your lecture?
+        timeout: 600
+
 
   1371951485629370458:
     server_name: Stats
@@ -229,6 +231,7 @@ servers:
               authenticated_user_role_name: Student
               email_domain: byu.edu
               sender_email: byu-cs-course-ops@cs.byu.edu
+        timeout: 600
 
       - channel_id: 1371951696061661215
         channel_name: duck-pond
@@ -260,6 +263,7 @@ servers:
         channel_name: physics-230-phys230
         ducks:
           - standard-rubber-duck
+        timeout: 600
 
       - channel_id: 1359587713749094700
         channel_name: review-phys-430
@@ -371,6 +375,8 @@ servers:
                   - name: Lab Sections
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
+        timeout: 600
+
 
       - channel_id: 1384678077694480434
         channel_name: designer-duck
