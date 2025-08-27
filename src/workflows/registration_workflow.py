@@ -229,7 +229,7 @@ class RegistrationWorkflow:
             else:
                 available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
                 if available_roles:
-                    selected_role_ids = await self._select_roles(thread_id, available_roles, settings, timeout)
+                    selected_role_ids = await self._select_roles(thread_id, available_roles, timeout)
                 else:
                     selected_role_ids = []
 
