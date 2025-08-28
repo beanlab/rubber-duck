@@ -60,11 +60,11 @@ class DiscordTool:
             raise ValueError(f"Guild with id {guild_id} not found or bot is not in that guild.")
 
         data = {
-            str(guild.id): {
+            guild.id: {
                 "server_name": guild.name,
                 "channels": [
                     {
-                        "channel_id": str(channel.id),
+                        "channel_id": channel.id,
                         "channel_name": channel.name,
                         "ducks": [],
                         "timeout": 600

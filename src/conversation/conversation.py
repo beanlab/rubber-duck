@@ -34,7 +34,8 @@ class DiscordAgentConversation:
     async def __call__(self, context: DuckContext):
         await self._talk_tool.send_message_to_user(context, "What is the guild id of the new server?")
         guild = await self._talk_tool.receive_message_from_user(context)
-        await self._talk_tool.send_message_to_user(context, "This bot requires you to accept the bot into the newly created server.\n The link to the bot is https://discord.com/oauth2/authorize?client_id=1329497251265122344&permissions=126000&scope=bot\n Paste the link into the general channel and authorize it in the server.\n Once you have done this, please type 'done' to continue.")
+        await self._talk_tool.send_message_to_user(context, "This bot requires you to accept the bot into the newly created server.\n Copy the link below into your newly created server\n Once you have done this, please type 'done' to continue.")
+        await self._talk_tool.send_message_to_user(context, "```https://discord.com/oauth2/authorize?client_id=1329497251265122344&permissions=126000&scope=bot```")
         response = await self._talk_tool.receive_message_from_user(context)
         if "done" not in response.lower():
             await self._talk_tool.send_message_to_user(context, "You did not type 'done'. Exiting.")
