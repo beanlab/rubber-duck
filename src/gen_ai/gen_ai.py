@@ -2,18 +2,18 @@ import inspect
 import json
 import os
 from dataclasses import dataclass
-from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
+from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Any
 
 from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
-    ToolChoiceFunctionParam
+    ToolChoiceFunctionParam, ResponseReasoningItem
 from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step
 
 from ..armory.armory import Armory
-from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
+from ..utils.config_types import DuckContext, GPTMessage, HistoryType
 from ..utils.logger import duck_logger
 
 
@@ -58,29 +58,13 @@ class Response(TypedDict):
     summary: NotRequired[list]
 
 
+
 def format_function_call_history_items(result: str, call: Response):
-    return [
-        ResponseFunctionToolCallParam(
-            type="function_call",
-            id=call['id'],
-            call_id=call['call_id'],
-            name=call['name'],
-            arguments=call['arguments']
-        ),
-        FunctionCallOutput(
+    return FunctionCallOutput(
             type="function_call_output",
             call_id=call['call_id'],
             output=str(result)
         )
-    ]
-
-
-def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
-    return {
-        'id': id,
-        'type': 'reasoning',
-        'summary': summary
-    }
 
 
 class AIClient:
@@ -121,6 +105,8 @@ class AIClient:
 
             response = await self._client.responses.create(**params)
 
+            history += response.output
+
             if response.usage:
                 usage = response.usage
                 await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
@@ -138,20 +124,11 @@ class AIClient:
                         call_id=item.call_id,
                         id=item.id
                     ))
-
                 elif item.type == "message":
                     responses.append(Response(type="message",
                                               message=response.output_text))
-
-                elif item.type == "reasoning":
-                    responses.append(Response(
-                        type="reasoning",
-                        id=item.id,
-                        summary=item.summary
-                    ))
-
                 else:
-                    raise NotImplementedError(f"Unknown response type")
+                    continue
 
             return responses
 
@@ -179,13 +156,6 @@ class AIClient:
                 outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
                                                      agent.tool_settings, agent.output_format, agent.reasoning)
                 for output in outputs:
-                    if output['type'] == "reasoning":
-                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
-                                                   str(reasoning_item))
-                        history.append(reasoning_item)
-                        continue
-
                     if output['type'] == "function_call":
                         tool_name = output["name"]
                         tool_args = json.loads(output["arguments"])
@@ -194,12 +164,10 @@ class AIClient:
 
                         result = await self._run_tool(tool, ctx, tool_args)
 
-                        function_items = format_function_call_history_items(result, output)
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
-                                                   str(function_items[0]))
+                        function_item = format_function_call_history_items(result, output)
                         await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
-                                                   str(function_items[1]))
-                        history.extend(function_items)
+                                                   str(function_item))
+                        history.append(function_item)
 
                         continue
 
