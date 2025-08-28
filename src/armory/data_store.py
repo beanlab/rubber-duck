@@ -38,13 +38,13 @@ class DataStore:
 
     def _read_md_from_s3_object(self, bucket, obj):
         key = obj['Key']
-        if key.endswith('.csv'):
+        if key.endswith('.csv') or key.endswith('.txt'):
             key = str(key)
-            metadata_file = key[:-len('.csv')] + '.meta.json'
+            metadata_file = key[:-4] + '.meta.json'
             if self._s3_file_exists(bucket, metadata_file):
                 yield self._load_md_from_s3_json(bucket, metadata_file)
             else:
-                yield self._load_md_from_s3_csv(bucket, key)
+                yield self._load_md_from_s3_file(bucket, key)
 
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
@@ -55,12 +55,12 @@ class DataStore:
             yield from self._read_md_from_s3_object(bucket, obj)
 
     def _read_md_from_local_file(self, file):
-        if file.is_file() and file.name.endswith('.csv'):
+        if file.is_file() and (file.name.endswith('.csv') or file.name.endswith('.txt')):
             metadata_file = file.with_suffix('.meta.json')
             if metadata_file.exists():
                 yield self._load_md_from_local_json(metadata_file)
             else:
-                yield self._load_md_from_local_csv(file)
+                yield self._load_md_from_local_file(file)
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
@@ -77,22 +77,42 @@ class DataStore:
         metadata['location'] = str(location.resolve())
         return metadata['name'], metadata
 
-    def _load_md_from_s3_csv(self, bucket: str, obj: str) -> tuple[str, DatasetMetadata]:
-        full_location = f"s3://{bucket}/{obj}"
-        name = obj.replace('.csv', '').split('/')[-1]
+    def _load_md_from_s3_file(self, bucket: str, key: str) -> tuple[str, DatasetMetadata]:
+        full_location = f"s3://{bucket}/{key}"
+        name = key.rsplit('.', 1)[0].split('/')[-1]
 
-        obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
-        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')), nrows=0)
+        # fetch object but DON'T overwrite key
+        s3_obj = self._s3_client.get_object(Bucket=bucket, Key=key)
+        raw = s3_obj['Body'].read()
+        try:
+            data = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            data = raw.decode('latin1')
+
+        if key.endswith(".csv"):
+            df = pd.read_csv(StringIO(data), nrows=0)
+        elif key.endswith(".txt"):
+            df = pd.read_csv(StringIO(data), nrows=0, sep=r"\s+", quotechar='"')
+        else:
+            raise ValueError(f"Unsupported file type: {key}")
+
         columns = [
             ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
         ]
         return name, DatasetMetadata(location=full_location, name=name, columns=columns)
 
-    def _load_md_from_local_csv(self, location: Path) -> tuple[str, DatasetMetadata]:
+    def _load_md_from_local_file(self, location: Path) -> tuple[str, DatasetMetadata]:
         name = location.stem
         full_location = str(Path(location).resolve())
-        df = pd.read_csv(location, nrows=0)
+
+        if location.suffix == ".csv":
+            df = pd.read_csv(location, nrows=0)
+        elif location.suffix == ".txt":
+            df = pd.read_csv(location, nrows=0, sep=r"\s+", quotechar='"')
+        else:
+            raise ValueError(f"Unsupported file type: {location.suffix}")
+
         columns = [
             ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
@@ -136,29 +156,65 @@ class DataStore:
 
         try:
             if self._metadata[name]:
-                location = self._metadata[name]['location']
+                location = self._metadata[name]["location"]
+
+                # --- Handle S3 case ---
                 if self._is_s3_location(location):
                     bucket_name, key = self._get_s3_info(location)
-                    csv_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
-                    df = pd.read_csv(StringIO(csv_obj['Body'].read().decode('utf-8')))
-                else:
-                    df = pd.read_csv(location)
+                    s3_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
+                    raw = s3_obj["Body"].read()
 
+                    try:
+                        data = raw.decode("utf-8")
+                    except UnicodeDecodeError:
+                        data = raw.decode("latin1")
+
+                    if key.endswith(".csv"):
+                        df = pd.read_csv(StringIO(data))
+                    elif key.endswith(".txt"):
+                        df = pd.read_csv(
+                            StringIO(data),
+                            sep=r"\s+",
+                            engine="python",
+                            quotechar='"'
+                        )
+                    else:
+                        raise ValueError(f"Unsupported file type: {key}")
+
+                else:
+                    path = Path(location)
+                    if path.suffix == ".csv":
+                        df = pd.read_csv(path)
+                    elif path.suffix == ".txt":
+                        df = pd.read_csv(
+                            path,
+                            sep=r"\s+",
+                            engine="python",
+                            quotechar='"'
+                        )
+                    else:
+                        raise ValueError(f"Unsupported file type: {path.suffix}")
+
+                # cache result
                 self._loaded_datasets[name] = df
                 return df
+
         except KeyError:
             raise KeyError(
-                f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
+                f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}"
+            )
 
         raise FileNotFoundError(
-            f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}")
+            f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}"
+        )
 
     def get_column(self, dataset: pd.DataFrame, column: str) -> pd.Series:
         try:
             return dataset[column]
         except KeyError:
             raise KeyError(
-                f"Column '{column}' not found in dataset. Available columns are: {dataset.columns.tolist()}")
+                f"Column '{column}' not found in dataset. Available columns are: {dataset.columns.tolist()}"
+            )
 
     def clear_cache(self):
         self._loaded_datasets = {}
