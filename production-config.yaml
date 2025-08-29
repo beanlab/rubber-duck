@@ -130,7 +130,14 @@ servers:
                     description: Sorted by teacher's name (e.g. smith-section-000)
         timeout: 600
 
-
+  911014551263268916:
+    server_name: CS Faculty
+    channels:
+      - channel_id: 1146906576788140154
+        channel_name: Duck Pond
+        timeout: 600
+        ducks:
+          - standard-rubber-duck
 
   747510855536738336:
     server_name: CS 235
