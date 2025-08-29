@@ -158,7 +158,6 @@ class DataStore:
             if self._metadata[name]:
                 location = self._metadata[name]["location"]
 
-                # --- Handle S3 case ---
                 if self._is_s3_location(location):
                     bucket_name, key = self._get_s3_info(location)
                     s3_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
@@ -195,7 +194,6 @@ class DataStore:
                     else:
                         raise ValueError(f"Unsupported file type: {path.suffix}")
 
-                # cache result
                 self._loaded_datasets[name] = df
                 return df
 
