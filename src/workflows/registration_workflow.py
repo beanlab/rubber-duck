@@ -48,9 +48,9 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        first_name, last_name = await self._get_names(thread_id, context.timeout)
+        name = await self._get_names(thread_id, context.timeout)
 
-        await self._assign_nickname(context, server_id, author_id, first_name, last_name, self._settings['ta_channel_id'], thread_id)
+        await self._assign_nickname(context, server_id, author_id, name, self._settings['ta_channel_id'], thread_id)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -63,26 +63,19 @@ class RegistrationWorkflow:
                 return message['content']
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
+    
     @step
     async def _get_names(self, thread_id, timeout):
         try:
-            await self._send_message(thread_id, "Please enter your preferred first name.")
+            await self._send_message(thread_id, "Please enter your preferred first and last name, e.g. 'Shane Reese'")
 
             # Wait for user response
-            first_name = await self._wait_for_message(timeout)
-            if not first_name:
-                await self._send_message(thread_id, "Registration failed: No first name provided. Please start over.")
-                raise ValueError("No First Name provided")
+            name = await self._wait_for_message(timeout)
+            if not name:
+                await self._send_message(thread_id, "Registration failed: No name provided. Please start over.")
+                raise ValueError("No Name provided")
 
-            await self._send_message(thread_id, "Please enter your preferred last name.")
-
-            # Wait for user response
-            last_name = await self._wait_for_message(timeout)
-            if not last_name:
-                await self._send_message(thread_id, "Registration failed: No last name provided. Please start over.")
-                raise ValueError("No Last Name provided")
-
-            return first_name, last_name
+            return name
 
         except Exception as e:
             duck_logger.error(f"Setup failed: {e}")
