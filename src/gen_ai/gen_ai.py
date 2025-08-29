@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
 
-from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
     ToolChoiceFunctionParam
@@ -209,7 +209,6 @@ class AIClient:
 
                     else:
                         raise NotImplementedError(f"Unknown response type: {output['type']}")
-
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:

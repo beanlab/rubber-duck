@@ -5,7 +5,6 @@ from ..utils.config_types import (
     SingleAgentSettings,
 )
 
-
 def build_agent(config: SingleAgentSettings) -> Agent:
     prompt = config.get("prompt")
     if not prompt:
