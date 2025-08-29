@@ -344,20 +344,19 @@ class RegistrationWorkflow:
 
             if result[0]:
                 await self._send_message(ta_channel_id,
-                    f"⚠️ {member.mention} submitted unusual name: **{preferred_name}**\n"
+                    f"{member.mention} submitted unusual name: **{preferred_name}**\n"
                     f"Reason: {result[1]}\n"
                     f"Please confirm against Canvas before nickname is set."
                 )
                 await self._send_message(
                     thread_id,
-                    "✅ Thanks! Your registration is nearly complete, but a TA needs to confirm your name before I can set it."
+                    "Thanks! Your registration is nearly complete, but a TA needs to confirm your name before I can set it."
                 )
                 return
 
-            # Safe nickname → set it
             await member.edit(nick=preferred_name, reason="Student registration")
-            await self._send_message(thread_id, f"✅ Your nickname has been set to **{preferred_name}**")
+            await self._send_message(thread_id, f"Your nickname has been set to **{preferred_name}**")
 
         except Exception as e:
             duck_logger.exception(f"Error assigning nickname: {e}")
-            await self._send_message(thread_id, "⚠️ I wasn’t able to set your nickname. Please contact a TA.")
+            await self._send_message(thread_id, "I wasn’t able to set your nickname. Please contact a TA.")
