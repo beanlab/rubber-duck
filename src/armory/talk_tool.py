@@ -1,5 +1,7 @@
 import asyncio
+import json
 
+import yaml
 from quest import queue, step
 
 from .tools import register_tool
@@ -67,4 +69,24 @@ class TalkTool:
         :param file_json: str: The JSON content of the file to send (already a JSON-formatted string).
         """
         file_data = (file_name, file_json.encode("utf-8"))
+        await self._send_message(ctx.thread_id, file=file_data)
+
+    @register_tool
+    async def send_yaml_file(self, ctx: DuckContext, file_name: str, file_json: str):
+        """
+        Convert a JSON string to YAML and send it as a file to the user.
+        :param file_name: str: The name of the YAML file to send (should end with .yaml or .yml).
+        :param file_json: str: The JSON content (string) to convert and send.
+        """
+        try:
+            # Parse JSON string into Python dict
+            data = json.loads(file_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON provided: {e}")
+
+        # Convert to YAML (safe, readable formatting)
+        yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+
+        # Encode and send as file
+        file_data = (file_name, yaml_str.encode("utf-8"))
         await self._send_message(ctx.thread_id, file=file_data)
