@@ -24,7 +24,6 @@ class RegistrationWorkflow:
                  agent_suspicion_tool : Callable | None
                  ):
         self.name = name
-
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild
@@ -48,9 +47,8 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        name = await self._get_names(thread_id, context.timeout)
-
-        await self._assign_nickname(context, server_id, author_id, name, self._settings['ta_channel_id'], thread_id)
+        # Get and assign nickname
+        await self._nickname_flow(context, server_id, author_id, thread_id)
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -165,7 +163,7 @@ class RegistrationWorkflow:
                 await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
                 return []
 
-            if 'skip' in response:
+            if 'skip' in response.lower():
                 await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
                 return []
                 
@@ -292,15 +290,14 @@ class RegistrationWorkflow:
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
+        """Check if a nickname looks suspicious."""
         if self._suspicion_tool:
             try:
                 raw = await self._suspicion_tool(context, name)
                 result = json.loads(raw)
-                suspicious = bool(result.get("suspicious", False))
-                reason = result.get("reason", "No reason provided by tool")
-                return suspicious, reason
+                return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
             except Exception as e:
-                duck_logger.exception(f"Suspicion tool failed, falling back: {e}")
+                duck_logger.warning(f"Suspicion tool failed: {e}")
 
         if len(name) < 3 or len(name) > 32:
             return True, "Name length not typical"
@@ -313,43 +310,64 @@ class RegistrationWorkflow:
 
         return False, "Name looks normal"
 
+
     @step
     async def _assign_nickname(
-            self,
-            context: DuckContext,
-            server_id: int,
-            user_id: int,
-            first_name: str,
-            last_name: str,
-            ta_channel_id: int,
-            thread_id: int
-    ):
+        self,
+        context: DuckContext,
+        server_id: int,
+        user_id: int,
+        name: str
+    ) -> tuple[bool, str]:
+        """Try assigning the nickname, return (success, reason)."""
         try:
             guild: Guild = await self._get_guild(server_id)
             member = await guild.fetch_member(user_id)
-            preferred_name = f"{first_name.strip()}_{last_name.strip()}"
 
-            try:
-                result = await self._is_suspicious(context, preferred_name)
-            except Exception as agent_err:
-                duck_logger.exception(f"Suspicion agent failed: {agent_err}")
-                result = {"suspicious": False, "reason": "Agent failed, default allow"}
+            suspicious, reason = await self._is_suspicious(context, name)
+            if suspicious:
+                return False, reason
 
-            if result[0]:
-                await self._send_message(ta_channel_id,
-                    f"{member.mention} submitted unusual name: **{preferred_name}**\n"
-                    f"Reason: {result[1]}\n"
-                    f"Please confirm against Canvas before nickname is set."
-                )
-                await self._send_message(
-                    thread_id,
-                    "Thanks! Your registration is nearly complete, but a TA needs to confirm your name before I can set it."
-                )
-                return
+            if member.guild.owner_id == member.id:
+                return False, "Cannot change the server owner's nickname"
 
-            await member.edit(nick=preferred_name, reason="Student registration")
-            await self._send_message(thread_id, f"Your nickname has been set to **{preferred_name}**")
+            await member.edit(nick=name, reason="Student registration")
+            return True, "Nickname set successfully"
 
         except Exception as e:
             duck_logger.exception(f"Error assigning nickname: {e}")
-            await self._send_message(thread_id, "I wasn’t able to set your nickname. Please contact a TA.")
+            return False, "Unexpected error"
+
+
+    @step
+    async def _nickname_flow(
+        self,
+        context: DuckContext,
+        server_id: int,
+        author_id: int,
+        thread_id: int,
+        max_retries: int = 1
+    ):
+        """Handle full nickname assignment flow with retries and TA escalation."""
+        guild: Guild = await self._get_guild(server_id)
+        member = await guild.fetch_member(author_id)
+        for attempt in range(max_retries + 1):
+            name = await self._get_names(thread_id, context.timeout)
+            success, reason = await self._assign_nickname(context, server_id, author_id, name)
+            if success:
+                await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
+                break
+            if attempt < max_retries:
+                await self._send_message(thread_id, f"Please try again.")
+            else:
+                await self._send_message(
+                    thread_id,
+                    "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
+                )
+                await self._send_message(
+                    self._settings['ta_channel_id'],
+                    f"Student {member.mention} needs nickname approval.\n"
+                    f"Reason: {reason}\n"
+                    f"Thread: <#{thread_id}>"
+                )
+                break
