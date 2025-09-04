@@ -4,7 +4,7 @@ import re
 import uuid
 from typing import Callable
 
-from discord import Guild,utils
+from discord import Guild, utils
 from quest import step, queue
 
 from ..utils.config_types import RegistrationSettings, DuckContext
@@ -21,7 +21,7 @@ class RegistrationWorkflow:
                  fetch_guild,
                  email_sender: EmailSender,
                  settings: RegistrationSettings,
-                 agent_suspicion_tool : Callable | None
+                 agent_suspicion_tool: Callable | None
                  ):
         self.name = name
         self._send_message = step(send_message)
@@ -35,11 +35,16 @@ class RegistrationWorkflow:
         # Start the registration process
         thread_id = context.thread_id
         net_id = await self._get_net_id(thread_id, context.timeout)
+        if not net_id:
+            await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
+            return
+
         server_id = context.guild_id
         author_id = context.author_id
 
         # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'], context.timeout):
+        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
+                                                          context.timeout):
             await self._send_message(thread_id,
                                      'Unable to validate your email. Please talk to a TA or your instructor.')
             return
@@ -61,7 +66,7 @@ class RegistrationWorkflow:
                 return message['content']
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
-    
+
     @step
     async def _get_names(self, thread_id, timeout):
         try:
@@ -69,9 +74,7 @@ class RegistrationWorkflow:
 
             # Wait for user response
             name = await self._wait_for_message(timeout)
-            if not name:
-                await self._send_message(thread_id, "Registration failed: No name provided. Please start over.")
-                raise ValueError("No Name provided")
+            return name
 
             return name
 
@@ -80,7 +83,6 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             raise
 
-
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
         try:
@@ -88,10 +90,6 @@ class RegistrationWorkflow:
 
             # Wait for user response
             net_id = await self._wait_for_message(timeout)
-            if not net_id:
-                await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
-                raise ValueError("No Net ID provided")
-
             return net_id
 
         except Exception as e:
@@ -100,7 +98,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str, timeout: int = 300) -> bool:
+    async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
+                                              timeout: int = 300) -> bool:
         email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
@@ -120,7 +119,7 @@ class RegistrationWorkflow:
             response = await self._wait_for_message(timeout)
             if not response:
                 await self._send_message(thread_id, "No response received. Please start a new chat.")
-                raise TimeoutError("Timeout waiting for user email verification")
+                return False
 
             if response == 'resend':
                 token = self._email_sender.send_email(email, token)
@@ -166,7 +165,7 @@ class RegistrationWorkflow:
             if 'skip' in response.lower():
                 await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
                 return []
-                
+
             # Split by comma and convert to integers
             selected_indices = []
             errors = []
@@ -181,12 +180,12 @@ class RegistrationWorkflow:
             if errors:
                 await self._send_message(thread_id, "\n".join(errors))
                 continue
-            
+
             selected_roles = [
                 available_roles[idx]['id']
                 for idx in selected_indices
             ]
-            
+
             return selected_roles
 
     @step
@@ -198,7 +197,7 @@ class RegistrationWorkflow:
             # Get all roles from the guild
             guild = await self._get_guild(server_id)
             if not guild:
-                raise ValueError("Guild not found")
+                raise ValueError(f"Guild {server_id} not found")
 
             # Get role patterns from config
             role_patterns = settings.get("roles", {}).get("patterns", [])
@@ -233,7 +232,8 @@ class RegistrationWorkflow:
             raise
 
     @step
-    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings, timeout: int = 300):
+    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
+                            timeout: int = 300):
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
         try:
             # Get roles and selection
@@ -244,7 +244,7 @@ class RegistrationWorkflow:
                 member = await guild.fetch_member(user_id)
 
                 # Find role by name instead of ID
-                role = utils.get(guild.roles, name=role_name) # This function is from the discord.utils module
+                role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
                 if not role:
                     raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
 
@@ -279,7 +279,6 @@ class RegistrationWorkflow:
                 if new_roles:
                     await member.add_roles(*new_roles, reason="User registration")
 
-
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
@@ -309,17 +308,15 @@ class RegistrationWorkflow:
             except Exception as e:
                 duck_logger.warning(f"Suspicion tool failed: {e}")
 
-
         return False, "Name looks normal"
-
 
     @step
     async def _assign_nickname(
-        self,
-        context: DuckContext,
-        server_id: int,
-        user_id: int,
-        name: str
+            self,
+            context: DuckContext,
+            server_id: int,
+            user_id: int,
+            name: str
     ) -> tuple[bool, str]:
         """Try assigning the nickname, return (success, reason)."""
         try:
@@ -340,21 +337,24 @@ class RegistrationWorkflow:
             duck_logger.exception(f"Error assigning nickname: {e}")
             return False, "Unexpected error"
 
-
     @step
     async def _nickname_flow(
-        self,
-        context: DuckContext,
-        server_id: int,
-        author_id: int,
-        thread_id: int,
-        max_retries: int = 1
+            self,
+            context: DuckContext,
+            server_id: int,
+            author_id: int,
+            thread_id: int,
+            max_retries: int = 1
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
         guild: Guild = await self._get_guild(server_id)
         member = await guild.fetch_member(author_id)
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, context.timeout)
+            if not name:
+                await self._send_message(thread_id, "Registration incomplete: No name provided. Please start over.")
+                return
+
             success, reason = await self._assign_nickname(context, server_id, author_id, name)
             if success:
                 await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
