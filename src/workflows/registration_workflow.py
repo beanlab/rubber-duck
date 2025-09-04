@@ -291,15 +291,8 @@ class RegistrationWorkflow:
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
         """Check if a nickname looks suspicious."""
-        if self._suspicion_tool:
-            try:
-                raw = await self._suspicion_tool(context, name)
-                result = json.loads(raw)
-                return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
-            except Exception as e:
-                duck_logger.info(f"Suspicion tool failed: {e}")
 
-        if len(name) < 3 or len(name) > 32:
+        if len(name) < 3 or len(name) > 64:
             return True, "Name length not typical"
         if any(char.isdigit() for char in name):
             return True, "Contains digits"
@@ -307,6 +300,15 @@ class RegistrationWorkflow:
             return True, "Contains unusual symbols"
         if any(ord(char) > 10000 for char in name):
             return True, "Contains emojis/unicode"
+
+        if self._suspicion_tool:
+            try:
+                raw = await self._suspicion_tool(context, name)
+                result = json.loads(raw)
+                return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
+            except Exception as e:
+                duck_logger.warning(f"Suspicion tool failed: {e}")
+
 
         return False, "Name looks normal"
 

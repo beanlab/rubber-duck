@@ -21,6 +21,36 @@ sql:
   database: /rubber-duck.db
 
 agents_as_tools:
+  - tool_name: check_suspicion_bot
+    doc_string: |
+      This tool determines if a user's message is suspicious. Suspicious messages are those that do not appear to follow the format
+      of a user's name (first_name_last_name). The tool checks for profanity, unusual characters, and other indicators of suspicious behavior.
+      If the message is suspicious, the tool returns a formatted output indicating the reason for suspicion. If the message is not suspicious,
+      the tool returns a formatted output indicating that the message is safe.
+    agent:
+      name: SuspicionChecker
+      prompt_files:
+        - prompts/suspicion-checker.txt
+      engine: gpt-5-mini
+      reasoning: minimal
+      tools: [ ]
+      output_format:
+        format:
+          type: json_schema
+          name: suspicion_output
+          strict: true
+          schema:
+            type: object
+            properties:
+              suspicious:
+                type: boolean
+                description: Indicates if the name is suspicious according to the agent.
+              reason:
+                type: string
+                description: The reason why the name is considered suspicious or safe.
+            required: [ "suspicious", "reason" ]
+            additionalProperties: false
+
   - tool_name: code_complexity_agent
     doc_string: |
       This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
@@ -123,6 +153,8 @@ servers:
               cache_timeout: 60800
               authenticated_user_role_name: Student
               email_domain: byu.edu
+              ta_channel_id: 1413242197398126613
+              suspicion_checker_tool: check_suspicion_bot
               roles:
                 patterns:
                   - name: Teacher Sections
@@ -199,6 +231,8 @@ servers:
               cache_timeout: 60800
               authenticated_user_role_name: student
               email_domain: byu.edu
+              ta_channel_id: 1413242407566315550
+              suspicion_checker_tool: check_suspicion_bot
               roles:
                 patterns:
                   - name: Lecture Sections
