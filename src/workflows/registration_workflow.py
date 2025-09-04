@@ -203,7 +203,7 @@ class RegistrationWorkflow:
             # Get role patterns from config
             role_patterns = settings.get("roles", {}).get("patterns", [])
             if not role_patterns:
-                duck_logger.warning("No role patterns configured for this server")
+                duck_logger.info("No role patterns configured for this server")
 
             # Filter roles based on patterns
             available_roles = []
@@ -297,7 +297,7 @@ class RegistrationWorkflow:
                 result = json.loads(raw)
                 return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
             except Exception as e:
-                duck_logger.warning(f"Suspicion tool failed: {e}")
+                duck_logger.info(f"Suspicion tool failed: {e}")
 
         if len(name) < 3 or len(name) > 32:
             return True, "Name length not typical"
