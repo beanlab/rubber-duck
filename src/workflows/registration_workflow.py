@@ -121,7 +121,7 @@ class RegistrationWorkflow:
                 await self._send_message(thread_id, "No response received. Please start a new chat.")
                 return False
 
-            if response == 'resend':
+            if response.lower() == 'resend':
                 token = self._email_sender.send_email(email, token)
                 if not token:
                     return False
@@ -130,6 +130,7 @@ class RegistrationWorkflow:
             if response == token:
                 await self._send_message(thread_id, "Successfully verified your email!")
                 return True
+            
             else:
                 attempts += 1
                 duck_logger.error(f"Token mismatch: {response} != {token}")

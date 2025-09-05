@@ -37,6 +37,7 @@ class EmailSender:
             )
             duck_logger.debug(f"Email sent to {email}")
             return True
+
         except Exception as e:
             duck_logger.exception("Error sending email")
             return False
