@@ -124,6 +124,29 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
+  - name: discord_setup
+    duck_type: agent_conversation
+    settings:
+      agent:
+        name: discord_setup
+        engine: gpt-5
+        reasoning: minimal
+        prompt_files:
+          - prompts/discord_setup.txt
+        tools:
+          - start_discord_conversation
+          - understand_structure
+          - talk_to_user
+          - create_category
+          - create_text_channel
+          - delete_text_channel
+          - move_channel_to_category
+          - get_roles
+          - get_server_structure
+          - send_file
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
+
 servers:
   927616651409649675:
     server_name: CS 110
@@ -440,6 +463,12 @@ servers:
         channel_name: stats-tool
         ducks:
           - stats-duck
+        timeout: 600
+
+      - channel_id: 1413995344471265490
+        channel_name: edit_server
+        ducks:
+          - discord_setup
         timeout: 600
 
 feedback_notifier_settings:

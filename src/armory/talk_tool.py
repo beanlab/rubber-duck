@@ -74,7 +74,6 @@ class TalkTool:
     async def send_file(self, ctx: DuckContext, file_name: str, file_contents: str):
         """
         Send a file to the user as an attachment. Validates YAML/JSON if applicable.
-
         :param file_name: str: The name of the file to send.
         :param file_contents: str: The text content of the file to send.
         """
