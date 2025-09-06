@@ -4,10 +4,10 @@ import os
 from dataclasses import dataclass
 from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Any
 
-from openai import OpenAI, APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
+from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
-from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
-    ToolChoiceFunctionParam, ResponseReasoningItem
+from openai.types.responses import FunctionToolParam, ToolChoiceTypesParam, \
+    ToolChoiceFunctionParam
 from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step

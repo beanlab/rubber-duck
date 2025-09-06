@@ -1,6 +1,7 @@
-import json
+from typing import Dict
 
 import discord
+import yaml
 
 from src.armory.tools import register_tool
 
@@ -23,7 +24,6 @@ class DiscordTool:
 
         description_lines = [f"Server **{guild.name}** (ID: {guild.id}) structure:"]
 
-        # Group channels by category
         categories = {cat.id: cat for cat in guild.categories}
         category_channels = {cat.id: [] for cat in guild.categories}
         uncategorized = []
@@ -53,13 +53,13 @@ class DiscordTool:
     @register_tool
     async def get_server_structure(self, guild_id: int) -> str:
         """
-        Reads a Discord server from its guild_id and returns its structure as a JSON string
+        Reads a Discord server from its guild_id and returns its structure as a YAML string.
         """
         guild = self.bot.get_guild(guild_id)
         if guild is None:
             raise ValueError(f"Guild with id {guild_id} not found or bot is not in that guild.")
 
-        data = {
+        data: Dict[int, dict] = {
             guild.id: {
                 "server_name": guild.name,
                 "channels": [
@@ -75,7 +75,14 @@ class DiscordTool:
             }
         }
 
-        return json.dumps(data, indent=2)
+        yaml_str = yaml.dump(
+            data,
+            sort_keys=False,
+            default_flow_style=False,
+            indent=2
+        )
+
+        return yaml_str
 
     @register_tool
     async def create_category(self, guild_id: int, category_name: str) -> str:
@@ -150,3 +157,20 @@ class DiscordTool:
             return f"Moved channel '{channel.name}' (ID: {channel.id}) into category '{category.name}' (ID: {category.id}) in guild '{guild.name}'."
         except Exception as e:
             return f"Failed to move channel '{channel_name}' in guild '{guild.name}': {str(e)}"
+
+    @register_tool
+    async def get_roles(self, guild_id: int) -> str:
+        """Get a list of roles in the guild. Returns a descriptive string."""
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return f"Guild with ID {guild_id} not found."
+
+        roles = [role for role in guild.roles if role.name != "@everyone"]
+        if not roles:
+            return f"No roles found in guild '{guild.name}'."
+
+        role_lines = [f"Roles in guild '{guild.name}':"]
+        for role in roles:
+            role_lines.append(f"- {role.name} (ID: {role.id})")
+
+        return "\n".join(role_lines)
