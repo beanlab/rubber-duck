@@ -178,7 +178,6 @@ class AIClient:
                     else:
                         raise NotImplementedError(f"Unknown response type: {output['type']}")
 
-
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e

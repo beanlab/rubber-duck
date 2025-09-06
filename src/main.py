@@ -87,8 +87,10 @@ def build_conversation_review_duck(
 
 
 def build_registration_duck(
-        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings
+        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
+    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get('suspicion_checker_tool') else None
+
     email_confirmation = EmailSender(config['sender_email'])
 
     registration_workflow = RegistrationWorkflow(
@@ -97,7 +99,8 @@ def build_registration_duck(
         bot.get_channel,
         bot.fetch_guild,
         email_confirmation,
-        settings
+        settings,
+        agent_suspicion_tool,
     )
     return registration_workflow
 
@@ -130,7 +133,8 @@ def build_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        ai_client
+        ai_client,
+        armory
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
@@ -143,14 +147,13 @@ def build_ducks(
             starting_agent = build_agent(settings["agent"])
             ducks[name] = AgentConversation(name, starting_agent, ai_client)
 
-
         elif duck_type == 'conversation_review':
             ducks[name] = build_conversation_review_duck(
                 name, settings, bot, metrics_handler.record_feedback, feedback_manager
             )
 
         elif duck_type == 'registration':
-            ducks[name] = build_registration_duck(name, bot, config, settings)
+            ducks[name] = build_registration_duck(name, bot, config, settings, armory)
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
@@ -166,12 +169,13 @@ def _setup_ducks(
         bot: DiscordBot,
         metrics_handler,
         feedback_manager,
-        ai_client
+        ai_client,
+        armory
 ) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
+    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory)
 
     channel_ducks = {}
 
@@ -273,7 +277,7 @@ async def _main(config: Config, log_dir: Path):
             ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
             add_agent_tools_to_armory(config, armory, ai_client)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client)
+            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory)
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,

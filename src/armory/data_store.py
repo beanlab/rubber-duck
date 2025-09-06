@@ -1,4 +1,5 @@
 import json
+import logging
 from io import StringIO
 from pathlib import Path
 from typing import TypedDict, Iterable
@@ -52,7 +53,11 @@ class DataStore:
             prefix += '/'
         response = self._s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
         for obj in response.get('Contents', []):
-            yield from self._read_md_from_s3_object(bucket, obj)
+            try:
+                yield from self._read_md_from_s3_object(bucket, obj)
+            except:
+                logging.exception(f'Error loading metadata from {bucket}/{obj}')
+                continue
 
     def _read_md_from_local_file(self, file):
         if file.is_file() and file.name.endswith('.csv'):
@@ -64,7 +69,11 @@ class DataStore:
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
-            yield from self._read_md_from_local_file(file)
+            try:
+                yield from self._read_md_from_local_file(file)
+            except:
+                logging.exception(f'Error loading metadata for {file}')
+                continue
 
     def _load_md_from_s3_json(self, bucket: str, obj: str) -> tuple[str, DatasetMetadata]:
         obj = self._s3_client.get_object(Bucket=bucket, Key=obj)
@@ -149,6 +158,9 @@ class DataStore:
         except KeyError:
             raise KeyError(
                 f"Dataset '{name}' not found in metadata. Available datasets: {self.get_available_datasets()}")
+        except:
+            logging.exception(f'Error loading data for {name}')
+            raise
 
         raise FileNotFoundError(
             f"Dataset '{name}' not found in local or S3 storage. Available datasets: {self.get_available_datasets()}")
