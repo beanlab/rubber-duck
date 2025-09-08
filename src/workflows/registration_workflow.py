@@ -32,28 +32,34 @@ class RegistrationWorkflow:
         self._suspicion_tool = agent_suspicion_tool
 
     async def __call__(self, context: DuckContext):
-        # Start the registration process
-        thread_id = context.thread_id
-        net_id = await self._get_net_id(thread_id, context.timeout)
-        if not net_id:
-            await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
-            return
+        try:
+            # Start the registration process
+            thread_id = context.thread_id
+            net_id = await self._get_net_id(thread_id, context.timeout)
+            if not net_id:
+                await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
+                return
 
-        server_id = context.guild_id
-        author_id = context.author_id
+            server_id = context.guild_id
+            author_id = context.author_id
 
-        # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
-                                                          context.timeout):
-            await self._send_message(thread_id,
-                                     'Unable to validate your email. Please talk to a TA or your instructor.')
-            return
+            # Get and verify the email
+            if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
+                                                              context.timeout):
+                await self._send_message(thread_id,
+                                         'Unable to validate your email. Please talk to a TA or your instructor.')
+                return
 
-        # Assign Discord roles
-        await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
+            # Assign Discord roles
+            await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        # Get and assign nickname
-        await self._nickname_flow(context, server_id, author_id, thread_id)
+            # Get and assign nickname
+            await self._nickname_flow(context, server_id, author_id, thread_id)
+        except Exception as e:
+            await self._send_message(self._settings['ta_channel_id'],
+                                     f"Registration workflow failed for user {context.author_id} in server {context.guild_id}.\n"
+                                     f"Error: {e}\n"
+                                     f"Thread: <#{context.thread_id}>")
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -74,8 +80,6 @@ class RegistrationWorkflow:
 
             # Wait for user response
             name = await self._wait_for_message(timeout)
-            return name
-
             return name
 
         except Exception as e:
@@ -111,7 +115,7 @@ class RegistrationWorkflow:
         while attempts < max_attempts:
             await self._send_message(thread_id,
                                      "Email Verification:\n"
-                                     "We sent a verification code to your BYU email\n"
+                                     f"We sent a verification code to your BYU email: {email}\n"
                                      "Enter the code in the chat\n"
                                      "or type *resend* to get a new code")
 
@@ -133,7 +137,6 @@ class RegistrationWorkflow:
             
             else:
                 attempts += 1
-                duck_logger.error(f"Token mismatch: {response} != {token}")
                 if attempts < max_attempts:
                     await self._send_message(thread_id,
                                              f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
@@ -287,6 +290,7 @@ class RegistrationWorkflow:
         except Exception as e:
             duck_logger.exception(f"Error in role assignment process: {str(e)}")
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
+            raise
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
