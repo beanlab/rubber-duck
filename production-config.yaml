@@ -272,6 +272,8 @@ servers:
               authenticated_user_role_name: Student
               email_domain: byu.edu
               sender_email: byu-cs-course-ops@cs.byu.edu
+              ta_channel_id: 1371951756149260298
+              suspicion_checker_tool: check_suspicion_bot
         timeout: 600
 
       - channel_id: 1371951696061661215
@@ -407,6 +409,8 @@ servers:
             settings:
               cache_timeout: 60800
               authenticated_user_role_name: I-passed-registration
+              ta_channel_id: 1379965339428720700
+              suspicion_checker_tool: check_suspicion_bot
               email_domain: byu.edu
               roles:
                 patterns:
