@@ -8,6 +8,8 @@ import boto3
 import botocore.exceptions
 import pandas as pd
 
+from src.utils.logger import duck_logger
+
 
 class ColumnMetadata(TypedDict):
     name: str
@@ -119,10 +121,7 @@ class DataStore:
 
     def _load_dataframe_from_source(self, data: bytes | str, file_suffix: str) -> pd.DataFrame:
         if isinstance(data, bytes):
-            try:
-                data = data.decode("utf-8")
-            except UnicodeDecodeError:
-                data = data.decode("latin1")
+            data = data.decode("utf-8")
 
         if file_suffix == ".csv":
             return pd.read_csv(StringIO(data))
