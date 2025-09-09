@@ -4,8 +4,10 @@ import re
 import uuid
 from typing import Callable
 
+import discord
 from discord import Guild, utils
 from quest import step, queue
+from shapely.speedups import available
 
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
@@ -147,6 +149,13 @@ class RegistrationWorkflow:
 
         return False
 
+    async def get_user_roles(self, member: discord.Member) -> list[int]:
+        roles = [role.id for role in member.roles if role.name != "@everyone"]
+        return roles
+
+    def get_new_roles(self, old_roles, new_roles):
+        return list(set(new_roles) - set(old_roles))
+
     @step
     async def _select_roles(self, thread_id, available_roles, timeout: int = 300):
         while True:
@@ -256,7 +265,11 @@ class RegistrationWorkflow:
                 await member.add_roles(role, reason="User registration")
 
             else:
-                available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
+                guild: Guild = await self._get_guild(server_id)
+                member = await guild.fetch_member(user_id)
+                old_roles = await self.get_user_roles(member)
+                new_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
+                available_roles = self.get_new_roles(old_roles, new_roles)
                 if available_roles:
                     selected_role_ids = await self._select_roles(thread_id, available_roles, timeout)
                 else:

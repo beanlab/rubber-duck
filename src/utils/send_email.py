@@ -38,6 +38,8 @@ class EmailSender:
             duck_logger.debug(f"Email sent to {email}")
             return True
 
+        except self._ses_client.boto3.exceptions.ClientError as e:
+            return False
         except Exception as e:
             duck_logger.exception("Error sending email")
             return False
@@ -54,8 +56,12 @@ class EmailSender:
         </body>
         </html>
         """
-        if self._send_email(email, subject, body):
-            return token
-        else:
-            duck_logger.warning(f"Email not sent to {email}")
-            return None
+        try:
+            if self._send_email(email, subject, body):
+                return token
+            else:
+                duck_logger.warning(f"Email not sent to {email}")
+                return None
+        except Exception as e:
+            raise
+

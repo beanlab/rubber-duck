@@ -153,6 +153,29 @@ class StatsTools:
     @register_tool
     @sends_image
     @cache_result
+    async def plot_density(self, dataset: str, column: str) -> tuple[str, bytes] | str:
+        """Generate a kernel density plot for the specified dataset column."""
+        duck_logger.debug(f"Generating density plot for {dataset}.{column}")
+
+        data = self._datastore.get_dataset(dataset)
+        name = self._photo_name(dataset, column, "density")
+
+        column_val = self._datastore.get_column(data, column)
+
+        if self._is_categorical(column_val):
+            return "Density plots are not appropriate for categorical data. Please use a barplot or pie chart instead."
+
+        plt.figure(figsize=(8, 6))
+        sns.kdeplot(data=column_val, fill=True, alpha=0.7)
+        plt.title(f"Density Plot of {column}")
+        plt.xlabel(column)
+        plt.ylabel("Density")
+
+        return self._save_plot(name)
+
+    @register_tool
+    @sends_image
+    @cache_result
     async def plot_histogram(self, dataset: str, column: str) -> tuple[str, bytes] | str:
         """Generate a histogram for the specified dataset column."""
         duck_logger.debug(f"Generating histogram plot for {dataset}.{column}")
@@ -166,7 +189,7 @@ class StatsTools:
             return "Histograms are not appropriate for categorical data. Please use a barplot or pie chart instead."
 
         plt.figure(figsize=(8, 6))
-        sns.histplot(column_val, kde=True, bins=20)
+        sns.histplot(column_val, bins=20)
         plt.title(f"Histogram of {column}")
         plt.xlabel(column)
         plt.ylabel("Frequency")
