@@ -9,7 +9,7 @@ from openai import AsyncOpenAI
 from openai.types.responses import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_item import FunctionCallOutput
 
-load_dotenv(".env")
+load_dotenv("../../../.env")
 
 prompt = """
     You are an AI assistant that performs simple math calculations. You always use the provided tools to perform calculations.
