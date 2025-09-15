@@ -7,7 +7,6 @@ from typing import Callable
 import discord
 from discord import Guild, utils
 from quest import step, queue
-from shapely.speedups import available
 
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
@@ -34,34 +33,29 @@ class RegistrationWorkflow:
         self._suspicion_tool = agent_suspicion_tool
 
     async def __call__(self, context: DuckContext):
-        try:
-            # Start the registration process
-            thread_id = context.thread_id
-            net_id = await self._get_net_id(thread_id, context.timeout)
-            if not net_id:
-                await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
-                return
+        # Start the registration process
+        thread_id = context.thread_id
+        net_id = await self._get_net_id(thread_id, context.timeout)
+        if not net_id:
+            await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
+            return
 
-            server_id = context.guild_id
-            author_id = context.author_id
+        server_id = context.guild_id
+        author_id = context.author_id
 
-            # Get and verify the email
-            if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
-                                                              context.timeout):
-                await self._send_message(thread_id,
-                                         'Unable to validate your email. Please talk to a TA or your instructor.')
-                return
+        # Get and verify the email
+        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
+                                                          context.timeout):
+            await self._send_message(thread_id,
+                                     'Unable to validate your email. Please talk to a TA or your instructor.')
+            return
 
-            # Assign Discord roles
-            await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
+        # Assign Discord roles
+        await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-            # Get and assign nickname
-            await self._nickname_flow(context, server_id, author_id, thread_id)
-        except Exception as e:
-            await self._send_message(self._settings['ta_channel_id'],
-                                     f"Registration workflow failed for user {context.author_id} in server {context.guild_id}.\n"
-                                     f"Error: {e}\n"
-                                     f"Thread: <#{context.thread_id}>")
+        # Get and assign nickname
+        await self._nickname_flow(context, server_id, author_id, thread_id)
+
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -85,9 +79,10 @@ class RegistrationWorkflow:
             return name
 
         except Exception as e:
-            duck_logger.error(f"Setup failed: {e}")
+            duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
-            raise
+            if self._settings.get('ta_channel_id'):
+                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during name collection. Thread: <#{thread_id}")
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
@@ -99,9 +94,11 @@ class RegistrationWorkflow:
             return net_id
 
         except Exception as e:
-            duck_logger.error(f"Setup failed: {e}")
+            duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
-            raise
+            if self._settings.get('ta_channel_id'):
+                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during net id collection. Thread: <#{thread_id}")
+
 
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
@@ -136,7 +133,7 @@ class RegistrationWorkflow:
             if response == token:
                 await self._send_message(thread_id, "Successfully verified your email!")
                 return True
-            
+
             else:
                 attempts += 1
                 if attempts < max_attempts:
@@ -152,9 +149,6 @@ class RegistrationWorkflow:
     async def get_user_roles(self, member: discord.Member) -> list[int]:
         roles = [role.id for role in member.roles if role.name != "@everyone"]
         return roles
-
-    def get_new_roles(self, old_roles, new_roles):
-        return list(set(new_roles) - set(old_roles))
 
     @step
     async def _select_roles(self, thread_id, available_roles, timeout: int = 300):
@@ -240,9 +234,12 @@ class RegistrationWorkflow:
             return available_roles, authenticated_user_role_id
 
         except Exception as e:
-            duck_logger.error(f"Error getting guild roles: {str(e)}")
+            duck_logger.info(f"Error getting guild roles: {str(e)}")
             await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
-            raise
+            if self._settings.get('ta_channel_id'):
+                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed to get available roles. Thread: <#{thread_id}")
+
+
 
     @step
     async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
@@ -251,7 +248,7 @@ class RegistrationWorkflow:
         try:
             # Get roles and selection
             if settings.get('roles') is None:
-                duck_logger.debug("No roles configured for this server. Using authenticated user role only.")
+                duck_logger.info("No roles configured for this server. Using authenticated user role only.")
                 role_name = settings['authenticated_user_role_name']
                 guild: Guild = await self._get_guild(server_id)
                 member = await guild.fetch_member(user_id)
@@ -265,11 +262,7 @@ class RegistrationWorkflow:
                 await member.add_roles(role, reason="User registration")
 
             else:
-                guild: Guild = await self._get_guild(server_id)
-                member = await guild.fetch_member(user_id)
-                old_roles = await self.get_user_roles(member)
-                new_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
-                available_roles = self.get_new_roles(old_roles, new_roles)
+                available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
                 if available_roles:
                     selected_role_ids = await self._select_roles(thread_id, available_roles, timeout)
                 else:
@@ -281,29 +274,50 @@ class RegistrationWorkflow:
                 guild: Guild = await self._get_guild(server_id)
                 member = await guild.fetch_member(user_id)
 
+                # Get member's current roles
+                current_role_ids = await self.get_user_roles(member)
+
                 # Get the role objects
                 selected_roles = []
+                already_roles = []
                 for role_id in selected_role_ids:
+                    if role_id in current_role_ids:
+                        already_roles.append(role_id)
+                        continue
                     role = guild.get_role(role_id)
                     if role:
                         selected_roles.append(role)
 
-                if not selected_roles:  # sanity check
-                    raise ValueError('Could not lookup role objects from the selected role IDs.')
+                if not selected_roles and already_roles:
+                    duck_logger.info('User already has selected roles, no need to add')
+                elif not selected_roles:
+                    duck_logger.info('Could not lookup role objects from the selected role IDs.')
 
                 # Assign roles
                 new_roles = [role for role in selected_roles if role not in member.roles]
                 if new_roles:
                     await member.add_roles(*new_roles, reason="User registration")
 
+                if already_roles:
+                    already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
+                    already_added_role_names = ", ".join(role.name for role in already_added_roles)
+                    await self._send_message(thread_id, f"You already have these selected roles: {already_added_role_names}")
+
+
+
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)
-            await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
+            if not selected_roles:
+                await self._send_message(thread_id, f"No new roles added")
+            else:
+                await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
 
         except Exception as e:
-            duck_logger.exception(f"Error in role assignment process: {str(e)}")
+            duck_logger.info(f"Error in role assignment process: {str(e)}")
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
-            raise
+            if self._settings.get('ta_channel_id'):
+                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during role assignment. Thread: <#{thread_id}")
+
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
@@ -324,7 +338,7 @@ class RegistrationWorkflow:
                 result = json.loads(raw)
                 return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
             except Exception as e:
-                duck_logger.warning(f"Suspicion tool failed: {e}")
+                duck_logger.info(f"Suspicion tool failed: {e}")
 
         return False, "Name looks normal"
 
@@ -352,7 +366,7 @@ class RegistrationWorkflow:
             return True, "Nickname set successfully"
 
         except Exception as e:
-            duck_logger.exception(f"Error assigning nickname: {e}")
+            duck_logger.info(f"Error assigning nickname: {e}")
             return False, "Unexpected error"
 
     @step

@@ -1,4 +1,5 @@
 import os
+import re
 
 import boto3
 
@@ -25,23 +26,33 @@ class EmailSender:
             region_name=aws_region,
         )
 
+    def _check_email(self, netid: str) -> bool:
+        if not netid:
+            return False
+
+        # Regex: netid (5–8 chars, starts with letter, lowercase letters/numbers only) + @byu.edu
+        NETID_REGEX = re.compile(r"^[a-z][a-z0-9]{4,7}@byu\.edu$")
+
+        return bool(NETID_REGEX.match(netid))
+
     def _send_email(self, email, subject, body) -> bool:
         try:
-            self._ses_client.send_email(
-                Source=self._sender_email,
-                Destination={"ToAddresses": [email]},
-                Message={
-                    "Subject": {"Data": subject},
-                    "Body": {"Html": {"Data": body}},
-                },
-            )
-            duck_logger.debug(f"Email sent to {email}")
-            return True
-
-        except self._ses_client.boto3.exceptions.ClientError as e:
-            return False
+            if self._check_email(email):
+                self._ses_client.send_email(
+                    Source=self._sender_email,
+                    Destination={"ToAddresses": [email]},
+                    Message={
+                        "Subject": {"Data": subject},
+                        "Body": {"Html": {"Data": body}},
+                    },
+                )
+                duck_logger.info(f"Email sent to {email}")
+                return True
+            else:
+                duck_logger.info(f"Invalid email address: {email}")
+                return False
         except Exception as e:
-            duck_logger.exception("Error sending email")
+            duck_logger.info("Error sending email")
             return False
 
     def send_email(self, email, token) -> str | None:
@@ -60,8 +71,7 @@ class EmailSender:
             if self._send_email(email, subject, body):
                 return token
             else:
-                duck_logger.warning(f"Email not sent to {email}")
+                duck_logger.info(f"Email not sent to {email}")
                 return None
         except Exception as e:
             raise
-
