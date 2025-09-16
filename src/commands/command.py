@@ -98,7 +98,6 @@ class StatusCommand(Command):
         channel_id = message['channel_id']
         await self.send_message(channel_id, 'I am alive. 🦆')
 
-
 class ReportCommand(Command):
     name = "!report"
     help_msg = "get the report"
