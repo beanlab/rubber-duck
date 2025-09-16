@@ -41,7 +41,7 @@ class RegistrationWorkflow:
             return
 
         if not self._check_netid(net_id):
-            await self._send_message(thread_id, "NetID did not meet set requirements. Please start over")
+            await self._send_message(thread_id, "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
             return
 
         server_id = context.guild_id
