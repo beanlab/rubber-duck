@@ -26,14 +26,13 @@ class EmailSender:
             region_name=aws_region,
         )
 
-    def _check_email(self, netid: str) -> bool:
-        if not netid:
+    def _check_email(self, email: str) -> bool:
+        if not email:
             return False
 
-        # Regex: netid (5–8 chars, starts with letter, lowercase letters/numbers only) + @byu.edu
-        NETID_REGEX = re.compile(r"^[a-z][a-z0-9]{4,7}@byu\.edu$")
+        EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
-        return bool(NETID_REGEX.match(netid))
+        return bool(EMAIL_REGEX.match(email))
 
     def _send_email(self, email, subject, body) -> bool:
         try:

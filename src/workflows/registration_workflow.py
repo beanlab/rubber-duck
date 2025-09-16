@@ -40,6 +40,10 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
             return
 
+        if not self._check_netid(net_id):
+            await self._send_message(thread_id, "NetID did not meet set requirements. Please start over")
+            return
+
         server_id = context.guild_id
         author_id = context.author_id
 
@@ -56,6 +60,14 @@ class RegistrationWorkflow:
         # Get and assign nickname
         await self._nickname_flow(context, server_id, author_id, thread_id)
 
+    def _check_netid(self, netid: str) -> bool:
+        if not netid:
+            return False
+
+        # Regex: netid (5–8 chars, starts with letter, lowercase letters/numbers only)
+        NETID_REGEX = re.compile(r"^[a-z][a-z0-9]{4,7}$")
+
+        return bool(NETID_REGEX.match(netid))
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -114,7 +126,7 @@ class RegistrationWorkflow:
         while attempts < max_attempts:
             await self._send_message(thread_id,
                                      "Email Verification:\n"
-                                     f"We sent a verification code to your BYU email: {email}\n"
+                                     f"We sent a verification code to: {email}\n"
                                      "Enter the code in the chat\n"
                                      "or type *resend* to get a new code")
 
