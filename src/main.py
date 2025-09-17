@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .armory.discord_tools import DiscordTool
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
@@ -221,8 +222,8 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def build_armory(config: Config, send_message) -> Armory:
-    armory = Armory(send_message)
+def build_armory(config: Config, bot) -> Armory:
+    armory = Armory(bot.send_message)
 
     dataset_dirs = config.get("dataset_folder_locations")
     if dataset_dirs:
@@ -232,9 +233,10 @@ def build_armory(config: Config, send_message) -> Armory:
     else:
         duck_logger.warning("**No dataset folder locations provided in config**")
 
-    talk_tool = TalkTool(send_message)
+    talk_tool = TalkTool(bot.send_message)
     armory.scrub_tools(talk_tool)
-
+    discord_tool = DiscordTool(bot)
+    armory.scrub_tools(discord_tool)
     return armory
 
 
@@ -271,7 +273,7 @@ async def _main(config: Config, log_dir: Path):
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
 
-            armory = build_armory(config, bot.send_message)
+            armory = build_armory(config, bot)
             ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
             add_agent_tools_to_armory(config, armory, ai_client)
 
