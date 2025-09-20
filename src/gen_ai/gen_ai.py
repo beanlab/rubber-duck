@@ -91,7 +91,6 @@ class AIClient:
         self._record_usage = step(record_usage)
         self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
     @step
     async def _get_completion(
             self,
@@ -204,7 +203,6 @@ class AIClient:
                         continue
 
                     elif output['type'] == "message":
-                        duck_logger.debug("Going back to agent: main_agent")
                         return output['message']
 
                     else:
@@ -220,6 +218,76 @@ class AIClient:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent}")
             return await self.run_agent(ctx, agent, query)
+
+        agent_runner.__name__ = name
+        agent_runner.__doc__ = doc_string
+        return agent_runner
+
+    def _check_for_history(self, my_func: callable):
+        sig = inspect.signature(my_func)
+        params = sig.parameters
+        if "history" in params:
+            return True
+        return False
+
+    @step
+    async def run_agent_completion(self, ctx: DuckContext, agent: Agent, history: list[HistoryType]):
+        tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
+        original_history = history
+        try:
+            while True:
+                outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
+                                                     agent.tool_settings, agent.output_format, agent.reasoning)
+                for output in outputs:
+                    if output['type'] == "reasoning":
+                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
+                                                   str(reasoning_item))
+                        history.append(reasoning_item)
+                        continue
+
+                    if output['type'] == "function_call":
+                        tool_name = output["name"]
+                        tool_args = json.loads(output["arguments"])
+
+                        tool = self._armory.get_specific_tool(tool_name)
+
+                        if self._check_for_history(tool):
+                            tool_args["history"] = history
+
+                        result = await self._run_tool(tool, ctx, tool_args)
+
+                        function_items = format_function_call_history_items(result, output)
+
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
+                                                   str(function_items[0]))
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
+                                                   str(function_items[1]))
+
+                        history.extend(function_items)
+
+                        if self._check_for_history((tool)):
+                            history.extend(result)
+                        continue
+
+                    elif output['type'] == "message":
+                        history.append(GPTMessage(role="assistant", content=output['message']))
+                        return history[len(original_history):]
+
+                    else:
+                        raise NotImplementedError(f"Unknown response type: {output['type']}")
+
+        except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
+                BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
+            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
+        except Exception as e:
+            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
+
+    def build_agent_completion_tool(self, agent: Agent, name: str,
+                                    doc_string: str) -> callable:
+        async def agent_runner(ctx: DuckContext, history: list[HistoryType]):
+            duck_logger.debug(f"Talking to agent: {agent}")
+            return await self.run_agent_completion(ctx, agent, history)
 
         agent_runner.__name__ = name
         agent_runner.__doc__ = doc_string

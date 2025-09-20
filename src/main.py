@@ -13,7 +13,7 @@ from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
 from .armory.talk_tool import TalkTool
-from .conversation.conversation import AgentConversation
+from .conversation.conversation import AgentLedConversation
 from .gen_ai.gen_ai import AIClient
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -144,7 +144,7 @@ def build_ducks(
 
         if duck_type == 'agent_conversation':
             starting_agent = build_agent(settings["agent"])
-            ducks[name] = AgentConversation(name, starting_agent, ai_client)
+            ducks[name] = AgentLedConversation(name, starting_agent, ai_client)
 
         elif duck_type == 'conversation_review':
             ducks[name] = build_conversation_review_duck(
