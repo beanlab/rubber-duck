@@ -2,7 +2,7 @@ import inspect
 import json
 import os
 from dataclasses import dataclass
-from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional
+from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Callable
 
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from quest import step
 
 from ..armory.armory import Armory
+from ..armory.talk_tool import ConversationComplete
 from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
 from ..utils.logger import duck_logger
 
@@ -163,19 +164,50 @@ class AIClient:
         except Exception as error:
             if isinstance(error, GenAIException):
                 raise error
-            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
+            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}.", False
         return result
 
+    async def run_agent(self, ctx: DuckContext, agent: Agent, query: str | None) -> str | None:
+        initial_history = []
+
+        if query is not None:
+            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+                                       json.dumps(query))
+            initial_history.append(GPTMessage(role='user', content=query))
+
+        message, history, _ = await self._run_agent(ctx, agent, initial_history)
+        return message
+
+    async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message) -> list[HistoryType]:
+        history = []
+        while True:
+            try:
+                user_message = await get_user_message(ctx)
+
+            except TimeoutError:
+                break
+
+            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+                                       json.dumps(user_message))
+            history.append(GPTMessage(role='user', content=user_message))
+
+            agent_response, agent_history, conversation_complete = await self._run_agent(ctx, agent, history)
+            history.extend(agent_history)
+
+            if conversation_complete:
+                break
+
+        return history
+
     @step
-    async def run_agent(self, ctx: DuckContext, agent: Agent, query: str):
+    async def _run_agent(self,
+                         ctx: DuckContext, agent: Agent, context: list[HistoryType]
+                         ) -> tuple[str | None, list[HistoryType], bool]:
         tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
-        user_message = GPTMessage(role='user', content=query)
-        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
-                                   json.dumps(user_message))
-        history: list[HistoryType] = [GPTMessage(role='user', content=query)]
+        history = []
         try:
             while True:
-                outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
+                outputs = await self._get_completion(ctx, agent.prompt, context + history, agent.model, tools_json,
                                                      agent.tool_settings, agent.output_format, agent.reasoning)
                 for output in outputs:
                     if output['type'] == "reasoning":
@@ -191,19 +223,29 @@ class AIClient:
 
                         tool = self._armory.get_specific_tool(tool_name)
 
-                        result = await self._run_tool(tool, ctx, tool_args)
+                        try:
+                            result, completes_response = await self._run_tool(tool, ctx, tool_args)
 
-                        function_items = format_function_call_history_items(result, output)
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
-                                                   str(function_items[0]))
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
-                                                   str(function_items[1]))
-                        history.extend(function_items)
+                            function_items = format_function_call_history_items(result, output)
+                            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
+                                                       str(function_items[0]))
+                            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id,
+                                                       "function_call_output",
+                                                       str(function_items[1]))
+                            history.extend(function_items)
 
-                        continue
+                            if completes_response:
+                                return None, history, False
+                            continue
+
+                        except ConversationComplete:
+                            return None, history, True
 
                     elif output['type'] == "message":
-                        return output['message']
+                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "assistant",
+                                                   output['message'])
+                        history.append(GPTMessage(role='assistant', content=output['message']))
+                        return output['message'], history, False
 
                     else:
                         raise NotImplementedError(f"Unknown response type: {output['type']}")
@@ -214,7 +256,7 @@ class AIClient:
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
-    def build_agent_tool(self, agent, name: str, doc_string: str) -> callable:
+    def build_agent_tool(self, agent, name: str, doc_string: str) -> Callable:
         async def agent_runner(ctx: DuckContext, query: str):
             duck_logger.debug(f"Talking to agent: {agent}")
             return await self.run_agent(ctx, agent, query)
@@ -223,56 +265,9 @@ class AIClient:
         agent_runner.__doc__ = doc_string
         return agent_runner
 
-    def _check_for_history(self, my_func: callable):
+    def _check_for_history(self, my_func: Callable):
         sig = inspect.signature(my_func)
         params = sig.parameters
         if "history" in params:
             return True
         return False
-
-    @step
-    async def run_agent_completion(self, ctx: DuckContext, agent: Agent, history: list[HistoryType]):
-        tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
-        try:
-            while True:
-                outputs = await self._get_completion(ctx, agent.prompt, history, agent.model, tools_json,
-                                                     agent.tool_settings, agent.output_format, agent.reasoning)
-                for output in outputs:
-                    if output['type'] == "reasoning":
-                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
-                                                   str(reasoning_item))
-                        history.append(reasoning_item)
-                        continue
-
-                    if output['type'] == "function_call":
-                        tool_name = output["name"]
-                        tool_args = json.loads(output["arguments"])
-
-                        tool = self._armory.get_specific_tool(tool_name)
-
-                        result = await self._run_tool(tool, ctx, tool_args)
-
-                        if result == "":
-                            return ""
-
-                        function_items = format_function_call_history_items(result, output)
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
-                                                   str(function_items[0]))
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call_output",
-                                                   str(function_items[1]))
-                        history.extend(function_items)
-
-                        continue
-
-                    elif output['type'] == "message":
-                        return output['message']
-
-                    else:
-                        raise NotImplementedError(f"Unknown response type: {output['type']}")
-
-        except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
-                BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
-            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
-        except Exception as e:
-            raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e

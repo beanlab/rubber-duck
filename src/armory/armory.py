@@ -11,6 +11,8 @@ from ..utils.config_types import DuckContext
 class Armory:
     def __init__(self, send_message: Callable):
         self._tools: dict[str, Callable] = {}
+        self._schemas: dict[str, FunctionToolParam] = {}
+
         self._send_message = send_message
 
     def scrub_tools(self, tool_instance: object):
@@ -51,7 +53,18 @@ class Armory:
         if hasattr(tool_function, "sends_image"):
             wrapped = self.send_image_directly(wrapped)
 
-        self._tools[tool_function.__name__] = wrapped
+        self._schemas[tool_function.__name__] = generate_function_schema(tool_function)
+
+        completes_response = hasattr(tool_function, 'complete_response')
+
+        if inspect.iscoroutinefunction(wrapped):
+            async def wrapper(*args, **kwargs):
+                return await wrapped(*args, **kwargs), completes_response
+        else:
+            def wrapper(ctx: DuckContext, *args, **kwargs):
+                return wrapped(*args, **kwargs), completes_response
+
+        self._tools[tool_function.__name__] = wrapper
 
     def get_specific_tool(self, tool_name: str):
         if tool_name in self._tools:
@@ -59,12 +72,13 @@ class Armory:
         raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
 
     def get_tool_schema(self, tool_name: str) -> FunctionToolParam:
-        tool_function = self.get_specific_tool(tool_name)
-        return generate_function_schema(tool_function)
+        if tool_name in self._schemas:
+            return self._schemas[tool_name]
+        raise KeyError(f"Tool '{tool_name}' not found in any armory module.")
 
     def send_image_directly(self, func):
         @wraps(func)
-        async def wrapper(ctx, *args, **kwargs):
+        async def wrapper(ctx, *args, **kwargs) -> None:
             if inspect.iscoroutinefunction(func):
                 result = await func(ctx, *args, **kwargs)
             else:
@@ -72,6 +86,6 @@ class Armory:
 
             name, _ = result
             await self._send_message(ctx.thread_id, file=result)
-            return ""
+            return None
 
         return wrapper
