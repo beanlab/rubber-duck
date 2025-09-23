@@ -72,6 +72,6 @@ class Armory:
 
             name, _ = result
             await self._send_message(ctx.thread_id, file=result)
-            return name
+            return ""
 
         return wrapper
