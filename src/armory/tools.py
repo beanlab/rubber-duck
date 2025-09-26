@@ -68,7 +68,7 @@ def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
 
         ann = type_hints.get(name, param.annotation)
         if ann is inspect._empty:
-            raise TypeError(f"Missing type annotation for parameter: {name}")
+            raise TypeError(f"On func {func.__name__}: missing type annotation for parameter: {name}")
 
         schema_entry = get_strict_json_schema_type(ann)
 
