@@ -2,13 +2,12 @@ import inspect
 import json
 import os
 from dataclasses import dataclass
-from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Callable
+from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Callable, Required
 
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
-from openai.types.responses import ResponseFunctionToolCallParam, FunctionToolParam, ToolChoiceTypesParam, \
+from openai.types.responses import FunctionToolParam, ToolChoiceTypesParam, \
     ToolChoiceFunctionParam
-from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel
 from quest import step
 
@@ -58,8 +57,22 @@ class Response(TypedDict):
     call_id: NotRequired[str]
     summary: NotRequired[list]
 
+class ResponseFunctionToolCallParam(TypedDict):
+    arguments: Required[str]
+    call_id: Required[str]
+    name: Required[str]
+    type: Required[Literal["function_call"]]
+    id: str
 
-def format_function_call_history_items(result: str, call: Response):
+class FunctionCallOutput(BaseModel):
+    call_id: str
+    output: str
+    type: Literal["function_call_output"]
+    id: Optional[str] = None
+    status: Optional[Literal["in_progress", "completed", "incomplete"]] = None
+
+
+def format_function_call_history_items(result: str, call: Response) -> list[dict]:
     return [
         ResponseFunctionToolCallParam(
             type="function_call",
@@ -72,7 +85,7 @@ def format_function_call_history_items(result: str, call: Response):
             type="function_call_output",
             call_id=call['call_id'],
             output=str(result)
-        )
+        ).model_dump()
     ]
 
 
@@ -156,7 +169,7 @@ class AIClient:
             return responses
 
     @step
-    async def _run_tool(self, tool, ctx, tool_args):
+    async def _run_tool(self, tool, ctx, tool_args) -> tuple[str | None, bool]:
         try:
             result = tool(ctx, **tool_args)
             if inspect.isawaitable(result):
@@ -178,7 +191,7 @@ class AIClient:
         message, history, _ = await self._run_agent(ctx, agent, initial_history)
         return message
 
-    async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message) -> list[HistoryType]:
+    async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message, send_user_message) -> list[HistoryType]:
         history = []
         while True:
             try:
@@ -192,6 +205,9 @@ class AIClient:
             history.append(GPTMessage(role='user', content=user_message))
 
             agent_response, agent_history, conversation_complete = await self._run_agent(ctx, agent, history)
+
+            await send_user_message(ctx, agent_response)
+
             history.extend(agent_history)
 
             if conversation_complete:

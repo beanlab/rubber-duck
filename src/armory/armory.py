@@ -58,11 +58,11 @@ class Armory:
         completes_response = hasattr(tool_function, 'complete_response')
 
         if inspect.iscoroutinefunction(wrapped):
-            async def wrapper(*args, **kwargs):
-                return await wrapped(*args, **kwargs), completes_response
+            async def wrapper(ctx: DuckContext, *args, **kwargs):
+                return await wrapped(ctx, *args, **kwargs), completes_response
         else:
             def wrapper(ctx: DuckContext, *args, **kwargs):
-                return wrapped(*args, **kwargs), completes_response
+                return wrapped(ctx, *args, **kwargs), completes_response
 
         self._tools[tool_function.__name__] = wrapper
 

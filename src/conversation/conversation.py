@@ -40,7 +40,7 @@ class UserLedConversation:
     async def __call__(self, context: DuckContext):
         duck_logger.info(f"Starting conversation with agent: {self._main_agent.name} (Thread: {context.thread_id})")
         await self._send_message(context, self._introduction)
-        await self._ai_client.run_conversation(context, self._main_agent, self._get_message)
+        await self._ai_client.run_conversation(context, self._main_agent, self._get_message, self._send_message)
 
 
 
