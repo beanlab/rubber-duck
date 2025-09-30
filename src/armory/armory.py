@@ -78,7 +78,7 @@ class Armory:
 
     def send_image_directly(self, func):
         @wraps(func)
-        async def wrapper(ctx, *args, **kwargs) -> None:
+        async def wrapper(ctx, *args, **kwargs) -> tuple[None, bool]:
             if inspect.iscoroutinefunction(func):
                 result = await func(ctx, *args, **kwargs)
             else:

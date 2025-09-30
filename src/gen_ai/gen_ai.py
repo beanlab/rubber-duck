@@ -206,7 +206,8 @@ class AIClient:
 
             agent_response, agent_history, conversation_complete = await self._run_agent(ctx, agent, history)
 
-            await send_user_message(ctx, agent_response)
+            if agent_response:
+                await send_user_message(ctx, agent_response)
 
             history.extend(agent_history)
 
@@ -240,9 +241,8 @@ class AIClient:
                         tool = self._armory.get_specific_tool(tool_name)
 
                         try:
-                            result, completes_response = await self._run_tool(tool, ctx, tool_args)
-
-                            function_items = format_function_call_history_items(result, output)
+                            result = await self._run_tool(tool, ctx, tool_args)
+                            function_items = format_function_call_history_items(result[0], output)
                             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
                                                        str(function_items[0]))
                             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id,
@@ -250,7 +250,7 @@ class AIClient:
                                                        str(function_items[1]))
                             history.extend(function_items)
 
-                            if completes_response:
+                            if result[1]:
                                 return None, history, False
                             continue
 

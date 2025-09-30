@@ -14,6 +14,7 @@ def register_tool(func):
 
 def sends_image(func):
     func.sends_image = True
+    func.complete_response = True
     return func
 
 
