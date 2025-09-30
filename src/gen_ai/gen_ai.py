@@ -57,13 +57,6 @@ class Response(TypedDict):
     call_id: NotRequired[str]
     summary: NotRequired[list]
 
-class ResponseFunctionToolCallParam(TypedDict):
-    arguments: Required[str]
-    call_id: Required[str]
-    name: Required[str]
-    type: Required[Literal["function_call"]]
-    id: str
-
 class FunctionCallOutput(BaseModel):
     call_id: str
     output: str
@@ -93,8 +86,8 @@ class AIClient:
             self,
             ctx: DuckContext,
             prompt: str,
-            local_history,
-            context,
+            local_history: list[HistoryType],
+            context: list[HistoryType],
             model: str,
             tools: list[FunctionToolParam],
             tool_settings: ToolChoiceTypes,
