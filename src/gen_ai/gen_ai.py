@@ -158,16 +158,8 @@ class AIClient:
                 elif item.type == "message":
                     responses.append(Response(type="message",
                                               message=response.output_text))
-
-                elif item.type == "reasoning":
-                    responses.append(Response(
-                        type="reasoning",
-                        id=item.id,
-                        summary=item.summary
-                    ))
-
                 else:
-                    raise NotImplementedError(f"Unknown response type")
+                    continue
 
             return responses
 
