@@ -110,7 +110,8 @@ class AIClient:
             self,
             ctx: DuckContext,
             prompt: str,
-            history,
+            local_history,
+            context,
             model: str,
             tools: list[FunctionToolParam],
             tool_settings: ToolChoiceTypes,
@@ -121,7 +122,7 @@ class AIClient:
             params = dict(
                 model=model,
                 instructions=prompt,
-                input=history,
+                input=context + local_history,
                 tools=tools,
                 tool_choice=tool_settings
             )
@@ -133,6 +134,8 @@ class AIClient:
                 params["reasoning"] = {"effort": reasoning}
 
             response = await self._client.responses.create(**params)
+
+            local_history += response.output
 
             if response.usage:
                 usage = response.usage
@@ -224,16 +227,9 @@ class AIClient:
         history = []
         try:
             while True:
-                outputs = await self._get_completion(ctx, agent.prompt, context + history, agent.model, tools_json,
+                outputs = await self._get_completion(ctx, agent.prompt, history, context, agent.model, tools_json,
                                                      agent.tool_settings, agent.output_format, agent.reasoning)
                 for output in outputs:
-                    if output['type'] == "reasoning":
-                        reasoning_item = format_reasoning_history_item(output['id'], output['summary'])
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "reasoning",
-                                                   str(reasoning_item))
-                        history.append(reasoning_item)
-                        continue
-
                     if output['type'] == "function_call":
                         tool_name = output["name"]
                         tool_args = json.loads(output["arguments"])
