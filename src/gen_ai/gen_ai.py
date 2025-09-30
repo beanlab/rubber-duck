@@ -2,18 +2,18 @@ import inspect
 import json
 import os
 from dataclasses import dataclass
-from typing import TypedDict, Protocol, Literal, NotRequired, Type, Optional, Callable, Required
+from typing import Protocol, Literal, Type, Optional, Callable
 
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import FunctionToolParam, ToolChoiceTypesParam, \
-    ToolChoiceFunctionParam
+    ToolChoiceFunctionParam, Response, EasyInputMessage
 from pydantic import BaseModel
 from quest import step
 
 from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
-from ..utils.config_types import DuckContext, GPTMessage, HistoryType
+from ..utils.config_types import DuckContext, HistoryType
 from ..utils.logger import duck_logger
 
 
@@ -48,15 +48,6 @@ class Agent:
     reasoning: Optional[str] = None
 
 
-class Response(TypedDict):
-    type: Literal["function_call", "message", "reasoning"]
-    name: NotRequired[str]
-    arguments: NotRequired[str]
-    message: NotRequired[str]
-    id: NotRequired[str]
-    call_id: NotRequired[str]
-    summary: NotRequired[list]
-
 class FunctionCallOutput(BaseModel):
     call_id: str
     output: str
@@ -67,10 +58,10 @@ class FunctionCallOutput(BaseModel):
 
 def format_function_call_history_items(result: str, call: Response) -> FunctionCallOutput:
     return FunctionCallOutput(
-            type="function_call_output",
-            call_id=call['call_id'],
-            output=str(result)
-        ).model_dump()
+        type="function_call_output",
+        call_id=call['call_id'],
+        output=str(result)
+    ).model_dump(exclude_none=True)
 
 
 class AIClient:
@@ -111,8 +102,6 @@ class AIClient:
 
             response = await self._client.responses.create(**params)
 
-            local_history += response.output
-
             if response.usage:
                 usage = response.usage
                 await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
@@ -120,24 +109,10 @@ class AIClient:
                                          usage.input_tokens_details.cached_tokens,
                                          usage.output_tokens_details.reasoning_tokens)
 
-            responses = []
-            for item in response.output:
-                if item.type == "function_call":
-                    responses.append(Response(
-                        type="function_call",
-                        name=item.name,
-                        arguments=item.arguments,
-                        call_id=item.call_id,
-                        id=item.id
-                    ))
-
-                elif item.type == "message":
-                    responses.append(Response(type="message",
-                                              message=response.output_text))
-                else:
-                    continue
-
-            return responses
+            return [
+                resp.model_dump(exclude_none=True)
+                for resp in response.output
+            ]
 
     @step
     async def _run_tool(self, tool, ctx, tool_args) -> tuple[str | None, bool]:
@@ -157,12 +132,13 @@ class AIClient:
         if query is not None:
             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
                                        json.dumps(query))
-            initial_history.append(GPTMessage(role='user', content=query))
+            initial_history.append(EasyInputMessage(role='user', content=query, type='message').model_dump())
 
         message, history, _ = await self._run_agent(ctx, agent, initial_history)
         return message
 
-    async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message, send_user_message) -> list[HistoryType]:
+    async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message, send_user_message) -> list[
+        HistoryType]:
         history = []
         while True:
             try:
@@ -173,8 +149,8 @@ class AIClient:
 
             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
                                        json.dumps(user_message))
-            history.append(GPTMessage(role='user', content=user_message))
 
+            history.append(EasyInputMessage(role='user', content=user_message, type='message').model_dump())
             agent_response, agent_history, conversation_complete = await self._run_agent(ctx, agent, history)
 
             if agent_response:
@@ -195,8 +171,22 @@ class AIClient:
         history: list[HistoryType] = []
         try:
             while True:
-                outputs = await self._get_completion(ctx, agent.prompt, history, context, agent.model, tools_json,
-                                                     agent.tool_settings, agent.output_format, agent.reasoning)
+                outputs = await self._get_completion(
+                    ctx, agent.prompt, history, context,
+                    agent.model, tools_json, agent.tool_settings,
+                    agent.output_format, agent.reasoning
+                )
+
+                history += outputs
+                for output in outputs:
+                    # TODO - handle all possible outputs gracefully
+                    if 'role' not in output:
+                        continue
+                    await self._record_message(
+                        ctx.guild_id, ctx.thread_id, ctx.author_id,
+                        output['role'], str(output['content'])  # <-- what should output store for each type of output
+                    )
+
                 for output in outputs:
                     if output['type'] == "function_call":
                         tool_name = output["name"]
@@ -207,9 +197,10 @@ class AIClient:
                         try:
                             result = await self._run_tool(tool, ctx, tool_args)
                             function_item = format_function_call_history_items(result[0], output)
-                            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id,
-                                                       "function_call_output",
-                                                       str(function_item))
+                            await self._record_message(
+                                ctx.guild_id, ctx.thread_id, ctx.author_id,
+                                "function_call_output", str(function_item)
+                            )
 
                             history.append(function_item)
 
@@ -221,10 +212,11 @@ class AIClient:
                             return None, history, True
 
                     elif output['type'] == "message":
-                        await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "assistant",
-                                                   output['message'])
-                        history.append(GPTMessage(role='assistant', content=output['message']))
-                        return output['message'], history, False
+                        message = output['content'][0]['text']  # TODO - should we be more intelligent here?
+                        return message, history, False
+
+                    elif output['type'] == 'reasoning':
+                        pass  # FUTURE - could do something clever with this
 
                     else:
                         raise NotImplementedError(f"Unknown response type: {output['type']}")

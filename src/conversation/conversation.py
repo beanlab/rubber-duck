@@ -2,7 +2,7 @@ from quest import step
 
 from ..armory.talk_tool import TalkTool
 from ..gen_ai.gen_ai import Agent, AIClient
-from ..utils.config_types import DuckContext, GPTMessage
+from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 
 
