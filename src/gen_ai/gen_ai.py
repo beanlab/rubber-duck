@@ -13,7 +13,7 @@ from quest import step
 
 from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
-from ..utils.config_types import DuckContext, GPTMessage, HistoryType, ReasoningItem
+from ..utils.config_types import DuckContext, GPTMessage, HistoryType
 from ..utils.logger import duck_logger
 
 
@@ -78,14 +78,6 @@ def format_function_call_history_items(result: str, call: Response) -> dict:
             call_id=call['call_id'],
             output=str(result)
         ).model_dump()
-
-
-def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
-    return {
-        'id': id,
-        'type': 'reasoning',
-        'summary': summary
-    }
 
 
 class AIClient:
