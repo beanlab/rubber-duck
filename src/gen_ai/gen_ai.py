@@ -72,21 +72,12 @@ class FunctionCallOutput(BaseModel):
     status: Optional[Literal["in_progress", "completed", "incomplete"]] = None
 
 
-def format_function_call_history_items(result: str, call: Response) -> list[dict]:
-    return [
-        ResponseFunctionToolCallParam(
-            type="function_call",
-            id=call['id'],
-            call_id=call['call_id'],
-            name=call['name'],
-            arguments=call['arguments']
-        ),
-        FunctionCallOutput(
+def format_function_call_history_items(result: str, call: Response) -> dict:
+    return FunctionCallOutput(
             type="function_call_output",
             call_id=call['call_id'],
             output=str(result)
         ).model_dump()
-    ]
 
 
 def format_reasoning_history_item(id: str, summary: list) -> ReasoningItem:
@@ -122,7 +113,7 @@ class AIClient:
             params = dict(
                 model=model,
                 instructions=prompt,
-                input=context + local_history,
+                input=(context + local_history),
                 tools=tools,
                 tool_choice=tool_settings
             )
@@ -230,13 +221,12 @@ class AIClient:
 
                         try:
                             result = await self._run_tool(tool, ctx, tool_args)
-                            function_items = format_function_call_history_items(result[0], output)
-                            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "function_call",
-                                                       str(function_items[0]))
+                            function_item = format_function_call_history_items(result[0], output)
                             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id,
                                                        "function_call_output",
-                                                       str(function_items[1]))
-                            history.extend(function_items)
+                                                       str(function_item))
+
+                            history.append(function_item)
 
                             if result[1]:
                                 return None, history, False
