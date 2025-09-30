@@ -65,7 +65,7 @@ class FunctionCallOutput(BaseModel):
     status: Optional[Literal["in_progress", "completed", "incomplete"]] = None
 
 
-def format_function_call_history_items(result: str, call: Response) -> dict:
+def format_function_call_history_items(result: str, call: Response) -> FunctionCallOutput:
     return FunctionCallOutput(
             type="function_call_output",
             call_id=call['call_id'],
@@ -192,7 +192,7 @@ class AIClient:
                          ctx: DuckContext, agent: Agent, context: list[HistoryType]
                          ) -> tuple[str | None, list[HistoryType], bool]:
         tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
-        history = []
+        history: list[HistoryType] = []
         try:
             while True:
                 outputs = await self._get_completion(ctx, agent.prompt, history, context, agent.model, tools_json,
