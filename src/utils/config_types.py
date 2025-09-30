@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from typing import NotRequired, Union, Any, Literal
+from typing import NotRequired
 
-from openai.types.responses import ResponseFunctionToolCallParam
-from openai.types.responses.response_input_item import FunctionCallOutput
+from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
 
 CHANNEL_ID = int
@@ -21,17 +20,7 @@ class AgentMessage(TypedDict):
     agent_name: str
 
 
-class GPTMessage(TypedDict):
-    role: str
-    content: str
-
-class ReasoningItem(TypedDict):
-    type: Literal["reasoning"]
-    id: NotRequired[str]
-    summary: NotRequired[list]
-
-
-HistoryType = Union[GPTMessage, FunctionCallOutput, ResponseFunctionToolCallParam, ReasoningItem]
+HistoryType = ResponseInputItemParam
 
 
 class FeedbackNotifierSettings(TypedDict):
