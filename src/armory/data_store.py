@@ -8,20 +8,18 @@ import boto3
 import botocore.exceptions
 import pandas as pd
 
-from src.utils.logger import duck_logger
-
-
-class ColumnMetadata(TypedDict):
+class ColumnMetadata(TypedDict, total=False):
     name: str
     dtype: str
     description: str
+    display_name: str
 
 
-class DatasetMetadata(TypedDict):
+class DatasetMetadata(TypedDict, total=False):
     location: str
     name: str
+    description: str
     columns: list[ColumnMetadata]
-
 
 class DataStore:
     def __init__(self, locations: list[str]):
@@ -116,6 +114,7 @@ class DataStore:
         metadata = json.loads(location.read_text())
         metadata["location"] = str(location.resolve())
         return metadata["name"], metadata
+
 
     # Data loading
 
