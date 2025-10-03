@@ -1,0 +1,81 @@
+{
+  "name": "Car Price Data",
+  "description": "Dataset containing details about cars and their prices.",
+  "columns": [
+    {
+      "name": "car_ID",
+      "display_name": "Car Id",
+      "description": "Information about Car Id."
+    },
+    {
+      "name": "gas",
+      "display_name": "Gas",
+      "description": "Information about Gas."
+    },
+    {
+      "name": "turbo",
+      "display_name": "Turbo",
+      "description": "Information about Turbo."
+    },
+    {
+      "name": "four.door",
+      "display_name": "Four.Door",
+      "description": "Information about Four.Door."
+    },
+    {
+      "name": "front.engine",
+      "display_name": "Front.Engine",
+      "description": "Engine specifications of the car."
+    },
+    {
+      "name": "wheelbase",
+      "display_name": "Wheelbase",
+      "description": "Information about Wheelbase."
+    },
+    {
+      "name": "carlength",
+      "display_name": "Carlength",
+      "description": "Information about Carlength."
+    },
+    {
+      "name": "carwidth",
+      "display_name": "Carwidth",
+      "description": "Information about Carwidth."
+    },
+    {
+      "name": "carheight",
+      "display_name": "Carheight",
+      "description": "Information about Carheight."
+    },
+    {
+      "name": "enginesize",
+      "display_name": "Enginesize",
+      "description": "Engine specifications of the car."
+    },
+    {
+      "name": "horsepower",
+      "display_name": "Horsepower",
+      "description": "Horsepower of the car\u2019s engine."
+    },
+    {
+      "name": "peakrpm",
+      "display_name": "Peakrpm",
+      "description": "Information about Peakrpm."
+    },
+    {
+      "name": "citympg",
+      "display_name": "Citympg",
+      "description": "Information about Citympg."
+    },
+    {
+      "name": "highwaympg",
+      "display_name": "Highwaympg",
+      "description": "Information about Highwaympg."
+    },
+    {
+      "name": "price",
+      "display_name": "Price",
+      "description": "Price of the car."
+    }
+  ]
+}
