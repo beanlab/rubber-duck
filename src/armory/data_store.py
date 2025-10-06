@@ -42,7 +42,7 @@ class DataStore:
         if key.endswith(".csv") or key.endswith(".txt"):
             metadata_file = key[:-4] + ".meta.json"
             if self._s3_file_exists(bucket, metadata_file):
-                yield self._load_md_from_s3_json(bucket, metadata_file)
+                yield self._load_md_from_s3_json(bucket, metadata_file, key)
             else:
                 yield self._build_md_from_s3_file(bucket, key)
 
@@ -62,7 +62,7 @@ class DataStore:
         if file.is_file() and (file.suffix in {".csv", ".txt"}):
             metadata_file = file.with_suffix(".meta.json")
             if metadata_file.exists():
-                yield self._load_md_from_local_json(metadata_file)
+                yield self._load_md_from_local_json(metadata_file, file)
             else:
                 yield self._build_md_from_local_file(file)
 
@@ -104,15 +104,15 @@ class DataStore:
 
     # Regular loading
 
-    def _load_md_from_s3_json(self, bucket: str, key: str) -> tuple[str, DatasetMetadata]:
+    def _load_md_from_s3_json(self, bucket: str, key: str, original_key: str) -> tuple[str, DatasetMetadata]:
         s3_obj = self._s3_client.get_object(Bucket=bucket, Key=key)
         md = json.loads(s3_obj["Body"].read().decode("utf-8"))
-        md["location"] = f"s3://{bucket}/{key}"
+        md["location"] = f"s3://{bucket}/{original_key}"
         return md["name"], md
 
-    def _load_md_from_local_json(self, location: Path) -> tuple[str, DatasetMetadata]:
+    def _load_md_from_local_json(self, location: Path, original_location: Path) -> tuple[str, DatasetMetadata]:
         metadata = json.loads(location.read_text())
-        metadata["location"] = str(location.resolve())
+        metadata["location"] = str(original_location.resolve())
         return metadata["name"], metadata
 
 
@@ -131,6 +131,14 @@ class DataStore:
 
     # Utils
 
+    def _rename_columns(self, dataset_name: str, dataframe: pd.DataFrame):
+        if self._metadata[dataset_name] is not None:
+            column_dict = {}
+            for column in self._metadata[dataset_name]["columns"]:
+                column_dict[column["name"]] = column["display_name"]
+            dataframe.rename(columns=column_dict, inplace=True)
+        return dataframe
+
     def get_dataset(self, name: str) -> pd.DataFrame:
         if name in self._loaded_datasets:
             return self._loaded_datasets[name]
@@ -147,6 +155,8 @@ class DataStore:
                 else:
                     path = Path(location)
                     df = self._load_dataframe_from_source(path.read_bytes(), path.suffix)
+
+                df = self._rename_columns(name, df)
 
                 self._loaded_datasets[name] = df
                 return df
