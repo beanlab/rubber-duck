@@ -7,9 +7,17 @@ from ..utils.config_types import DuckContext
 from ..utils.protocols import Message
 
 
+class ConversationComplete(BaseException):
+    pass
+
+
 class TalkTool:
     def __init__(self, send_message):
         self._send_message = step(send_message)
+
+    @register_tool
+    async def conclude_conversation(self, ctx: DuckContext):
+        raise ConversationComplete
 
     @register_tool
     async def send_message_to_user(self, ctx: DuckContext, message_to_user: str):
