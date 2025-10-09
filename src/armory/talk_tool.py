@@ -17,7 +17,7 @@ class TalkTool:
 
     @register_tool
     async def conclude_conversation(self, ctx: DuckContext):
-        raise ConversationComplete
+        raise ConversationComplete()
 
     @register_tool
     async def send_message_to_user(self, ctx: DuckContext, message_to_user: str):
@@ -43,7 +43,7 @@ class TalkTool:
                 )
             return message['content']
         except asyncio.TimeoutError:
-            return "SYSTEM: The user has not responded."
+            raise ConversationComplete()
 
     @register_tool
     async def talk_to_user(self, ctx: DuckContext, message_to_user: str) -> str:
