@@ -1,0 +1,50 @@
+{
+  "name": "College Admissions Dataset",
+  "columns": [
+    {
+      "name": "Serial No.",
+      "dtype": "int",
+      "description": "Unique identifier for each applicant record."
+    },
+    {
+      "name": "GRE Score",
+      "dtype": "int",
+      "description": "Graduate Record Examination score of the applicant (typically out of 340)."
+    },
+    {
+      "name": "TOEFL Score",
+      "dtype": "int",
+      "description": "Test of English as a Foreign Language score of the applicant (typically out of 120)."
+    },
+    {
+      "name": "University Rating",
+      "dtype": "int",
+      "description": "Rating of the university applied to, on a scale of 1 to 5."
+    },
+    {
+      "name": "SOP",
+      "dtype": "float",
+      "description": "Strength of the applicant’s Statement of Purpose, rated from 1 to 5."
+    },
+    {
+      "name": "LOR",
+      "dtype": "float",
+      "description": "Strength of the applicant’s Letter of Recommendation, rated from 1 to 5."
+    },
+    {
+      "name": "CGPA",
+      "dtype": "float",
+      "description": "Undergraduate Cumulative Grade Point Average, typically on a 10-point scale."
+    },
+    {
+      "name": "Research",
+      "dtype": "int",
+      "description": "Indicator of research experience (1 if the applicant has research experience, 0 otherwise)."
+    },
+    {
+      "name": "Chance of Admit",
+      "dtype": "float",
+      "description": "Estimated probability of admission, ranging from 0.0 to 1.0."
+    }
+  ]
+}

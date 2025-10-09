@@ -8,8 +8,6 @@ import boto3
 import botocore.exceptions
 import pandas as pd
 
-from src.utils.logger import duck_logger
-
 
 class ColumnMetadata(TypedDict):
     name: str
@@ -44,9 +42,11 @@ class DataStore:
         if key.endswith(".csv") or key.endswith(".txt"):
             metadata_file = key[:-4] + ".meta.json"
             if self._s3_file_exists(bucket, metadata_file):
-                yield self._load_md_from_s3_json(bucket, metadata_file)
+                name, mdata = self._load_md_from_s3_json(bucket, metadata_file)
             else:
-                yield self._build_md_from_s3_file(bucket, key)
+                name, mdata = self._build_md_from_s3_file(bucket, key)
+            mdata['location'] = key
+            yield name, mdata
 
     def _load_md_from_s3(self, location: str):
         bucket, prefix = self._get_s3_info(location)
@@ -64,9 +64,11 @@ class DataStore:
         if file.is_file() and (file.suffix in {".csv", ".txt"}):
             metadata_file = file.with_suffix(".meta.json")
             if metadata_file.exists():
-                yield self._load_md_from_local_json(metadata_file)
+                name, mdata = self._load_md_from_local_json(metadata_file)
             else:
-                yield self._build_md_from_local_file(file)
+                name, mdata = self._build_md_from_local_file(file)
+            mdata['location'] = str(file.resolve())
+            yield name, mdata
 
     def _load_md_from_local(self, location: str):
         for file in Path(location).iterdir():
@@ -109,12 +111,11 @@ class DataStore:
     def _load_md_from_s3_json(self, bucket: str, key: str) -> tuple[str, DatasetMetadata]:
         s3_obj = self._s3_client.get_object(Bucket=bucket, Key=key)
         md = json.loads(s3_obj["Body"].read().decode("utf-8"))
-        md["location"] = f"s3://{bucket}/{key}"
+        # md["location"] = f"s3://{bucket}/{key}"
         return md["name"], md
 
     def _load_md_from_local_json(self, location: Path) -> tuple[str, DatasetMetadata]:
         metadata = json.loads(location.read_text())
-        metadata["location"] = str(location.resolve())
         return metadata["name"], metadata
 
     # Data loading
