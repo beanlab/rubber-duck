@@ -64,7 +64,7 @@ agents_as_tools:
 
 ducks:
   - name: standard-rubber-duck
-    duck_type: agent_conversation
+    duck_type: agent_led_conversation
     settings:
       agent:
         name: RubberDuck
@@ -78,17 +78,15 @@ ducks:
       file_type_ext: *file_type_ext
 
   - name: stats-duck
-    duck_type: agent_conversation
+    duck_type: user_led_conversation
     settings:
       agent:
         name: stats_duck
         prompt_files:
-          - prompts/stats2.txt
+          - prompts/stats.txt
         engine: gpt-5
         reasoning: minimal
         tools:
-          - talk_to_user
-          - receive_message_from_user
           - describe_dataset
           - list_categories
           - explain_capabilities
@@ -96,6 +94,7 @@ ducks:
           - get_variable_names
           - show_dataset_head
           - plot_histogram
+          - plot_density
           - plot_boxplot
           - plot_dotplot
           - plot_barplot
@@ -121,6 +120,7 @@ ducks:
           - calculate_one_sample_proportion_z_test
           - calculate_two_sample_proportion_z_test
           - simple_linear_regression
+      introduction: "Hi, I can help with your stats questions! Let me know what you're thinking"
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -349,7 +349,7 @@ servers:
         channel_name: emoji-duck
         ducks:
           - name: Emoji-Duck-Demo
-            duck_type: agent_conversation
+            duck_type: agent_led_conversation
             settings:
               agent:
                 name: emoji-duck
@@ -366,7 +366,7 @@ servers:
         channel_name: code-complexity-analysis-duck
         ducks:
           - name: Code-Complexity-Duck-Demo
-            duck_type: agent_conversation
+            duck_type: agent_led_conversation
             settings:
               file_size_limit: 5100
               file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
@@ -389,7 +389,7 @@ servers:
         channel_name: socratic-duck
         ducks:
           - name: Socratic-Rubber-Duck-Demo
-            duck_type: agent_conversation
+            duck_type: agent_led_conversation
             settings:
               agent:
                 name: socrates
@@ -427,7 +427,7 @@ servers:
         channel_name: designer-duck
         ducks:
           - name: Phd-Duck-Demo
-            duck_type: agent_conversation
+            duck_type: agent_led_conversation
             settings:
               agent:
                 name: PhdDuck

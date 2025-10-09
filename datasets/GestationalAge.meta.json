@@ -1,0 +1,71 @@
+{
+  "name": "Gestational Age Data",
+  "description": "Dataset containing gestational age measurements and related maternal/infant attributes.",
+  "columns": [
+    {
+      "name": "fage",
+      "display_name": "Fage",
+      "description": "Information about Fage."
+    },
+    {
+      "name": "mage",
+      "display_name": "Mage",
+      "description": "Information about Mage."
+    },
+    {
+      "name": "mature",
+      "display_name": "Mature",
+      "description": "Information about Mature."
+    },
+    {
+      "name": "weeks",
+      "display_name": "Weeks",
+      "description": "Information about Weeks."
+    },
+    {
+      "name": "premie",
+      "display_name": "Premie",
+      "description": "Information about Premie."
+    },
+    {
+      "name": "visits",
+      "display_name": "Visits",
+      "description": "Information about Visits."
+    },
+    {
+      "name": "weight",
+      "display_name": "Weight",
+      "description": "Information about Weight."
+    },
+    {
+      "name": "lowbirthweight",
+      "display_name": "Lowbirthweight",
+      "description": "Information about Lowbirthweight."
+    },
+    {
+      "name": "sex",
+      "display_name": "Sex",
+      "description": "Information about Sex."
+    },
+    {
+      "name": "habit",
+      "display_name": "Habit",
+      "description": "Information about Habit."
+    },
+    {
+      "name": "marital",
+      "display_name": "Marital",
+      "description": "Information about Marital."
+    },
+    {
+      "name": "whitemom",
+      "display_name": "Whitemom",
+      "description": "Information about Whitemom."
+    },
+    {
+      "name": "WeightGain",
+      "display_name": "Weightgain",
+      "description": "Information about Weightgain."
+    }
+  ]
+}
