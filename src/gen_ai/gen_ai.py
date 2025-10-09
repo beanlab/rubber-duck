@@ -134,6 +134,11 @@ class AIClient:
                                        json.dumps(query))
             initial_history.append(EasyInputMessage(role='user', content=query, type='message').model_dump())
 
+        else:
+            # TODO - the API seems to not include the "instructions" parameter as sufficient input
+            # This is likely a bug, and at some point we could drop this else block.
+            initial_history.append(EasyInputMessage(role='user', content='Hi', type='message').model_dump())
+
         message, history, _ = await self._run_agent(ctx, agent, initial_history)
         return message
 
