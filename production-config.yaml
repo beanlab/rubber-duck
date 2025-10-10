@@ -74,6 +74,7 @@ ducks:
         reasoning: minimal
         tools:
           - talk_to_user
+          - conclude_conversation
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
