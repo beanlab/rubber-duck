@@ -120,10 +120,15 @@ class AIClient:
             result = tool(ctx, **tool_args)
             if inspect.isawaitable(result):
                 result = await result
+
+        except ConversationComplete:
+            raise
+
         except Exception as error:
             if isinstance(error, GenAIException):
                 raise error
             result = f"An error occurred while running the tool. Please try again. Error: {str(error)}.", False
+
         return result
 
     async def run_agent(self, ctx: DuckContext, agent: Agent, query: str | None) -> str | None:
