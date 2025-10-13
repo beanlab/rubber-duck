@@ -1,5 +1,4 @@
 import json
-import logging
 from io import StringIO
 from pathlib import Path
 from typing import TypedDict, Iterable
@@ -7,7 +6,7 @@ from typing import TypedDict, Iterable
 import boto3
 import botocore.exceptions
 import pandas as pd
-
+from ..utils.logger import duck_logger
 
 class ColumnMetadata(TypedDict, total=False):
     name: str
@@ -58,7 +57,7 @@ class DataStore:
             try:
                 yield from self._read_md_from_s3_object(bucket, obj)
             except Exception:
-                logging.exception(f"Error loading metadata from {bucket}/{obj}")
+                duck_logger.exception(f"Error loading metadata from {bucket}/{obj}")
                 continue
 
     def _read_md_from_local_file(self, file: Path):
@@ -76,7 +75,7 @@ class DataStore:
             try:
                 yield from self._read_md_from_local_file(file)
             except Exception:
-                logging.exception(f"Error loading metadata for {file}")
+                duck_logger.exception(f"Error loading metadata for {file}")
                 continue
 
     # Metadata loading
@@ -117,7 +116,6 @@ class DataStore:
     def _load_md_from_local_json(self, location: Path, original_location: Path) -> tuple[str, DatasetMetadata]:
         metadata = json.loads(location.read_text())
         return metadata["name"], metadata
-
 
     # Data loading
 
@@ -170,7 +168,7 @@ class DataStore:
                 f"Available datasets: {self.get_available_datasets()}"
             )
         except Exception:
-            logging.exception(f"Error loading data for {name}")
+            duck_logger.exception(f"Error loading data for {name}")
             raise
 
         raise FileNotFoundError(
