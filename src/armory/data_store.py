@@ -92,7 +92,7 @@ class DataStore:
         df = self._load_dataframe_from_source(raw, Path(key).suffix)
 
         columns = [
-            ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
+            ColumnMetadata(name=col, display_name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
         ]
         return name, DatasetMetadata(location=full_location, name=name, columns=columns)
