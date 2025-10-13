@@ -46,7 +46,7 @@ class DataStore:
                 name, mdata = self._load_md_from_s3_json(bucket, metadata_file, key)
             else:
                 name, mdata = self._build_md_from_s3_file(bucket, key)
-            mdata['location'] = key
+            mdata['location'] = f's3://{bucket}/{key}'
             yield name, mdata
 
     def _load_md_from_s3(self, location: str):
