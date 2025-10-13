@@ -6,7 +6,9 @@ from typing import TypedDict, Iterable
 import boto3
 import botocore.exceptions
 import pandas as pd
+
 from ..utils.logger import duck_logger
+
 
 class ColumnMetadata(TypedDict, total=False):
     name: str
@@ -20,6 +22,7 @@ class DatasetMetadata(TypedDict, total=False):
     name: str
     description: str
     columns: list[ColumnMetadata]
+
 
 class DataStore:
     def __init__(self, locations: list[str]):
@@ -57,7 +60,7 @@ class DataStore:
             try:
                 yield from self._read_md_from_s3_object(bucket, obj)
             except Exception:
-                duck_logger.exception(f"Error loading metadata from {bucket}/{obj}")
+                duck_logger.exception(f"Error loading metadata from {location}")
                 continue
 
     def _read_md_from_local_file(self, file: Path):
@@ -110,7 +113,17 @@ class DataStore:
 
     def _load_md_from_s3_json(self, bucket: str, key: str, original_key: str) -> tuple[str, DatasetMetadata]:
         s3_obj = self._s3_client.get_object(Bucket=bucket, Key=key)
-        md = json.loads(s3_obj["Body"].read().decode("utf-8"))
+        content = s3_obj["Body"].read()
+        try:
+            content = content.decode('utf-8')
+
+        except UnicodeDecodeError as err:
+            try:
+                content = content.decode('utf-16')
+            except UnicodeDecodeError:
+                raise err
+
+        md = json.loads(content)
         return md["name"], md
 
     def _load_md_from_local_json(self, location: Path, original_location: Path) -> tuple[str, DatasetMetadata]:
@@ -144,37 +157,32 @@ class DataStore:
         if name in self._loaded_datasets:
             return self._loaded_datasets[name]
 
-        try:
-            if self._metadata[name]:
-                location = self._metadata[name]["location"]
-
-                if self._is_s3_location(location):
-                    bucket_name, key = self._get_s3_info(location)
-                    s3_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
-                    raw = s3_obj["Body"].read()
-                    df = self._load_dataframe_from_source(raw, Path(key).suffix)
-                else:
-                    path = Path(location)
-                    df = self._load_dataframe_from_source(path.read_bytes(), path.suffix)
-
-                df = self._rename_columns(name, df)
-
-                self._loaded_datasets[name] = df
-                return df
-
-        except KeyError:
-            raise KeyError(
-                f"Dataset '{name}' not found in metadata. "
+        if name not in self._metadata:
+            raise FileNotFoundError(
+                f"Dataset '{name}' not found in local or S3 storage. "
                 f"Available datasets: {self.get_available_datasets()}"
             )
+
+        try:
+            location = self._metadata[name]["location"]
+
+            if self._is_s3_location(location):
+                bucket_name, key = self._get_s3_info(location)
+                s3_obj = self._s3_client.get_object(Bucket=bucket_name, Key=key)
+                raw = s3_obj["Body"].read()
+                df = self._load_dataframe_from_source(raw, Path(key).suffix)
+            else:
+                path = Path(location)
+                df = self._load_dataframe_from_source(path.read_bytes(), path.suffix)
+
+            df = self._rename_columns(name, df)
+
+            self._loaded_datasets[name] = df
+            return df
+
         except Exception:
             duck_logger.exception(f"Error loading data for {name}")
             raise
-
-        raise FileNotFoundError(
-            f"Dataset '{name}' not found in local or S3 storage. "
-            f"Available datasets: {self.get_available_datasets()}"
-        )
 
     def get_dataset_metadata(self) -> dict[str, DatasetMetadata]:
         return self._metadata
