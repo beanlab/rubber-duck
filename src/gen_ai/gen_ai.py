@@ -205,8 +205,8 @@ class AIClient:
                         tool = self._armory.get_specific_tool(tool_name)
 
                         try:
-                            result = await self._run_tool(tool, ctx, tool_args)
-                            function_item = format_function_call_history_items(result[0], output)
+                            result, response_complete = await self._run_tool(tool, ctx, tool_args)
+                            function_item = format_function_call_history_items(result, output)
                             await self._record_message(
                                 ctx.guild_id, ctx.thread_id, ctx.author_id,
                                 "function_call_output", str(function_item)
@@ -214,7 +214,7 @@ class AIClient:
 
                             history.append(function_item)
 
-                            if result[1]:
+                            if response_complete:
                                 return None, history, False
                             continue
 
