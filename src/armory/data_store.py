@@ -60,7 +60,7 @@ class DataStore:
             try:
                 yield from self._read_md_from_s3_object(bucket, obj)
             except Exception:
-                duck_logger.exception(f"Error loading metadata from {location}")
+                duck_logger.exception(f"Error loading metadata from s3://{bucket}/{obj['Key']}")
                 continue
 
     def _read_md_from_local_file(self, file: Path):
@@ -104,7 +104,7 @@ class DataStore:
         df = self._load_dataframe_from_source(location.read_bytes(), location.suffix)
 
         columns = [
-            ColumnMetadata(name=col, dtype=str(df[col].dtype), description="")
+            ColumnMetadata(name=col, display_name=col, dtype=str(df[col].dtype), description="")
             for col in df.columns
         ]
         return name, DatasetMetadata(location=full_location, name=name, columns=columns)
