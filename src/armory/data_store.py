@@ -24,6 +24,15 @@ class DatasetMetadata(TypedDict, total=False):
     columns: list[ColumnMetadata]
 
 
+def safe_decode(data: bytes) -> str:
+    for encoding in ["utf-8", "utf-16", "latin-1"]:
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise UnicodeDecodeError("Unable to decode bytes with tried encodings.")
+
+
 class DataStore:
     def __init__(self, locations: list[str]):
         self._loaded_datasets = {}
@@ -114,15 +123,7 @@ class DataStore:
     def _load_md_from_s3_json(self, bucket: str, key: str, original_key: str) -> tuple[str, DatasetMetadata]:
         s3_obj = self._s3_client.get_object(Bucket=bucket, Key=key)
         content = s3_obj["Body"].read()
-        try:
-            content = content.decode('utf-8')
-
-        except UnicodeDecodeError as err:
-            try:
-                content = content.decode('utf-16')
-            except UnicodeDecodeError:
-                raise err
-
+        content = safe_decode(content)
         md = json.loads(content)
         return md["name"], md
 
@@ -134,12 +135,14 @@ class DataStore:
 
     def _load_dataframe_from_source(self, data: bytes | str, file_suffix: str) -> pd.DataFrame:
         if isinstance(data, bytes):
-            data = data.decode("utf-8")
+            data = safe_decode(data)
 
         if file_suffix == ".csv":
             return pd.read_csv(StringIO(data))
+
         elif file_suffix == ".txt":
             return pd.read_csv(StringIO(data), sep=r"\s+", engine="python", quotechar='"')
+
         else:
             raise ValueError(f"Unsupported file type: {file_suffix}")
 
