@@ -138,24 +138,11 @@ class DataStore:
         if isinstance(data, bytes):
             data = safe_decode(data)
 
-        def _auto_read_csv(data_str: str) -> pd.DataFrame:
-            sample = data_str[:4096]
+        if file_suffix in (".csv", ".txt"):
             try:
-                dialect = csv.Sniffer().sniff(sample, delimiters=[',', ';', '\t', ' '])
-                sep = dialect.delimiter
-            except csv.Error:
-                sep = ','
-
-            try:
-                return pd.read_csv(StringIO(data_str), sep=sep, quotechar='"', engine="python")
+                return pd.read_csv(StringIO(data), sep=None, engine="python", quotechar='"')
             except pd.errors.ParserError:
-                try:
-                    return pd.read_csv(StringIO(data_str), sep=None, engine="python")
-                except Exception:
-                    return pd.read_csv(StringIO(data_str), sep=r"\s+", engine="python")
-
-        if file_suffix.lower() in {".csv", ".txt", ".tsv"}:
-            return _auto_read_csv(data)
+                return pd.read_csv(StringIO(data), sep=r"\s+", engine="python", quotechar='"')
 
         raise ValueError(f"Unsupported file type: {file_suffix}")
 
