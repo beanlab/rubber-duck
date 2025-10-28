@@ -6,6 +6,7 @@ from typing import TypedDict, Iterable
 import boto3
 import botocore.exceptions
 import pandas as pd
+import csv
 
 from ..utils.logger import duck_logger
 
@@ -137,14 +138,26 @@ class DataStore:
         if isinstance(data, bytes):
             data = safe_decode(data)
 
-        if file_suffix == ".csv":
-            return pd.read_csv(StringIO(data))
+        def _auto_read_csv(data_str: str) -> pd.DataFrame:
+            sample = data_str[:4096]
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=[',', ';', '\t', ' '])
+                sep = dialect.delimiter
+            except csv.Error:
+                sep = ','
 
-        elif file_suffix == ".txt":
-            return pd.read_csv(StringIO(data), sep=r"\s+", engine="python", quotechar='"')
+            try:
+                return pd.read_csv(StringIO(data_str), sep=sep, quotechar='"', engine="python")
+            except pd.errors.ParserError:
+                try:
+                    return pd.read_csv(StringIO(data_str), sep=None, engine="python")
+                except Exception:
+                    return pd.read_csv(StringIO(data_str), sep=r"\s+", engine="python")
 
-        else:
-            raise ValueError(f"Unsupported file type: {file_suffix}")
+        if file_suffix.lower() in {".csv", ".txt", ".tsv"}:
+            return _auto_read_csv(data)
+
+        raise ValueError(f"Unsupported file type: {file_suffix}")
 
     # Utils
 
