@@ -67,6 +67,20 @@ class SingleAgentSettings(TypedDict):
     reasoning: NotRequired[str]
 
 
+class Gradable(TypedDict):
+    name: str
+    instruction_link: NotRequired[str]
+    instruction_path: NotRequired[str]
+    sections: list[str]
+
+
+class FeedbackSettings(TypedDict):
+    name: str
+    general_requirements: NotRequired[list[Gradable]]
+    gradable_assignments: list[Gradable]
+    grader_agent: SingleAgentSettings
+
+
 class AgentAsToolSettings(TypedDict):
     tool_name: str
     doc_string: str

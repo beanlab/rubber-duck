@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.workflows.feedback_workflow import FeedbackWorkflow
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
@@ -30,7 +31,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig, AgentAsToolSettings
+    DUCK_NAME, DuckConfig, AgentAsToolSettings, FeedbackSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -159,6 +160,17 @@ def build_ducks(
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, config, settings, armory)
 
+        elif duck_type == 'feedback':
+            grader_agent = build_agent(settings["grader_agent"])
+            ducks[name] = FeedbackWorkflow(
+                settings['name'],
+                bot.send_message,
+                settings,
+                grader_agent,
+                ai_client,
+                bot.read_url
+            )
+
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')
 
@@ -263,6 +275,9 @@ async def main(config: Config, log_dir: Path):
 
 
 async def _main(config: Config, log_dir: Path):
+    from dotenv import load_dotenv
+    load_dotenv()
+
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:

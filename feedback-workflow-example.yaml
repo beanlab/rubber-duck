@@ -1,0 +1,32 @@
+ducks:
+  - name: cs312-grader
+    duck_type: feedback
+    settings:
+      name: cs312-projects
+      general_requirements:
+        - name: Additional Standards
+          instruction_path: rubrics/general_requirements.md
+          sections:
+            - Code Quality
+      gradable_assignments:
+        - name: Project SCC
+          instruction_path: rubrics/scc-rubric.md
+          sections:
+            - Baseline
+            - Core
+            - Stretch 1
+            - Stretch 2
+        - name: Project Alignment
+          instruction_path: rubrics/alignment-rubric.md
+          sections:
+            - Tier 1
+            - Tier 2
+      grader_agent:
+        # This agent expects a report and a set of requirements as a list
+        name: grader
+        engine: gpt-5-mini
+        prompt_files:
+          - prompts/feedback/tier-grader.md
+        reasoning: minimal
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext
