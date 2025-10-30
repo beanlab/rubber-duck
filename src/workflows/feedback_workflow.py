@@ -35,6 +35,9 @@ class FeedbackWorkflow:
         project_name, sections = await self.get_project_and_sections(thread_id, context)
         report_contents = await self.get_report_contents(thread_id, context)
 
+        if report_contents is None:
+            return
+
         all_sections_for_project = self.get_sections_for_project(project_name)
         project_rubric = await self.get_project_rubric(project_name, all_sections_for_project)
 
@@ -94,9 +97,17 @@ class FeedbackWorkflow:
     async def get_report_contents(self, thread_id, context):
         try:
             await self._send_message(thread_id, "Please upload your md report: ")
-            response = await self._wait_for_message(context.timeout)
-            file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in response["files"]])
-            return file_contents
+            for i in range(3): # we will give them three tries
+                response = await self._wait_for_message(context.timeout)
+
+                if not response['files']:
+                    await self._send_message(thread_id, "Please upload your md report: ")
+                    continue
+
+                file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in response["files"]])
+                return file_contents
+            await self._send_message(thread_id, "Closing thread...")
+            return None
         except Exception as e:
             duck_logger.info(f"Something failed: {e}")
             await self._send_message(thread_id, "Something didn't work quite right.")
