@@ -6,6 +6,7 @@ from quest import step, queue
 
 from ..gen_ai.gen_ai import Agent, AIClient
 from ..utils.config_types import DuckContext, FeedbackSettings
+from ..utils.fetch_github_file import fetch_github_file
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
@@ -17,6 +18,7 @@ class FeedbackWorkflow:
                  send_message,
                  settings: FeedbackSettings,
                  grader_agent: Agent,
+                 interviewer_agent: Agent,
                  ai_client: AIClient,
                  read_url
                  ):
@@ -24,6 +26,7 @@ class FeedbackWorkflow:
         self._send_message = send_message
         self._settings = settings
         self._grader_agent = grader_agent
+        self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
 
@@ -32,7 +35,9 @@ class FeedbackWorkflow:
 
         project_name, sections = await self.get_project_and_sections(thread_id, context)
         report_contents = await self.get_report_contents(thread_id, context)
-        project_rubric = self.get_project_rubric(project_name)
+
+        all_sections_for_project = self.get_sections_for_project(project_name)
+        project_rubric = await self.get_project_rubric(project_name, all_sections_for_project)
 
         for section in sections:
             await self._send_message(thread_id, f"## {section}")
@@ -43,6 +48,14 @@ class FeedbackWorkflow:
             await self._send_message(thread_id, feedback)
 
         await self._send_message(thread_id, "That is all. :thumbsup:")
+
+
+    def get_sections_for_project(self, project_name):
+        for assignment in self._settings['gradable_assignments']:
+            if assignment['name'] == project_name:
+                return assignment['sections']
+        raise Exception("Project not found")
+
 
     def is_valid_project_name(self, project_name):
         return project_name in [assignment["name"] for assignment in self._settings['gradable_assignments']]
@@ -65,7 +78,15 @@ class FeedbackWorkflow:
         await self._send_message(thread_id, "Enter the project and sections to grade: ")
         await self._send_message(thread_id, "Actually...we will grade Project SCC Baseline and Core")
 
-        project, sections = "Project SCC", ["Baseline", "Core"]
+        project, sections = "Project Alignment", ["Baseline", "Core"]
+
+        # input = [
+        #     (assignment["name"], assignment["sections"])
+        #     for assignment in self._settings['gradable_assignments']
+        # ]
+        # response = await self._ai_client.run_agent(context, self._interviewer_agent, str(input))
+        # print(response)
+        # project, sections = response
 
         if not self.is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
@@ -127,17 +148,37 @@ class FeedbackWorkflow:
             raise "Exception: Unable to find section in report " + section
         return rubric_contents
 
-    def get_github_link_contents(self, link):
-        raise NotImplemented("Not implemented")
-
-    def get_project_rubric(self, project_name):
+    async def get_project_rubric(self, project_name, all_sections):
         # rely on the settings to get rubric contents for the project
         for gradable in self._settings["gradable_assignments"] + self._settings["general_requirements"]:
             if gradable["name"] == project_name:
                 if 'instruction_link' in gradable:
-                    return self.get_github_link_contents(gradable['instruction_link'])
+                    instructions = fetch_github_file(gradable['instruction_link'])
+                    return self.instructions_to_rubric(instructions, all_sections)
                 elif 'instruction_path' in gradable:
                     return Path(gradable['instruction_path']).read_text(encoding="utf-8")
                 else:
                     raise ValueError(f"You must provide 'instruction_link' or 'instruction_path' for {project_name} ")
         raise f"Exception: unable to find project {project_name}"
+
+
+    def instructions_to_rubric(self, instructions, all_sections):
+        # Parse the instructions to get just the rubric
+        outlines = []
+        for line in instructions.splitlines():
+            is_target_header = line.startswith("## ") and any(
+                key in line for key in all_sections
+            )
+            is_check_item = line.strip().startswith("- [ ]")
+
+            if is_target_header and outlines:
+                outlines.append("```")
+
+            if is_target_header or is_check_item:
+                outlines.append(line)
+
+            if is_target_header:
+                outlines.append("```")
+
+        outlines.append("```")
+        return "\n".join(outlines)
