@@ -17,16 +17,28 @@ ducks:
             - Stretch 1
             - Stretch 2
         - name: Project Alignment
-          instruction_path: rubrics/alignment-rubric.md
+          instruction_link: https://github.com/math919191/project-feedback/blob/main/proj-alignment-instructions.md
           sections:
-            - Tier 1
-            - Tier 2
+            - Baseline
+            - Core
+            - Stretch 1
+            - Stretch 2
       grader_agent:
         # This agent expects a report and a set of requirements as a list
         name: grader
-        engine: gpt-5-mini
+        engine: gpt-5
         prompt_files:
           - prompts/feedback/tier-grader.md
         reasoning: minimal
+      interviewer_agent:
+        # This agent gets the desired report/section name from the user
+        name: interviewer
+        engine: gpt-5
+        prompt_files:
+          - prompts/feedback/interviewer.md
+        reasoning: minimal
+        tools:
+          - talk_to_user
+      # TODO these aren't actually being relied on right now.
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
