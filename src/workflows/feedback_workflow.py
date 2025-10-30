@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+import json
 
 import markdowndata
 from quest import step, queue
@@ -9,8 +10,6 @@ from ..utils.config_types import DuckContext, FeedbackSettings
 from ..utils.fetch_github_file import fetch_github_file
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
-
-# TODO ask: where should my functions should be stepped?
 
 class FeedbackWorkflow:
     def __init__(self,
@@ -75,18 +74,15 @@ class FeedbackWorkflow:
     async def get_project_and_sections(self, thread_id, context):
         # this should rely on the settings to make sure that we actually get a **valid section and project**
         # can decide to use an agent for this.
-        await self._send_message(thread_id, "Enter the project and sections to grade: ")
-        await self._send_message(thread_id, "Actually...we will grade Project SCC Baseline and Core")
+        await self._send_message(thread_id, "...")
 
-        project, sections = "Project Alignment", ["Baseline", "Core"]
-
-        # input = [
-        #     (assignment["name"], assignment["sections"])
-        #     for assignment in self._settings['gradable_assignments']
-        # ]
-        # response = await self._ai_client.run_agent(context, self._interviewer_agent, str(input))
-        # print(response)
-        # project, sections = response
+        input = [
+            (assignment["name"], assignment["sections"])
+            for assignment in self._settings['gradable_assignments']
+        ]
+        response = await self._ai_client.run_agent(context, self._interviewer_agent, str(input))
+        response = json.loads(response) # to dictionary (dict specified in prompt)
+        project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
 
         if not self.is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
