@@ -1,15 +1,20 @@
 import asyncio
 from pathlib import Path
 import json
+import yaml
 
 import markdowndata
 from quest import step, queue
 
 from ..gen_ai.gen_ai import Agent, AIClient
-from ..utils.config_types import DuckContext, FeedbackSettings
+from ..utils.config_types import DuckContext, FeedbackSettings, Gradable
 from ..utils.fetch_github_file import fetch_github_file
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
+
+PROJECT_NAME: str
+SECTION: str
+RUBRIC_ITEM: str
 
 class FeedbackWorkflow:
     def __init__(self,
@@ -28,6 +33,10 @@ class FeedbackWorkflow:
         self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
+        # fail early and get the rubrics / sections
+        self._assignments_rubrics: dict[PROJECT_NAME: dict[SECTION: any]] = {}
+
+        self._populate_assignments_rubrics_dictionary()
 
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
@@ -39,12 +48,9 @@ class FeedbackWorkflow:
             if report_contents is None:
                 return
 
-            all_sections_for_project = self.get_sections_for_project(project_name)
-            project_rubric = await self.get_project_rubric(project_name, all_sections_for_project)
-
             for section in sections:
                 await self._send_message(thread_id, f"## {section}")
-                rubric_for_section = self.get_rubric_for_section(project_rubric, section)
+                rubric_for_section = self._assignments_rubrics[project_name][section]
                 report_section = await self.get_report_section(report_contents, section)
 
                 feedback = await self.get_feedback(context, report_section, rubric_for_section)
@@ -63,8 +69,33 @@ class FeedbackWorkflow:
             await self._send_message(thread_id, "Would you like to regrade your report? (Y/N)")
 
             repeat_loop: Message = await self._wait_for_message(context.timeout)
-            if 'N' in repeat_loop["content"]:
+            if 'n' in repeat_loop["content"].lower():
                 break
+
+    def _get_instructions_content(self, assignment: Gradable):
+        if 'instruction_link' in assignment:
+            instructions = fetch_github_file(assignment['instruction_link'])
+        elif 'instruction_path' in assignment:
+            instructions = Path(assignment['instruction_path']).read_text(encoding="utf-8")
+        else:
+            raise "No instructions included"
+        return instructions
+
+    def _get_rubric_sections(self, assignment: Gradable):
+        instruction_content = self._get_instructions_content(assignment)
+        # TODO code smell... need to fix mdd to allow lists from yaml; making a lot of assumptions about how the rubric is set up...
+        instruction_content_as_mdd = markdowndata.loads(instruction_content)
+
+        sections_rubrics = {}
+        for section_name in assignment['sections']:
+            rubric_section = self._find_key(instruction_content_as_mdd, section_name)
+            sections_rubrics[section_name] = rubric_section[section_name]
+
+        return sections_rubrics
+
+    def _populate_assignments_rubrics_dictionary(self):
+        for assignment in self._settings["gradable_assignments"]:
+            self._assignments_rubrics[assignment["name"]] = self._get_rubric_sections(assignment)
 
     def get_sections_for_project(self, project_name):
         for assignment in self._settings['gradable_assignments']:
@@ -126,7 +157,7 @@ class FeedbackWorkflow:
             duck_logger.info(f"Something failed: {e}")
             await self._send_message(thread_id, "Sorry...something didn't work quite right.")
 
-    # TODO Unduplicate from registration workflow? - I am not familiar enought with the framework to know
+    # TODO Unduplicate from registration workflow? - I am not familiar enough with the framework to know how to
     async def _wait_for_message(self, timeout=300) -> Message | None:
         async with queue('messages', None) as messages:
             try:
@@ -135,11 +166,52 @@ class FeedbackWorkflow:
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
 
-    async def get_feedback(self, context, report_section, rubric_for_section):
-        input = {"report_contents": report_section,
-                 "rubric": rubric_for_section}
-        result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
-        return result
+    # async def get_feedback(self, context, report_section, rubric_for_section):
+    #     input = {"report_contents": report_section,
+    #              "rubric": rubric_for_section}
+    #     result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
+    #     return result
+
+    async def get_feedback(self, context, report_section, section_rubric):
+
+        feedback_items = []
+        def grade(rubric_items, report_section):
+            if rubric_items == []: return "refuse to grade on an empty list"
+            return f"GRADED {rubric_items} on {report_section}"
+
+        def grader_helper(rubric, report_piece):
+            if isinstance(rubric, list):
+                curr_feedback_items = []
+                rubric_items = []
+                for i in rubric:
+                    if isinstance(i,dict):
+                        feedback = grader_helper(i, report_piece)
+                        curr_feedback_items.append(feedback)
+                    else:
+                        rubric_items.append(i)
+
+                if isinstance(report_piece, dict) and "content" in report_piece:
+                    report_piece = report_piece["content"]
+
+                feedback = grade(rubric_items, report_piece)
+                curr_feedback_items = [feedback] + curr_feedback_items
+                return curr_feedback_items
+
+            elif isinstance(rubric, dict):
+                curr_feedback_items = {}
+                for key, value in rubric.items():
+                    if key not in report_piece:
+                        raise Exception(f"{key} missing from report")
+                    feedback = grader_helper(value, report_piece[key])
+                    curr_feedback_items[key] = feedback
+                return curr_feedback_items
+            else:
+                raise ("not a list or dict")
+
+        all_feedback_as_dict = grader_helper(section_rubric, report_section)
+
+        feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False)
+        return feedback_str
 
     def _find_key(self, d, target):
         # ChatGPT wrote this function
