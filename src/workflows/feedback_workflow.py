@@ -32,25 +32,39 @@ class FeedbackWorkflow:
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
 
-        project_name, sections = await self.get_project_and_sections(thread_id, context)
-        report_contents = await self.get_report_contents(thread_id, context)
+        while True:
+            project_name, sections = await self.get_project_and_sections(thread_id, context)
+            report_contents = await self.get_report_contents(thread_id, context)
 
-        if report_contents is None:
-            return
+            if report_contents is None:
+                return
 
-        all_sections_for_project = self.get_sections_for_project(project_name)
-        project_rubric = await self.get_project_rubric(project_name, all_sections_for_project)
+            all_sections_for_project = self.get_sections_for_project(project_name)
+            project_rubric = await self.get_project_rubric(project_name, all_sections_for_project)
 
-        for section in sections:
-            await self._send_message(thread_id, f"## {section}")
-            rubric_for_section = self.get_rubric_for_section(project_rubric, section)
-            report_section = await self.get_report_section(report_contents, section)
+            for section in sections:
+                await self._send_message(thread_id, f"## {section}")
+                rubric_for_section = self.get_rubric_for_section(project_rubric, section)
+                report_section = await self.get_report_section(report_contents, section)
 
-            feedback = await self.get_feedback(context, report_section, rubric_for_section)
-            await self._send_message(thread_id, feedback)
+                feedback = await self.get_feedback(context, report_section, rubric_for_section)
+                await self._send_message(thread_id, feedback)
 
-        await self._send_message(thread_id, "That is all. :thumbsup:")
+            await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
+                                                f"If not, indicate why. Provide any other additional feedback.\n"
+                                                f"TAs will look over your feedback to "
+                                                f"make this grading experience better and more consistent.")
+            student_feedback = await self._wait_for_message(context.timeout)
 
+            duck_logger.info(f"Student feedback: {student_feedback}")
+
+            await self._send_message(thread_id, "Thank you for your feedback! :thumbsup: @<role-mention> please review the feedback.")
+
+            await self._send_message(thread_id, "Would you like to regrade your report? (Y/N)")
+
+            repeat_loop: Message = await self._wait_for_message(context.timeout)
+            if 'N' in repeat_loop["content"]:
+                break
 
     def get_sections_for_project(self, project_name):
         for assignment in self._settings['gradable_assignments']:
@@ -97,7 +111,7 @@ class FeedbackWorkflow:
     async def get_report_contents(self, thread_id, context):
         try:
             await self._send_message(thread_id, "Please upload your md report: ")
-            for i in range(3): # we will give them three tries
+            for i in range(3): # We will give them three tries to upload a md report
                 response = await self._wait_for_message(context.timeout)
 
                 if not response['files']:
@@ -106,13 +120,13 @@ class FeedbackWorkflow:
 
                 file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in response["files"]])
                 return file_contents
-            await self._send_message(thread_id, "Closing thread...")
+            await self._send_message(thread_id, "Closing thread...") # TODO logic for not uploading a md report
             return None
         except Exception as e:
             duck_logger.info(f"Something failed: {e}")
-            await self._send_message(thread_id, "Something didn't work quite right.")
+            await self._send_message(thread_id, "Sorry...something didn't work quite right.")
 
-    # TODO unduplicate
+    # TODO Unduplicate from registration workflow? - I am not familiar enought with the framework to know
     async def _wait_for_message(self, timeout=300) -> Message | None:
         async with queue('messages', None) as messages:
             try:
@@ -128,6 +142,7 @@ class FeedbackWorkflow:
         return result
 
     def _find_key(self, d, target):
+        # ChatGPT wrote this function
         if target in d:
             return d[target]
 
@@ -143,6 +158,7 @@ class FeedbackWorkflow:
         section_contents = self._find_key(data, section)
 
         if section_contents is None:
+            # TODO consider creating an agent as a backup who can run through the report and try to find it
             raise "Exception: Unable to find section in report " + section
 
         return section_contents
