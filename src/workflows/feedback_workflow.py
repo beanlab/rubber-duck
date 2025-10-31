@@ -33,7 +33,6 @@ class FeedbackWorkflow:
         self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
-        # fail early and get the rubrics / sections
 
         self._assignments_rubrics: dict[ASSIGNMENT_NAME: dict[SECTION: any]] = {}
         self._populate_assignments_rubrics()
@@ -91,7 +90,9 @@ class FeedbackWorkflow:
             if rubric_section is None:
                 raise Exception(f"{rubric_section} does not exist in {assignment['name']}")
                 # TODO consider creating an agent as a backup who can run through the report and try to find it
-            sections_rubrics[section_name] = rubric_section['content']
+            if isinstance(rubric_section,dict) and 'content' in rubric_section:
+                rubric_section = rubric_section['content']
+            sections_rubrics[section_name] = rubric_section
 
         return sections_rubrics
 
@@ -177,7 +178,6 @@ class FeedbackWorkflow:
     async def get_feedback(self, context, report_section, section_rubric):
 
         def grade(rubric_items, report_section):
-            if rubric_items == []: return "refuse to grade on an empty list"
             return f"GRADED {rubric_items} on {report_section}"
 
         def grader_helper(rubric, report_piece):
@@ -194,8 +194,8 @@ class FeedbackWorkflow:
                 if isinstance(report_piece, dict) and "content" in report_piece:
                     report_piece = report_piece["content"]
 
-                feedback = grade(rubric_items, report_piece)
-                curr_feedback_items = [feedback] + curr_feedback_items
+                feedback = [grade(rubric_items, report_piece)] if rubric_items else []
+                curr_feedback_items = feedback + curr_feedback_items
                 return curr_feedback_items
 
             elif isinstance(rubric, dict):
@@ -207,7 +207,7 @@ class FeedbackWorkflow:
                     curr_feedback_items[key] = feedback
                 return curr_feedback_items
             else:
-                raise ("not a list or dict")
+                raise ValueError(f"Unexpected type of {type(rubric)}. Not a dictionary or a list ")
 
         all_feedback_as_dict = grader_helper(section_rubric, report_section)
 
@@ -230,5 +230,7 @@ class FeedbackWorkflow:
         section_contents = self._find_key(data, section)
 
         if section_contents is None:
-            raise "Exception: Unable to find section in report " + section
+            # TODO: some error back to the user about the incorrect report?
+            raise Exception("Exception: Unable to find section in report " + section)
+
         return section_contents
