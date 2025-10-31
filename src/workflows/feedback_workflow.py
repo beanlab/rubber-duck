@@ -12,7 +12,7 @@ from ..utils.fetch_github_file import fetch_github_file
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
-PROJECT_NAME: str
+ASSIGNMENT_NAME: str
 SECTION: str
 RUBRIC_ITEM: str
 
@@ -34,15 +34,15 @@ class FeedbackWorkflow:
         self._ai_client = ai_client
         self.read_url = read_url
         # fail early and get the rubrics / sections
-        self._assignments_rubrics: dict[PROJECT_NAME: dict[SECTION: any]] = {}
 
-        self._populate_assignments_rubrics_dictionary()
+        self._assignments_rubrics: dict[ASSIGNMENT_NAME: dict[SECTION: any]] = {}
+        self._populate_assignments_rubrics()
 
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
 
         while True:
-            project_name, sections = await self.get_project_and_sections(thread_id, context)
+            project_name, sections = await self._get_project_and_sections(thread_id, context)
             report_contents = await self.get_report_contents(thread_id, context)
 
             if report_contents is None:
@@ -78,7 +78,7 @@ class FeedbackWorkflow:
         elif 'instruction_path' in assignment:
             instructions = Path(assignment['instruction_path']).read_text(encoding="utf-8")
         else:
-            raise "No instructions included"
+            raise ValueError(f"You must provide 'instruction_link' or 'instruction_path' for {assignment['name']}")
         return instructions
 
     def _get_rubric_sections(self, assignment: Gradable):
@@ -88,11 +88,14 @@ class FeedbackWorkflow:
         sections_rubrics = {}
         for section_name in assignment['sections']:
             rubric_section = self._find_key(instruction_content_as_mdd, section_name)
+            if rubric_section is None:
+                raise Exception(f"{rubric_section} does not exist in {assignment['name']}")
+                # TODO consider creating an agent as a backup who can run through the report and try to find it
             sections_rubrics[section_name] = rubric_section['content']
 
         return sections_rubrics
 
-    def _populate_assignments_rubrics_dictionary(self):
+    def _populate_assignments_rubrics(self):
         for assignment in self._settings["gradable_assignments"]:
             self._assignments_rubrics[assignment["name"]] = self._get_rubric_sections(assignment)
 
@@ -103,7 +106,7 @@ class FeedbackWorkflow:
         raise Exception("Project not found")
 
 
-    def is_valid_project_name(self, project_name):
+    def _is_valid_project_name(self, project_name):
         return project_name in [assignment["name"] for assignment in self._settings['gradable_assignments']]
 
     def is_valid_section_name(self, project_name, section_name):
@@ -118,7 +121,7 @@ class FeedbackWorkflow:
                 return True
         return False
 
-    async def get_project_and_sections(self, thread_id, context):
+    async def _get_project_and_sections(self, thread_id, context):
         # this should rely on the settings to make sure that we actually get a **valid section and project**
         # can decide to use an agent for this.
         await self._send_message(thread_id, "...")
@@ -131,7 +134,7 @@ class FeedbackWorkflow:
         response = json.loads(response) # to dictionary (dict specified in prompt)
         project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
 
-        if not self.is_valid_project_name(project):
+        if not self._is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
         if not all(self.is_valid_section_name(project, section_name) for section_name in sections):
             raise Exception(f"Invalid section name(s): project: {project}, sections: {sections}")
@@ -156,7 +159,7 @@ class FeedbackWorkflow:
             duck_logger.info(f"Something failed: {e}")
             await self._send_message(thread_id, "Sorry...something didn't work quite right.")
 
-    # TODO Unduplicate from registration workflow? - I am not familiar enough with the framework to know how to
+    # TODO unduplicate function from registration workflow?
     async def _wait_for_message(self, timeout=300) -> Message | None:
         async with queue('messages', None) as messages:
             try:
@@ -173,7 +176,6 @@ class FeedbackWorkflow:
 
     async def get_feedback(self, context, report_section, section_rubric):
 
-        feedback_items = []
         def grade(rubric_items, report_section):
             if rubric_items == []: return "refuse to grade on an empty list"
             return f"GRADED {rubric_items} on {report_section}"
@@ -213,7 +215,6 @@ class FeedbackWorkflow:
         return feedback_str
 
     def _find_key(self, d, target):
-        # ChatGPT wrote this function
         if target in d:
             return d[target]
 
@@ -229,50 +230,5 @@ class FeedbackWorkflow:
         section_contents = self._find_key(data, section)
 
         if section_contents is None:
-            # TODO consider creating an agent as a backup who can run through the report and try to find it
             raise "Exception: Unable to find section in report " + section
-
         return section_contents
-
-    def get_rubric_for_section(self, project_rubric: str, section):
-        data = markdowndata.loads(project_rubric)
-        rubric_contents = self._find_key(data, section)
-
-        if rubric_contents is None:
-            raise "Exception: Unable to find section in report " + section
-        return rubric_contents
-
-    async def get_project_rubric(self, project_name, all_sections):
-        # rely on the settings to get rubric contents for the project
-        for gradable in self._settings["gradable_assignments"] + self._settings["general_requirements"]:
-            if gradable["name"] == project_name:
-                if 'instruction_link' in gradable:
-                    instructions = fetch_github_file(gradable['instruction_link'])
-                    return self.instructions_to_rubric(instructions, all_sections)
-                elif 'instruction_path' in gradable:
-                    return Path(gradable['instruction_path']).read_text(encoding="utf-8")
-                else:
-                    raise ValueError(f"You must provide 'instruction_link' or 'instruction_path' for {project_name} ")
-        raise f"Exception: unable to find project {project_name}"
-
-
-    def instructions_to_rubric(self, instructions, all_sections):
-        # Parse the instructions to get just the rubric
-        outlines = []
-        for line in instructions.splitlines():
-            is_target_header = line.startswith("## ") and any(
-                key in line for key in all_sections
-            )
-            is_check_item = line.strip().startswith("- [ ]")
-
-            if is_target_header and outlines:
-                outlines.append("```")
-
-            if is_target_header or is_check_item:
-                outlines.append(line)
-
-            if is_target_header:
-                outlines.append("```")
-
-        outlines.append("```")
-        return "\n".join(outlines)
