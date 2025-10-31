@@ -83,13 +83,12 @@ class FeedbackWorkflow:
 
     def _get_rubric_sections(self, assignment: Gradable):
         instruction_content = self._get_instructions_content(assignment)
-        # TODO code smell... need to fix mdd to allow lists from yaml; making a lot of assumptions about how the rubric is set up...
         instruction_content_as_mdd = markdowndata.loads(instruction_content)
 
         sections_rubrics = {}
         for section_name in assignment['sections']:
             rubric_section = self._find_key(instruction_content_as_mdd, section_name)
-            sections_rubrics[section_name] = rubric_section[section_name]
+            sections_rubrics[section_name] = rubric_section['content']
 
         return sections_rubrics
 
