@@ -125,6 +125,21 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
+  - name: heaton-duck
+    duck_type: user_led_conversation
+    settings:
+      introduction: How can I help you with stats?
+      agent:
+        name: heaton_duck
+        prompt_files:
+          - prompts/production-prompts/stats-heaton.md
+        engine: gpt-5-mini
+        reasoning: minimal
+        tools:
+          - conclude_conversation
+        file_size_limit: *file_size_limit
+        file_type_ext: *file_type_ext
+
 servers:
   927616651409649675:
     server_name: CS 110
