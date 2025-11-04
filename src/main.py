@@ -12,6 +12,7 @@ from quest.utils import quest_logger
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
+from .armory.python_tool import PythonTool
 from .armory.talk_tool import TalkTool
 from .conversation.conversation import AgentLedConversation, UserLedConversation
 from .gen_ai.gen_ai import AIClient
@@ -88,7 +89,8 @@ def build_conversation_review_duck(
 def build_registration_duck(
         name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
-    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get('suspicion_checker_tool') else None
+    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get(
+        'suspicion_checker_tool') else None
 
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -240,6 +242,9 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
+
+    python_tool = PythonTool(allowed_imports=["math", "numpy", "pandas", "matplotlib", "seaborn"])
+    armory.scrub_tools(python_tool)
 
     return armory, talk_tool
 
