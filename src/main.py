@@ -12,7 +12,7 @@ from quest.utils import quest_logger
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
-from .armory.python_tool import PythonTool
+from .armory.python_tools import PythonTool
 from .armory.talk_tool import TalkTool
 from .conversation.conversation import AgentLedConversation, UserLedConversation
 from .gen_ai.gen_ai import AIClient
