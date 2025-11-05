@@ -243,7 +243,7 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
 
-    python_tool = PythonTool(allowed_imports=["math", "numpy", "pandas", "matplotlib", "seaborn"])
+    python_tool = PythonTool(allowed_imports=["math", "numpy", "pandas", "matplotlib", "seaborn", "statsmodels"])
     armory.scrub_tools(python_tool)
 
     return armory, talk_tool
