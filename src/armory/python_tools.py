@@ -4,6 +4,7 @@ import os
 import re
 from typing import Optional
 from .tools import register_tool, sends_image
+from ..utils.logger import duck_logger
 
 
 class PythonTool:
@@ -12,7 +13,6 @@ class PythonTool:
     Agents can call this tool to run code with access to installed libraries
     and optionally return matplotlib/seaborn plots as images.
     """
-
 
     def __init__(
             self,
@@ -24,14 +24,23 @@ class PythonTool:
         self.timeout = timeout
         self.python_executable = python_executable
 
-
     def _is_safe_code(self, code: str) -> bool:
         if not self.allowed_imports:
             return True
-        for match in re.finditer(r'^\s*(?:from|import)\s+([a-zA-Z0-9_\.]+)', code, re.MULTILINE):
-            module = match.group(1).split(".")[0]
+
+        # Remove comments and strings to avoid false matches
+        code_no_strings = re.sub(r'(\'\'\'[\s\S]*?\'\'\'|\"\"\"[\s\S]*?\"\"\"|\'[^\']*\'|\"[^\"]*\")', '', code)
+        code_no_comments = re.sub(r'#.*', '', code_no_strings)
+
+        for match in re.finditer(r'^\s*(?:from|import)\s+([a-zA-Z0-9_\.]+)', code_no_comments, re.MULTILINE):
+            module = match.group(1).split('.')[0]
             if module not in self.allowed_imports:
                 return False
+
+        # Block access to builtins that can escape sandbox
+        dangerous_keywords = ['os', 'sys', 'subprocess', 'shutil', 'importlib', 'eval', 'exec', '__import__']
+        if any(word in code_no_comments for word in dangerous_keywords):
+            return False
         return True
 
     @register_tool
@@ -58,12 +67,17 @@ class PythonTool:
     @register_tool
     @sends_image
     async def run_python_return_img(self, code: str) -> tuple[str, bytes] | str:
+        duck_logger.info(f"Executing Python code: {code}")
+
         if not self._is_safe_code(code):
             return "Error: code imports disallowed modules."
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_file = os.path.join(tmp_dir, "script.py")
             output_path = os.path.join(tmp_dir, "plot.png")
+
+            # remove show and savefig lines if included
+            code = re.sub(r'^\s*plt\.(show|savefig)\s*\(.*?\)\s*;?\s*(#.*)?$', '', code, flags=re.MULTILINE)
 
             injected_code = (
                     "import matplotlib.pyplot as plt\n"
