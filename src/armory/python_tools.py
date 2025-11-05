@@ -45,6 +45,8 @@ class PythonTool:
 
     @register_tool
     async def run_python_return_text(self, code: str) -> str:
+        duck_logger.info(f"\nExecuting Python code in run_python_return_text:\n{code}\n")
+
         if not self._is_safe_code(code):
             return "Error: code imports disallowed modules."
 
@@ -67,7 +69,7 @@ class PythonTool:
     @register_tool
     @sends_image
     async def run_python_return_img(self, code: str) -> tuple[str, bytes] | str:
-        duck_logger.info(f"Executing Python code: {code}")
+        duck_logger.info(f"Executing Python code in run_python_return_img:\n{code}\n")
 
         if not self._is_safe_code(code):
             return "Error: code imports disallowed modules."
