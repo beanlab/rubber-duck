@@ -81,6 +81,12 @@ class FeedbackSettings(TypedDict):
     grader_agent: SingleAgentSettings
 
 
+class RubricItemResponse(TypedDict):
+    rubric_item: str
+    justification: str
+    satisfactory: bool
+
+
 class AgentAsToolSettings(TypedDict):
     tool_name: str
     doc_string: str

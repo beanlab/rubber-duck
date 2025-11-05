@@ -163,11 +163,13 @@ def build_ducks(
         elif duck_type == 'feedback':
             grader_agent = build_agent(settings["grader_agent"])
             interviewer_agent = build_agent(settings["interviewer_agent"])
+            single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
             ducks[name] = FeedbackWorkflow(
                 settings['name'],
                 bot.send_message,
                 settings,
                 grader_agent,
+                single_rubric_item_grader,
                 interviewer_agent,
                 ai_client,
                 bot.read_url

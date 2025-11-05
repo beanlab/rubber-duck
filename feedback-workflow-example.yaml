@@ -1,44 +1,123 @@
-ducks:
   - name: cs312-grader
     duck_type: feedback
     settings:
       name: cs312-projects
-      general_requirements:
-        - name: Additional Standards
-          instruction_path: rubrics/general_requirements.md
-          sections:
-            - Code Quality
+#      general_requirements:
+#        - name: Additional Standards
+#          instruction_path: rubrics/general_requirements.md
+#          sections:
+#            - Code Quality
       gradable_assignments:
-        - name: Project SCC
-          instruction_path: rubrics/scc-rubric.md
+        - name: Project RSA
+          instruction_path: rubrics/rsa-baseline-core.md
+          sections:
+            - Baseline
+            - Core
+        - name: Project Mock
+          instruction_path: rubrics/mock-rubric.md
+#          instruction_link: https://github.com/math919191/project-feedback/blob/main/mock-rubric.md
+          sections:
+            - Core
+            - Stretch 1
+        - name: Project LeetCode
+#          instruction_link: https://github.com/BYU-CS-Course-Ops/CS312-course-content/blob/reformat-rubrics/canvas/Unit5-DP/project-leetcode/instruction.md
+          instruction_path: rubrics/leetcode.md
           sections:
             - Baseline
             - Core
             - Stretch 1
             - Stretch 2
+        - name: Project Backtracking
+          instruction_path: rubrics/backtracking.md
+          sections:
+            - Baseline
         - name: Project Alignment
-          instruction_link: https://github.com/math919191/project-feedback/blob/main/proj-alignment-instructions.md
+          instruction_path: rubrics/alignment-rubric.md
           sections:
             - Baseline
             - Core
             - Stretch 1
             - Stretch 2
+            - Project Review
       grader_agent:
         # This agent expects a report and a set of requirements as a list
         name: grader
-        engine: gpt-5
+        engine: gpt-5-nano
         prompt_files:
-          - prompts/feedback/tier-grader.md
+#          - prompts/feedback/tier-grader.md
+#          - prompts/feedback/zero-shot-grader-emojis.md
+#          - prompts/feedback/tier-grader-yaml-based.md
+          - prompts/feedback/tier-grader-structured-output.md
         reasoning: minimal
+        output_format:
+          format:
+            type: json_schema
+            name: grading_output
+            strict: true
+            schema:
+              type: object
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      rubric_item:
+                        type: string
+                        description: same exact rubric item provided to you
+                      satisfactory:
+                        type: boolean
+                        description: Indicates if the report provided meets the given rubric item
+                      justification:
+                        type: string
+                        description: Justification for if the report satisfied the requirement
+                    required: [ "rubric_item", "satisfactory", "justification"]
+                    additionalProperties: false
+              required: ["results"]
+              additionalProperties: false
+      single_rubric_item_grader:
+        # This agent expects a report and a single requirement
+        name: grader
+        engine: gpt-5-nano
+        prompt_files:
+          - prompts/feedback/tier-grader-structured-output-single.md
+        reasoning: minimal
+        output_format:
+          format:
+            type: json_schema
+            name: grading_output
+            strict: true
+            schema:
+              type: object
+              properties:
+                rubric_item:
+                  type: string
+                  description: same exact rubric item provided to you
+                justification:
+                  type: string
+                  description: Justification for if the report satisfied the requirement
+                satisfactory:
+                  type: boolean
+                  description: Indicates if the report provided meets the given rubric item
+              required: ["rubric_item", "justification", "satisfactory"]
+              additionalProperties: false
+
       interviewer_agent:
-        # This agent gets the desired report/section name from the user
+        # This agent gets the desired report and section name(s) from the user based on the gradable_assignments
         name: interviewer
-        engine: gpt-5
+        engine: gpt-5-mini
         prompt_files:
           - prompts/feedback/interviewer.md
         reasoning: minimal
         tools:
           - talk_to_user
+        # this agent interacts with the user to get feedback
+      student_feedback_settings:
+        #        feedback_agent:
+        ask_for_feedback: True
+        server: <id_number>
+        target_channel_id: <id_number> # this user will be a channel with feedback from the students.
+
       # TODO these aren't actually being relied on right now.
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext

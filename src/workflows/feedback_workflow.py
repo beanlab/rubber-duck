@@ -22,6 +22,7 @@ class FeedbackWorkflow:
                  send_message,
                  settings: FeedbackSettings,
                  grader_agent: Agent,
+                 single_rubric_item_grader: Agent,
                  interviewer_agent: Agent,
                  ai_client: AIClient,
                  read_url
@@ -30,6 +31,7 @@ class FeedbackWorkflow:
         self._send_message = send_message
         self._settings = settings
         self._grader_agent = grader_agent
+        self._single_rubric_item_grader = single_rubric_item_grader
         self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
@@ -55,17 +57,18 @@ class FeedbackWorkflow:
                 feedback = await self.get_feedback(context, report_section, rubric_for_section)
                 await self._send_message(thread_id, feedback)
 
-            await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
-                                                f"If not, indicate why. Provide any other additional feedback.\n"
-                                                f"TAs will look over your feedback to "
-                                                f"make this grading experience better and more consistent.")
-            student_feedback = await self._wait_for_message(context.timeout)
+            # await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
+            #                                     f"If not, indicate why. Provide any other additional feedback.\n"
+            #                                     f"TAs will look over your feedback to "
+            #                                     f"make this grading experience better and more consistent.")
+            #
+            # student_feedback = await self._wait_for_message(context.timeout)
+            #
+            # duck_logger.info(f"Student feedback: {student_feedback}")
+            #
+            # await self._send_message(thread_id, "Thank you for your feedback! :thumbsup:")
 
-            duck_logger.info(f"Student feedback: {student_feedback}")
-
-            await self._send_message(thread_id, "Thank you for your feedback! :thumbsup: @<role-mention> please review the feedback.")
-
-            await self._send_message(thread_id, "Would you like to regrade your report? (Y/N)")
+            await self._send_message(thread_id, "Would you like to me grade another report or section? (Y/N)")
 
             repeat_loop: Message = await self._wait_for_message(context.timeout)
             if 'n' in repeat_loop["content"].lower():
@@ -111,14 +114,15 @@ class FeedbackWorkflow:
         return project_name in [assignment["name"] for assignment in self._settings['gradable_assignments']]
 
     def is_valid_section_name(self, project_name, section_name):
-        general_sections = [
-            section
-            for general_req in self._settings['general_requirements']
-            for section in general_req['sections']
-        ]
+        # general_sections = [
+        #     section
+        #     for general_req in self._settings['general_requirements']
+        #     for section in general_req['sections']
+        #
+        # ]
+        #         or section_name in general_sections)
         for assignment in self._settings['gradable_assignments']:
-            if (assignment['name'] == project_name and (section_name in assignment['sections'] or
-                                                        section_name in general_sections)):
+            if assignment['name'] == project_name and (section_name in assignment['sections']):
                 return True
         return False
 
@@ -169,32 +173,67 @@ class FeedbackWorkflow:
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
 
-    # async def get_feedback(self, context, report_section, rubric_for_section):
-    #     input = {"report_contents": report_section,
-    #              "rubric": rubric_for_section}
-    #     result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
-    #     return result
+    async def ai_grader(self, context, report_section, rubric_for_section):
+        input = {"report_contents": report_section,
+                 "rubric": rubric_for_section}
+        result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
+        print(result)
+        return result
+
+    async def single_item_ai_grader(self, context, report_section, rubric_item):
+        input = {"report_contents": report_section,
+                 "rubric_item": rubric_item}
+        result = await self._ai_client.run_agent(context, self._single_rubric_item_grader, str(input))
+        return result
+
 
     async def get_feedback(self, context, report_section, section_rubric):
 
-        def grade(rubric_items, report_section):
-            return f"GRADED {rubric_items} on {report_section}"
+        async def grade(rubric_items, report_section, use_single=True):
 
-        def grader_helper(rubric, report_piece):
+            if use_single:
+                all_rubric_item_responses = []
+                for rubric_item in rubric_items:
+                    raw_response = await self.single_item_ai_grader(context, report_section, rubric_item)
+                    formatted_response = json.loads(raw_response)
+                    all_rubric_item_responses.append(formatted_response)
+            else:
+                try:
+                    ai_grader_response = await self.ai_grader(context, report_section, rubric_items)
+                    all_rubric_item_responses = json.loads(ai_grader_response)['results']
+                except Exception as e:
+                    print(e)
+                    return all_rubric_item_responses
+
+            items = []
+            for item in all_rubric_item_responses:
+                emoji = ':white_check_mark:' if item['satisfactory'] else ':x:'
+                justification = '' if item['satisfactory'] else item['justification']
+                feedback = f'{emoji} **{item["rubric_item"]}** - {justification}'
+                items.append(feedback)
+            return items
+            # return (f"- **Rubric**: {rubric_items}\n\n"
+            #         f"- **Report**: ``````md\n{report_section}\n``````\n\n"
+            #         f"- RESPONSE: \n\n```{ai_grader_response.strip()}```\n")
+
+        async def grader_helper(rubric, report_piece):
             if isinstance(rubric, list):
                 curr_feedback_items = []
                 rubric_items = []
                 for i in rubric:
                     if isinstance(i,dict):
-                        feedback = grader_helper(i, report_piece)
+                        feedback = await grader_helper(i, report_piece)
                         curr_feedback_items.append(feedback)
                     else:
                         rubric_items.append(i)
 
                 if isinstance(report_piece, dict) and "content" in report_piece:
                     report_piece = report_piece["content"]
-
-                feedback = [grade(rubric_items, report_piece)] if rubric_items else []
+                if rubric_items:
+                    feedback = await grade(rubric_items, report_piece)
+                    feedback = [feedback]
+                else:
+                    feedback = []
                 curr_feedback_items = feedback + curr_feedback_items
                 return curr_feedback_items
 
@@ -203,13 +242,13 @@ class FeedbackWorkflow:
                 for key, value in rubric.items():
                     if key not in report_piece:
                         raise Exception(f"{key} missing from report")
-                    feedback = grader_helper(value, report_piece[key])
+                    feedback = await grader_helper(value, report_piece[key])
                     curr_feedback_items[key] = feedback
                 return curr_feedback_items
             else:
                 raise ValueError(f"Unexpected type of {type(rubric)}. Not a dictionary or a list ")
 
-        all_feedback_as_dict = grader_helper(section_rubric, report_section)
+        all_feedback_as_dict = await grader_helper(section_rubric, report_section)
 
         feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False)
         return feedback_str
