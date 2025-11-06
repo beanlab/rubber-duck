@@ -111,7 +111,33 @@
         reasoning: minimal
         tools:
           - talk_to_user
-        # this agent interacts with the user to get feedback
+      project_scanner_agent:
+        # This agent gets the desired report and section name(s) from the user based on the report
+        name: project_scanner
+        engine: gpt-5-nano
+        prompt_files:
+          - prompts/feedback/section-and-project-determiner.md
+        output_format:
+          format:
+            type: json_schema
+            name: project_and_sections
+            strict: true
+            schema:
+              type: object
+              properties:
+                project_name:
+                  type: string
+                  description: the name of the project
+                sections:
+                  type: array
+                  description: list of section names
+                  items:
+                    type: string
+              required: [ "project_name", "sections"]
+              additionalProperties: false
+
+        reasoning: minimal
+
       student_feedback_settings:
         #        feedback_agent:
         ask_for_feedback: True

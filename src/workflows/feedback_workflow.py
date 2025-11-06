@@ -24,6 +24,7 @@ class FeedbackWorkflow:
                  grader_agent: Agent,
                  single_rubric_item_grader: Agent,
                  interviewer_agent: Agent,
+                 project_scanner_agent: Agent,
                  ai_client: AIClient,
                  read_url
                  ):
@@ -32,6 +33,7 @@ class FeedbackWorkflow:
         self._settings = settings
         self._grader_agent = grader_agent
         self._single_rubric_item_grader = single_rubric_item_grader
+        self._project_scanner_agent = project_scanner_agent
         self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
@@ -39,40 +41,41 @@ class FeedbackWorkflow:
         self._assignments_rubrics: dict[ASSIGNMENT_NAME: dict[SECTION: any]] = {}
         self._populate_assignments_rubrics()
 
+        self.interview = False
+
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
 
-        while True:
-            project_name, sections = await self._get_project_and_sections(thread_id, context)
-            report_contents = await self.get_report_contents(thread_id, context)
+        report_contents = await self.get_report_contents(thread_id, context)
 
-            if report_contents is None:
-                return
+        if self.interview:
+            project_name, sections = await self._get_project_and_sections_via_interview(thread_id, context)
+        else:
+            project_name, sections = await self._get_project_and_sections_from_report(thread_id, context, report_contents, "")
 
-            for section in sections:
-                await self._send_message(thread_id, f"## {section}")
-                rubric_for_section = self._assignments_rubrics[project_name][section]
-                report_section = await self.get_report_section(report_contents, section)
+        if report_contents is None:
+            return
 
-                feedback = await self.get_feedback(context, report_section, rubric_for_section)
-                await self._send_message(thread_id, feedback)
+        if not self.report_has_all_sections(report_contents, sections):
+            self._send_message("Missing section(s) from report")
+            return
 
-            # await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
-            #                                     f"If not, indicate why. Provide any other additional feedback.\n"
-            #                                     f"TAs will look over your feedback to "
-            #                                     f"make this grading experience better and more consistent.")
-            #
-            # student_feedback = await self._wait_for_message(context.timeout)
-            #
-            # duck_logger.info(f"Student feedback: {student_feedback}")
-            #
-            # await self._send_message(thread_id, "Thank you for your feedback! :thumbsup:")
+        for section in sections:
+            await self._send_message(thread_id, f"## {section}")
+            rubric_for_section = self._assignments_rubrics[project_name][section]
+            report_section = self.get_report_section(report_contents, section)
 
-            await self._send_message(thread_id, "Would you like to me grade another report or section? (Y/N)")
+            feedback = await self.get_feedback(context, report_section, rubric_for_section)
+            await self._send_message(thread_id, feedback)
 
-            repeat_loop: Message = await self._wait_for_message(context.timeout)
-            if 'n' in repeat_loop["content"].lower():
-                break
+        await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
+                                            f"If not, indicate why. Provide any other additional feedback.\n"
+                                            f"TAs will look over your feedback to "
+                                            f"make this grading experience better and more consistent.")
+
+        student_feedback = await self._wait_for_message(context.timeout)
+
+        duck_logger.info(f"Student feedback: {student_feedback}")
 
     def _get_instructions_content(self, assignment: Gradable):
         if 'instruction_link' in assignment:
@@ -92,7 +95,6 @@ class FeedbackWorkflow:
             rubric_section = self._find_key(instruction_content_as_mdd, section_name)
             if rubric_section is None:
                 raise Exception(f"{rubric_section} does not exist in {assignment['name']}")
-                # TODO consider creating an agent as a backup who can run through the report and try to find it
             if isinstance(rubric_section,dict) and 'content' in rubric_section:
                 rubric_section = rubric_section['content']
             sections_rubrics[section_name] = rubric_section
@@ -114,27 +116,43 @@ class FeedbackWorkflow:
         return project_name in [assignment["name"] for assignment in self._settings['gradable_assignments']]
 
     def is_valid_section_name(self, project_name, section_name):
-        # general_sections = [
-        #     section
-        #     for general_req in self._settings['general_requirements']
-        #     for section in general_req['sections']
-        #
-        # ]
-        #         or section_name in general_sections)
         for assignment in self._settings['gradable_assignments']:
             if assignment['name'] == project_name and (section_name in assignment['sections']):
                 return True
         return False
 
-    async def _get_project_and_sections(self, thread_id, context):
+    def get_list_of_assignments_and_sections(self):
+        assignments_and_sections = [
+            (assignment["name"], assignment["sections"])
+            for assignment in self._settings['gradable_assignments']
+        ]
+        return assignments_and_sections
+
+    async def _get_project_and_sections_from_report(self, thread_id, context, report_contents, message=''):
+
+        input = {
+            'report_contents': report_contents,
+            'user_specification': message,
+            'valid_projects_and_sections': self.get_list_of_assignments_and_sections()
+        }
+        response = await self._ai_client.run_agent(context, self._project_scanner_agent, str(input))
+        print(response)
+        response = json.loads(response) # to dictionary (dict specified in prompt)
+        project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
+
+        if not self._is_valid_project_name(project):
+            raise Exception(f"Invalid project name {project}")
+        if not all(self.is_valid_section_name(project, section_name) for section_name in sections):
+            raise Exception(f"Invalid section name(s): project: {project}, sections: {sections}")
+
+        return project, sections
+
+    async def _get_project_and_sections_via_interview(self, thread_id, context):
         # this should rely on the settings to make sure that we actually get a **valid section and project**
         # can decide to use an agent for this.
         await self._send_message(thread_id, "...")
 
-        input = [
-            (assignment["name"], assignment["sections"])
-            for assignment in self._settings['gradable_assignments']
-        ]
+        input = self.get_list_of_assignments_and_sections()
         response = await self._ai_client.run_agent(context, self._interviewer_agent, str(input))
         response = json.loads(response) # to dictionary (dict specified in prompt)
         project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
@@ -158,13 +176,14 @@ class FeedbackWorkflow:
 
                 file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in response["files"]])
                 return file_contents
-            await self._send_message(thread_id, "Closing thread...") # TODO logic for not uploading a md report
+            # TODO logic for not uploading a md report
+            await self._send_message(thread_id, "Closing thread...")
             return None
         except Exception as e:
             duck_logger.info(f"Something failed: {e}")
             await self._send_message(thread_id, "Sorry...something didn't work quite right.")
 
-    # TODO unduplicate function from registration workflow?
+    # unduplicate function from registration workflow?
     async def _wait_for_message(self, timeout=300) -> Message | None:
         async with queue('messages', None) as messages:
             try:
@@ -177,7 +196,6 @@ class FeedbackWorkflow:
         input = {"report_contents": report_section,
                  "rubric": rubric_for_section}
         result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
-        print(result)
         return result
 
     async def single_item_ai_grader(self, context, report_section, rubric_item):
@@ -189,15 +207,15 @@ class FeedbackWorkflow:
 
     async def get_feedback(self, context, report_section, section_rubric):
 
-        async def grade(rubric_items, report_section, use_single=True):
+        async def grade(rubric_items, report_section, per_rubric_item_grading=True):
 
-            if use_single:
+            if per_rubric_item_grading:
                 all_rubric_item_responses = []
                 for rubric_item in rubric_items:
                     raw_response = await self.single_item_ai_grader(context, report_section, rubric_item)
                     formatted_response = json.loads(raw_response)
                     all_rubric_item_responses.append(formatted_response)
-            else:
+            else: # per section item grading
                 try:
                     ai_grader_response = await self.ai_grader(context, report_section, rubric_items)
                     all_rubric_item_responses = json.loads(ai_grader_response)['results']
@@ -211,10 +229,9 @@ class FeedbackWorkflow:
                 justification = '' if item['satisfactory'] else item['justification']
                 feedback = f'{emoji} **{item["rubric_item"]}** - {justification}'
                 items.append(feedback)
+            # TODO consider creating a report indicating which sections and rubric items were passed in for each call to grade
+            # (Rather than just returning items, it returns the report section/rubric/the result from AI
             return items
-            # return (f"- **Rubric**: {rubric_items}\n\n"
-            #         f"- **Report**: ``````md\n{report_section}\n``````\n\n"
-            #         f"- RESPONSE: \n\n```{ai_grader_response.strip()}```\n")
 
         async def grader_helper(rubric, report_piece):
             if isinstance(rubric, list):
@@ -264,12 +281,18 @@ class FeedbackWorkflow:
                     return result
         return None
 
-    async def get_report_section(self, report_contents: str, section):
+    def get_report_section(self, report_contents: str, section):
         data = markdowndata.loads(report_contents)
         section_contents = self._find_key(data, section)
 
         if section_contents is None:
-            # TODO: some error back to the user about the incorrect report?
-            raise Exception("Exception: Unable to find section in report " + section)
+            return None
 
         return section_contents
+
+    def report_has_all_sections(self, report_contents: str, sections):
+        for section in sections:
+            if self.get_report_section(report_contents, section) is None:
+                print("Report is missing", {section})
+                return False
+        return True
