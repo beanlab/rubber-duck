@@ -8,7 +8,6 @@ from quest import step, queue
 
 from ..gen_ai.gen_ai import Agent, AIClient
 from ..utils.config_types import DuckContext, FeedbackSettings, Gradable
-from ..utils.fetch_github_file import fetch_github_file
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
@@ -56,34 +55,31 @@ class FeedbackWorkflow:
         if report_contents is None:
             return
 
-        if not self.report_has_all_sections(report_contents, sections):
+        if not self._report_has_all_sections(report_contents, sections):
             self._send_message("Missing section(s) from report")
             return
 
         for section in sections:
             await self._send_message(thread_id, f"## {section}")
             rubric_for_section = self._assignments_rubrics[project_name][section]
-            report_section = self.get_report_section(report_contents, section)
+            report_section = self._get_report_section(report_contents, section)
 
             feedback = await self.get_feedback(context, report_section, rubric_for_section)
             await self._send_message(thread_id, feedback)
 
         await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
                                             f"If not, indicate why. Provide any other additional feedback.\n"
-                                            f"TAs will look over your feedback to "
-                                            f"make this grading experience better and more consistent.")
+                                            f"Your feedback is valuable in making this grading experience better and more consistent.")
 
         student_feedback = await self._wait_for_message(context.timeout)
 
-        duck_logger.info(f"Student feedback: {student_feedback}")
+        duck_logger.info(f"Student feedback on grading: {student_feedback}")
 
     def _get_instructions_content(self, assignment: Gradable):
-        if 'instruction_link' in assignment:
-            instructions = fetch_github_file(assignment['instruction_link'])
-        elif 'instruction_path' in assignment:
+        if 'instruction_path' in assignment:
             instructions = Path(assignment['instruction_path']).read_text(encoding="utf-8")
         else:
-            raise ValueError(f"You must provide 'instruction_link' or 'instruction_path' for {assignment['name']}")
+            raise ValueError(f"You must provide an 'instruction_path' for {assignment['name']}")
         return instructions
 
     def _get_rubric_sections(self, assignment: Gradable):
@@ -105,7 +101,7 @@ class FeedbackWorkflow:
         for assignment in self._settings["gradable_assignments"]:
             self._assignments_rubrics[assignment["name"]] = self._get_rubric_sections(assignment)
 
-    def get_sections_for_project(self, project_name):
+    def _get_sections_for_project(self, project_name):
         for assignment in self._settings['gradable_assignments']:
             if assignment['name'] == project_name:
                 return assignment['sections']
@@ -115,7 +111,7 @@ class FeedbackWorkflow:
     def _is_valid_project_name(self, project_name):
         return project_name in [assignment["name"] for assignment in self._settings['gradable_assignments']]
 
-    def is_valid_section_name(self, project_name, section_name):
+    def _is_valid_section_name(self, project_name, section_name):
         for assignment in self._settings['gradable_assignments']:
             if assignment['name'] == project_name and (section_name in assignment['sections']):
                 return True
@@ -142,14 +138,12 @@ class FeedbackWorkflow:
 
         if not self._is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
-        if not all(self.is_valid_section_name(project, section_name) for section_name in sections):
+        if not all(self._is_valid_section_name(project, section_name) for section_name in sections):
             raise Exception(f"Invalid section name(s): project: {project}, sections: {sections}")
 
         return project, sections
 
     async def _get_project_and_sections_via_interview(self, thread_id, context):
-        # this should rely on the settings to make sure that we actually get a **valid section and project**
-        # can decide to use an agent for this.
         await self._send_message(thread_id, "...")
 
         input = self.get_list_of_assignments_and_sections()
@@ -159,7 +153,7 @@ class FeedbackWorkflow:
 
         if not self._is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
-        if not all(self.is_valid_section_name(project, section_name) for section_name in sections):
+        if not all(self._is_valid_section_name(project, section_name) for section_name in sections):
             raise Exception(f"Invalid section name(s): project: {project}, sections: {sections}")
 
         return project, sections
@@ -230,7 +224,7 @@ class FeedbackWorkflow:
                 feedback = f'{emoji} **{item["rubric_item"]}** - {justification}'
                 items.append(feedback)
             # TODO consider creating a report indicating which sections and rubric items were passed in for each call to grade
-            # (Rather than just returning items, it returns the report section/rubric/the result from AI
+            # (Rather than just returning items, it also returns the report section/rubric/AI response)
             return items
 
         async def grader_helper(rubric, report_piece):
@@ -281,7 +275,7 @@ class FeedbackWorkflow:
                     return result
         return None
 
-    def get_report_section(self, report_contents: str, section):
+    def _get_report_section(self, report_contents: str, section):
         data = markdowndata.loads(report_contents)
         section_contents = self._find_key(data, section)
 
@@ -290,9 +284,9 @@ class FeedbackWorkflow:
 
         return section_contents
 
-    def report_has_all_sections(self, report_contents: str, sections):
+    def _report_has_all_sections(self, report_contents: str, sections):
         for section in sections:
-            if self.get_report_section(report_contents, section) is None:
+            if self._get_report_section(report_contents, section) is None:
                 print("Report is missing", {section})
                 return False
         return True

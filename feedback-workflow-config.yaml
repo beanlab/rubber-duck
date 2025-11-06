@@ -2,11 +2,6 @@
     duck_type: feedback
     settings:
       name: cs312-projects
-#      general_requirements:
-#        - name: Additional Standards
-#          instruction_path: rubrics/general_requirements.md
-#          sections:
-#            - Code Quality
       gradable_assignments:
         - name: Project RSA
           instruction_path: rubrics/rsa-baseline-core.md
@@ -15,12 +10,10 @@
             - Core
         - name: Project Mock
           instruction_path: rubrics/mock-rubric.md
-#          instruction_link: https://github.com/math919191/project-feedback/blob/main/mock-rubric.md
           sections:
             - Core
             - Stretch 1
         - name: Project LeetCode
-#          instruction_link: https://github.com/BYU-CS-Course-Ops/CS312-course-content/blob/reformat-rubrics/canvas/Unit5-DP/project-leetcode/instruction.md
           instruction_path: rubrics/leetcode.md
           sections:
             - Baseline
@@ -40,7 +33,7 @@
             - Stretch 2
             - Project Review
       grader_agent:
-        # This agent expects a report and a set of requirements as a list
+        # This agent expects a report and a set of requirements as a list and returns a list of the requirements
         name: grader
         engine: gpt-5-nano
         prompt_files:
@@ -76,7 +69,7 @@
               required: ["results"]
               additionalProperties: false
       single_rubric_item_grader:
-        # This agent expects a report and a single requirement
+        # This agent expects a report section and a single requirement and grades on the single requirement
         name: grader
         engine: gpt-5-nano
         prompt_files:
@@ -137,12 +130,6 @@
               additionalProperties: false
 
         reasoning: minimal
-
-      student_feedback_settings:
-        #        feedback_agent:
-        ask_for_feedback: True
-        server: <id_number>
-        target_channel_id: <id_number> # this user will be a channel with feedback from the students.
 
       # TODO these aren't actually being relied on right now.
       file_size_limit: *file_size_limit
