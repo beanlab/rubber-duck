@@ -149,8 +149,14 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
 
+class RunPythonConfig(TypedDict):
+    image: str
+    timeout: int
+
+
 class Config(TypedDict):
     sql: SQLConfig
+    run_python: RunPythonConfig
     ducks: list[DuckConfig]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]

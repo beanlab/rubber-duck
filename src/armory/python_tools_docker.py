@@ -21,7 +21,7 @@ class PythonToolsDocker:
     def _run_docker(self, code: str, tool_mode: str):
         """Runs the docker with a given mode ('text' or 'image')"""
         # Cleans /tmp/out before running
-        self._cleanup_out_dir()
+        # self._cleanup_out_dir()
 
         # Writes code to temporary file
         temp_code_path = self.tmp_dir / "code_to_run.py"
@@ -29,17 +29,34 @@ class PythonToolsDocker:
 
         # Docker command
         cmd = [
-            "docker", "run", "--rm",
+            "docker", "create",
             "--network=none",
             "--read-only",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--tmpfs", "/out:rw,noexec,nosuid,size=64m",
+            "--tmpfs /tmp:rw,noexec,nosuid,size=64m",
+            "--mount type=tmpfs,destination=/out,tmpfs-mode=1777",
+            "--security-opt no-new-privileges",
+            "--cap-drop ALL",
+            "--pids-limit 128",
             "-e", f"CODE_PATH=/app/code_to_run.py",
             "-e", f"OUT_DIR=/out",
             "-e", f"TOOL_MODE={tool_mode}",
-            self.docker_image
+            self.docker_image,
+            "sh -c 'python /app/script.py > /out/stdout.txt 2>&1'"
         ]
-        subprocess.run(cmd, check=True)
+        container_id = subprocess.check_output(cmd)
+
+        # 2) Inject your script (no runtime mount; no host FS access during run)
+        subprocess.check_output(f'docker cp {script} {container_id}:/app/script.py')
+
+        # 3) Start and wait for completion
+        subprocess.check_output(f'docker start {container_id} > /dev/null')
+        subprocess.check_output(f'docker wait {container_id} > /dev/null')
+
+        # 4) Extract the stdout file
+        subprocess.check_output(f'docker cp {container_id}:/out/stdout.txt {output_file}')
+
+        # 5) Cleanup
+        subprocess.check_output(f'docker rm {container_id} > /dev/null')t
 
         # Reads results
         stdout = (self.out_dir / "stdout.txt").read_text() if (self.out_dir / "stdout.txt").exists() else ""
