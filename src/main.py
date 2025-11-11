@@ -12,7 +12,7 @@ from quest.utils import quest_logger
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
-from .armory.python_tools import PythonTools
+from .armory.python_tools_docker import PythonToolsDocker
 from .armory.talk_tool import TalkTool
 from .conversation.conversation import AgentLedConversation, UserLedConversation
 from .gen_ai.gen_ai import AIClient
@@ -207,8 +207,8 @@ def _setup_ducks(
 
     return channel_ducks
 
-def _setup_python_tools(config: Config) -> PythonTools | None:
-    # Pull stats duck settings from config
+def _setup_python_tools(config: Config) -> PythonToolsDocker:
+    # Pull stats-duck agent settings from config
     cfg = None
     for d in config.get("ducks", []):
         if d.get("name") == "stats-duck":
@@ -216,14 +216,12 @@ def _setup_python_tools(config: Config) -> PythonTools | None:
             break
 
     if cfg:
-        python_tools = PythonTools(
-            allowed_imports=cfg.get("allowed_libraries"),
-            timeout=cfg.get("timeout", 10),
-            python_executable=cfg.get("python_environment")
-        )
-        return python_tools
+        docker_image = cfg.get("docker_image")
+        timeout = cfg.get("timeout")
+        python_tools_docker = PythonToolsDocker(docker_image=docker_image, timeout=timeout)
+        return python_tools_docker
     else:
-        raise ValueError("No stats-duck config found; PythonTools not created")
+        raise ValueError("No stats-duck config found; PythonToolsDocker not created")
 
 def _build_feedback_queues(config: Config, sql_session):
     queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
@@ -254,8 +252,8 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
         data_store = DataStore(dataset_dirs)
         stat_tools = StatsTools(data_store)
         armory.scrub_tools(stat_tools)
-        python_tools = _setup_python_tools(config)
-        armory.scrub_tools(python_tools)
+        python_tools_docker = _setup_python_tools(config)
+        armory.scrub_tools(python_tools_docker)
     else:
         duck_logger.warning("**No dataset folder locations provided in config**")
 
