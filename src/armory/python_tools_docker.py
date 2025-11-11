@@ -2,6 +2,8 @@ import subprocess
 import shutil
 from pathlib import Path
 from .tools import register_tool, sends_image
+from ..utils.logger import duck_logger
+
 
 class PythonToolsDocker:
     def __init__(self, docker_image: str, timeout: int):
@@ -49,6 +51,8 @@ class PythonToolsDocker:
     @register_tool
     def run_python_return_text(self, code: str):
         """Runs python code in a docker that returns stdout/stderr only, no images or tables"""
+        duck_logger.info(f"\nExecuting Python code in run_python_return_text:\n{code}\n")
+
         stdout, stderr, _ = self._run_docker(code, tool_mode="text")
         if stderr:
             # Optionally raise or return error text
@@ -59,6 +63,8 @@ class PythonToolsDocker:
     @sends_image
     def run_python_return_img(self, code: str):
         """Runs python code in a docker that saves a single image only (plots/tables)"""
+        duck_logger.info(f"\nExecuting Python code in run_python_return_img:\n{code}\n")
+
         _, stderr, plots = self._run_docker(code, tool_mode="image")
         if stderr:
             # Include error messages if needed
