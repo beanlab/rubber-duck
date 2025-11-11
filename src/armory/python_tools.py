@@ -6,8 +6,12 @@ from typing import Optional
 from .tools import register_tool, sends_image
 from ..utils.logger import duck_logger
 
+PYTHON_TOOL_NAMES = {
+    "run_python_return_text",
+    "run_python_return_img"
+}
 
-class PythonTool:
+class PythonTools:
     """
     Executes Python code in a subprocess sandbox.
     Agents can call this tool to run code with access to installed libraries
@@ -16,9 +20,9 @@ class PythonTool:
 
     def __init__(
             self,
-            allowed_imports: Optional[list[str]] = None,
-            timeout: int = 10,
-            python_executable: str = "/opt/anaconda3/envs/skill-bot/bin/python"
+            allowed_imports: list[str],
+            timeout: int,
+            python_executable: str
     ):
         self.allowed_imports = set(allowed_imports) if allowed_imports else None
         self.timeout = timeout

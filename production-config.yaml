@@ -139,8 +139,17 @@ ducks:
           - talk_to_user
           - run_python_return_text
           - run_python_return_img
+        allowed_libraries:
+          - math
+          - numpy
+          - pandas
+          - matplotlib
+          - seaborn
+          - statsmodels
         file_size_limit: *file_size_limit
         file_type_ext: *file_type_ext
+        python_environment: "" # TODO: add python environment/executable location
+        timeout: 30
 
 servers:
   927616651409649675:
