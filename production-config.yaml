@@ -148,7 +148,7 @@ ducks:
           - statsmodels
         file_size_limit: *file_size_limit
         file_type_ext: *file_type_ext
-        python_environment: "" # TODO: add python environment/executable location
+        docker_image: python-tools-sandbox:latest
         timeout: 30
 
 servers:
