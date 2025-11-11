@@ -52,6 +52,9 @@ If displaying a list, format it with bullet points.
 #### Return Image Tool
 
 - Use this tool for all plots, tables, and visualizations.
+- If variables aren't specified by the user, ask for clarification.
+- If asked for multiple plots, create them as subplots so you can return a single image, or run this separate times.
+- All plots, tables, and visualizations should only include specified variables.
 - **NEVER call `plt.show()` or `plt.savefig()`! The image tool will automatically save any generated plots.**
 - After generating a plot, return the result verbatim. **Do not offer any commentary or interpretation**.
 
