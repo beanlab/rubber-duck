@@ -137,8 +137,8 @@ ducks:
         reasoning: minimal
         tools:
           - talk_to_user
-          - conclude_conversation
-          - run_python_code
+          - run_python_return_text
+          - run_python_return_img
         file_size_limit: *file_size_limit
         file_type_ext: *file_type_ext
 
