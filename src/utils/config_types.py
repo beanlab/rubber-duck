@@ -69,8 +69,7 @@ class SingleAgentSettings(TypedDict):
 
 class Gradable(TypedDict):
     name: str
-    instruction_link: NotRequired[str]
-    instruction_path: NotRequired[str]
+    rubric_path: str
     sections: list[str]
 
 

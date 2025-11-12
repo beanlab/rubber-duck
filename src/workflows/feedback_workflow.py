@@ -67,19 +67,12 @@ class FeedbackWorkflow:
             feedback = await self.get_feedback(context, report_section, rubric_for_section)
             await self._send_message(thread_id, feedback)
 
-        await self._send_message(thread_id, f"Please rate your experience 1-10. Do you agree with the AI's grading? \n"
-                                            f"If not, indicate why. Provide any other additional feedback.\n"
-                                            f"Your feedback is valuable in making this grading experience better and more consistent.")
-
-        student_feedback = await self._wait_for_message(context.timeout)
-
-        duck_logger.info(f"Student feedback on grading: {student_feedback}")
 
     def _get_instructions_content(self, assignment: Gradable):
-        if 'instruction_path' in assignment:
-            instructions = Path(assignment['instruction_path']).read_text(encoding="utf-8")
+        if 'rubric_path' in assignment:
+            instructions = Path(assignment['rubric_path']).read_text(encoding="utf-8")
         else:
-            raise ValueError(f"You must provide an 'instruction_path' for {assignment['name']}")
+            raise ValueError(f"You must provide an 'rubric_path' for {assignment['name']}")
         return instructions
 
     def _get_rubric_sections(self, assignment: Gradable):
@@ -124,17 +117,16 @@ class FeedbackWorkflow:
         ]
         return assignments_and_sections
 
-    async def _get_project_and_sections_from_report(self, thread_id, context, report_contents, message=''):
+    async def _get_project_and_sections_from_report(self, context, report_contents):
 
         input = {
             'report_contents': report_contents,
-            'user_specification': message,
             'valid_projects_and_sections': self.get_list_of_assignments_and_sections()
         }
+
         response = await self._ai_client.run_agent(context, self._project_scanner_agent, str(input))
-        print(response)
-        response = json.loads(response) # to dictionary (dict specified in prompt)
-        project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
+        response = json.loads(response) # returns structured output as specified in the config
+        project, sections = response["project_name"], response["sections"]
 
         if not self._is_valid_project_name(project):
             raise Exception(f"Invalid project name {project}")
@@ -165,19 +157,20 @@ class FeedbackWorkflow:
                 response = await self._wait_for_message(context.timeout)
 
                 if not response['files']:
-                    await self._send_message(thread_id, "Please upload your md report: ")
+                    await self._send_message(thread_id, "No files were uploaded. Please upload your md report: ")
                     continue
 
                 file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in response["files"]])
                 return file_contents
-            # TODO logic for not uploading a md report
-            await self._send_message(thread_id, "Closing thread...")
+            # TODO logic for not uploading a md report?
+
+            await self._send_message(thread_id, "No report was uploaded. Closing the thread.")
             return None
         except Exception as e:
-            duck_logger.info(f"Something failed: {e}")
+            duck_logger.warning(f"Exception: {e}")
             await self._send_message(thread_id, "Sorry...something didn't work quite right.")
 
-    # unduplicate function from registration workflow?
+    # TODO unduplicate function from registration workflow?
     async def _wait_for_message(self, timeout=300) -> Message | None:
         async with queue('messages', None) as messages:
             try:
@@ -220,11 +213,12 @@ class FeedbackWorkflow:
             items = []
             for item in all_rubric_item_responses:
                 emoji = ':white_check_mark:' if item['satisfactory'] else ':x:'
-                justification = '' if item['satisfactory'] else item['justification']
+                # justification = '' if item['satisfactory'] else item['justification']
+                justification = item['justification']
                 feedback = f'{emoji} **{item["rubric_item"]}** - {justification}'
                 items.append(feedback)
+
             # TODO consider creating a report indicating which sections and rubric items were passed in for each call to grade
-            # (Rather than just returning items, it also returns the report section/rubric/AI response)
             return items
 
         async def grader_helper(rubric, report_piece):
@@ -261,7 +255,7 @@ class FeedbackWorkflow:
 
         all_feedback_as_dict = await grader_helper(section_rubric, report_section)
 
-        feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False)
+        feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False, width=10**9)
         return feedback_str
 
     def _find_key(self, d, target):

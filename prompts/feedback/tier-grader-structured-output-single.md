@@ -12,7 +12,7 @@ You will be provided
 You will return
 - `dict(rubric_item: str, justification: str, satisfactory: bool)`
     - rubric_item: the first string is an **exact** copy of an initial rubric item
-    - justification: justification for if the item was met 
+    - justification: **a very brief** justification for if the item was met (less than 10 words)
     - satisfactory: the bool indicates if it was met or not.
         
 **Ensure your response is valid json output**
