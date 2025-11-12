@@ -4,6 +4,7 @@ import json
 import yaml
 
 import markdowndata
+# TODO ask: step functions?
 from quest import step, queue
 
 from ..gen_ai.gen_ai import Agent, AIClient
@@ -13,16 +14,13 @@ from ..utils.protocols import Message
 
 ASSIGNMENT_NAME: str
 SECTION: str
-RUBRIC_ITEM: str
 
 class FeedbackWorkflow:
     def __init__(self,
                  name: str,
                  send_message,
                  settings: FeedbackSettings,
-                 grader_agent: Agent,
                  single_rubric_item_grader: Agent,
-                 interviewer_agent: Agent,
                  project_scanner_agent: Agent,
                  ai_client: AIClient,
                  read_url
@@ -30,33 +28,32 @@ class FeedbackWorkflow:
         self.name = name
         self._send_message = send_message
         self._settings = settings
-        self._grader_agent = grader_agent
         self._single_rubric_item_grader = single_rubric_item_grader
         self._project_scanner_agent = project_scanner_agent
-        self._interviewer_agent = interviewer_agent
         self._ai_client = ai_client
         self.read_url = read_url
 
         self._assignments_rubrics: dict[ASSIGNMENT_NAME: dict[SECTION: any]] = {}
         self._populate_assignments_rubrics()
 
-        self.interview = False
-
     async def __call__(self, context: DuckContext):
         thread_id = context.thread_id
 
+        await self._send_message(thread_id, f"This feedback is given by AI and may be incorrect and may not reflect your final grade.\n"
+                                      f"This generated feedback does **not** check images and may give false feedback regarding images.\n"
+                                      f"You are responsible for ensuring your report meets the requirements.\n")
+
+        await self._send_message(thread_id, f"The reports that are supported for grading are {' '.join(self._assignments_rubrics.keys()) }\n")
+
         report_contents = await self.get_report_contents(thread_id, context)
 
-        if self.interview:
-            project_name, sections = await self._get_project_and_sections_via_interview(thread_id, context)
-        else:
-            project_name, sections = await self._get_project_and_sections_from_report(thread_id, context, report_contents, "")
+        project_name, sections = await self._get_project_and_sections_from_report(context, report_contents)
 
         if report_contents is None:
             return
 
         if not self._report_has_all_sections(report_contents, sections):
-            self._send_message("Missing section(s) from report")
+            await self._send_message(thread_id, "Missing section(s) from report")
             return
 
         for section in sections:
@@ -76,12 +73,12 @@ class FeedbackWorkflow:
         return instructions
 
     def _get_rubric_sections(self, assignment: Gradable):
-        instruction_content = self._get_instructions_content(assignment)
-        instruction_content_as_mdd = markdowndata.loads(instruction_content)
+        raw_instruction_content = self._get_instructions_content(assignment)
+        instruction_content = yaml.safe_load(raw_instruction_content)
 
         sections_rubrics = {}
         for section_name in assignment['sections']:
-            rubric_section = self._find_key(instruction_content_as_mdd, section_name)
+            rubric_section = self._find_key(instruction_content, section_name)
             if rubric_section is None:
                 raise Exception(f"{rubric_section} does not exist in {assignment['name']}")
             if isinstance(rubric_section,dict) and 'content' in rubric_section:
@@ -135,25 +132,11 @@ class FeedbackWorkflow:
 
         return project, sections
 
-    async def _get_project_and_sections_via_interview(self, thread_id, context):
-        await self._send_message(thread_id, "...")
-
-        input = self.get_list_of_assignments_and_sections()
-        response = await self._ai_client.run_agent(context, self._interviewer_agent, str(input))
-        response = json.loads(response) # to dictionary (dict specified in prompt)
-        project, sections = response["project_name"], response["sections"] # names/keys configured in the interviewer prompt
-
-        if not self._is_valid_project_name(project):
-            raise Exception(f"Invalid project name {project}")
-        if not all(self._is_valid_section_name(project, section_name) for section_name in sections):
-            raise Exception(f"Invalid section name(s): project: {project}, sections: {sections}")
-
-        return project, sections
-
     async def get_report_contents(self, thread_id, context):
         try:
-            await self._send_message(thread_id, "Please upload your md report: ")
-            for i in range(3): # We will give them three tries to upload a md report
+            await self._send_message(thread_id, "Please upload your md report. Do not include any images."
+                                                "Just upload your a single file that contains your md report.")
+            for i in range(3): # Three tries to upload a md report
                 response = await self._wait_for_message(context.timeout)
 
                 if not response['files']:
@@ -179,12 +162,6 @@ class FeedbackWorkflow:
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
 
-    async def ai_grader(self, context, report_section, rubric_for_section):
-        input = {"report_contents": report_section,
-                 "rubric": rubric_for_section}
-        result = await self._ai_client.run_agent(context, self._grader_agent, str(input))
-        return result
-
     async def single_item_ai_grader(self, context, report_section, rubric_item):
         input = {"report_contents": report_section,
                  "rubric_item": rubric_item}
@@ -207,8 +184,8 @@ class FeedbackWorkflow:
                     ai_grader_response = await self.ai_grader(context, report_section, rubric_items)
                     all_rubric_item_responses = json.loads(ai_grader_response)['results']
                 except Exception as e:
-                    print(e)
-                    return all_rubric_item_responses
+                    duck_logger.warning(e)
+                    return ai_grader_response
 
             items = []
             for item in all_rubric_item_responses:
@@ -255,7 +232,7 @@ class FeedbackWorkflow:
 
         all_feedback_as_dict = await grader_helper(section_rubric, report_section)
 
-        feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False, width=10**9)
+        feedback_str = yaml.dump(all_feedback_as_dict, sort_keys=False, width=10**9, default_style=None)
         return feedback_str
 
     def _find_key(self, d, target):

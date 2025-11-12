@@ -2,76 +2,41 @@
     duck_type: feedback
     settings:
       name: cs312-projects
+
       gradable_assignments:
-        - name: Project RSA
-          instruction_path: rubrics/rsa-baseline-core.md
-          sections:
-            - Baseline
-            - Core
-        - name: Project Mock
-          instruction_path: rubrics/mock-rubric.md
-          sections:
-            - Core
-            - Stretch 1
-        - name: Project LeetCode
-          instruction_path: rubrics/leetcode.md
-          sections:
-            - Baseline
-            - Core
-            - Stretch 1
-            - Stretch 2
-        - name: Project Backtracking
-          instruction_path: rubrics/backtracking.md
-          sections:
-            - Baseline
+#        - name: Project LeetCode
+#          rubric_path: rubrics/leetcode.yaml
+#          sections:
+#            - Baseline
+#            - Core
+#            - Stretch 1
+#            - Stretch 2
+#        - name: Project Backtracking
+#          rubric_path: rubrics/backtracking.yaml
+#          sections:
+#            - Baseline
+#            - Core
+#            - Stretch 1
+#            - Stretch 2
+#            - Project Review
+#        - name: Project Mock
+#          rubric_path: rubrics/mock.yaml
+#          sections:
+#            - Brownie Recipe
+#            - Pie Recipe
         - name: Project Alignment
-          instruction_path: rubrics/alignment-rubric.md
+          rubric_path: rubrics/alignment-rubric.yaml
           sections:
             - Baseline
             - Core
             - Stretch 1
             - Stretch 2
             - Project Review
-      grader_agent:
-        # This agent expects a report and a set of requirements as a list and returns a list of the requirements
-        name: grader
-        engine: gpt-5-nano
-        prompt_files:
-#          - prompts/feedback/tier-grader.md
-#          - prompts/feedback/zero-shot-grader-emojis.md
-#          - prompts/feedback/tier-grader-yaml-based.md
-          - prompts/feedback/tier-grader-structured-output.md
-        reasoning: minimal
-        output_format:
-          format:
-            type: json_schema
-            name: grading_output
-            strict: true
-            schema:
-              type: object
-              properties:
-                results:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      rubric_item:
-                        type: string
-                        description: same exact rubric item provided to you
-                      satisfactory:
-                        type: boolean
-                        description: Indicates if the report provided meets the given rubric item
-                      justification:
-                        type: string
-                        description: Justification for if the report satisfied the requirement
-                    required: [ "rubric_item", "satisfactory", "justification"]
-                    additionalProperties: false
-              required: ["results"]
-              additionalProperties: false
+
       single_rubric_item_grader:
-        # This agent expects a report section and a single requirement and grades on the single requirement
+        # This agent expects a part of a report and a single requirement
         name: grader
-        engine: gpt-5-nano
+        engine: gpt-5-mini
         prompt_files:
           - prompts/feedback/tier-grader-structured-output-single.md
         reasoning: minimal
@@ -95,15 +60,6 @@
               required: ["rubric_item", "justification", "satisfactory"]
               additionalProperties: false
 
-      interviewer_agent:
-        # This agent gets the desired report and section name(s) from the user based on the gradable_assignments
-        name: interviewer
-        engine: gpt-5-mini
-        prompt_files:
-          - prompts/feedback/interviewer.md
-        reasoning: minimal
-        tools:
-          - talk_to_user
       project_scanner_agent:
         # This agent gets the desired report and section name(s) from the user based on the report
         name: project_scanner
@@ -130,7 +86,3 @@
               additionalProperties: false
 
         reasoning: minimal
-
-      # TODO these aren't actually being relied on right now.
-      file_size_limit: *file_size_limit
-      file_type_ext: *file_type_ext
