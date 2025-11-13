@@ -11,16 +11,17 @@ from quest.utils import quest_logger
 
 from .armory.armory import Armory
 from .armory.data_store import DataStore
+from .armory.python_tools_docker import PythonToolsDocker
 from .armory.stat_tools import StatsTools
 from .armory.talk_tool import TalkTool
-from .conversation.conversation import AgentLedConversation, UserLedConversation
-from .gen_ai.gen_ai import AIClient
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
+from .conversation.conversation import AgentLedConversation, UserLedConversation
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
 from .gen_ai.build import build_agent
+from .gen_ai.gen_ai import AIClient
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -88,7 +89,8 @@ def build_conversation_review_duck(
 def build_registration_duck(
         name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
-    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get('suspicion_checker_tool') else None
+    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get(
+        'suspicion_checker_tool') else None
 
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -240,6 +242,10 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
+
+    if run_python_settings := config.get('run_python'):
+        pytools = PythonToolsDocker(run_python_settings['image'], run_python_settings.get('timeout', 30))
+        armory.scrub_tools(pytools)
 
     return armory, talk_tool
 
