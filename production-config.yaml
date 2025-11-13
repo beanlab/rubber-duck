@@ -468,6 +468,13 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
+    "gpt-5": [1.25, 10.00]
+    "gpt-5-mini": [0.25, 2.00]
+    "gpt-5-nano": [0.05, 0.40]
+    "gpt-4.1": [2.00, 8.00]
+    "gpt-4.1-mini": [0.40, 1.60]
+    "gpt-4.1-nano": [0.01, 0.04]
+
     "gpt-4": [ 0.03, 0.06 ]
     "gpt-4o": [ 0.0025, 0.01 ]
     "gpt-4-1106-preview": [ 0.01, 0.03 ]
