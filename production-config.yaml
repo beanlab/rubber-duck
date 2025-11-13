@@ -20,6 +20,10 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+run_python:
+  image: byucscourseops/python-tools-sandbox:latest
+  timeout: 30
+
 agents_as_tools:
   - tool_name: check_suspicion_bot
     doc_string: |
@@ -148,8 +152,6 @@ ducks:
           - statsmodels
         file_size_limit: *file_size_limit
         file_type_ext: *file_type_ext
-        docker_image: python-tools-sandbox:latest
-        timeout: 30
 
 servers:
   927616651409649675:
