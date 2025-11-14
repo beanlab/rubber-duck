@@ -1,5 +1,6 @@
 import subprocess
 import shutil
+import tempfile
 import textwrap
 import uuid
 from pathlib import Path
@@ -11,7 +12,7 @@ class PythonToolsDocker:
     def __init__(self, docker_image: str, timeout: int):
         self.docker_image = docker_image
         self.timeout = timeout
-        self.tmp_dir = Path("/tmp")  # temp directory for code and outputs
+        self.tmp_dir = Path("/tmp")  # TODO: use tempdir
         self.out_dir = self.tmp_dir / "out"
         # Ensure output directory exists
         self.out_dir.mkdir(exist_ok=True, parents=True)
@@ -19,47 +20,47 @@ class PythonToolsDocker:
     def _run_docker(self, code: str, tool_mode: str, run_id: str) -> tuple[str, str, Path | None]:
         """Runs Python code inside Docker and captures stdout/stderr and plots"""
 
-        # Create unique input/output for this session to avoid concurrency conflicts
+        # Create unique input/output for the session to avoid concurrency conflicts
         run_out_dir = self.out_dir / run_id
         plots_dir = run_out_dir / "plots"
 
         # Write code to a unique temporary file
-        temp_code_path = self.tmp_dir / f"code_to_run_{run_id}.py"
-        temp_code_path.write_text(code)
+        with tempfile.NamedTemporaryFile() as temp_code_path: # TODO: change to temp dir and put
+            # temp_code_path = self.tmp_dir / f"code_to_run_{run_id}.py"
+            temp_code_path.write_text(code)
 
-        # Docker run command
-        cmd = [
-            "docker", "run", "--rm",
-            "--network=host",  # TODO: add datasets to docker so no imports are needed
-            "--read-only",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--mount", f"type=bind,source={self.tmp_dir},target=/app",
-            "--mount", f"type=bind,source={run_out_dir},target=/out",
-            "--security-opt", "no-new-privileges",
-            "--cap-drop", "ALL",
-            "--pids-limit", "128",
-            "-e", f"CODE_PATH=/app/{temp_code_path.name}",
-            "-e", f"OUT_DIR=/out",
-            "-e", f"TOOL_MODE={tool_mode}",
-            "-e", "MPLCONFIGDIR=/tmp/.matplotlib",
-            "-e", "XDG_CACHE_HOME=/tmp/.cache",
-            self.docker_image,
-            "sh", "-c",
-            f"mkdir -p /out/plots && python /app/{temp_code_path.name} > /out/stdout.txt 2>&1"
-        ]
+            # Docker run command
+            cmd = [
+                "docker", "run", "--rm",
+                "--network=host",  # TODO: add datasets to docker so no imports are needed
+                "--read-only",
+                "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+                "--mount", f"type=bind,source={self.tmp_dir},target=/app", # TODO: copying instead of mounting
+                "--mount", f"type=bind,source={run_out_dir},target=/out",
+                "--security-opt", "no-new-privileges",
+                "--cap-drop", "ALL",
+                "--pids-limit", "128",
+                "-e", f"CODE_PATH=/app/{temp_code_path.name}",
+                "-e", f"OUT_DIR=/out",
+                "-e", f"TOOL_MODE={tool_mode}",
+                "-e", "MPLCONFIGDIR=/tmp/.matplotlib",
+                "-e", "XDG_CACHE_HOME=/tmp/.cache",
+                self.docker_image,
+                "sh", "-c",
+r            ]
 
-        try:
-            subprocess.run(cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            duck_logger.error(f"Docker run failed: {e}")
-            # stdout.txt may still exist even on failure
-            pass
+            try:
+                subprocess.run(cmd, check=True) # TODO: python docker client
+            except subprocess.CalledProcessError as e:
+                duck_logger.error(f"Docker run failed: {e}")
+                # stdout.txt may still exist even if there's a failure
+                pass
 
         # Read stdout
         stdout_path = run_out_dir / "stdout.txt"
         stdout = stdout_path.read_text() if stdout_path.exists() else ""
 
-        # Extract errors if present
+        # Extract errors
         stderr = ""
         if "Traceback" in stdout:
             stderr = stdout
