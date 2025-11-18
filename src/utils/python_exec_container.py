@@ -51,9 +51,11 @@ class PythonExecContainer():
 
     def _read_files(self):
         out_files = {}
-        for filename in os.listdir(self.out_dir):
-            with open(os.path.join(self.out_dir, filename), "rb") as f:
-                out_files[filename] = f.read()
+        for root, _, files in os.walk(self.out_dir):
+            for file in files:
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, self.out_dir)
+                out_files[rel_path] = open(full_path, "rb").read()
         return out_files
 
     def _wrap_and_execute(self, code: str):
@@ -61,11 +63,13 @@ class PythonExecContainer():
 import sys
 import traceback
 with open('/out/stdout.txt', 'w') as f:
+    sys.stdout = f
+    sys.stderr = f
     try:
         exec({code!r})
     except Exception as e:
         traceback.print_exc(file=f)
-        """
+"""
         return self.container.exec_run(["python3", "-u", "-c", wrapped_code])
 
     def run_code(self, code: str, files: dict = None):
@@ -75,71 +79,16 @@ with open('/out/stdout.txt', 'w') as f:
         self._wrap_and_execute(code)
         return self._read_files()
 
-    def run_code_concurrent(self, code: str, stream_output=True):
-        """
-        Run Python code inside the container.
-        If stream_output=True, yields output lines in real-time.
-        """
-        exec_instance = self.container.client.api.exec_create(
-            self.container.id,
-            cmd=["python3", "-u", "-c", code],
-            stdout=True,
-            stderr=True
-        )
-
-        if stream_output:
-            for line in self.container.client.api.exec_start(exec_instance['Id'], stream=True):
-                yield line.decode().strip()
-        else:
-            res = self.container.exec_run(cmd=["python3", "-c", code], stdout=True, stderr=True)
-            yield res.output.decode().strip()
-
-
-# ====== testing concurrency with streaming ====== #
-from concurrent.futures import ThreadPoolExecutor
-
-
-def run_task(code, task_name):
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as c:
-        print(f"[{task_name}] Started")
-        for line in c.run_code(code):
-            print(f"[{task_name}] {line}")
-        print(f"[{task_name}] Finished")
-
 
 def run_code_test():
     with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
-        code = """print('hello world')"""
-        result = container.run_code(code)
-
-
-def concurrent_test():
-    codes = [
-        ("""
-import time
-for i in range(10):
-    print(f'Code 1: 1.{i}')
-    time.sleep(.1)
-print('Code 1: 2')
-print('Code 1 done')
-    """, "Task 1"),
-        ("""
-import time
-for i in range(10):
-    print(f'Code 2: {i+1} seconds')
-    time.sleep(1)
-print('Code 2 done')
-    """, "Task 2")
-    ]
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(run_task, code, name) for code, name in codes]
-
-    # Wait for all tasks to finish
-    for future in futures:
-        future.result()
+        code = """
+print('hello world')
+open("/out/test.txt", "w").write("hi there!")
+"""
+        return container.run_code(code)
 
 
 if __name__ == "__main__":
-    run_code_test()
+    print(run_code_test())
     # concurrent_test()
