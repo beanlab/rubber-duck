@@ -1,6 +1,5 @@
 import docker
 
-
 class PythonExecContainer():
     def __init__(self, image: str) -> None:
         self.image: str = image
@@ -42,10 +41,38 @@ class PythonExecContainer():
             res = self.container.exec_run(cmd=["python3", "-c", code], stdout=True, stderr=True)
             yield res.output.decode().strip()
 
+# ====== testing concurrency with streaming ====== #
+from concurrent.futures import ThreadPoolExecutor
 
-def run_task(code):
+def run_task(code, task_name):
     with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as c:
-        print("Started")
+        print(f"[{task_name}] Started")
         for line in c.run_code(code):
-            print(line)
-        print("Finished")
+            print(f"[{task_name}] {line}")
+        print(f"[{task_name}] Finished")
+
+if __name__ == "__main__":
+    codes = [
+        ("""
+import time
+for i in range(10):
+    print(f'Code 1: 1.{i}')
+    time.sleep(.1)
+print('Code 1: 2')
+print('Code 1 done')
+""", "Task 1"),
+        ("""
+import time
+for i in range(10):
+    print(f'Code 2: {i+1} seconds')
+    time.sleep(1)
+print('Code 2 done')
+""", "Task 2")
+    ]
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(run_task, code, name) for code, name in codes]
+
+    # Wait for all tasks to finish
+    for future in futures:
+        future.result()
