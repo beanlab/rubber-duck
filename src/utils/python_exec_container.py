@@ -49,13 +49,32 @@ class PythonExecContainer():
             container_dir = os.path.dirname(path)
             self.container.put_archive(container_dir, tarstream.getvalue())
 
+    def _gen_img_description(self, file_path):
+        # This assumes you can access the figure metadata before saving
+        # In practice, have user code save plot title/labels as JSON or .txt next to image
+        # For now, we fall back to generic description
+        return f"Image file: {os.path.basename(file_path)}"
+
     def _read_files(self):
         out_files = {}
         for root, _, files in os.walk(self.out_dir):
             for file in files:
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, self.out_dir)
-                out_files[rel_path] = open(full_path, "rb").read()
+
+                if file.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+                    description = self._gen_img_description(full_path)
+                    with open(full_path, "rb") as f:
+                        out_files[rel_path] = {
+                            "description": description,
+                            "data": f.read()
+                        }
+                else:
+                    with open(full_path, "rb") as f:
+                        out_files[rel_path] = {
+                            "description": "Text output or other file",
+                            "data": f.read()
+                        }
         return out_files
 
     def _wrap_and_execute(self, code: str):
@@ -83,8 +102,11 @@ with open('/out/stdout.txt', 'w') as f:
 def run_code_test():
     with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
         code = """
-print('hello world')
-open("/out/test.txt", "w").write("hi there!")
+import matplotlib.pyplot as plt
+
+plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
+plt.title('Example Plot')
+plt.savefig('/out/plot.png')
 """
         return container.run_code(code)
 
