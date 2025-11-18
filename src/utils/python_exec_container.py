@@ -22,7 +22,12 @@ class PythonExecContainer():
             self.container.stop()
             self.container.remove()
 
-    def run_code(self, code: str, stream_output=True):
+    def run_code(self, code: str):
+        result = self.container.exec_run(cmd=["python3", "-u", "-c", code], stdout=True, stderr=True )
+        output = result.output.decode().strip()
+        return output
+
+    def run_code_concurrent(self, code: str, stream_output=True):
         """
         Run Python code inside the container.
         If stream_output=True, yields output lines in real-time.
@@ -51,7 +56,12 @@ def run_task(code, task_name):
             print(f"[{task_name}] {line}")
         print(f"[{task_name}] Finished")
 
-if __name__ == "__main__":
+def run_code_test():
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
+        code = """print('hello world')"""
+        result = container.run_code(code)
+
+def concurrent_test():
     codes = [
         ("""
 import time
@@ -60,14 +70,14 @@ for i in range(10):
     time.sleep(.1)
 print('Code 1: 2')
 print('Code 1 done')
-""", "Task 1"),
+    """, "Task 1"),
         ("""
 import time
 for i in range(10):
     print(f'Code 2: {i+1} seconds')
     time.sleep(1)
 print('Code 2 done')
-""", "Task 2")
+    """, "Task 2")
     ]
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -76,3 +86,7 @@ print('Code 2 done')
     # Wait for all tasks to finish
     for future in futures:
         future.result()
+
+if __name__ == "__main__":
+    run_code_test()
+    # concurrent_test()
