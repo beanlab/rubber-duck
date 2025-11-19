@@ -73,8 +73,9 @@ class Gradable(TypedDict):
     sections: list[str]
 
 
-class FeedbackSettings(TypedDict):
+class AssignmentFeedbackSettings(TypedDict):
     name: str
+    initial_message: str
     general_requirements: NotRequired[list[Gradable]]
     gradable_assignments: list[Gradable]
     grader_agent: SingleAgentSettings

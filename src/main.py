@@ -9,7 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.workflows.feedback_workflow import FeedbackWorkflow
+from src.workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
@@ -31,7 +31,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig, AgentAsToolSettings, FeedbackSettings
+    DUCK_NAME, DuckConfig, AgentAsToolSettings, AssignmentFeedbackSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -160,10 +160,10 @@ def build_ducks(
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, config, settings, armory)
 
-        elif duck_type == 'feedback':
+        elif duck_type == 'assignment_feedback':
             single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
             project_scanner_agent = build_agent(settings["project_scanner_agent"])
-            ducks[name] = FeedbackWorkflow(
+            ducks[name] = AssignmentFeedbackWorkflow(
                 settings['name'],
                 bot.send_message,
                 settings,
