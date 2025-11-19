@@ -1,46 +1,45 @@
-#&&
-#    -  Solve the problem and pass all the LeetCode tests for the problem
-#    -  Include submission link
-#    -  Include snapshot of your submission in LeetCode. (Must include your username, the problem name, and the passed status.)
-#    -  Theoretical time:
-#        -  Include annotated code in report
-#        -  Annotate all non-trivial parts of your code
-#        -  Provide explanation of time complexity
-#        -  State all assumptions clearly
-#        -  Bold final time complexity
-#    -  Theoretical space:
-#        -  Include annotated code in report
-#        -  Annotate all non-trivial parts of your code
-#        -  Provide explanation of space complexity
-#        -  State all assumptions clearly
-#        -  Bold final space complexity
+Common Setting:
+     &single_problem_requirements
+     -  Solve the problem and pass all the LeetCode tests for the problem
+     -  Include submission link
+     -  Include snapshot of your submission in LeetCode. (Must include your username, the problem name, and the passed status.)
+     - Theoretical time:
+        -  Include annotated code in report
+        -  Annotate all non-trivial parts of your code
+        -  Provide explanation of time complexity
+        -  State all assumptions clearly
+        -  Bold final time complexity
+     - Theoretical space:
+        -  Include annotated code in report
+        -  Annotate all non-trivial parts of your code
+        -  Provide explanation of space complexity
+        -  State all assumptions clearly
+        -  Bold final space complexity
 
 
 Baseline:
-
--  Baseline Problem 1:
-     yamlanchorhere
--  Baseline Problem 2:
-     yamlanchorhere
--  Baseline Problem 3:
-     yamlanchorhere
+  Baseline Problem 1:
+     <<: *single_problem_requirements
+  Baseline Problem 2:
+     <<: *single_problem_requirements
+  Baseline Problem 3:
+     <<: *single_problem_requirements
 
 Core:
 
--  Core Problem 1:
-     yamlanchorhere
--  Core Problem 2:
-     yamlanchorhere
--  Core Problem 3:
-     yamlanchorhere
+  Core Problem 1:
+     <<: *single_problem_requirements
+  Core Problem 2:
+     <<: *single_problem_requirements
+  Core Problem 3:
+     <<: *single_problem_requirements
 
 
 Stretch 1:
 
--  Stretch 1 Problem 1:
-     yamlanchorhere
+  Stretch 1 Problem 1:
+     <<: *single_problem_requirements
 
 Stretch 2:
-
--  Stretch 2 Problem 1:
-     yamlanchorhere
+  Stretch 2 Problem 1:
+     <<: *single_problem_requirements

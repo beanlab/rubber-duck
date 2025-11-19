@@ -23,9 +23,9 @@ FEEDBACK = str
 SATISFACTORY = bool
 
 
-# TODO consider give another chance if they upload no valid reports  the wrong report?
+# TODO consider give another chance if they upload no valid reports the wrong report?
 # TODO ask: step functions?
-
+# TODO consider error handling without a report
 
 class AssignmentFeedbackWorkflow:
     def __init__(self,
@@ -50,10 +50,12 @@ class AssignmentFeedbackWorkflow:
 
     async def __call__(self, context: DuckContext):
         """
-        Assumptions:
-        - Every header in the yaml rubric has a corresponding header in the md report
         - Ideally, the same project name provided in the config is the first level 1 header in the document
-            - If not, an agent scrubs the report for the name
+        - If not, an agent scrubs the report for the name
+        Assumptions about rubric and report:
+        - Every header in the yaml rubric has a corresponding header in the md report.
+            It is assumed the nesting and the names are exactly the same.
+            The root yaml headers correspond to level 2 headers in the markdown
         """
 
         # Send an initial message
@@ -102,6 +104,8 @@ class AssignmentFeedbackWorkflow:
                     yield from helper_func(name, rubric_section[section_name], report_section[section_name])
                 elif isinstance(rubric_section[section_name], list):
                     for section_item in rubric_section[section_name]:
+                        if isinstance(section_item, dict):
+                            helper_func(name, section_item, report_section['contents'])
                         print(name, section_item)
                         yield name[::], section_item, report_section[section_name]
                 name.pop(-1)
@@ -122,7 +126,7 @@ class AssignmentFeedbackWorkflow:
         ]
 
         result = self._unflatten_dictionary(results)
-        return yaml.dump(result, sort_keys=False, width=10 ** 9)
+        return self.dict_to_md(result)
 
     def _get_nested(self, d, keys):
         return reduce(operator.getitem, keys, d)
@@ -220,3 +224,36 @@ class AssignmentFeedbackWorkflow:
                 return message
             except asyncio.TimeoutError:  # Close the thread if the conversation has closed
                 return None
+
+    def dict_to_md(self, d, level=1):
+        """
+        Convert a nested dict of the form
+        {a: {b: {c: [1]}}}
+        into markdown:
+
+        # a
+        ## b
+        ### c
+        - 1
+        """
+        lines = []
+
+        for key, value in d.items():
+            # Header line
+            header_prefix = "#" * level
+            lines.append(f"{header_prefix} {key}")
+
+            # Nested dict → go one level deeper
+            if isinstance(value, dict):
+                lines.append(self.dict_to_md(value, level + 1))
+
+            # List → bullet items
+            elif isinstance(value, list):
+                for item in value:
+                    lines.append(f"- {item}")
+
+            # Fallback: non-dict, non-list leaf
+            else:
+                lines.append(f"- {value}")
+
+        return "\n".join(lines)
