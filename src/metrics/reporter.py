@@ -4,6 +4,8 @@ import sys
 from argparse import ArgumentParser, ArgumentError
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+import yaml
 from dotenv import load_dotenv
 import os
 
@@ -156,9 +158,9 @@ class Reporter:
         output_tokens = pd.to_numeric(row['output_tokens'], errors='coerce')
         
         duck_logger.debug(f"Tokens - Input: {input_tokens}, Output: {output_tokens}")
-        duck_logger.debug(f"Input cost: {input_tokens / 1000 * ip}")
-        duck_logger.debug(f"Output cost: {output_tokens / 1000 * op}")
-        cost = input_tokens / 1000 * ip + output_tokens / 1000 * op
+        duck_logger.debug(f"Input cost: {input_tokens / 1000000 * ip}")
+        duck_logger.debug(f"Output cost: {output_tokens / 1000000 * op}")
+        cost = input_tokens / 1000000 * ip + output_tokens / 1000000 * op
         duck_logger.debug(f"Total computed cost: {cost}")
         return cost
 
@@ -343,6 +345,7 @@ class Reporter:
         parser.add_argument("-avg", "--average", action="store_true", help="Averages, not sums, the ind_var")
         parser.add_argument("-c", "--count", action="store_true", help="Counts, not sums, the ind_var")
         parser.add_argument("-per", "--percent", action="store_true", help="Percent, not sums, the ind_var")
+        parser.add_argument("-tid", "--threadid", help="thread id for cost")
         return parser.parse_args()
 
     def arg_to_string(self, args):
@@ -390,7 +393,11 @@ class Reporter:
             args = self.parse_args(arg_string)
 
             df = self.select_dataframe(args.dataframe)
+            df['cost'] = df.apply(self.compute_cost, axis=1)
+            # df.loc[df['thread_id']==1435368161422606396,'cost'].sum() -- its cheap...
+
             df_limited = self.prepare_df(df, args)
+            sub_df = self.prepare_df(df, {})
             
             if len(df_limited) == 0:
                 return "No data available for this plot."
@@ -462,18 +469,18 @@ if __name__ == '__main__':
     project_root = this_file.parent.parent.parent  # Go up three levels to reach project root
 
     # Use provided config path or fall back to default
-    config_path = Path(args.config) if args.config else project_root / 'config.json'
+    config_path = Path(args.config) if args.config else project_root / 'config.yaml'
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found at {config_path}")
 
-    config = json.loads(config_path.read_text())
+    config = yaml.safe_load(config_path.read_text())
     
     # Create SQL session and initialize handler
     db_name = os.getenv('DB_NAME')  # Get DB_NAME from env
     metrics_db_path = project_root / db_name
     session = create_sql_session({'db_type': 'sqlite', 'database': str(metrics_db_path)})
-    SQLMetricsHandler = SQLMetricsHandler(session)
-    
-    reporter = Reporter(SQLMetricsHandler, config['reporting'], show_fig=True)
+    metrics_handler = SQLMetricsHandler(session)
+
+    reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], False)
 
     reporter.interactive_report()
