@@ -257,9 +257,9 @@ servers:
                 **This feedback is given by AI and may be incorrect.**
                 
                 This generated feedback does **not** check images and may give false feedback regarding images.
-        
+                
                 The rubrics used by AI to grade your project may differ from the ones in Canvas. They may not include the coding requirements.
-        
+                
                 You are responsible for ensuring your report meets the requirements.
                 
                 ------
@@ -302,7 +302,7 @@ servers:
                         satisfactory:
                           type: boolean
                           description: Indicates if the report provided meets the given rubric item
-                      required: ["rubric_item", "justification", "satisfactory"]
+                      required: [ "rubric_item", "justification", "satisfactory" ]
                       additionalProperties: false
 
               project_scanner_agent:
@@ -322,7 +322,7 @@ servers:
                         project_name:
                           type: string
                           description: the name of the project
-                      required: ["project_name"]
+                      required: [ "project_name" ]
                       additionalProperties: false
 
                 reasoning: minimal
