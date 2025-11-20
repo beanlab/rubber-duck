@@ -42,19 +42,37 @@ class PythonExecContainer():
         self.container.exec_run(["mkdir", "-p", path])
         return path
 
-    def _write_files(self, files: dict[str, bytes], path: str):
-        for path, data in files.items():
-            tarstream = io.BytesIO()
-            tar = tarfile.TarFile(fileobj=tarstream, mode='w')
+    def _write_files(self, files: dict[str, bytes], container_dir: str):
+        """
+        Writes a dict of {relative_path: bytes} to the container directory
 
-            info = tarfile.TarInfo(name=os.path.basename(path)) # TODO: change to remote dir
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
-            tar.close()
+        Example:
+            files = {
+                "input.txt": b"...",
+                "subdir/data.json": b"..."
+            }
+
+        container_dir should be a full container path, e.g. "/out/<uuid>"
+        """
+        # iterates over each file to copy into the container
+        for rel_path, data in files.items():
+            dest_path = os.path.join(container_dir, rel_path) # full path to file
+
+            # make sure the directory exists in the container
+            parent_dir = os.path.dirname(dest_path)
+            self.container.exec_run(["mkdir", "-p", parent_dir])
+
+            # Create a tar archive containing just this file
+            tarstream = io.BytesIO()
+            with tarfile.open(fileobj=tarstream, mode="w") as tar:
+                info = tarfile.TarInfo(name=os.path.basename(dest_path))
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+
             tarstream.seek(0)
 
-            container_dir = os.path.dirname(path)
-            self.container.put_archive(container_dir, tarstream.getvalue())
+            # Send archive into the correct directory
+            self.container.put_archive(parent_dir, tarstream.getvalue())
 
     def _gen_img_description(self, file_path):
         # This assumes you can access the figure metadata before saving
@@ -210,7 +228,7 @@ async def run_code_test():
             
             plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
             plt.title('Example Plot')
-            plt.savefig('/out/plot.png')
+            plt.savefig('plot.png')
             time.sleep(1)
             print("end", time.time())
             """)
