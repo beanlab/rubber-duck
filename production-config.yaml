@@ -246,8 +246,9 @@ servers:
                   - name: Lecture Sections
                     pattern: "lecture-"
                     description: Who teaches your lecture?
-          - channel_id: TBD
-            channel_name: assignment_feedback
+      - channel_id: 1441162951968166051
+        channel_name: ai-project-feedback
+        ducks:
           - name: cs312-grader
             duck_type: assignment_feedback
             settings:
