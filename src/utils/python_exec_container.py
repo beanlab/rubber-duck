@@ -156,54 +156,95 @@ class PythonExecContainer():
             import traceback
             import os
             import json
-            
-            # === Redirect stdout/stderr ===
-            sys.stdout = open('{path}/stdout.txt', 'w')
+
+            outdir = {path!r}  # <-- make directory available in the wrapper
+
+            # ===== Redirect stdout/stderr ===== #
+            sys.stdout = open(f"{path}/stdout.txt", "w")
             sys.stderr = sys.stdout
             
-            # === Patch matplotlib to auto-save metadata ===
+
+            # ===== Patch matplotlib to auto-save metadata ===== #
             try:
                 import matplotlib.pyplot as plt
                 import matplotlib.figure
-            
+
                 _original_savefig = plt.Figure.savefig
-            
+                
+                # ===== plot type detector function ===== # 
+                def detect_plot_type(ax):
+                    if ax.lines:
+                        return "line"
+                    if ax.collections:
+                        return "scatter_or_heatmap"
+                    if ax.patches:
+                        return "bar_or_hist"
+                    if ax.images:
+                        return "image"
+                    return "unknown"
+
+                # ===== save fig metadata to .json file with same name as the fig ===== #
                 def savefig_with_metadata(self, *args, **kwargs):
-                    # Determine file path
-                    path = args[0] if args else kwargs.get('fname', 'figure.png')
-                    # Call original savefig
+                    # Extract original user filename
+                    if args:
+                        orig = args[0]
+                        new_path = os.path.join(outdir, os.path.basename(orig))
+                        args = (new_path, *args[1:])
+                    else:
+                        orig = kwargs.get("fname", "figure.png")
+                        new_path = os.path.join(outdir, os.path.basename(orig))
+                        kwargs["fname"] = new_path
+
+                    # Call original savefig using rewritten path
                     _original_savefig(self, *args, **kwargs)
-            
-                    # Extract metadata if axes exist
+
+                    # Build metadata
                     if self.axes:
                         ax = self.axes[0]
-                        metadata = {{
+                        metadata = {
                             "title": ax.get_title(),
                             "xlabel": ax.get_xlabel(),
                             "ylabel": ax.get_ylabel(),
-                            "plot_type": "line" if ax.lines else "unknown"
-                        }}
+                            "plot_type": detect_plot_type(ax)
+                        }
                     else:
-                        metadata = {{"title": "", "xlabel": "", "ylabel": "", "plot_type": "unknown"}}
-            
-                    # Save metadata next to image
-                    meta_path = os.path.splitext(path)[0] + ".json"
-                    with open(meta_path, 'w') as f:
-                        json.dump(metadata, f)
-            
+                        metadata = {
+                            "title": "", 
+                            "xlabel": "", 
+                            "ylabel": "", 
+                            "plot_type": "unknown"
+                        }
+
+                    # Save metadata for all axes
+                    for i, ax in enumerate(self.axes):
+                        metadata = {
+                            "title": ax.get_title(),
+                            "xlabel": ax.get_xlabel(),
+                            "ylabel": ax.get_ylabel(),
+                            "plot_type": detect_plot_type(ax)
+                        }
+                        # save JSON per axis
+                        if len(self.axes) == 1:
+                            meta_path = os.path.splitext(new_path)[0] + ".json"
+                        else:
+                            base, ext = os.path.splitext(new_path)
+                            meta_path = f"{{base}}_ax{{i}}.json"
+                        with open(meta_path, "w") as f:
+                            json.dump(metadata, f)
+
                 plt.Figure.savefig = savefig_with_metadata
             except ImportError:
-                # matplotlib not installed; ignore
                 pass
-            
+
             # === Execute user code safely ===
             try:
-                exec({code!r})
+                exec({code!r}) # !r calls repr on the string, making it safe
             except Exception:
                 traceback.print_exc(file=sys.stdout)
             finally:
                 sys.stdout.flush()
-            """)
+        """)
+
         return self.container.exec_run(["python3", "-u", "-c", wrapped_code])
 
     def _run_code(self, code: str, files: dict = None): # returns json object containing all the output files and their data
