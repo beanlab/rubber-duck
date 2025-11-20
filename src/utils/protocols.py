@@ -54,4 +54,8 @@ class CreateThread(Protocol):
 
 
 class ConversationComplete(BaseException):
-    pass
+    def __init__(self, message=None):
+        if message is not None:
+            super().__init__(message)
+        else:
+            super().__init__()

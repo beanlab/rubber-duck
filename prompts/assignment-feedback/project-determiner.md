@@ -8,7 +8,7 @@ Your final output must be a `project_name: str`
 
 * **Output** Ensure your final response matches **exactly** with project names provided
 
-### Example
+### Example 1
 
 <input>
 <options>
@@ -38,5 +38,33 @@ Your final output must be a `project_name: str`
 <final-output><
 {
     "project_name": "Project Mock",
+}
+/final-output>
+
+### Example 2
+
+If none of the provided projects appear to match the uploaded report, simply return "No matches"
+
+<input>
+    <options>
+    ["Project Mock",
+    "Project RSA",
+    "Project SCC"]
+    </options>
+
+    <report>
+    
+    # Project Brownie Recipe
+    
+    ### Section 2
+    
+    *Fill me in*
+    
+    </report>
+</input>
+
+<final-output><
+{
+    "project_name": "No matches",
 }
 /final-output>

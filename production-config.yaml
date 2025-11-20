@@ -248,67 +248,84 @@ servers:
                     description: Who teaches your lecture?
           - channel_id: TBD
             channel_name: assignment_feedback
-            ducks:
-              - name: cs312-grader
-                duck_type: assignment_feedback
-                settings:
-                  name: cs312-projects
-                  initial_message: |
-                    This feedback is given by AI and may be incorrect and may not reflect your final grade.
-                    This generated feedback does **not** check images and may give false feedback regarding images.
-                    You are responsible for ensuring your report meets the requirements.
-                  gradable_assignments:
-                    - name: Project Small Mock
-                      rubric_path: rubrics/small-mock-project-rubric.yaml
+          - name: cs312-grader
+            duck_type: assignment_feedback
+            settings:
+              name: cs312-projects
+              initial_message: |
+                
+                **This feedback is given by AI and may be incorrect.**
+                
+                This generated feedback does **not** check images and may give false feedback regarding images.
+        
+                The rubrics used by AI to grade your project may differ from the ones in Canvas. They may not include the coding requirements.
+        
+                You are responsible for ensuring your report meets the requirements.
+                
+                ------
 
-                  single_rubric_item_grader:
-                    # This agent expects a part of a report and a single requirement
-                    name: grader
-                    engine: gpt-5-mini
-                    prompt_files:
-                      - prompts/assignment-feedback/tier-grader-structured-output-single.md
-                    reasoning: minimal
-                    output_format:
-                      format:
-                        type: json_schema
-                        name: grading_output
-                        strict: true
-                        schema:
-                          type: object
-                          properties:
-                            rubric_item:
-                              type: string
-                              description: same exact rubric item provided to you
-                            justification:
-                              type: string
-                              description: Justification for if the report satisfied the requirement
-                            satisfactory:
-                              type: boolean
-                              description: Indicates if the report provided meets the given rubric item
-                          required: [ "rubric_item", "justification", "satisfactory" ]
-                          additionalProperties: false
+              gradable_assignments:
+                - name: Mock Project
+                  rubric_path: rubrics/mock-project-rubric.yaml
+                  message: |
+                    Please note this is a fake project (:
+                - name: Project Alignment
+                  rubric_path: rubrics/alignment-rubric.yaml
+                - name: Project Backtracking
+                  rubric_path: rubrics/backtracking-rubric.yaml
+                - name: Project Branch and Bound
+                  rubric_path: rubrics/branch-and-bound-rubric.yaml
+                - name: Project Leetcode
+                  rubric_path: rubrics/leetcode-rubric.yaml
 
-                  project_scanner_agent:
-                    # This agent gets the desired report and section name(s) from the user based on the report
-                    name: project_scanner
-                    engine: gpt-5-nano
-                    prompt_files:
-                      - prompts/assignment-feedback/project-determiner.md
-                    output_format:
-                      format:
-                        type: json_schema
-                        name: project_name
-                        strict: true
-                        schema:
-                          type: object
-                          properties:
-                            project_name:
-                              type: string
-                              description: the name of the project
-                          required: [ "project_name" ]
-                          additionalProperties: false
+              single_rubric_item_grader:
+                # This agent expects a part of a report and a single requirement
+                name: grader
+                engine: gpt-5-mini
+                prompt_files:
+                  - prompts/assignment-feedback/tier-grader-structured-output-single.md
+                reasoning: minimal
+                output_format:
+                  format:
+                    type: json_schema
+                    name: grading_output
+                    strict: true
+                    schema:
+                      type: object
+                      properties:
+                        rubric_item:
+                          type: string
+                          description: same exact rubric item provided to you
+                        justification:
+                          type: string
+                          description: Justification for if the report satisfied the requirement
+                        satisfactory:
+                          type: boolean
+                          description: Indicates if the report provided meets the given rubric item
+                      required: ["rubric_item", "justification", "satisfactory"]
+                      additionalProperties: false
 
-                    reasoning: minimal
+              project_scanner_agent:
+                # This agent gets the desired report and section name(s) from the user based on the report
+                name: project_scanner
+                engine: gpt-5-mini
+                prompt_files:
+                  - prompts/assignment-feedback/project-determiner.md
+                output_format:
+                  format:
+                    type: json_schema
+                    name: project_name
+                    strict: true
+                    schema:
+                      type: object
+                      properties:
+                        project_name:
+                          type: string
+                          description: the name of the project
+                      required: ["project_name"]
+                      additionalProperties: false
+
+                reasoning: minimal
 
         timeout: 600
 

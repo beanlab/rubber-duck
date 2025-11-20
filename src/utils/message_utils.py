@@ -2,6 +2,7 @@ from quest import queue
 from ..utils.protocols import Message
 import asyncio
 
+
 async def wait_for_message(self, timeout=300) -> Message | None:
     async with queue('messages', None) as messages:
         try:
@@ -9,3 +10,4 @@ async def wait_for_message(self, timeout=300) -> Message | None:
             return message
         except asyncio.TimeoutError:  # Close the thread if the conversation has closed
             return None
+

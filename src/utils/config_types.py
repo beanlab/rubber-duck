@@ -70,16 +70,14 @@ class SingleAgentSettings(TypedDict):
 class Gradable(TypedDict):
     name: str
     rubric_path: str
-    sections: list[str]
-
+    message: NotRequired[str]
 
 class AssignmentFeedbackSettings(TypedDict):
     name: str
     initial_message: str
-    general_requirements: NotRequired[list[Gradable]]
     gradable_assignments: list[Gradable]
-    grader_agent: SingleAgentSettings
-
+    single_rubric_item_grader: SingleAgentSettings
+    project_scanner_agent: SingleAgentSettings
 
 class RubricItemResponse(TypedDict):
     rubric_item: str

@@ -1,74 +1,90 @@
 Project Report - Backtracking:
   Baseline:
     Design Experience:
-      - State your discussion partner.
-      - Provide a brief summary of your conversation about your Greedy TSP design.
+      - State your discussion partner
+      - Provide a brief summary of your conversation
     Theoretical Analysis - Greedy:
-      Space:
-        - Include annotated Greedy TSP code in the report for space analysis.
-        - Annotate all non-trivial parts of your Greedy TSP code relevant to space usage.
-        - Provide an explanation of the space complexity of the Greedy TSP algorithm.
-        - State all assumptions clearly when deriving the space complexity.
-        - Bold the final space complexity in your writeup.
       Time:
-        - Include annotated Greedy TSP code in the report for time analysis.
-        - Annotate all non-trivial parts of your Greedy TSP code relevant to time usage.
-        - Provide an explanation of the time complexity of the Greedy TSP algorithm.
-        - State all assumptions clearly when deriving the time complexity.
-        - Bold the final time complexity in your writeup.
+        - Include annotated code in report
+        - Annotate all non-trivial parts of your code
+        - Provide explanation of time complexity
+        - State all assumptions clearly
+        - Bold final time complexity
+      Space:
+        - Include annotated code in report
+        - Annotate all non-trivial parts of your code
+        - Provide explanation of space complexity
+        - State all assumptions clearly
+        - Bold final space complexity
     Empirical Data - Greedy:
-        - Fill in the empirical runtimes table for the Greedy TSP algorithm.
+      - Fill in table
     Comparison of Theoretical and Empirical Results - Greedy:
-      - Provide a plot comparing the theoretical time complexity of Greedy TSP to the observed runtimes.
-      - Explain whether the theoretical and empirical results match; if not, include a plot with a better-fitting theoretical complexity and briefly discuss which parts of your code might account for the differences.
-
+      - Provide plot comparing theoretical time complexity to observed runtimes
+      - If theoretical and empirical results match
+          - Simply state this
+      - If they do not match
+          - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
+          - Provide a brief discussion explaining what sections of your code might account for the difference.
   Core:
     Design Experience:
-      - State your discussion partner.
-      - Provide a brief summary of your conversation about your Backtracking TSP and plotting strategy.
+      - State your discussion partner
+      - Provide a brief summary of your conversation
     Theoretical Analysis - Backtracking:
-      Space:
-        - Include annotated Backtracking TSP code in the report for space analysis.
-        - Annotate all non-trivial parts of your Backtracking TSP code relevant to space usage.
-        - Provide an explanation of the space complexity of the Backtracking TSP algorithm.
-        - State all assumptions clearly when deriving the space complexity.
-        - Bold the final space complexity in your writeup.
       Time:
-        - Include annotated Backtracking TSP code in the report for time analysis.
-        - Annotate all non-trivial parts of your Backtracking TSP code relevant to time usage.
-        - Provide an explanation of the time complexity of the Backtracking TSP algorithm.
-        - State all assumptions clearly when deriving the time complexity.
-        - Bold the final time complexity in your writeup.
-    Comparison of Theoretical and Empirical Results - Backtracking:
-      - Provide a plot comparing the theoretical time complexity of Backtracking TSP to the observed runtimes.
-      - Explain whether the theoretical and empirical results match; if not, include a plot with a better-fitting theoretical complexity and briefly discuss which parts of your Backtracking implementation might account for the differences.
+        - Include annotated code in report
+        - Annotate all non-trivial parts of your code
+        - Provide explanation of time complexity
+        - State all assumptions clearly
+        - Bold final time complexity
+      Space:
+        - Include annotated code in report
+        - Annotate all non-trivial parts of your code
+        - Provide explanation of space complexity
+        - State all assumptions clearly
+        - Bold final space complexity
     Empirical Data - Backtracking:
-      - Fill in the empirical runtimes table for the Backtracking TSP algorithm.
+      - Fill in table
+    Comparison of Theoretical and Empirical Results - Backtracking:
+      - Provide plot comparing theoretical time complexity to observed runtimes
+      - If theoretical and empirical results match
+          - Simply state this
+      - If they do not match
+          - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
+          - Provide a brief discussion explaining what sections of your code might account for the difference.
     Greedy v Backtracking:
-      - Briefly comment on any differences you notice between the Greedy and Backtracking algorithms.
-      - Create a plot with both Greedy and Backtracking showing problem size versus runtime on the same axes.
+      - Briefly comment on any differences you notice between Greedy and Backtracking
+      - Create a plot with both greedy and backtracking size vs runtimes
     Water Bottle Scenario:
       Scenario 1:
-        - Include the algorithm you would recommend for the Warehouse Maze scenario (and describe any modifications you would make to the algorithm, if applicable).
-        - Justify why you would select that algorithm for this scenario.
+        - Include the algorithm you would recommend (if applicable, describe any modifications you would make the algorithm)
+        - Justify why you would select that algorithm
       Scenario 2:
-        - Include the algorithm you would recommend for the Seasonal Scheduling scenario (and describe any modifications you would make to the algorithm, if applicable).
-        - Justify why you would select that algorithm for this scenario.
-
-  #Project Review: '*Fill me in*'
-  #Stretch 1:
-  #  BSSF Backtracking v Backtracking Complexity Differences: '*Fill me in*'
-  #  Demonstrate BSSF Backtracking Works Better than No-BSSF Backtracking: '*Fill me
-  #      in*'
-  #  Design Experience: '*Fill me in*'
-  #  Time v Solution Cost: '![Plot]()
-  #
-  #
-  #      *Fill me in*'
-  #Stretch 2:
-  #  Cut Tree: '*Fill me in*'
-  #  Design Experience: '*Fill me in*'
-  #  Plots: '*Fill me in*'
-  #
-  #
-  #Process finished with exit code 0
+        - Include the algorithm you would recommend (if applicable, describe any modifications you would make the algorithm)
+        - Justify why you would select that algorithm
+  Stretch 1:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Demonstrate BSSF Backtracking Works Better than No-BSSF Backtracking:
+      - Demonstrate at least one case (seed, size, runtime, scores) where your BSSF Backtracking algorithm does better than your Backtracking algorithm
+      - In addition to the scores of each algorithm, specify the seed, size, and runtime for your example.
+    BSSF Backtracking v Backtracking Complexity Differences:
+      - Comment on whether the theoretical complexity from your previous Backtracking theoretical analysis has changed. Justify your response.
+    Time v Solution Cost:
+      - Collect empirical data
+      - Create plots for time vs solution cost for Greedy, Basic Backtracking, BSSF Backtracking, and Random (we have provided this last algorithm in random_tour)
+      - Use the same generated graph and same timeout for each algorithm so there is a fair comparison
+      - Use as large a number of nodes as you can while still getting meaningful results (for most machines, this is somewhere between 15 and 30 nodes)
+      - Discuss the results from your plots for time vs solution cost. What do you notice? Was there anything unexpected? How do the algorithms differ?
+  Stretch 2:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Cut Tree:
+      - Look at the cuttree.py file and provide a brief description of how the CutTree class works
+    Plots:
+      - Fill in the remaining SolutionStat metrics for Backtracking
+      - Create at least 4 more interesting plots using the additional metrics from SolutionStats (i.e., max_queue_size, n_nodes_expanded, n_nodes_pruned, n_leaves_covered, fraction_leaves_covered)
+      - For each plot, briefly discuss your results and what insights you gain
+  Project Review:
+    - Includes name of partner and a summary of the project review

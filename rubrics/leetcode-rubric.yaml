@@ -2,13 +2,13 @@ _: &single_problem_requirements
   - Solve the problem and pass all the LeetCode tests for the problem
   - Include submission link
   - Include snapshot of your submission in LeetCode. (Must include your username, the problem name, and the passed status.)
-  - Theoretical time:
+  - Time Complexity:
       - Include annotated code in report
       - Annotate all non-trivial parts of your code
       - Provide explanation of time complexity
       - State all assumptions clearly
       - Bold final time complexity
-  - Theoretical space:
+  - Space Complexity:
       - Include annotated code in report
       - Annotate all non-trivial parts of your code
       - Provide explanation of space complexity
