@@ -31,7 +31,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig, AgentAsToolSettings, AssignmentFeedbackSettings
+    DUCK_NAME, DuckConfig, AgentAsToolSettings
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
