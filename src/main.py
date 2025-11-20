@@ -277,9 +277,6 @@ async def main(config: Config, log_dir: Path):
 
 
 async def _main(config: Config, log_dir: Path):
-    from dotenv import load_dotenv
-    load_dotenv()
-
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
