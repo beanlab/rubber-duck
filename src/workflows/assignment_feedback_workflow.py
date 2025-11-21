@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 import json
 import yaml
@@ -50,11 +51,10 @@ class AssignmentFeedbackWorkflow:
             - The structure rubric and report should match exactly. The nesting and the names should align.
             - safe_yaml.loads() from the rubric and mdd.loads() from the report should result in the same dictionary structure
             - The report content in the corresponding section in the rubric will be what will be graded for that rubric item
-
-        If there are any lists in the rubric that contain rubric items and a header, the report content those rubric items will
-        be graded are is directly under the header.
+            - Headers and rubric items cannot be mixed on the same level
 
         Any top level headers in rubric yaml starting with '_' will be ignored.
+        The grading will grade based on the rubric. If there are additional sections in the md, they will be ignored.
 
         Ideally, the project name provided in the config and the first level 1 header in the document align.
         If not, an agent scrubs the report to determine the corresponding report.
@@ -64,14 +64,16 @@ class AssignmentFeedbackWorkflow:
         ```yaml
         Project Fruit:
            Section 1:
-              - Rubric item to talk about oranges
               Subsection 1:
                 - Rubric item to talk about apples
-              Subsecton 2:
+              Section 2:
                 - Rubric item to talk about bananas
            Section 2:
               - Rubric item to talk about cars
-        _header:
+           _Section 3:
+              - This rubric item and section will **not** be ignored because it is not a top level header
+
+        _private_header:
             - This header, and anything in this section, will be ignored.
             - This may be useful for yaml anchors
 
@@ -80,7 +82,6 @@ class AssignmentFeedbackWorkflow:
         ```md
         # Project Fruit
         ## Section 1
-        This is would be graded on the rubric item about oranges
         ### Subsection 1
         This is the section that would be graded on talking about apples.
         ### Subsection 2
@@ -113,7 +114,7 @@ class AssignmentFeedbackWorkflow:
 
             # break up the report into small pieces to grade with the associated rubric item
             tasks = [
-                asyncio.create_task(self._single_item_ai_grader(context, piece_name, report_section, rubric_item))
+                asyncio.create_task(self._single_item_grader(context, piece_name, report_section, rubric_item))
                 for piece_name, rubric_item, report_section in
                 self._flatten_report_and_rubric_items(report_contents, self._assignments_rubrics[project_name])
             ]
@@ -130,8 +131,6 @@ class AssignmentFeedbackWorkflow:
             print("\n\nEXCEPTION:\n\n", e)
             await self._send_message(context.thread_id, str(e))
             return
-        except Exception as e:
-            duck_logger.warn(e)
 
     def _get_project_specific_message(self, project_name):
         gradables = self._settings['gradable_assignments']
@@ -155,14 +154,7 @@ class AssignmentFeedbackWorkflow:
                     yield from helper_func(name, rubric_section[section_name], report_section[section_name])
                 elif isinstance(rubric_section[section_name], list):
                     for section_item in rubric_section[section_name]:
-                        if isinstance(section_item, dict):
-                            yield from helper_func(name, section_item, report_section[section_name])
-                        else:
-                            report_content = report_section[section_name]
-                            if isinstance(report_content, dict):
-                                report_content = report_content.get('content', '')
-
-                            yield name[::], section_item, report_content
+                        yield name[::], section_item, report_section[section_name]
                 name.pop(-1)
 
         try:
@@ -274,8 +266,20 @@ class AssignmentFeedbackWorkflow:
             return file_contents
         raise ConversationComplete("No md report was not uploaded")
 
-    async def _single_item_ai_grader(self, context, piece_name, report_section, rubric_item) -> tuple[
+    def _report_section_not_filled_in(self, report_section):
+        cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section))
+        return cleaned_report_section.strip().lower() == "fill me in"
+
+    async def _single_item_grader(self, context, piece_name, report_section, rubric_item) -> tuple[
         list[SECTION_NAME], RubricItemResponse]:
+
+        if self._report_section_not_filled_in(report_section):
+            return piece_name, RubricItemResponse(
+                rubric_item=rubric_item,
+                justification="Report section is not filled in.",
+                satisfactory=False
+            )
+
         input = {"report_contents": report_section,
                  "rubric_item": rubric_item}
         raw_response = await self._ai_client.run_agent(context, self._single_rubric_item_grader, str(input))
@@ -307,10 +311,7 @@ class AssignmentFeedbackWorkflow:
             # List → bullet items or recurse
             elif isinstance(value, list):
                 for item in value:
-                    if isinstance(item, dict):
-                        lines.append(self._dict_to_md(item, level + 1))
-                    else:
-                        lines.append(f"- {item}")
+                    lines.append(f"- {item}")
 
             # Fallback: non-dict, non-list leaf
             else:
