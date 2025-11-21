@@ -16,7 +16,7 @@ class PythonExecContainer():
         self.container = None
         self._working_dir = '/home/sandbox/out'
 
-    def __enter__(self):
+    def __enter__(self) -> "PythonExecContainer":
         # start docker container
         # duck_logger.info(f"Starting container from image: {self.image}")
         self.container = self.client.containers.run(
@@ -26,20 +26,20 @@ class PythonExecContainer():
         )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         # Stop and remove container
         if self.container:
             self.container.stop()
             self.container.remove()
 
     def _mkdir(self, path: str) -> str:
-        """Makes a directory in the tmpfs /out directory"""
-        res = self.container.exec_run(["mkdir", "-p", path])
+        """Makes a directory in the tmpfs /out directory and returns the path"""
+        self.container.exec_run(["mkdir", "-p", path])
         return path
 
-    def _write_file(self, rel_path: str, data: bytes, container_dir: str):
+    def _write_file(self, rel_path: str, data: bytes, container_dir: str) -> int:
         """
-        Writes a dict of {relative_path: bytes} to the container directory
+        Writes a dict of {relative_path: bytes} to the container directory and returns exit code
 
         Example:
             files = {
@@ -65,9 +65,11 @@ class PythonExecContainer():
         tarstream.seek(0)
 
         # Send archive into the correct directory
-        self.container.put_archive(parent_dir, tarstream.getvalue())
+        res = self.container.put_archive(parent_dir, tarstream.getvalue())
+        return res.exit_code
 
     def _get_description(self, path: str, filename: str, json_files: set[str]) -> str:
+        """Returns the description of a file contained in its corresponding json file"""
         if filename == "stdout.txt":
             return "stdout/stderr"
 
@@ -98,12 +100,12 @@ class PythonExecContainer():
                 key=lambda item: int(item[0].split("_ax")[-1].split(".")[0])
             )
 
-            # Now enumerate descriptions in order
+            # enumerate descriptions in order
             parts = []
             for idx, desc in enumerate(sorted_items):
                 parts.append(f"subplot {idx}: {desc}")
 
-            return f"\n\t\tfigure with {len(parts)} subplots: [\n\t\t\t" + ";\n\t\t\t".join(parts) + "\n\t]"
+            return f"figure with {len(parts)} subplots: [" + "; ".join(parts) + "]"
 
         # ===== otherwise fall back to single json behavior ===== #
         single_json = base + ".json"
@@ -121,11 +123,11 @@ class PythonExecContainer():
             except Exception:
                 return "unknown image"
 
-        # ---- 4. No metadata found ----
+        # if no metadata found
         return "unknown image"
 
-    def _read_file(self, path):
-        """Reads a file from a full path, e.g. '/out/<uuid>/file.txt'"""
+    def _read_file(self, path) -> bytes:
+        """Reads a file from a full path, e.g. '/out/<uuid>/file.txt' and returns its contents"""
         stream, _ = self.container.get_archive(path)
         tar_bytes = b"".join(stream)
         tarstream = io.BytesIO(tar_bytes)
@@ -150,20 +152,19 @@ class PythonExecContainer():
         """
         out_files = {}
 
-        # Run `ls` inside container to list directory contents
-        cmd = f"ls -1 {path}"
-        exit_code, output = self.container.exec_run(cmd)
+        # run ls inside container to list directory contents
+        exit_code, dirs = self.container.exec_run(f"ls -1 {path}")
 
         if exit_code != 0:
             raise FileNotFoundError(f"Directory not found in container: {path}")
 
-        filenames = output.decode().splitlines()
+        filenames = dirs.decode().splitlines()
         json_files = {f for f in filenames if f.endswith(".json")}
 
         print("\nFiles found:")
         for filename in filenames:
             # skip json files
-            print("\t",filename)
+            print("\t", filename)
             if filename.endswith(".json"):
                 continue
 
@@ -180,9 +181,8 @@ class PythonExecContainer():
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str):
-        # Ensure the output directory exists
-
+    def _wrap_and_execute(self, code: str, path: str) -> int:
+        """Wraps the code before execution and returns the exit code"""
         wrapped_code = dedent(f"""\
             import sys
             import traceback
@@ -255,20 +255,21 @@ class PythonExecContainer():
                 sys.stdout.close()
         """)
 
-        # Execute inside the container
+        # execute inside the container
         res = self.container.exec_run(["python3", "-u", "-c", wrapped_code])
-        return res
+        return res.exit_code
 
-    def _run_code(self, code: str, files: dict = None):
-        id = str(uuid.uuid4())
-        dir_path = self._mkdir(f'{self._working_dir}/{id}')
+    def _run_code(self, code: str, files: dict = None) -> dict[str, dict[str, str] | bytes]:
+        unique_id = str(uuid.uuid4())
+        dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
         self._wrap_and_execute(code, dir_path)
         return self._read_files(dir_path)
 
-    async def run_code(self, code: str, files: dict = None):
+    async def run_code(self, code: str, files: dict = None) -> dict[str, dict[str, str] | bytes]:
+        """Takes python code to execute and an optional list of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
 
@@ -323,10 +324,13 @@ async def async_run_code_test():
 
 if __name__ == "__main__":
     output = asyncio.run(run_code_test())
-    print("\nOutput description content")
+    print("\nOutput descriptions:")
     for file in output:
-        print("\t",file, end=": ")
-        print(output[file]['description'])
+        print("\t", file, end=": ")
+        print(output[file]['description'], end="")
+        if file.endswith(".txt"):
+            print(";", output[file]["data"], end="")
+        print()
     # output1 = asyncio.run(async_run_code_test())
     # for dict in output1:
     #     for file in dict:
