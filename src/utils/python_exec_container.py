@@ -79,6 +79,8 @@ class PythonExecContainer():
         )
 
         description = "unknown image"
+        if filename == "stdout.txt":
+            description = "stdout/stderr"
         json_name = filename.rsplit(".", 1)[0] + ".json"
         if json_name in json_files:
             try:
