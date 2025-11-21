@@ -88,6 +88,9 @@ class AssignmentFeedbackWorkflow:
         This section would be graded on talking about bananas
         ## Section 2
         This section would be graded on talking about cars
+        ### Section 3
+        This section would be ignored because it is not included in the rubric.
+        it would **not** be graded or looked at.
         ```
 
         """
