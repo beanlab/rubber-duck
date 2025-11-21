@@ -1,0 +1,16 @@
+Project Demo Fruit:
+  Section 1:
+    Subsection 1:
+      - Rubric item to talk about apples
+      - Rubric item to talk about oranges
+    Subsection 2:
+      - Rubric item to talk about bananas
+  Section 2:
+    - Rubric item to talk about raspberries
+  _Section3:
+    - Talk about blueberries: This rubric item and section will **not** be ignored because it is not a top level header
+  Section 4:
+    - Mention any fruit
+_private_header:
+  - This header, and anything in this section, will be ignored.
+  - This may be useful for yaml anchors

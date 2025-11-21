@@ -47,32 +47,47 @@ class AssignmentFeedbackWorkflow:
 
     async def __call__(self, context: DuckContext):
         """
-        Assumptions about rubric and report:
-            - The structure rubric and report should match exactly. The nesting and the names should align.
-            - safe_yaml.loads() from the rubric and mdd.loads() from the report should result in the same dictionary structure
-            - The report content in the corresponding section in the rubric will be what will be graded for that rubric item
-            - Headers and rubric items cannot be mixed on the same level
+        This workflow allows for grading of md reports based on yaml rubrics provided in the config.
 
-        Any top level headers in rubric yaml starting with '_' will be ignored.
-        The grading will grade based on the rubric. If there are additional sections in the md, they will be ignored.
+        Rubrics:
+           - File paths are specified in the config with a project name
+           - Rubrics are loaded via safe_yaml.loads()
+           - Any top level headers starting with '_' will be ignored.
+           - Headers and rubric items cannot be mixed on the same level of nesting
 
-        Ideally, the project name provided in the config and the first level 1 header in the document align.
-        If not, an agent scrubs the report to determine the corresponding report.
+        Reports:
+           - are loaded via markdowndata.loads()
+           - All sections present in the rubric should have corresponding sections in the markdown file
+               - Both the nesting and the names should align **exactly**
+           - Everything in md report section under a corresponding header in the yaml with rubric items
+             will be included when grading for that rubric item
+           - Additional sections in the md, without corresponding headers in the yaml, will be ignored
+           - Ideally, the project name provided in the config and the first level 1 header in the markdown document align.
+                If not, an agent scrubs the report to determine the corresponding report.
 
-        Rubric and Project Report Example
+        Grading:
+            - Each rubric item is graded independently of the other rubric items.
+            - When a rubric item is graded, it includes whether the rubric item was met (T/F) and justification
+              for if it was met
+            - If the report section only contains 'fill me in' after removing any special characters, that rubric item
+              will not be considered met and the justification provided is "Report section is not filled in."
+
+        **Rubric and Project Report Example**
 
         ```yaml
         Project Fruit:
            Section 1:
               Subsection 1:
                 - Rubric item to talk about apples
-              Section 2:
+                - Rubric item to talk about oranges
+              Subsection 2:
                 - Rubric item to talk about bananas
            Section 2:
-              - Rubric item to talk about cars
-           _Section 3:
-              - This rubric item and section will **not** be ignored because it is not a top level header
-
+              - Rubric item to talk about raspberries
+           _Section3:
+              - Talk about blueberries: This rubric item and section will **not** be ignored because it is not a top level header
+           Section 4:
+              - Mention any fruit
         _private_header:
             - This header, and anything in this section, will be ignored.
             - This may be useful for yaml anchors
@@ -81,16 +96,47 @@ class AssignmentFeedbackWorkflow:
 
         ```md
         # Project Fruit
+
+        ## Section 1
+
+        ### Subsection 1
+        This is the section that would be graded on both talking about apples and oranges.
+
+        ### Subsection 2
+        Everything under this heading (including Subsubsection and is contents) would be graded on talking about bananas
+
+        #### SubSubSection
+        This section will be included when grading on any of the rubric items for subsection 1 including about bananas
+
+        ## Section 2
+        This section would be graded on talking about raspberries
+
+        ## _Section3
+        This section would be graded on talking about blueberries
+
+        ## Section 4
+        **Fill me in**
+
+        ## Section 5
+        This section would be ignored because it is not included in the rubric nor is it a subsection of another section with rubric items.
+        It would **not** be graded or looked at.
+        ```
+
+        Example Output:
+        ```md
+        # Project Fruit
         ## Section 1
         ### Subsection 1
-        This is the section that would be graded on talking about apples.
+        - :white_check_mark: **Rubric item to talk about apples** - Report mentions apples explicitly
+        - :white_check_mark: **Rubric item to talk about oranges** - Report mentions oranges explicitly
         ### Subsection 2
-        This section would be graded on talking about bananas
+        - :white_check_mark: **Rubric item to talk about bananas** - Report explicitly states grading focuses on talking about bananas
         ## Section 2
-        This section would be graded on talking about cars
-        ### Section 3
-        This section would be ignored because it is not included in the rubric.
-        it would **not** be graded or looked at.
+        - :white_check_mark: **Rubric item to talk about raspberries** - Report explicitly mentions raspberries
+        ## _Section3
+        - :white_check_mark: **Talk about blueberries** - Report explicitly mentions blueberries
+        ## Section 4
+        - :x: **Mention any fruit** - Report section is not filled in.
         ```
 
         """

@@ -263,13 +263,16 @@ servers:
                 
                 You are responsible for ensuring your report meets the requirements.
                 
+                Please also note the project reports may have been updated slightly since you downloaded your report. 
+                You may need to download the most recent project report from Canvas or update yours to match the expected formatting. 
+                
                 ------
 
               gradable_assignments:
-                - name: Mock Project
-                  rubric_path: rubrics/mock-project-rubric.yaml
+                - name: Project Demo Fruit
+                  rubric_path: rubrics/fruit-rubric.yaml
                   message: |
-                    Please note this is a fake project (:
+                    Please note this is a demo project (:
                 - name: Project Alignment
                   rubric_path: rubrics/alignment-rubric.yaml
                 - name: Project Backtracking
@@ -278,7 +281,6 @@ servers:
                   rubric_path: rubrics/branch-and-bound-rubric.yaml
                 - name: Project Leetcode
                   rubric_path: rubrics/leetcode-rubric.yaml
-
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
                 name: grader
