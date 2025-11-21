@@ -4,9 +4,9 @@ import json
 import os
 import tarfile
 import uuid
-from textwrap import dedent, indent
-
 import docker
+from textwrap import dedent, indent
+# from utils.logger import duck_logger
 
 
 class PythonExecContainer():
@@ -68,11 +68,8 @@ class PythonExecContainer():
         res = self.container.put_archive(parent_dir, tarstream.getvalue())
         return res.exit_code
 
-    def _get_description(self, path: str, filename: str, json_files: set[str]) -> str:
-        """Returns the description of a file contained in its corresponding json file"""
-        if filename == "stdout.txt":
-            return "stdout/stderr"
-
+    def _get_plot_description(self, path: str, filename: str, json_files: set[str]) -> str:
+        """Returns the description of a plot contained in its corresponding json file"""
         # filename without file extension
         base = filename.rsplit(".", 1)[0]
 
@@ -105,7 +102,8 @@ class PythonExecContainer():
             for idx, desc in enumerate(sorted_items):
                 parts.append(f"subplot {idx}: {desc}")
 
-            return f"figure with {len(parts)} subplots: [" + "; ".join(parts) + "]"
+            return f"figure with {len(parts)} subplots: {{" + "; ".join(parts) + "}"
+            # return f"figure with {len(parts)} subplots: {{\n\t\t\t" + ";\n\t\t\t".join(parts) + "\n\t\t}"
 
         # ===== otherwise fall back to single json behavior ===== #
         single_json = base + ".json"
@@ -168,21 +166,18 @@ class PythonExecContainer():
             if filename.endswith(".json"):
                 continue
 
-            if filename.endswith(".txt"):
-                pass
-
             full_path = os.path.join(path, filename)
             file_data = self._read_file(full_path)
-            description = self._get_description(path, filename, json_files)
+            description = self._get_plot_description(path, filename, json_files)
 
-            out_files[full_path] = {
+            out_files[filename] = {
                 "description": description,
                 "data": file_data
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str) -> int:
-        """Wraps the code before execution and returns the exit code"""
+    def _wrap_and_execute(self, code: str, path: str) -> str:
+        """Wraps the code before execution and returns the stdout/stderr"""
         wrapped_code = dedent(f"""\
             import sys
             import traceback
@@ -191,11 +186,6 @@ class PythonExecContainer():
             from pathlib import Path
 
             outdir = Path({path!r})  # full container path for outputs
-
-            # ===== Redirect stdout/stderr ===== #
-            stdout_path = outdir / "stdout.txt"
-            sys.stdout = open(stdout_path, "w")
-            sys.stderr = sys.stdout
 
             # ===== Patch matplotlib to auto-save metadata ===== #
             try:
@@ -256,27 +246,33 @@ class PythonExecContainer():
         """)
 
         # execute inside the container
-        res = self.container.exec_run(["python3", "-u", "-c", wrapped_code])
-        return res.exit_code
+        result = self.container.exec_run(["python3", "-u", "-c", wrapped_code], demux=True)
+        return result.output
 
-    def _run_code(self, code: str, files: dict = None) -> dict[str, dict[str, str] | bytes]:
+    def _run_code(self, code: str, files: dict = None) -> dict[str, str | dict[str, bytes]]:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
+        # duck_logger.info(f"Code to execute:\n{code}\n\nDir: {dir_path}\nContains Files: {files is not None}")
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
-        self._wrap_and_execute(code, dir_path)
-        return self._read_files(dir_path)
+        result = self._wrap_and_execute(code, dir_path)
+        files = self._read_files(dir_path)
+        output = {
+            'stdout': result[0],
+            'stderr': result[1],
+            'files': files
+        }
+        return output
 
     async def run_code(self, code: str, files: dict = None) -> dict[str, dict[str, str] | bytes]:
-        """Takes python code to execute and an optional list of files to reference"""
+        """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
 
 async def run_code_test():
     with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
         code = dedent("""\
-            import time
             import matplotlib.pyplot as plt
 
             # Create a 1x2 subplot layout
@@ -297,7 +293,13 @@ async def run_code_test():
             # Save both subplots in one figure
             plt.savefig('subplots.png')
 
-            print("figure saved")
+            print("subplots saved")
+            plt.close()
+            
+            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
+            plt.title('Example Plot')
+            plt.savefig('plot.png')
+            print("plot saved")
                 """)
         return await container.run_code(code)
 
@@ -324,13 +326,14 @@ async def async_run_code_test():
 
 if __name__ == "__main__":
     output = asyncio.run(run_code_test())
-    print("\nOutput descriptions:")
-    for file in output:
-        print("\t", file, end=": ")
-        print(output[file]['description'], end="")
-        if file.endswith(".txt"):
-            print(";", output[file]["data"], end="")
-        print()
+    print("\nOutput:")
+    print("\tstdout: ", output['stdout'])
+    print("\tstderr: ", output['stderr'])
+    print("\tfiles: {")
+    for file in output['files']:
+        print("\t\t", file, end=": ")
+        print(output['files'][file]['description'])
+    print("\t}")
     # output1 = asyncio.run(async_run_code_test())
     # for dict in output1:
     #     for file in dict:
