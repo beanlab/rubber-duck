@@ -154,9 +154,26 @@ class RunPythonConfig(TypedDict):
     timeout: int
 
 
+class ContainerConfig(TypedDict):
+    image: str
+    timeout: int
+    cpu_limit: int
+    memory_limit: str
+    network: str
+
+
+class ToolConfig(TypedDict):
+    type: str
+    container: NotRequired[str]
+    agent: NotRequired[str]
+    output: NotRequired[str]
+
+
 class Config(TypedDict):
     sql: SQLConfig
     run_python: RunPythonConfig
+    containers: list[ContainerConfig]
+    tools: list[ToolConfig]
     ducks: list[DuckConfig]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]

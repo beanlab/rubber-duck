@@ -20,6 +20,19 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+containers:
+  - python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    cpu_limit: 1
+    memory_limit: 512m
+    network: disabled
+    timeout: 30
+
+tools:
+  - run_python:
+    type: container_exec
+    container: python-sandbox
+
 run_python:
   image: byucscourseops/python-tools-sandbox:latest
   timeout: 30
