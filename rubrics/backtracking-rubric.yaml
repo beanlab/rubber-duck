@@ -8,13 +8,13 @@ Project Report - Backtracking:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of time complexity
-        - State all assumptions clearly
+        - State all assumptions regarding the time complexity clearly
         - Bold final time complexity
       Space:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of space complexity
-        - State all assumptions clearly
+        - State all assumptions regarding the space complexity clearly
         - Bold final space complexity
     Empirical Data - Greedy:
       - Fill in table
@@ -34,13 +34,13 @@ Project Report - Backtracking:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of time complexity
-        - State all assumptions clearly
+        - State all assumptions regarding the time complexity clearly
         - Bold final time complexity
       Space:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of space complexity
-        - State all assumptions clearly
+        - State all assumptions regarding the space complexity clearly
         - Bold final space complexity
     Empirical Data - Backtracking:
       - Fill in table

@@ -25,13 +25,13 @@ Project Report - Branch and Bound:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of time complexity
-        - State all assumptions clearly
+        - State all assumptions clearly regarding the time complexity clearly
         - Bold final time complexity
       Space:
         - Include annotated code in report
         - Annotate all non-trivial parts of your code
         - Provide explanation of space complexity using the branching factor approach
-        - State all assumptions clearly, including your predicted branching factor
+        - State all assumptions clearly regarding the space complexity clearly, including your predicted branching factor
         - Bold final space complexity
     Empirical Data:
       - Fill in empirical runtimes table
