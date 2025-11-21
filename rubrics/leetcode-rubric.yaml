@@ -20,16 +20,16 @@ _: &single_problem_requirements
 Project Leetcode:
   Baseline:
     Baseline Problem 1: *single_problem_requirements
-#    Baseline Problem 2: *single_problem_requirements
-#    Baseline Problem 3: *single_problem_requirements
-#
-#  Core:
-#    Core Problem 1: *single_problem_requirements
-#    Core Problem 2: *single_problem_requirements
-#    Core Problem 3: *single_problem_requirements
-#
-#  Stretch 1:
-#    Stretch 1 Problem 1: *single_problem_requirements
-#
-#  Stretch 2:
-#    Stretch 2 Problem 1: *single_problem_requirements
+    Baseline Problem 2: *single_problem_requirements
+    Baseline Problem 3: *single_problem_requirements
+
+  Core:
+    Core Problem 1: *single_problem_requirements
+    Core Problem 2: *single_problem_requirements
+    Core Problem 3: *single_problem_requirements
+
+  Stretch 1:
+    Stretch 1 Problem 1: *single_problem_requirements
+
+  Stretch 2:
+    Stretch 2 Problem 1: *single_problem_requirements
