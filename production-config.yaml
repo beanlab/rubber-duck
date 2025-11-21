@@ -255,32 +255,31 @@ servers:
               name: cs312-projects
               initial_message: |
                 
-                **This feedback is given by AI and may be incorrect.**
+                ------
+                **The feedback given by AI may be incorrect**
                 
                 This generated feedback does **not** check images and may give false feedback regarding images.
-                
-                The rubrics used by AI to grade your project may differ from the ones in Canvas. They may not include the coding requirements.
-                
-                You are responsible for ensuring your report meets the requirements.
-                
-                Please also note the project reports may have been updated slightly since you downloaded your report. 
-                You may need to download the most recent project report from Canvas or update yours to match the expected formatting. 
-                
+        
+                The rubrics used the tool to grade your project may differ slightly from the ones in Canvas. 
+                They may not include the coding requirements.
+        
                 ------
 
               gradable_assignments:
                 - name: Project Demo Fruit
-                  rubric_path: rubrics/fruit-rubric.yaml
+                  rubric_path: rubrics/demo-fruit-rubric.yaml
                   message: |
                     Please note this is a demo project (:
-                - name: Project Alignment
-                  rubric_path: rubrics/alignment-rubric.yaml
+
                 - name: Project Backtracking
                   rubric_path: rubrics/backtracking-rubric.yaml
+
                 - name: Project Branch and Bound
                   rubric_path: rubrics/branch-and-bound-rubric.yaml
+
                 - name: Project Leetcode
                   rubric_path: rubrics/leetcode-rubric.yaml
+
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
                 name: grader
@@ -305,7 +304,7 @@ servers:
                         satisfactory:
                           type: boolean
                           description: Indicates if the report provided meets the given rubric item
-                      required: [ "rubric_item", "justification", "satisfactory" ]
+                      required: ["rubric_item", "justification", "satisfactory"]
                       additionalProperties: false
 
               project_scanner_agent:
@@ -325,7 +324,7 @@ servers:
                         project_name:
                           type: string
                           description: the name of the project
-                      required: [ "project_name" ]
+                      required: ["project_name"]
                       additionalProperties: false
 
                 reasoning: minimal

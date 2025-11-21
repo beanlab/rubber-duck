@@ -7,10 +7,11 @@ Project Demo Fruit:
       - Rubric item to talk about bananas
   Section 2:
     - Rubric item to talk about raspberries
-  _Section3:
-    - Talk about blueberries - This rubric item and section will **not** be ignored because it is not a top level header
-  Section 4:
+  _SectionIgnored:
+    SubSection:
+      - Anything under the '_SectionIgnored' will be ignored -- include this rubric item.
+  Section 3:
     - Mention any fruit
-_private_header:
+
+_Private_Header:
   - This header, and anything in this section, will be ignored.
-  - This may be useful for yaml anchors

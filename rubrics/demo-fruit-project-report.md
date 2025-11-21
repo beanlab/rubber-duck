@@ -14,12 +14,9 @@ This section will be included when grading on any of the rubric items for subsec
 ## Section 2
 This section would be graded on talking about raspberries
 
-## _Section3
-This section would be graded on talking about blueberries
-
-## Section 4
+## Section 3
 **Fill me in**
 
-## Section 5
+## Section 4
 This section would be ignored because it is not included in the rubric nor is it a subsection of another section with rubric items.
 It would **not** be graded or looked at.
