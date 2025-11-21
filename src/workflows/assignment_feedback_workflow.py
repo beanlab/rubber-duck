@@ -85,7 +85,7 @@ class AssignmentFeedbackWorkflow:
            Section 2:
               - Rubric item to talk about raspberries
            _Section3:
-              - Talk about blueberries: This rubric item and section will **not** be ignored because it is not a top level header
+              - Talk about blueberries - This rubric item and section will **not** be ignored because it is not a top level header
            Section 4:
               - Mention any fruit
         _private_header:
@@ -134,7 +134,7 @@ class AssignmentFeedbackWorkflow:
         ## Section 2
         - :white_check_mark: **Rubric item to talk about raspberries** - Report explicitly mentions raspberries
         ## _Section3
-        - :white_check_mark: **Talk about blueberries** - Report explicitly mentions blueberries
+        - :white_check_mark: **Talk about blueberries - This rubric item and section will **not** be ignored because it is not a top level header* - Report explicitly mentions blueberries
         ## Section 4
         - :x: **Mention any fruit** - Report section is not filled in.
         ```
