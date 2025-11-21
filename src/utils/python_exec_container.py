@@ -17,7 +17,7 @@ class PythonExecContainer():
         self._working_dir = '/home/sandbox/out'
 
     def __enter__(self):
-        # Start Docker container
+        # start docker container
         # duck_logger.info(f"Starting container from image: {self.image}")
         self.container = self.client.containers.run(
             self.image,
@@ -33,13 +33,8 @@ class PythonExecContainer():
             self.container.remove()
 
     def _mkdir(self, path: str) -> str:
-        """
-        Makes a directory in the tmpfs /out directory
-        """
+        """Makes a directory in the tmpfs /out directory"""
         res = self.container.exec_run(["mkdir", "-p", path])
-        if res.exit_code != 0:
-            raise RuntimeError(f"Failed to make directory {path}: {res.output}")
-        print('RES', res)
         return path
 
     def _write_file(self, rel_path: str, data: bytes, container_dir: str):
@@ -60,7 +55,7 @@ class PythonExecContainer():
         parent_dir = os.path.dirname(dest_path)
         self.container.exec_run(["mkdir", "-p", parent_dir])
 
-        # Create a tar archive containing just this file
+        # create a tar archive containing just this file
         tarstream = io.BytesIO()
         with tarfile.open(fileobj=tarstream, mode="w") as tar:
             info = tarfile.TarInfo(name=os.path.basename(dest_path))
@@ -73,34 +68,64 @@ class PythonExecContainer():
         self.container.put_archive(parent_dir, tarstream.getvalue())
 
     def _get_description(self, path: str, filename: str, json_files: set[str]) -> str:
-        # Look for a matching JSON description
-        description_path = os.path.join(
-            path, filename.rsplit(".", 1)[0] + ".json"
-        )
-
-        description = "unknown image"
         if filename == "stdout.txt":
-            description = "stdout/stderr"
-        json_name = filename.rsplit(".", 1)[0] + ".json"
-        if json_name in json_files:
+            return "stdout/stderr"
+
+        # filename without file extension
+        base = filename.rsplit(".", 1)[0]
+
+        # ===== find subplot json files: <imagename>_ax<index>.json ===== #
+        subplot_descriptions = {}
+        for json_name in json_files:
+            if json_name.startswith(base + "_ax") and json_name.endswith(".json"):
+                try:
+                    json_bytes = self._read_file(os.path.join(path, json_name))
+                    meta = json.loads(json_bytes.decode())
+
+                    subplot_descriptions[json_name] = (
+                        f"{meta.get('plot_type', 'unknown')} plot titled "
+                        f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
+                        f"ylabel='{meta.get('ylabel', '')}'"
+                    )
+                except Exception:
+                    subplot_descriptions[json_name] = "unknown subplot"
+
+        # ===== if subplots found, make combined description ===== #
+        if subplot_descriptions:
+            # sort keys by ax number
+            sorted_items = sorted(
+                subplot_descriptions.items(),
+                key=lambda item: int(item[0].split("_ax")[-1].split(".")[0])
+            )
+
+            # Now enumerate descriptions in order
+            parts = []
+            for idx, desc in enumerate(sorted_items):
+                parts.append(f"subplot {idx}: {desc}")
+
+            return f"\n\t\tfigure with {len(parts)} subplots: [\n\t\t\t" + ";\n\t\t\t".join(parts) + "\n\t]"
+
+        # ===== otherwise fall back to single json behavior ===== #
+        single_json = base + ".json"
+        description_path = os.path.join(path, single_json)
+
+        if single_json in json_files:
             try:
                 json_bytes = self._read_file(description_path)
                 meta = json.loads(json_bytes.decode())
-                description = (
+                return (
                     f"{meta.get('plot_type', 'unknown')} plot titled "
                     f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
                     f"ylabel='{meta.get('ylabel', '')}'"
                 )
             except Exception:
-                description = "unknown image"
+                return "unknown image"
 
-        return description
-
+        # ---- 4. No metadata found ----
+        return "unknown image"
 
     def _read_file(self, path):
-        """
-        Reads a file from a full path, e.g. "/out/<uuid>/file.txt"
-        """
+        """Reads a file from a full path, e.g. '/out/<uuid>/file.txt'"""
         stream, _ = self.container.get_archive(path)
         tar_bytes = b"".join(stream)
         tarstream = io.BytesIO(tar_bytes)
@@ -135,15 +160,15 @@ class PythonExecContainer():
         filenames = output.decode().splitlines()
         json_files = {f for f in filenames if f.endswith(".json")}
 
+        print("\nFiles found:")
         for filename in filenames:
             # skip json files
-            print("checking ", filename)
+            print("\t",filename)
             if filename.endswith(".json"):
                 continue
 
             if filename.endswith(".txt"):
                 pass
-
 
             full_path = os.path.join(path, filename)
             file_data = self._read_file(full_path)
@@ -252,12 +277,27 @@ async def run_code_test():
         code = dedent("""\
             import time
             import matplotlib.pyplot as plt
-            
-            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
-            plt.title('Example Plot')
-            plt.savefig('plot.png')
+
+            # Create a 1x2 subplot layout
+            fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+
+            # Left subplot – line plot
+            axs[0].plot([1, 2, 3, 4], [10, 20, 25, 30])
+            axs[0].set_title('Line Plot')
+            axs[0].set_xlabel('X')
+            axs[0].set_ylabel('Y')
+
+            # Right subplot – bar plot
+            axs[1].bar([1, 2, 3, 4], [5, 7, 3, 9])
+            axs[1].set_title('Bar Plot')
+            axs[1].set_xlabel('Category')
+            axs[1].set_ylabel('Value')
+
+            # Save both subplots in one figure
+            plt.savefig('subplots.png')
+
             print("figure saved")
-        """)
+                """)
         return await container.run_code(code)
 
 
@@ -283,7 +323,12 @@ async def async_run_code_test():
 
 if __name__ == "__main__":
     output = asyncio.run(run_code_test())
+    print("\nOutput description content")
     for file in output:
-        print(file, end=": ")
+        print("\t",file, end=": ")
         print(output[file]['description'])
-    # print(asyncio.run(async_run_code_test()))
+    # output1 = asyncio.run(async_run_code_test())
+    # for dict in output1:
+    #     for file in dict:
+    #         print(file, end=": ")
+    #         print(dict[file]['description'])
