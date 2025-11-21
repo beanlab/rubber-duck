@@ -3,9 +3,8 @@ import io
 import json
 import os
 import tarfile
-import tempfile
 import uuid
-from textwrap import dedent
+from textwrap import dedent, indent
 
 import docker
 
@@ -15,7 +14,7 @@ class PythonExecContainer():
         self.image: str = image
         self.client = docker.from_env()
         self.container = None
-        self.out_dir = tempfile.mkdtemp(prefix="sandbox_out_")
+        self._working_dir = '/home/sandbox/out'
 
     def __enter__(self):
         # Start Docker container
@@ -24,7 +23,6 @@ class PythonExecContainer():
             self.image,
             command="sleep infinity",
             detach=True,
-            tmpfs={"/out": "rw,size=100m"}
         )
         return self
 
@@ -38,11 +36,13 @@ class PythonExecContainer():
         """
         Makes a directory in the tmpfs /out directory
         """
-        path = f"/out/{path}"
-        self.container.exec_run(["mkdir", "-p", path])
+        res = self.container.exec_run(["mkdir", "-p", path])
+        if res.exit_code != 0:
+            raise RuntimeError(f"Failed to make directory {path}: {res.output}")
+        print('RES', res)
         return path
 
-    def _write_files(self, files: dict[str, bytes], container_dir: str):
+    def _write_file(self, rel_path: str, data: bytes, container_dir: str):
         """
         Writes a dict of {relative_path: bytes} to the container directory
 
@@ -54,31 +54,36 @@ class PythonExecContainer():
 
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
-        # iterates over each file to copy into the container
-        for rel_path, data in files.items():
-            dest_path = os.path.join(container_dir, rel_path) # full path to file
+        dest_path = os.path.join(container_dir, rel_path)  # full path to file
 
-            # make sure the directory exists in the container
-            parent_dir = os.path.dirname(dest_path)
-            self.container.exec_run(["mkdir", "-p", parent_dir])
+        # make sure the directory exists in the container
+        parent_dir = os.path.dirname(dest_path)
+        self.container.exec_run(["mkdir", "-p", parent_dir])
 
-            # Create a tar archive containing just this file
-            tarstream = io.BytesIO()
-            with tarfile.open(fileobj=tarstream, mode="w") as tar:
-                info = tarfile.TarInfo(name=os.path.basename(dest_path))
-                info.size = len(data)
-                tar.addfile(info, io.BytesIO(data))
+        # Create a tar archive containing just this file
+        tarstream = io.BytesIO()
+        with tarfile.open(fileobj=tarstream, mode="w") as tar:
+            info = tarfile.TarInfo(name=os.path.basename(dest_path))
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
 
-            tarstream.seek(0)
+        tarstream.seek(0)
 
-            # Send archive into the correct directory
-            self.container.put_archive(parent_dir, tarstream.getvalue())
+        # Send archive into the correct directory
+        self.container.put_archive(parent_dir, tarstream.getvalue())
 
-    def _gen_img_description(self, file_path):
-        # This assumes you can access the figure metadata before saving
-        # In practice, have user code save plot title/labels as JSON or .txt next to image
-        # For now, we fall back to generic description
-        return f"Image file: {os.path.basename(file_path)}"
+    def _read_file(self, path):
+        stream, _ = self.container.get_archive(path)
+        tar_bytes = b"".join(stream)
+        tarstream = io.BytesIO(tar_bytes)
+
+        with tarfile.open(fileobj=tarstream, mode="r:*") as tar:
+            for member in tar.getmembers():
+                if file := tar.extractfile(member):
+                    return file.read()
+
+        raise FileNotFoundError(f"File not found in container: {path}")
+
 
     def _read_files(self, path: str):
         """
@@ -94,6 +99,10 @@ class PythonExecContainer():
         out_files = {}
 
         # retrieve dir and load into tarfile
+        contents = self._read_file(os.path.join(path, 'contents.txt')).decode()
+        for out_file_path in contents.splitlines():
+            print(out_file_path)
+
         stream, _ = self.container.get_archive(path)
         tar_bytes = b"".join(stream)
         tarstream = io.BytesIO(tar_bytes)
@@ -147,31 +156,33 @@ class PythonExecContainer():
                     "description": description,
                     "data": data
                 }
-
+        # clear the temporary directory
+        # self.container.exec_run(["rm", "-rf", path])
         return out_files
 
     def _wrap_and_execute(self, code: str, path: str):
+        # Ensure the output directory exists
+
         wrapped_code = dedent(f"""\
             import sys
             import traceback
             import os
             import json
+            from pathlib import Path
 
-            outdir = {path!r}  # <-- make directory available in the wrapper
+            outdir = Path({path!r})  # full container path for outputs
 
             # ===== Redirect stdout/stderr ===== #
-            sys.stdout = open(f"{path}/stdout.txt", "w")
+            stdout_path = outdir / "stdout.txt"
+            sys.stdout = open(stdout_path, "w")
             sys.stderr = sys.stdout
-            
 
             # ===== Patch matplotlib to auto-save metadata ===== #
             try:
                 import matplotlib.pyplot as plt
-                import matplotlib.figure
 
                 _original_savefig = plt.Figure.savefig
-                
-                # ===== plot type detector function ===== # 
+
                 def detect_plot_type(ax):
                     if ax.lines:
                         return "line"
@@ -183,47 +194,25 @@ class PythonExecContainer():
                         return "image"
                     return "unknown"
 
-                # ===== save fig metadata to .json file with same name as the fig ===== #
                 def savefig_with_metadata(self, *args, **kwargs):
-                    # Extract original user filename
                     if args:
                         orig = args[0]
-                        new_path = os.path.join(outdir, os.path.basename(orig))
+                        new_path = str(outdir / os.path.basename(orig))
                         args = (new_path, *args[1:])
                     else:
                         orig = kwargs.get("fname", "figure.png")
-                        new_path = os.path.join(outdir, os.path.basename(orig))
+                        new_path = os.path.join(str(outdir), os.path.basename(orig))
                         kwargs["fname"] = new_path
 
-                    # Call original savefig using rewritten path
                     _original_savefig(self, *args, **kwargs)
 
-                    # Build metadata
-                    if self.axes:
-                        ax = self.axes[0]
-                        metadata = {
-                            "title": ax.get_title(),
-                            "xlabel": ax.get_xlabel(),
-                            "ylabel": ax.get_ylabel(),
-                            "plot_type": detect_plot_type(ax)
-                        }
-                    else:
-                        metadata = {
-                            "title": "", 
-                            "xlabel": "", 
-                            "ylabel": "", 
-                            "plot_type": "unknown"
-                        }
-
-                    # Save metadata for all axes
                     for i, ax in enumerate(self.axes):
-                        metadata = {
+                        metadata = {{
                             "title": ax.get_title(),
                             "xlabel": ax.get_xlabel(),
                             "ylabel": ax.get_ylabel(),
                             "plot_type": detect_plot_type(ax)
-                        }
-                        # save JSON per axis
+                        }}
                         if len(self.axes) == 1:
                             meta_path = os.path.splitext(new_path)[0] + ".json"
                         else:
@@ -236,24 +225,29 @@ class PythonExecContainer():
             except ImportError:
                 pass
 
-            # === Execute user code safely ===
+            # ===== Execute user code safely ===== #
             try:
-                exec({code!r}) # !r calls repr on the string, making it safe
+{indent(code, '                ')}
             except Exception:
                 traceback.print_exc(file=sys.stdout)
             finally:
                 sys.stdout.flush()
+                sys.stdout.close()
+                contents_file = outdir / "contents.txt"
+                contents_file.write_text('\\n'.join(str(p) for p in outdir.glob("*")))
         """)
 
-        return self.container.exec_run(["python3", "-u", "-c", wrapped_code])
+        # Execute inside the container
+        res = self.container.exec_run(["python3", "-u", "-c", wrapped_code])
+        return res
 
-    def _run_code(self, code: str, files: dict = None): # returns json object containing all the output files and their data
+    def _run_code(self, code: str, files: dict = None):
         id = str(uuid.uuid4())
-        dir_path = self._mkdir(id)
+        dir_path = self._mkdir(f'{self._working_dir}/{id}')
         if files:
-            self._write_files(files, dir_path)
+            for rel_path, data in files.items():
+                self._write_file(rel_path, data, dir_path)
         self._wrap_and_execute(code, dir_path)
-        # TODO: remove unique input and output dirs in _read_files
         return self._read_files(dir_path)
 
     async def run_code(self, code: str, files: dict = None):
@@ -261,6 +255,20 @@ class PythonExecContainer():
 
 
 async def run_code_test():
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
+        code = dedent("""\
+            import time
+            import matplotlib.pyplot as plt
+            
+            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
+            plt.title('Example Plot')
+            plt.savefig('plot.png')
+            print("figure saved")
+        """)
+        return await container.run_code(code)
+
+
+async def async_run_code_test():
     with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
         code = dedent("""\
             import time
@@ -282,4 +290,4 @@ async def run_code_test():
 
 if __name__ == "__main__":
     print(asyncio.run(run_code_test()))
-    # concurrent_test()
+    # print(asyncio.run(async_run_code_test()))
