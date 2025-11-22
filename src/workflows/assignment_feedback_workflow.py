@@ -1,28 +1,19 @@
 import asyncio
-import re
-from pathlib import Path
 import json
-import yaml
+from pathlib import Path
 
-import markdowndata
+from quest import step, task
 
-from functools import reduce
-import operator
-
+from .parsing_utils import is_filled_in_report, flatten_report_and_rubric_items, unflatten_dictionary, dict_to_md, \
+    find_project_name_in_report_headers
 from ..gen_ai.gen_ai import Agent, AIClient
 from ..utils.config_types import DuckContext, AssignmentFeedbackSettings, Gradable, RubricItemResponse
-from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message
 from ..utils.protocols import ConversationComplete
 
 ASSIGNMENT_NAME = str
-SECTION = str
 SECTION_NAME = str
 RUBRIC_ITEM = str
-REPORT_SECTION = str
-FEEDBACK = str
-SATISFACTORY = bool
-
 
 class AssignmentFeedbackWorkflow:
     def __init__(self,
@@ -35,213 +26,108 @@ class AssignmentFeedbackWorkflow:
                  read_url
                  ):
         self.name = name
-        self._send_message = send_message
+        self._send_message = step(send_message)
         self._settings = settings
-        self._single_rubric_item_grader = single_rubric_item_grader
-        self._project_scanner_agent = project_scanner_agent
+        self._single_rubric_item_grader_agent_settings = single_rubric_item_grader
+        self._project_scanner_agent_settings = project_scanner_agent
         self._ai_client = ai_client
         self.read_url = read_url
 
-        self._assignments_rubrics: dict[ASSIGNMENT_NAME: dict[SECTION: any]] = {}
-        self._populate_assignments_rubrics()
+        self._assignments: dict[ASSIGNMENT_NAME: Gradable] = {
+            assignment['name']: assignment
+            for assignment in (self._settings)["gradable_assignments"]
+        }
 
     async def __call__(self, context: DuckContext):
-        """
-        This workflow allows for grading of md reports based on yaml rubrics provided in the config.
-
-        Rubrics:
-           - File paths are specified in the config with a project name
-           - Rubrics are loaded via safe_yaml.loads()
-           - Any sections with headers starting with '_' will be ignored.
-           - Headers and rubric items cannot be mixed on the same level of nesting
-
-        Reports:
-           - are loaded via markdowndata.loads()
-           - All sections present in the rubric should have corresponding sections in the markdown file
-               - Both the nesting and the names should align **exactly**
-           - Everything in md report section under a corresponding header in the yaml with rubric items
-             will be included when grading for that rubric item
-           - Additional sections in the md, without corresponding headers in the yaml, will be ignored
-           - Ideally, the project name provided in the config and the first level 1 header in the markdown document align.
-                If not, an agent scrubs the report to determine the corresponding report.
-
-        Grading:
-            - Each rubric item is graded independently of the other rubric items.
-            - When a rubric item is graded, it includes whether the rubric item was met (T/F) and justification
-              for if it was met
-            - If the report section only contains 'fill me in' after removing any special characters, that rubric item
-              will not be considered met and the justification provided is "Report section is not filled in."
-
-        See an example of a rubric in rubric/demo-fruit-rubric.yaml
-        See an example of a corresponding report in rubric/demo-fruit-project-report.md
-
-        """
         try:
             # Send initial instructions
-            await self._send_message(context.thread_id, f"This AI tool takes a md report and determines if it meets a set of rubric requirements.\n"
-                                                        "As you use this tool, you should still be doing the work to make sure you satisfied all the requirements\n"
-                                                        "AI can make mistakes. **Because AI said that did or did not you meet a requirement, does not necessarily mean you did.** \n"
-                                                        "However, this can be a useful 'pre-flight check' before turning in your project\n"
-                                                        "The feedback provided by the tool may help you catch errors you otherwise would not have.\n\n")
-                                                        # "If you notice consistent errors in feedback given, please message in #ai-feedback as we try to improve this tool\n")
-
-            # Send project initial instructions if applicable
-            if project_initial_message := self._settings.get("initial_message", ""):
-                await self._send_message(context.thread_id, project_initial_message)
-
+            await self._send_message(context.thread_id, self._settings['initial_instructions'])
 
             # Tell the user the supported assignments
-            supported_assignments = ', '.join(f'**{assignment}**' for assignment in self._assignments_rubrics.keys())
+            supported_assignment_names = list(self._assignments.keys()) # should the supported assignments be set on self when initializing?
             await self._send_message(context.thread_id,
-                                     f"The supported assignments for grading are {supported_assignments}")
+                                     f"The supported assignments for grading are {supported_assignment_names}")
 
-            # Get the report contents from the user
-            report_contents = await self._get_report_contents(context)
+            # Query the report contents from the user
+            # TODO ask read url is being used here. Do we need to pass that in? Do we care? We just care that the report contents are returned
+            # pass in full context or just the thread id and timeout?
+            # should read url be passed in?
+            report_contents = await self._query_user_for_report(context)
 
-            # Get the project name associated with the report
-            valid_project_names = [assignment["name"] for assignment in self._settings['gradable_assignments']]
-            project_name = await self._get_project_name_from_report(context, report_contents, valid_project_names)
+            # Determine which project name is associated with the report
+            # TODO ask: what should be passed here? Do we need to pass in agent settings? or is it okay it just relies on it within the function
+            project_name = await self._extract_project_name_from_report(context, report_contents,
+                                                                        supported_assignment_names)
 
-            if project_message := self._get_project_specific_message(project_name):
+            # Read the rubric contents associated with the project
+            # TODO Error handling? in a function:  duck_logger.warn(f"Error loading the rubric file: {e}")
+            # Best practices for opening files and paths?
+            rubric_contents = Path(self._assignments[project_name].get("rubric_path")).read_text()
+
+            # If present, send a project specific message to the user
+            if project_message := self._assignments[project_name].get('message'):
                 await self._send_message(context.thread_id, project_message)
 
-            # break up the report into small pieces to grade with the associated rubric item
-            tasks = [
-                asyncio.create_task(self._single_item_grader(context, piece_name, report_section, rubric_item))
-                for piece_name, rubric_item, report_section in
-                self._flatten_report_and_rubric_items(report_contents, self._assignments_rubrics[project_name])
-            ]
+            # TODO: check rubric and report formatting If not valid formatting? throw exception.... here or elsewhere??
+            # early exit
+            # if not valid_formatting(report_contents, rubric_contents):
+            #     raise ConversationComplete("Error with formatting ")
 
-            # wait for the responses of all
-            graded_items: list[tuple[list[SECTION_NAME], RubricItemResponse]] = await asyncio.gather(*tasks)
+            # grade the report
+            # TODO ask: passing in functions here appropriate? Or just rely on them within the class? Is there a rule of thumb?
+            graded_results = self.grade_assignment(report_contents,
+                                                   rubric_contents,
+                                                   self._grade_single_item,
+                                                   self._format_graded_response)
 
-            # format and send the graded rubric items
-            formatted_graded_items = self._format_graded_items(graded_items)
+            await self._send_message(context.thread_id, graded_results)
 
-            await self._send_message(context.thread_id, formatted_graded_items)
+            # TODO ask: collect feedback from the user at the end? Did it work for the user?
+
 
         except ConversationComplete as e:
             await self._send_message(context.thread_id, str(e))
             return
 
-    def _get_project_specific_message(self, project_name):
-        gradables = self._settings['gradable_assignments']
-        for gradable in gradables:
-            if gradable['name'] == project_name:
-                return gradable.get('message')
+    @step
+    async def grade_assignment(self, context, report_contents, rubric_contents, grade_single_item, format_response) -> str:
 
-    def _get_expected_md_format(self, rubric):
-        as_md = self._dict_to_md(rubric)
-        return (f""
-                f"```md\n"
-                f"{as_md}"
-                f"```")
+        # break up the report into small pieces to grade with the associated rubric item
+        flattened_report_and_rubric_items = flatten_report_and_rubric_items(report_contents, rubric_contents)
 
-    def _flatten_report_and_rubric_items(self, report_contents, rubric) -> list[
-        tuple[list[SECTION_NAME], RUBRIC_ITEM, REPORT_SECTION]]:
-        def helper_func(name, rubric_section, report_section):
-            for section_name in rubric_section.keys():
-                name.append(section_name)
-                if isinstance(rubric_section[section_name], dict):
-                    yield from helper_func(name, rubric_section[section_name], report_section[section_name])
-                elif isinstance(rubric_section[section_name], list):
-                    for section_item in rubric_section[section_name]:
-                        yield name[::], section_item, report_section[section_name]
-                name.pop(-1)
+        tasks = [
+            grade_single_item(context, piece_name, report_section, rubric_item)
+            for piece_name, rubric_item, report_section in
+            flattened_report_and_rubric_items
+        ]
 
-        try:
-            report = markdowndata.loads(report_contents)
-            flattened = list(helper_func([], rubric, report))
-            return flattened
-        except KeyError as e:
-            raise ConversationComplete(f"Unable to find header {e} in the report. \n"
-                                       f"The expected format is as follows: {self._get_expected_md_format(rubric)}")
+        flattened_graded_items: list[tuple[list[SECTION_NAME], RubricItemResponse]] = await asyncio.gather(*tasks)
 
-    def _format_single_response(self, response: RubricItemResponse):
+        formatted_flattened_graded_items = [
+            (name, format_response(result))
+            for (name, result) in flattened_graded_items
+        ]
+
+        unflattened_formatted_graded_items = unflatten_dictionary(formatted_flattened_graded_items)
+
+        md_formatted_graded_items = dict_to_md(unflattened_formatted_graded_items)
+
+        return md_formatted_graded_items
+
+    # TODO ask: should this stay on the class? My guess is yes
+    def _format_graded_response(self, response: RubricItemResponse):
         emoji = ':white_check_mark:' if response['satisfactory'] else ':x:'
         justification = response['justification']
         return f'{emoji} **{response["rubric_item"]}** - {justification}'
 
-    def _format_graded_items(self, results: list[tuple[list[SECTION_NAME], RubricItemResponse]]):
-
-        results = [
-            (name, self._format_single_response(rubric_item_response))
-            for (name, rubric_item_response) in results
-        ]
-
-        result = self._unflatten_dictionary(results)
-        return self._dict_to_md(result)
-
-    def _get_nested(self, d, keys):
-        return reduce(operator.getitem, keys, d)
-
-    def _set_nested(self, d, keys, value):
-        *prefix, last = keys
-        parent = reduce(lambda acc, k: acc.setdefault(k, {}), prefix, d)
-        parent.setdefault(last, []).append(value)
-
-    def _unflatten_dictionary(self, results):
-        unflattened = {}
-        for keys, formatted in results:
-            self._set_nested(unflattened, keys, formatted)
-        return unflattened
-
-    def _get_rubric_content(self, assignment: Gradable):
-        if 'rubric_path' in assignment:
-            instructions = Path(assignment['rubric_path']).read_text(encoding="utf-8")
-        else:
-            raise ValueError(f"You must provide an 'rubric_path' for {assignment['name']}")
-        return instructions
-
-    def _remove_private_keys_from_rubric(self, node):
-        # If it's a dict, remove private keys and recurse into values
-        if isinstance(node, dict):
-            # Remove keys that start with '_'
-            keys_to_remove = [
-                k for k in node.keys()
-                if isinstance(k, str) and k.startswith('_')
-            ]
-            for k in keys_to_remove:
-                node.pop(k)
-
-            # Recurse into remaining values
-            for k, v in list(node.items()):
-                node[k] = self._remove_private_keys_from_rubric(v)
-
-        # If it's a list, recurse into each element
-        elif isinstance(node, list):
-            for i, item in enumerate(node):
-                node[i] = self._remove_private_keys_from_rubric(item)
-
-        # Anything else, just return as-is
-        return node
-
-    def _populate_assignments_rubrics(self):
-        try:
-            for assignment in self._settings["gradable_assignments"]:
-                raw_rubric_content = self._get_rubric_content(assignment)
-                rubric_content = yaml.safe_load(raw_rubric_content)
-                rubric_content = self._remove_private_keys_from_rubric(rubric_content)
-                self._assignments_rubrics[assignment["name"]] = rubric_content
-        except Exception as e:
-            duck_logger.warn(f"Error loading the rubric files: {e}")
-            raise e
-
-    def _get_project_name_directly_from_report(self, report_contents, valid_project_names):
-        report_contents = markdowndata.loads(report_contents)
-        top_headers = report_contents.keys()
-        for header in top_headers:
-            if header in valid_project_names:
-                return header
-        return None
-
+    @step
     async def _get_project_name_using_agent(self, context, report_contents, valid_project_names):
         input = {
             'report_contents': report_contents,
             'valid_projects_names': valid_project_names
         }
 
-        response = await self._ai_client.run_agent(context, self._project_scanner_agent, str(input))
+        response = await self._ai_client.run_agent(context, self._project_scanner_agent_settings, str(input))
         response = json.loads(response)  # returns structured output as specified in the config
         project = response["project_name"]
 
@@ -251,38 +137,44 @@ class AssignmentFeedbackWorkflow:
 
         return project
 
-    async def _get_project_name_from_report(self, context, report_contents: str, valid_project_names: list[str]) -> str:
-        if project_name := self._get_project_name_directly_from_report(report_contents, valid_project_names):
+    # TODO ask: double steps? Does it matter? for extract and then use agent
+    @step
+    async def _extract_project_name_from_report(self, context, report_contents: str,
+                                                valid_project_names: list[str]) -> str:
+        if project_name := find_project_name_in_report_headers(report_contents, valid_project_names): # TODO better naming?
             return project_name
         else:
             return await self._get_project_name_using_agent(context, report_contents, valid_project_names)
 
-    async def _get_report_contents(self, context):
-        message = "Please upload your md report."
+
+    @step
+    async def _query_user_for_report(self, context):
+        message = "Please upload your markdown report."
+
         for _ in range(3):
             await self._send_message(context.thread_id, message)
             response = await wait_for_message(context.timeout)
+
             if response is None:
                 raise ConversationComplete("This conversation has timed out.")
+
             attachments = response.get("files", [])
             md_attachments = [attachment for attachment in attachments if "md" in attachment["filename"]]
 
-            if not md_attachments:
-                message = "No md files were uploaded. Please upload your md report: "
-                continue
+            if md_attachments:
+                file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in md_attachments])
+                return file_contents
 
-            file_contents = "\n".join([await self.read_url(attachment['url']) for attachment in md_attachments])
-            return file_contents
-        raise ConversationComplete("No md report was not uploaded")
+            message = "No markdown files were uploaded. Please upload your markdown report: "
 
-    def _report_section_not_filled_in(self, report_section):
-        cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section))
-        return cleaned_report_section.strip().lower() == "fill me in"
+        raise ConversationComplete("No markdown files were uploaded")
 
-    async def _single_item_grader(self, context, piece_name, report_section, rubric_item) -> tuple[
+    @step
+    @task
+    async def _grade_single_item(self, context, piece_name, report_section, rubric_item) -> tuple[
         list[SECTION_NAME], RubricItemResponse]:
 
-        if self._report_section_not_filled_in(report_section):
+        if not is_filled_in_report(report_section):
             return piece_name, RubricItemResponse(
                 rubric_item=rubric_item,
                 justification="Report section is not filled in.",
@@ -291,39 +183,8 @@ class AssignmentFeedbackWorkflow:
 
         input = {"report_contents": report_section,
                  "rubric_item": rubric_item}
-        raw_response = await self._ai_client.run_agent(context, self._single_rubric_item_grader, str(input))
-        result = json.loads(raw_response)  # expected response = RubricItemResponse
+        raw_response = await self._ai_client.run_agent(context, self._single_rubric_item_grader_agent_settings,
+                                                       str(input))  # is the okay? Or should these be being passed in?
+        result: RubricItemResponse = json.loads(raw_response)
         return piece_name, result
 
-    def _dict_to_md(self, d, level=1):
-        """
-        Convert a nested dict of the form
-        {a: {b: {c: [1]}}}
-        into markdown:
-
-        # a
-        ## b
-        ### c
-        - 1
-        """
-        lines = []
-
-        for key, value in d.items():
-            # Header line
-            header_prefix = "#" * level
-            lines.append(f"{header_prefix} {key}")
-
-            # Nested dict → go one level deeper
-            if isinstance(value, dict):
-                lines.append(self._dict_to_md(value, level + 1))
-
-            # List → bullet items or recurse
-            elif isinstance(value, list):
-                for item in value:
-                    lines.append(f"- {item}")
-
-            # Fallback: non-dict, non-list leaf
-            else:
-                lines.append(f"- {value}")
-
-        return "\n".join(lines)

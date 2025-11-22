@@ -74,7 +74,7 @@ class Gradable(TypedDict):
 
 class AssignmentFeedbackSettings(TypedDict):
     name: str
-    initial_message: str
+    initial_instructions: str
     gradable_assignments: list[Gradable]
     single_rubric_item_grader: SingleAgentSettings
     project_scanner_agent: SingleAgentSettings

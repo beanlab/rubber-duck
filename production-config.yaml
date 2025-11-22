@@ -253,8 +253,15 @@ servers:
             duck_type: assignment_feedback
             settings:
               name: cs312-projects
-              initial_message: |
-                
+              initial_instruction: |
+                                      
+                This AI tool takes a md report and determines if it meets a set of rubric requirements
+                As you use this tool, you should still be doing the work to make sure you satisfied all the requirements
+                AI can make mistakes. **Because AI said that did or did not you meet a requirement, does not necessarily mean you did.**
+                However, this can be a useful 'pre-flight check' before turning in your project
+                The feedback provided by the tool may help you catch errors you otherwise would not have.
+                If you notice consistent errors in feedback given, please message in #ai-feedback as we try to improve this tool
+
                 ------
                 **The feedback given by AI may be incorrect**
                 
