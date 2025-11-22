@@ -1,0 +1,17 @@
+Project Demo Fruit:
+  Section 1:
+    Subsection 1:
+      - Rubric item to talk about apples
+      - Rubric item to talk about oranges
+    Subsection 2:
+      - Rubric item to talk about bananas
+  Section 2:
+    - Rubric item to talk about raspberries
+  _SectionIgnored:
+    SubSection:
+      - Anything under the '_SectionIgnored' will be ignored -- include this rubric item.
+  Section 3:
+    - Mention any fruit
+
+_Private_Header:
+  - This header, and anything in this section, will be ignored.

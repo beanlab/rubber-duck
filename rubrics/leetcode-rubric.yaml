@@ -1,0 +1,35 @@
+_: &single_problem_requirements
+  Problem Information:
+    - Solve the problem and pass all the LeetCode tests for the problem
+    - Include submission link
+    - Include snapshot of your submission in LeetCode. (Must include your username, the problem name, and the passed status.)
+  Time Complexity:
+      - Include annotated code in report
+      - Annotate all non-trivial parts of your code
+      - Provide explanation of time complexity
+      - State all assumptions regarding the time complexity clearly
+      - Bold final time complexity
+  Space Complexity:
+      - Include annotated code in report
+      - Annotate all non-trivial parts of your code
+      - Provide explanation of space complexity
+      - State all assumptions regarding the space complexity clearly
+      - Bold final space complexity
+
+
+Project Leetcode:
+  Baseline:
+    Baseline Problem 1: *single_problem_requirements
+    Baseline Problem 2: *single_problem_requirements
+    Baseline Problem 3: *single_problem_requirements
+
+  Core:
+    Core Problem 1: *single_problem_requirements
+    Core Problem 2: *single_problem_requirements
+    Core Problem 3: *single_problem_requirements
+
+  Stretch 1:
+    Stretch 1 Problem 1: *single_problem_requirements
+
+  Stretch 2:
+    Stretch 2 Problem 1: *single_problem_requirements
