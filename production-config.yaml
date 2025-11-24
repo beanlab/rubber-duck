@@ -255,22 +255,17 @@ servers:
               name: cs312-projects
               initial_instruction: |
                                       
-                This AI tool takes a md report and determines if it meets a set of rubric requirements
-                As you use this tool, you should still be doing the work to make sure you satisfied all the requirements
-                AI can make mistakes. **Because AI said that did or did not you meet a requirement, does not necessarily mean you did.**
-                However, this can be a useful 'pre-flight check' before turning in your project
-                The feedback provided by the tool may help you catch errors you otherwise would not have.
-                If you notice consistent errors in feedback given, please message in #ai-feedback as we try to improve this tool
-
-                ------
-                **The feedback given by AI may be incorrect**
+                This AI tool takes a report in markdown format and determines if it meets a set of rubric requirements.
                 
-                This generated feedback does **not** check images and may give false feedback regarding images.
+                The feedback provided by this tool is intended to be a helpful "second set of eyes" on your report; 
+                it is not intended as a definitive statement on whether your report is correct.
+                
+                Note:
+                - This generated feedback does **not** check images and may give inaccurate feedback regarding images.
+                - The rubrics used the tool to grade your project may differ slightly from the ones in Canvas and might not include the coding requirements.
         
-                The rubrics used the tool to grade your project may differ slightly from the ones in Canvas. 
-                They may not include the coding requirements.
-        
-                ------
+                Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
+                
 
               gradable_assignments:
                 - name: Project Demo Fruit

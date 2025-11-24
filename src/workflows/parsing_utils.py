@@ -4,8 +4,6 @@ import markdowndata
 from functools import reduce
 import operator
 
-import yaml
-
 SECTION = str
 SECTION_NAME = str
 RUBRIC_ITEM = str
@@ -65,38 +63,6 @@ def unflatten_dictionary(results):
     return unflattened
 
 
-def flatten_report_and_rubric_items(report_contents, rubric_contents) -> list[
-    tuple[list[SECTION_NAME], RUBRIC_ITEM, REPORT_SECTION]]:
-    def helper_func(name, rubric_section, report_section):
-        for section_name in rubric_section.keys():
-            if section_name[0] == '_':  # ignore any headers that start with '_'
-                continue
-
-            if section_name not in report_section:
-                raise Exception(f"Unable to find header {section_name} in the report. \n"
-                                f"The expected format is as follows: {get_expected_md_format(rubric)}")
-
-            name.append(section_name)
-            if isinstance(rubric_section[section_name], dict):
-                yield from helper_func(name[::], rubric_section[section_name], report_section[section_name])
-
-            elif isinstance(rubric_section[section_name], list):
-                for section_item in rubric_section[section_name]:
-
-                    if section_name not in report_section:
-                        raise Exception(f"Unable to find header {section_name} in the report. \n"
-                                        f"The expected format is as follows: {get_expected_md_format(rubric)}")
-
-                    yield name[::], section_item, report_section[section_name]
-            name.pop(-1)
-
-    rubric = yaml.safe_load(rubric_contents)
-    report = markdowndata.loads(report_contents)
-    flattened = list(helper_func([], rubric, report))
-
-    return flattened
-
-
 def get_expected_md_format(rubric):
     as_md = dict_to_md(rubric)
     return (f""
@@ -133,14 +99,8 @@ def dict_to_md(d, level=1):
     return "\n".join(lines)
 
 
-def _extract_top_level_headers(report_contents) -> list[str]:
-    report_contents = markdowndata.loads(report_contents)
-    top_headers = list(report_contents.keys())
-    return top_headers
-
-
-def find_project_name_in_report_headers(report_contents, valid_project_names):
-    top_level_headers = _extract_top_level_headers(report_contents)
+def find_project_name_in_report_headers(report_contents: dict, valid_project_names):
+    top_level_headers = list(report_contents.keys())
     for header in top_level_headers:
         if header in valid_project_names:
             return header
