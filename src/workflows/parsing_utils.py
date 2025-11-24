@@ -1,4 +1,6 @@
 import re
+from pathlib import Path
+
 import markdowndata
 
 from functools import reduce
@@ -20,7 +22,7 @@ These functions allow for the parsing of md reports based on yaml rubrics provid
 
 Rubrics:
    - File paths are specified in the config with a project name
-   - Rubrics are loaded via safe_yaml.loads()
+   - Rubrics are assumed to have correct yaml structure
    - Any sections with headers starting with '_' will be ignored.
    - Headers and rubric items cannot be mixed on the same level of nesting
 
@@ -142,3 +144,9 @@ def find_project_name_in_report_headers(report_contents, valid_project_names):
         if header in valid_project_names:
             return header
     return None
+
+
+def load_yaml_file(path: str | Path):
+    with Path(path).open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+

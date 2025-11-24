@@ -5,7 +5,7 @@ from pathlib import Path
 from quest import step, task
 
 from .parsing_utils import is_filled_in_report, flatten_report_and_rubric_items, unflatten_dictionary, dict_to_md, \
-    find_project_name_in_report_headers
+    find_project_name_in_report_headers, load_yaml_file
 from ..gen_ai.gen_ai import Agent, AIClient
 from ..utils.config_types import DuckContext, AssignmentFeedbackSettings, Gradable, RubricItemResponse
 from ..utils.message_utils import wait_for_message
@@ -37,6 +37,17 @@ class AssignmentFeedbackWorkflow:
             assignment['name']: assignment
             for assignment in (self._settings)["gradable_assignments"]
         }
+
+
+        context_for_rubric_items_path = self._settings.get('context_for_rubric_items_path')
+
+        self._rubric_items_context = (
+            load_yaml_file(context_for_rubric_items_path)
+            if context_for_rubric_items_path
+            else
+            {}
+        )
+
 
     async def __call__(self, context: DuckContext):
         try:
@@ -186,9 +197,11 @@ class AssignmentFeedbackWorkflow:
             )
 
         input = {"report_contents": report_section,
-                 "rubric_item": rubric_item}
+                 "rubric_item": rubric_item,
+                 "details": self._rubric_items_context.get(rubric_item, '')}
+
         raw_response = await self._ai_client.run_agent(context, self._single_rubric_item_grader_agent_settings,
-                                                       str(input))  # is the okay? Or should these be being passed in?
+                                                       str(input))
         result: RubricItemResponse = json.loads(raw_response)
         return piece_name, result
 

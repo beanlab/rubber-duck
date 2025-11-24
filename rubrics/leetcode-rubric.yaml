@@ -7,13 +7,13 @@ _: &single_problem_requirements
       - Include annotated code in report
       - Annotate all non-trivial parts of your code
       - Provide explanation of time complexity
-      - State all assumptions regarding the time complexity clearly
+      - State all assumptions
       - Bold final time complexity
   Space Complexity:
       - Include annotated code in report
       - Annotate all non-trivial parts of your code
       - Provide explanation of space complexity
-      - State all assumptions regarding the space complexity clearly
+      - State all assumptions
       - Bold final space complexity
 
 

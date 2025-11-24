@@ -78,6 +78,7 @@ class AssignmentFeedbackSettings(TypedDict):
     gradable_assignments: list[Gradable]
     single_rubric_item_grader: SingleAgentSettings
     project_scanner_agent: SingleAgentSettings
+    context_for_rubric_items_path: NotRequired[str]
 
 class RubricItemResponse(TypedDict):
     rubric_item: str
