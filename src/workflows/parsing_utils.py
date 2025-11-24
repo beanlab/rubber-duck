@@ -6,14 +6,10 @@ import operator
 
 import yaml
 
-ASSIGNMENT_NAME = str
 SECTION = str
 SECTION_NAME = str
 RUBRIC_ITEM = str
 REPORT_SECTION = str
-FEEDBACK = str
-SATISFACTORY = bool
-
 
 """
 These functions allow for the parsing of md reports based on yaml rubrics provided in the config.
@@ -49,7 +45,7 @@ See an example of a corresponding report in rubric/demo-fruit-project-report.md
 
 def is_filled_in_report(report_section):
     cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section))
-    return not cleaned_report_section.strip().lower() == "fill me in"
+    return (content := cleaned_report_section.strip()) and content != 'fill me in'
 
 
 def _get_nested(d, keys):
@@ -75,23 +71,30 @@ def flatten_report_and_rubric_items(report_contents, rubric_contents) -> list[
         for section_name in rubric_section.keys():
             if section_name[0] == '_':  # ignore any headers that start with '_'
                 continue
+
+            if section_name not in report_section:
+                raise Exception(f"Unable to find header {section_name} in the report. \n"
+                                f"The expected format is as follows: {get_expected_md_format(rubric)}")
+
             name.append(section_name)
             if isinstance(rubric_section[section_name], dict):
                 yield from helper_func(name, rubric_section[section_name], report_section[section_name])
+
             elif isinstance(rubric_section[section_name], list):
                 for section_item in rubric_section[section_name]:
+
+                    if section_name not in report_section:
+                        raise Exception(f"Unable to find header {section_name} in the report. \n"
+                                        f"The expected format is as follows: {get_expected_md_format(rubric)}")
+
                     yield name[::], section_item, report_section[section_name]
             name.pop(-1)
 
-    try:
-        rubric = yaml.safe_load(rubric_contents)
-        report = markdowndata.loads(report_contents)
-        flattened = list(helper_func([], rubric, report))
-        return flattened
-    except KeyError as e:
-        # TODO ask: what exception should be here? Is a vanilla exception fine? Best practice?
-        raise Exception(f"Unable to find header {e} in the report. \n"
-                        f"The expected format is as follows: {get_expected_md_format(rubric)}")
+    rubric = yaml.safe_load(rubric_contents)
+    report = markdowndata.loads(report_contents)
+    flattened = list(helper_func([], rubric, report))
+
+    return flattened
 
 
 def get_expected_md_format(rubric):
@@ -131,7 +134,7 @@ def dict_to_md(d, level=1):
 
 
 def _extract_top_level_headers(report_contents) -> list[str]:
-    report_contents = markdowndata.loads(report_contents)  # TODO: missing error handling for mdd loads failing
+    report_contents = markdowndata.loads(report_contents)
     top_headers = list(report_contents.keys())
     return top_headers
 

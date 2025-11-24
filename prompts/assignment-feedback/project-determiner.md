@@ -8,6 +8,8 @@ Your final output must be a `project_name: str`
 
 * **Output** Ensure your final response matches **exactly** with project names provided
 
+If it appears that the report does not match any of the projects, provide the project name of the uploaded report. 
+
 ### Example 1
 
 <input>
@@ -65,6 +67,6 @@ If none of the provided projects appear to match the uploaded report, simply ret
 
 <final-output><
 {
-    "project_name": "No matches",
+    "project_name": "Brownie Recipe",
 }
 /final-output>

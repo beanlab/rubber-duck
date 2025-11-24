@@ -50,10 +50,10 @@ class AssignmentFeedbackWorkflow:
 
             project_name = await self._extract_project_name_from_report(context, report_contents)
 
-            rubric_contents = await self._load_rubric(project_name)
-
             if assignment_message := self._assignments[project_name].get('message'):
                 await self._send_message(context.thread_id, assignment_message)
+
+            rubric_contents = await self._load_rubric(project_name)
 
             graded_results = await self._grade_assignment(context,
                                                           report_contents,
@@ -61,11 +61,11 @@ class AssignmentFeedbackWorkflow:
 
             await self._send_message(context.thread_id, graded_results)
 
-            # TODO ask: collect feedback from the user at the end? Did it work for the user?
         except ConversationComplete as e:
             await self._send_message(context.thread_id, str(e))
             return
 
+    @step
     async def _load_rubric(self, project_name):
         return Path(self._assignments[project_name].get("rubric_path")).read_text()
 
@@ -112,7 +112,7 @@ class AssignmentFeedbackWorkflow:
 
         if project not in valid_project_names:
             raise ConversationComplete(
-                f"{project} is not supported for grading.\n"  # TODO modify prompt for grabbing the project name 
+                f"{project} is not supported for grading.\n"
                 f"Supported projects are {' '.join(self._assignments)}")
 
         return project
