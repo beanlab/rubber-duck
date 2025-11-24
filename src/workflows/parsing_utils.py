@@ -78,7 +78,7 @@ def flatten_report_and_rubric_items(report_contents, rubric_contents) -> list[
 
             name.append(section_name)
             if isinstance(rubric_section[section_name], dict):
-                yield from helper_func(name, rubric_section[section_name], report_section[section_name])
+                yield from helper_func(name[::], rubric_section[section_name], report_section[section_name])
 
             elif isinstance(rubric_section[section_name], list):
                 for section_item in rubric_section[section_name]:
