@@ -46,7 +46,7 @@ class AssignmentFeedbackWorkflow:
             # Tell the user the supported assignments
             supported_assignment_names = list(self._assignments.keys()) # should the supported assignments be set on self when initializing?
             await self._send_message(context.thread_id,
-                                     f"The supported assignments for grading are {supported_assignment_names}")
+                                     f"The supported assignments for grading are {' '.join(supported_assignment_names)}")
 
             # Query the report contents from the user
             # TODO ask read url is being used here. Do we need to pass that in? Do we care? We just care that the report contents are returned
@@ -56,15 +56,14 @@ class AssignmentFeedbackWorkflow:
 
             # Determine which project name is associated with the report
             # TODO ask: what should be passed here? Do we need to pass in agent settings? or is it okay it just relies on it within the function
-            project_name = await self._extract_project_name_from_report(context, report_contents,
-                                                                        supported_assignment_names)
+            project_name = await self._extract_project_name_from_report(context, report_contents, supported_assignment_names)
 
             # Read the rubric contents associated with the project
             # TODO Error handling? in a function:  duck_logger.warn(f"Error loading the rubric file: {e}")
             # Best practices for opening files and paths?
             rubric_contents = Path(self._assignments[project_name].get("rubric_path")).read_text()
 
-            # If present, send a project specific message to the user
+            # If present in the config, send a project specific message to the user
             if project_message := self._assignments[project_name].get('message'):
                 await self._send_message(context.thread_id, project_message)
 
@@ -75,9 +74,10 @@ class AssignmentFeedbackWorkflow:
 
             # grade the report
             # TODO ask: passing in functions here appropriate? Or just rely on them within the class? Is there a rule of thumb?
-            graded_results = self.grade_assignment(report_contents,
+            # Passing self into self doesn't seem quite right
+            graded_results = await self.grade_assignment(context,
+                                                   report_contents,
                                                    rubric_contents,
-                                                   self._grade_single_item,
                                                    self._format_graded_response)
 
             await self._send_message(context.thread_id, graded_results)
@@ -90,13 +90,17 @@ class AssignmentFeedbackWorkflow:
             return
 
     @step
-    async def grade_assignment(self, context, report_contents, rubric_contents, grade_single_item, format_response) -> str:
+    async def grade_assignment(self, context, report_contents, rubric_contents, format_response) -> str:
 
         # break up the report into small pieces to grade with the associated rubric item
-        flattened_report_and_rubric_items = flatten_report_and_rubric_items(report_contents, rubric_contents)
+        try:
+            flattened_report_and_rubric_items = flatten_report_and_rubric_items(report_contents, rubric_contents)
+        except Exception as e:
+            raise ConversationComplete(e)
 
         tasks = [
-            grade_single_item(context, piece_name, report_section, rubric_item)
+            asyncio.create_task(self._grade_single_item(context, piece_name, report_section, rubric_item))
+            # self._grade_single_item(context, piece_name, report_section, rubric_item)
             for piece_name, rubric_item, report_section in
             flattened_report_and_rubric_items
         ]
@@ -170,7 +174,7 @@ class AssignmentFeedbackWorkflow:
         raise ConversationComplete("No markdown files were uploaded")
 
     @step
-    @task
+    # @task
     async def _grade_single_item(self, context, piece_name, report_section, rubric_item) -> tuple[
         list[SECTION_NAME], RubricItemResponse]:
 

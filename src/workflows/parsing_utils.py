@@ -6,7 +6,6 @@ import operator
 
 import yaml
 
-
 ASSIGNMENT_NAME = str
 SECTION = str
 SECTION_NAME = str
@@ -15,25 +14,6 @@ REPORT_SECTION = str
 FEEDBACK = str
 SATISFACTORY = bool
 
-# avoid anything when
-
-# no touching self -- after it's initialized shouldn't
-
-# no function references self
-
-# complete wiring diagrma
-
-# good workflow can see every piece of data moving around
-#
-# imperative verbs
-#
-# update comment
-#
-# typing ??
-#
-# add type hinting on function signatures (not have to do local variables)
-
-# what's the rule for passing in functions?
 
 """
 These functions allow for the parsing of md reports based on yaml rubrics provided in the config.
@@ -71,13 +51,16 @@ def is_filled_in_report(report_section):
     cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section))
     return not cleaned_report_section.strip().lower() == "fill me in"
 
+
 def _get_nested(d, keys):
     return reduce(operator.getitem, keys, d)
+
 
 def _set_nested(d, keys, value):
     *prefix, last = keys
     parent = reduce(lambda acc, k: acc.setdefault(k, {}), prefix, d)
     parent.setdefault(last, []).append(value)
+
 
 def unflatten_dictionary(results):
     unflattened = {}
@@ -85,11 +68,12 @@ def unflatten_dictionary(results):
         _set_nested(unflattened, keys, formatted)
     return unflattened
 
+
 def flatten_report_and_rubric_items(report_contents, rubric_contents) -> list[
     tuple[list[SECTION_NAME], RUBRIC_ITEM, REPORT_SECTION]]:
     def helper_func(name, rubric_section, report_section):
         for section_name in rubric_section.keys():
-            if section_name[0] == '_': # ignore any headers that start with '_'
+            if section_name[0] == '_':  # ignore any headers that start with '_'
                 continue
             name.append(section_name)
             if isinstance(rubric_section[section_name], dict):
@@ -105,8 +89,10 @@ def flatten_report_and_rubric_items(report_contents, rubric_contents) -> list[
         flattened = list(helper_func([], rubric, report))
         return flattened
     except KeyError as e:
-        raise ConversationComplete(f"Unable to find header {e} in the report. \n"
-                                   f"The expected format is as follows: {get_expected_md_format(rubric)}") # conversation complete? this exception should probably be corrected
+        # TODO ask: what exception should be here? Is a vanilla exception fine? Best practice?
+        raise Exception(f"Unable to find header {e} in the report. \n"
+                        f"The expected format is as follows: {get_expected_md_format(rubric)}")
+
 
 def get_expected_md_format(rubric):
     as_md = dict_to_md(rubric)
@@ -119,43 +105,39 @@ def get_expected_md_format(rubric):
 def dict_to_md(d, level=1):
     """
     Convert a nested dict of the form
-    {a: {b: {c: [1]}}}
+    {a: {b: [1] }}
     into markdown:
 
     # a
     ## b
-    ### c
     - 1
     """
     lines = []
 
     for key, value in d.items():
-        # Header line
         header_prefix = "#" * level
         lines.append(f"{header_prefix} {key}")
 
-        # Nested dict → go one level deeper
         if isinstance(value, dict):
             lines.append(dict_to_md(value, level + 1))
 
-        # List → bullet items or recurse
         elif isinstance(value, list):
             for item in value:
                 lines.append(f"- {item}")
-
-        # Fallback: non-dict, non-list leaf
         else:
             lines.append(f"- {value}")
 
     return "\n".join(lines)
 
-def extract_top_level_headers(report_contents) -> list[str]:
+
+def _extract_top_level_headers(report_contents) -> list[str]:
     report_contents = markdowndata.loads(report_contents)  # TODO: missing error handling for mdd loads failing
     top_headers = list(report_contents.keys())
     return top_headers
 
+
 def find_project_name_in_report_headers(report_contents, valid_project_names):
-    top_level_headers = extract_top_level_headers(report_contents)
+    top_level_headers = _extract_top_level_headers(report_contents)
     for header in top_level_headers:
         if header in valid_project_names:
             return header
