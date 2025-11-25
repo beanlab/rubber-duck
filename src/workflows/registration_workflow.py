@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 import uuid
@@ -10,9 +9,8 @@ from quest import step, queue
 
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
-from ..utils.protocols import Message
 from ..utils.send_email import EmailSender
-
+from ..utils.message_utils import wait_for_message
 
 class RegistrationWorkflow:
     def __init__(self,
@@ -73,21 +71,13 @@ class RegistrationWorkflow:
         code = str(uuid.uuid4().int)[:6]
         return code
 
-    async def _wait_for_message(self, timeout=300) -> str | None:
-        async with queue('messages', None) as messages:
-            try:
-                message: Message = await asyncio.wait_for(messages.get(), timeout)
-                return message['content']
-            except asyncio.TimeoutError:  # Close the thread if the conversation has closed
-                return None
-
     @step
     async def _get_names(self, thread_id, timeout):
         try:
             await self._send_message(thread_id, "Please enter your preferred first and last name, e.g. 'Shane Reese'")
 
             # Wait for user response
-            name = await self._wait_for_message(timeout)
+            name = await wait_for_message(timeout)
             return name
 
         except Exception as e:
@@ -102,7 +92,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
-            net_id = await self._wait_for_message(timeout)
+            net_id = await wait_for_message(timeout)
             return net_id
 
         except Exception as e:
@@ -131,7 +121,7 @@ class RegistrationWorkflow:
                                      "or type *resend* to get a new code")
 
             # Wait for user response
-            response = await self._wait_for_message(timeout)
+            response = await wait_for_message(timeout)
             if not response:
                 await self._send_message(thread_id, "No response received. Please start a new chat.")
                 return False
@@ -176,7 +166,7 @@ class RegistrationWorkflow:
                                      f"Available roles:\n{role_list}")
 
             # Wait for user response
-            response = await self._wait_for_message(timeout)
+            response = await wait_for_message(timeout)
             if response is None or not response.strip():
                 await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
                 return []
