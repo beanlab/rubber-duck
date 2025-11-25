@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NotRequired
+from typing import NotRequired, Literal, Union
 
 from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
@@ -157,11 +157,14 @@ class ContainerConfig(TypedDict):
     network: str
 
 
-class ToolConfig(TypedDict):
-    type: str
-    container: NotRequired[str]
-    agent: NotRequired[str]
-    output: NotRequired[str]
+class ContainerTool(TypedDict):
+    type: Literal['container_exec']
+    name: str
+    description: str
+    container: str
+
+
+ToolConfig = Union[ContainerTool]
 
 
 class Config(TypedDict):

@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import functools
 import logging
 import os
 from pathlib import Path
@@ -233,20 +234,25 @@ def _build_feedback_queues(config: Config, sql_session):
 def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
     armory = Armory(send_message)
 
-    dataset_dirs = config.get("dataset_folder_locations")
-    if dataset_dirs:
-        data_store = DataStore(dataset_dirs)
-        stat_tools = StatsTools(data_store)
-        armory.scrub_tools(stat_tools)
-        config_tools = config.get("tools")
-        for tool_config in config_tools:
-            container_image = tool_config.get("container")
-            if container_image:
-                container = PythonExecContainer(container_image, data_store)
-                python_tools = PythonTools(container)
-                armory.scrub_tools(python_tools)
-    else:
+    dataset_dirs = config.get("dataset_folder_locations", [])
+    if not dataset_dirs:
         duck_logger.warning("**No dataset folder locations provided in config**")
+
+    data_store = DataStore(dataset_dirs)
+    stat_tools = StatsTools(data_store)
+    armory.scrub_tools(stat_tools)
+
+    config_tools = config.get("tools", [])
+    for tool_config in config_tools:
+        if tool_config['type'] == 'container_exec':
+            container_image = tool_config['container']
+            container = PythonExecContainer(container_image, data_store)
+            python_tools = PythonTools(container, send_message)
+
+            armory.add_tool(python_tools.run_code, name=tool_config['name'], description=tool_config.get('description'))
+
+        else:
+            duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)

@@ -4,20 +4,37 @@ import json
 import os
 import tarfile
 import uuid
-from docker import from_env
+from typing import TypedDict
+
+from docker import from_env, Client
 from pathlib import Path
 from textwrap import dedent, indent
 from docker.types import Mount
 
 from .data_store import DataStore
+
+# TODO: add info logging for the code and errors the code runs into (not warnings)
+
+
 # from utils.logger import duck_logger
+
+
+class FileResult(TypedDict):
+    description: str
+    bytes: bytes
+
+
+class ExecuationResult(TypedDict):
+    stdout: str
+    stderr: str
+    files: dict[str, FileResult]
 
 
 class PythonExecContainer:
     def __init__(self, image: str, data_store: DataStore):
         self.image = image
         self.data_store = data_store
-        self.client = from_env()
+        self.client: Client = from_env()
         self.container = None
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
@@ -288,13 +305,13 @@ class PythonExecContainer:
         }
         return output
 
-    async def run_code(self, code: str, files: dict = None) -> dict[str, dict[str, str] | bytes]:
+    async def run_code(self, code: str, files: dict = None) -> ExecuationResult:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
 
 async def run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", DataStore([])) as container:
         code = dedent("""\
             import matplotlib.pyplot as plt
 
@@ -328,7 +345,7 @@ async def run_code_test():
 
 
 async def async_run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest") as container:
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", DataStore([])) as container:
         code = dedent("""\
             import time
             import matplotlib.pyplot as plt
