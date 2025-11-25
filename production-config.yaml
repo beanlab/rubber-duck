@@ -260,7 +260,7 @@ servers:
             duck_type: assignment_feedback
             settings:
               name: cs312-projects
-              initial_instruction: |                  
+              initial_instructions: |                  
                 This AI tool takes a report in markdown format and determines if it meets a set of rubric requirements.
                 
                 The feedback provided by this tool is intended to be a helpful "second set of eyes" on your report; 

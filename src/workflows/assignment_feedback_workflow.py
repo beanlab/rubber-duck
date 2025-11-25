@@ -45,7 +45,8 @@ class AssignmentFeedbackWorkflow:
 
     async def __call__(self, context: DuckContext):
         try:
-            await self._send_message(context.thread_id, self._settings['initial_instructions'])
+            if message := self._settings.get('initial_instructions'):
+                await self._send_message(context.thread_id, message)
 
             await self._send_message(context.thread_id,
                                      f"The supported assignments for grading are {', '.join(self._assignments)}")
