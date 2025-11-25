@@ -246,8 +246,12 @@ servers:
                   - name: Lecture Sections
                     pattern: "lecture-"
                     description: Who teaches your lecture?
-      - channel_id: 1441162951968166051
-        channel_name: ai-project-feedback
+      - channel_id: 1442908120488743113
+        channel_name: duck-pond
+        ducks:
+          - standard-rubber-duck
+      - channel_id: 1442908158757437502
+        channel_name: project-review
         ducks:
           - name: cs312-grader
             duck_type: assignment_feedback
@@ -330,7 +334,15 @@ servers:
                       additionalProperties: false
 
                 reasoning: minimal
-
+      - channel_id: 1442908515147710558
+        channel_name: duck-review
+        ducks:
+          - name: Conversation-Review-CS312
+            duck_type: conversation_review
+            settings:
+              target_channel_ids:
+                - 1442908120488743113
+                - 1442908158757437502
         timeout: 600
 
 
