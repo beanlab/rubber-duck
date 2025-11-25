@@ -149,11 +149,6 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
 
-class RunPythonConfig(TypedDict):
-    image: str
-    timeout: int
-
-
 class ContainerConfig(TypedDict):
     image: str
     timeout: int
@@ -171,7 +166,6 @@ class ToolConfig(TypedDict):
 
 class Config(TypedDict):
     sql: SQLConfig
-    run_python: RunPythonConfig
     containers: list[ContainerConfig]
     tools: list[ToolConfig]
     ducks: list[DuckConfig]

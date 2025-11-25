@@ -11,7 +11,6 @@ from quest.utils import quest_logger
 
 from .armory.armory import Armory
 from .armory.data_store import DataStore
-from .armory.python_tools_docker import PythonToolsDocker
 from .armory.stat_tools import StatsTools
 from .armory.talk_tool import TalkTool
 from .bot.discord_bot import DiscordBot
@@ -242,10 +241,6 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
-
-    if run_python_settings := config.get('run_python'):
-        pytools = PythonToolsDocker(run_python_settings['image'], run_python_settings.get('timeout', 30))
-        armory.scrub_tools(pytools)
 
     return armory, talk_tool
 

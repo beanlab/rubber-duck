@@ -33,10 +33,6 @@ tools:
     type: container_exec
     container: python-sandbox
 
-run_python:
-  image: byucscourseops/python-tools-sandbox:latest
-  timeout: 30
-
 agents_as_tools:
   - tool_name: check_suspicion_bot
     doc_string: |
