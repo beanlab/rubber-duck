@@ -1,4 +1,3 @@
-import asyncio
 import json
 from pathlib import Path
 
@@ -70,23 +69,19 @@ class AssignmentFeedbackWorkflow:
             await self._send_message(context.thread_id, str(e))
             return
 
-    # @step
+    @step
     async def _load_rubric(self, project_name):
         return yaml.safe_load(Path(self._assignments[project_name].get("rubric_path")).read_text())
 
-    # @step
+    @step
     async def _grade_assignment(self, context, report_contents, rubric_contents) -> str:
         flattened_report_and_rubric_items = self._flatten_report_and_rubric_items(report_contents, rubric_contents)
 
-        tasks = [
-            # self._grade_single_item(context, piece_name, report_section, rubric_item)
-            asyncio.create_task(self._grade_single_item(context, piece_name, report_section, rubric_item))
+        flattened_graded_items = [
+            await self._grade_single_item(context, piece_name, report_section, rubric_item)
             for piece_name, rubric_item, report_section in
             flattened_report_and_rubric_items
         ]
-
-        # noinspection PyTypeChecker
-        flattened_graded_items: list[tuple[list[SECTION_NAME], RubricItemResponse]] = await asyncio.gather(*tasks)
 
         formatted_flattened_graded_items = [
             (name, self._format_graded_response(result))
@@ -103,7 +98,7 @@ class AssignmentFeedbackWorkflow:
         emoji = ':white_check_mark:' if response['satisfactory'] else ':x:'
         return f'{emoji} **{response["rubric_item"]}** - {response["justification"]}'
 
-    # @step
+    @step
     async def _get_project_name_using_agent(self, context, report_contents, valid_project_names):
         input = {
             'report_contents': report_contents,
@@ -121,7 +116,7 @@ class AssignmentFeedbackWorkflow:
 
         return project
 
-    # @step
+    @step
     async def _extract_project_name_from_report(self, context, report_contents: dict) -> str:
         valid_project_names = list(self._assignments.keys())
         if project_name := find_project_name_in_report_headers(report_contents, valid_project_names):
@@ -129,7 +124,7 @@ class AssignmentFeedbackWorkflow:
         else:
             return await self._get_project_name_using_agent(context, report_contents, valid_project_names)
 
-    # @step
+    @step
     async def _query_user_for_report(self, context):
         message = "Please upload your markdown report."
 
@@ -151,8 +146,7 @@ class AssignmentFeedbackWorkflow:
 
         raise ConversationComplete("No markdown files were uploaded")
 
-    # @task
-    # @step
+    @step
     async def _grade_single_item(self, context, piece_name, report_section, rubric_item) -> tuple[
         list[SECTION_NAME], RubricItemResponse]:
 
