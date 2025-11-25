@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .armory.armory import Armory
 from .armory.data_store import DataStore
 from .armory.stat_tools import StatsTools
@@ -158,6 +159,19 @@ def build_ducks(
 
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, config, settings, armory)
+
+        elif duck_type == 'assignment_feedback':
+            single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
+            project_scanner_agent = build_agent(settings["project_scanner_agent"])
+            ducks[name] = AssignmentFeedbackWorkflow(
+                settings['name'],
+                bot.send_message,
+                settings,
+                single_rubric_item_grader,
+                project_scanner_agent,
+                ai_client,
+                bot.read_url
+            )
 
         else:
             raise NotImplementedError(f'Duck of type {duck_type} not implemented')

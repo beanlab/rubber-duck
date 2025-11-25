@@ -51,3 +51,8 @@ class IndicateTyping(Protocol):
 
 class CreateThread(Protocol):
     async def __call__(self, parent_channel_id: int, title: str) -> int: ...
+
+
+class ConversationComplete(BaseException):
+    def __init__(self, message=None):
+        super().__init__(message)
