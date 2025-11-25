@@ -9,7 +9,7 @@ from pathlib import Path
 from textwrap import dedent, indent
 from docker.types import Mount
 
-from armory.data_store import DataStore
+from .data_store import DataStore
 # from utils.logger import duck_logger
 
 

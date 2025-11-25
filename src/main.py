@@ -9,10 +9,10 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from armory.python_tools import PythonTools
-from utils.python_exec_container import PythonExecContainer
+from .armory.python_tools import PythonTools
+from .utils.python_exec_container import PythonExecContainer
 from .armory.armory import Armory
-from .armory.data_store import DataStore
+from .utils.data_store import DataStore
 from .armory.stat_tools import StatsTools
 from .armory.talk_tool import TalkTool
 from .bot.discord_bot import DiscordBot

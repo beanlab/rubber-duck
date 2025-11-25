@@ -15,7 +15,7 @@ import statsmodels.api as sm
 
 from .cache import cache_result
 from .tools import register_tool, sends_image
-from ..armory.data_store import DataStore
+from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
 
 
