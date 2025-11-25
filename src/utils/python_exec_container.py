@@ -4,26 +4,49 @@ import json
 import os
 import tarfile
 import uuid
-import docker
+from docker import from_env
+from pathlib import Path
 from textwrap import dedent, indent
+from docker.types import Mount
+
+from armory.data_store import DataStore
 # from utils.logger import duck_logger
 
 
-class PythonExecContainer():
-    def __init__(self, image: str) -> None:
-        self.image: str = image
-        self.client = docker.from_env()
+class PythonExecContainer:
+    def __init__(self, image: str, data_store: DataStore):
+        self.image = image
+        self.data_store = data_store
+        self.client = from_env()
         self.container = None
-        self._working_dir = '/home/sandbox/out'
+        self._working_dir = "/home/sandbox/out"
+        self._mounts = []
 
-    def __enter__(self) -> "PythonExecContainer":
-        # start docker container
-        # duck_logger.info(f"Starting container from image: {self.image}")
+        # prepare mounts for local datasets
+        for name, meta in self.data_store.get_dataset_metadata().items():
+            location = meta["location"]
+            if not location.startswith("s3://"):
+                host_path = Path(location).parent.resolve()
+                self._mounts.append(
+                    Mount(target=f"/datasets/{name}", source=str(host_path), type="bind", read_only=True))
+
+    def __enter__(self):
+        # start container
         self.container = self.client.containers.run(
             self.image,
             command="sleep infinity",
             detach=True,
+            mounts=self._mounts
         )
+
+        # copy S3 datasets into container
+        for name, meta in self.data_store.get_dataset_metadata().items():
+            location = meta["location"]
+            if location.startswith("s3://"):
+                df = self.data_store.get_dataset(name)
+                csv_bytes = df.to_csv(index=False).encode("utf-8")
+                self._write_file(f"{name}.csv", csv_bytes, "/datasets")
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -143,7 +166,7 @@ class PythonExecContainer():
         Returns:
             {
                 "path/filename": {
-                    "description": dict,
+                    "description": str,
                     "data": bytes
                 }
             }
