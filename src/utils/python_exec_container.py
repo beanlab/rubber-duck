@@ -24,7 +24,7 @@ class FileResult(TypedDict):
     bytes: bytes
 
 
-class ExecuationResult(TypedDict):
+class ExecutionResult(TypedDict):
     stdout: str
     stderr: str
     files: dict[str, FileResult]
@@ -305,7 +305,7 @@ class PythonExecContainer:
         }
         return output
 
-    async def run_code(self, code: str, files: dict = None) -> ExecuationResult:
+    async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
