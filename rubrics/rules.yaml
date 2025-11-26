@@ -1,0 +1,139 @@
+Annotated code: |
+  <correct>
+  
+  ```py
+  
+  for i in range(): # this is an example of an anotation
+    print("10")
+  
+  ```
+  
+  </correct>
+
+Non-trivial annotated code: |
+    Annotated code should include comments showing the time or space complexity 
+    for lines significantly contributing to the overall complexity.
+    
+    It is not necessary every single line. 
+    
+    Here is an example of annotated code for time complexity:  
+    
+    ```py
+    def fib_iterative(n):
+        """Calculates the fibonacci sequence using iteration"""
+        if n < 2:                                           
+            return n                                        
+    
+        seq = [0, 1]                                        
+        for i in range(1, n):                               # O(n) - The overall loop is O(n) - the for loop loops n times 
+            seq.append(seq[i] + seq[i - 1])                 # O(1) - The python append function is constant time, and addition is also constant time
+        return seq[-1]                                      
+    ```
+
+Provide explanation of time complexity: |
+  
+  ```py
+  def fib_iterative(n):
+      """Calculates the fibonacci sequence using iteration"""
+      if n < 2:                                           # O(1) - comparison is constant
+          return n                                        # O(1) - returning is constant
+  
+      seq = [0, 1]                                        # O(1) - declaring variables is constant
+      for i in range(1, n):                               # O(n) - The overall loop is O(n) - the for loop loops n times 
+          seq.append(seq[i] + seq[i - 1])                 # O(1) - The python append function is constant time, and addition is also constant time
+      return seq[-1]                                      # O(1) - Returning and indexing into a python list is constant time
+  ```
+
+  The largest operation is the for loop. The loop loops n times with a constant time complexity for each loop leading to an overall time complexity of **O(n)**.
+
+State all assumptions: |
+    When explaining the complexity, the responses should the assumptions. 
+    State any assumptions. Assumptions may include:
+  
+    - the time/space complexity of built-in functions in Python (e.g. sort)
+    - including/excluding space complexity of parameters
+    - which parameters vary in size and affect algorithm performance (e.g. size of variable-length numbers vs size of graph, etc.)
+
+    <correct-example>
+  
+      ```py
+      def fib_iterative(n):                           
+          """Calculates the fibonacci sequence using iteration"""
+          if n < 2:                                        
+              return n                                     
+      
+          seq = [0, 1]                                    
+          for i in range(1, n):                           # O(1) - Range has constant space complexity, see note below
+              seq.append(seq[i] + seq[i - 1])             # O(n) - seq grows to the size of n
+          return seq[-1]          
+      ```
+      
+      For analyzing space complexity of this function, we will look at the data structures and the space complexity of the functions being called.
+      
+      Within the context of this function, there is only 1 data structure being used -- `seq`. The variable declarations can be assumed to be constant time. The `seq` array will contain `n` items at the end, resulting in an overall space complexity of O(n).
+      
+      The functions called within this context are `range` and `append`. The [python documentation][1] for range states that only a small amount of memory will be used as it stores only the start, stop, and step values. Thus, range results in O(1) space complexity. The built in `append` function does not use additional space complexity.
+      
+      The overall space complexity is **O(n)** because the largest space complexity within the function is O(n).
+  
+    </correct-example>
+
+Bold final time complexity: |
+  The final bolded complexity can be in markdown: 
+  
+  <correct-example>
+    **O(n)**
+  </correct-example>
+  
+  <incorrect-example>
+    The final time complexity is O(n)
+  </incorrect-example>
+
+Provide explanation of space complexity: |
+  This example is correct because it explains what the space complexity is. 
+  
+    <correct>
+  
+      ```py
+      def fib_iterative(n):                           
+          """Calculates the fibonacci sequence using iteration"""
+          if n < 2:                                        
+              return n                                     
+      
+          seq = [0, 1]                                    
+          for i in range(1, n):                           # O(1) - Range has constant space complexity, see note below
+              seq.append(seq[i] + seq[i - 1])             # O(n) - seq grows to the size of n
+          return seq[-1]          
+      ```
+      
+      For analyzing space complexity of this function, we will look at the data structures and the space complexity of the functions being called.
+      
+      Within the context of this function, there is only 1 data structure being used -- `seq`. The variable declarations can be assumed to be constant time. The `seq` array will contain `n` items at the end, resulting in an overall space complexity of O(n).
+      
+      The functions called within this context are `range` and `append`. The [python documentation][1] for range states that only a small amount of memory will be used as it stores only the start, stop, and step values. Thus, range results in O(1) space complexity. The built in `append` function does not use additional space complexity.
+      
+      The overall space complexity is **O(n)** because the largest space complexity within the function is O(n).
+  
+    </correct>
+
+    This is missing any explanations.
+  
+    <incorrect>
+  
+      ```py
+      def fib_iterative(n):                           
+          """Calculates the fibonacci sequence using iteration"""
+          if n < 2:                                        
+              return n                                     
+      
+          seq = [0, 1]                                    
+          for i in range(1, n):                           # O(1)
+              seq.append(seq[i] + seq[i - 1])             # O(n) - seq grows to the size of n
+          return seq[-1]          
+      ```
+      
+      The overall space complexity is **O(n)**. 
+  
+    </incorrect>
+
+

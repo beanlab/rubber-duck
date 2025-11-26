@@ -1,0 +1,9 @@
+_Rules:
+  Fruit Definition:
+    A tomato is **not** a fruit
+    Cabbage **is** a fruit
+    
+    If the student mentions cabbage, it is correct. 
+    
+    If the student mentions a tomato it is incorrect.
+

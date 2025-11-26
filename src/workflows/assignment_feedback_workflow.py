@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import markdowndata
@@ -16,6 +17,7 @@ ASSIGNMENT_NAME = str
 SECTION_NAME = str
 RUBRIC_ITEM = str
 REPORT_SECTION = str
+RULES = str
 
 MISSING_SECTION_KEYWORD = 'MISSING'
 
@@ -72,15 +74,23 @@ class AssignmentFeedbackWorkflow:
 
     @step
     async def _load_rubric(self, project_name):
-        return yaml.safe_load(Path(self._assignments[project_name].get("rubric_path")).read_text())
+        rubric_files = self._assignments[project_name].get("rubric_path")
+
+        if isinstance(rubric_files, str):
+            rubric_files = [rubric_files]
+
+        contents = '\n'.join(Path(file).read_text() for file in rubric_files)
+
+        return yaml.safe_load(contents)
+
 
     @step
     async def _grade_assignment(self, context, report_contents, rubric_contents) -> str:
         flattened_report_and_rubric_items = self._flatten_report_and_rubric_items(report_contents, rubric_contents)
 
         flattened_graded_items = [
-            await self._grade_single_item(context, piece_name, report_section, rubric_item)
-            for piece_name, rubric_item, report_section in
+            await self._grade_single_item(context, piece_name, report_section, rubric_item, rules)
+            for piece_name, rubric_item, report_section, rules in
             flattened_report_and_rubric_items
         ]
 
@@ -97,7 +107,10 @@ class AssignmentFeedbackWorkflow:
 
     def _format_graded_response(self, response: RubricItemResponse):
         emoji = ':white_check_mark:' if response['satisfactory'] else ':x:'
-        return f'{emoji} **{response["rubric_item"]}** - {response["justification"]}'
+
+        # Reformat rubric item: fruit [rule_name] -> fruit
+        formatted_rubric_item = response["rubric_item"].split('[',1)[0].strip()
+        return f'{emoji} **{formatted_rubric_item}** - {response["justification"]}'
 
     @step
     async def _get_project_name_using_agent(self, context, report_contents, valid_project_names):
@@ -147,8 +160,21 @@ class AssignmentFeedbackWorkflow:
 
         raise ConversationComplete("No markdown files were uploaded")
 
+    def _get_rules(self, rubric_item, rubric_contents):
+        if match := re.search('\[(.*?)\]', rubric_item):
+            rules = match.group(1)
+            rule_names = rules.split(',')
+
+            rules = rubric_contents.get('_Rules')
+
+            rule_contents = [rules.get(rule_name) for rule_name in rule_names]
+            rule_contents = '----\n\n'.join(rule_contents)
+            return rule_contents
+        return None
+
+
     @step
-    async def _grade_single_item(self, context, piece_name, report_section, rubric_item) -> tuple[
+    async def _grade_single_item(self, context, piece_name, report_section, rubric_item, rules='') -> tuple[
         list[SECTION_NAME], RubricItemResponse]:
 
         if not is_filled_in_report(report_section):
@@ -166,13 +192,16 @@ class AssignmentFeedbackWorkflow:
             )
 
         input = {"report_contents": report_section,
-                 "rubric_item": rubric_item}
+                 "rubric_item": rubric_item,
+                 "rules": rules
+                 }
+
         raw_response = await self._ai_client.run_agent(context, self._single_rubric_item_grader_agent, str(input))
         result: RubricItemResponse = json.loads(raw_response)
         return piece_name, result
 
     def _flatten_report_and_rubric_items(self, report_contents, rubric_contents) -> list[
-        tuple[list[SECTION_NAME], RUBRIC_ITEM, REPORT_SECTION]]:
+        tuple[list[SECTION_NAME], RUBRIC_ITEM, REPORT_SECTION, RULES]]:
         def helper_func(name, rubric, report_section):
             for section_name, rubric_content in rubric.items():
                 if section_name[0] == '_':  # ignore any headers that start with '_'
@@ -180,7 +209,7 @@ class AssignmentFeedbackWorkflow:
 
                 name.append(section_name)
                 if section_name not in report_section:
-                    yield name[::], section_name, (f"{MISSING_SECTION_KEYWORD}: Unable to find header **{section_name}** in the report")
+                    yield name[::], section_name, (f"{MISSING_SECTION_KEYWORD}: Unable to find header **{section_name}** in the report"), ''
                     name.pop(-1)
                     continue
 
@@ -189,7 +218,10 @@ class AssignmentFeedbackWorkflow:
 
                 elif isinstance(rubric_content, list):
                     for section_item in rubric_content:
-                        yield name[::], section_item, report_section[section_name]
+
+                        rules = self._get_rules(section_item, rubric_contents)
+
+                        yield name[::], section_item, report_section[section_name], rules
                 name.pop(-1)
 
         flattened = list(helper_func([], rubric_contents, report_contents))
