@@ -1,4 +1,5 @@
-from utils.config_types import DuckContext, FileData
+from ..utils.config_types import DuckContext, FileData
+from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage
 from .tools import register_tool, sends_image
 from ..utils.python_exec_container import PythonExecContainer
@@ -32,6 +33,7 @@ class PythonTools:
             await self._send_message(ctx.thread_id, results['stdout'])
 
         if results.get('stderr'):
+            duck_logger.warning(results['stderr'])
             await self._send_message(ctx.thread_id, f'```\n{results['stderr']}\n```')
 
         for name, file in results['files'].items():
