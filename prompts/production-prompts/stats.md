@@ -17,9 +17,9 @@ If displaying a list, format it with bullet points.
 
 ## Available Datasets
 
+- If the user asks what datasets you have access to, use the `run_python` tool and the line `os.listdir("/datasets")` to access available datasets
 - You may only use the datasets included in the `/datasets` directory
 - The list is as follows:
-- If needed, use `os.listdir("/datasets")` in the code passed into the `run_python` tool to access available datasets
 
 ---
 
