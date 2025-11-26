@@ -12,6 +12,7 @@ from textwrap import dedent, indent
 from docker.types import Mount
 
 from .data_store import DataStore
+from .logger import duck_logger
 
 # TODO: add info logging for the code and errors the code runs into (not warnings)
 
@@ -55,6 +56,7 @@ class PythonExecContainer:
             detach=True,
             mounts=self._mounts
         )
+        duck_logger.info("Container started")
 
         # copy S3 datasets into container
         for name, meta in self.data_store.get_dataset_metadata().items():
@@ -90,7 +92,7 @@ class PythonExecContainer:
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
         dest_path = os.path.join(container_dir, rel_path)  # full path to file
-
+        duck_logger.info(f"Writing {dest_path}")
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
         self.container.exec_run(["mkdir", "-p", parent_dir])
@@ -307,6 +309,7 @@ class PythonExecContainer:
 
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
+        duck_logger.info(f"Executing code: {code}")
         return await asyncio.to_thread(self._run_code, code, files)
 
 
