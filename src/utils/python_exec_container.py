@@ -14,12 +14,6 @@ from docker.types import Mount
 from .data_store import DataStore
 from .logger import duck_logger
 
-# TODO: add info logging for the code and errors the code runs into (not warnings)
-
-
-# from utils.logger import duck_logger
-
-
 class FileResult(TypedDict):
     description: str
     bytes: bytes
@@ -309,7 +303,7 @@ class PythonExecContainer:
 
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
-        duck_logger.info(f"Executing code: {code}")
+        duck_logger.info(f"Executing code: \n{code}")
         return await asyncio.to_thread(self._run_code, code, files)
 
 
