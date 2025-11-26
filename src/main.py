@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import functools
 import logging
 import os
 from pathlib import Path
@@ -11,7 +10,6 @@ from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
 from .armory.python_tools import PythonTools
-from .utils.python_exec_container import PythonExecContainer
 from .armory.armory import Armory
 from .utils.data_store import DataStore
 from .armory.stat_tools import StatsTools
@@ -242,15 +240,20 @@ def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
     stat_tools = StatsTools(data_store)
     armory.scrub_tools(stat_tools)
 
+    # setup container dictionary
+    config_containers = config.get('containers')
+    container_config = {}
+    for c in config_containers:
+        container_config[c.get('name')] = c
+
+    # setup tools
     config_tools = config.get("tools", [])
     for tool_config in config_tools:
         if tool_config['type'] == 'container_exec':
-            container_image = tool_config['container']
-            container = PythonExecContainer(container_image, data_store)
-            python_tools = PythonTools(container, send_message)
-
+            container_name = tool_config['container']
+            container_image = container_config[container_name]['image']
+            python_tools = PythonTools(container_image, data_store, send_message)
             armory.add_tool(python_tools.run_code, name=tool_config['name'], description=tool_config.get('description'))
-
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 

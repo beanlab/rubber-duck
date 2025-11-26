@@ -39,8 +39,9 @@ class PythonExecContainer:
             location = meta["location"]
             if not location.startswith("s3://"):
                 host_path = Path(location).parent.resolve()
+                duck_logger.info(f"Mounting {name} to /datasets")
                 self._mounts.append(
-                    Mount(target=f"/datasets/{name}", source=str(host_path), type="bind", read_only=True))
+                    Mount(target=f"/datasets/{name.replace(" ", "_")}", source=str(host_path), type="bind", read_only=True))
 
     def __enter__(self):
         # start container
@@ -58,6 +59,7 @@ class PythonExecContainer:
             if location.startswith("s3://"):
                 df = self.data_store.get_dataset(name)
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
+                duck_logger.info(f"Copying {name} into /datasets")
                 self._write_file(f"{name}.csv", csv_bytes, "/datasets")
 
         return self
@@ -288,7 +290,7 @@ class PythonExecContainer:
     def _run_code(self, code: str, files: dict = None) -> dict[str, str | dict[str, bytes]]:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
-        # duck_logger.info(f"Code to execute:\n{code}\n\nDir: {dir_path}\nContains Files: {files is not None}")
+        duck_logger.info(f"Code to execute:\n{code}\n\nDir: {dir_path}\nContains Files: {files is not None}")
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
@@ -299,44 +301,24 @@ class PythonExecContainer:
             'stderr': result[1],
             'files': files
         }
+        if output:
+            duck_logger.info(f"Code execution stdout: {output['stdout']}\nCode execution stderr: {output['stderr']}\n Files: {output['files']}")
         return output
 
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
-        duck_logger.info(f"Executing code: \n{code}")
         return await asyncio.to_thread(self._run_code, code, files)
 
 
 async def run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", DataStore([])) as container:
+    data_store = DataStore(["datasets/"])
+
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", data_store) as container:
         code = dedent("""\
-            import matplotlib.pyplot as plt
-
-            # Create a 1x2 subplot layout
-            fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-
-            # Left subplot – line plot
-            axs[0].plot([1, 2, 3, 4], [10, 20, 25, 30])
-            axs[0].set_title('Line Plot')
-            axs[0].set_xlabel('X')
-            axs[0].set_ylabel('Y')
-
-            # Right subplot – bar plot
-            axs[1].bar([1, 2, 3, 4], [5, 7, 3, 9])
-            axs[1].set_title('Bar Plot')
-            axs[1].set_xlabel('Category')
-            axs[1].set_ylabel('Value')
-
-            # Save both subplots in one figure
-            plt.savefig('subplots.png')
-
-            print("subplots saved")
-            plt.close()
-            
-            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
-            plt.title('Example Plot')
-            plt.savefig('plot.png')
-            print("plot saved")
+            import os
+            datasets = os.listdir("/datasets")
+            for dataset in datasets:
+                print(dataset)
                 """)
         return await container.run_code(code)
 

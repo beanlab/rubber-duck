@@ -1,16 +1,17 @@
+from ..utils.python_exec_container import PythonExecContainer
+from ..utils.data_store import DataStore
 from ..utils.config_types import DuckContext, FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage
-from .tools import register_tool, sends_image
-from ..utils.python_exec_container import PythonExecContainer
+from .tools import register_tool
 
 
 class PythonTools:
-    def __init__(self, container: PythonExecContainer, send_message: SendMessage):
-        self._container = container
+    def __init__(self, image: str, data_store: DataStore, send_message: SendMessage):
+        self.image = image
+        self.data_store = data_store
         self._send_message = send_message
 
-    # TODO:
 
     @register_tool
     async def run_code(self, ctx: DuckContext, code: str) -> dict[str, dict[str, str] | bytes]:
@@ -27,7 +28,8 @@ class PythonTools:
             }
         }
         """
-        results = await self._container.run_code(code)
+        with PythonExecContainer(self.image, self.data_store) as container:
+            results = await container.run_code(code)
 
         if results.get('stdout'):
             await self._send_message(ctx.thread_id, results['stdout'])
