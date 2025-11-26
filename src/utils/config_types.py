@@ -150,11 +150,13 @@ class ReporterConfig(TypedDict):
 
 
 class ContainerConfig(TypedDict):
+    name: str
     image: str
-    timeout: int
     cpu_limit: int
     memory_limit: str
     network: str
+    timeout: int
+    mount_output_dir: bool
 
 
 class ContainerTool(TypedDict):
