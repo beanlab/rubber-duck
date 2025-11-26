@@ -4,10 +4,10 @@ import json
 import os
 import tarfile
 import uuid
+from pathlib import Path
 from typing import TypedDict
 
-from docker import from_env, Client
-from pathlib import Path
+import docker
 from textwrap import dedent, indent
 from docker.types import Mount
 
@@ -34,7 +34,7 @@ class PythonExecContainer:
     def __init__(self, image: str, data_store: DataStore):
         self.image = image
         self.data_store = data_store
-        self.client: Client = from_env()
+        self.client: docker.Client = docker.from_env()
         self.container = None
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
