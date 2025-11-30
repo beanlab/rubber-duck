@@ -11,7 +11,12 @@ Project Demo Fruit:
     SubSection:
       - Anything under the '_SectionIgnored' will be ignored -- include this rubric item.
   Section 3:
-    - Mention any fruit
+    - Mention any fruit [Fruit Definition, Fruit Mention]
 
 _Private_Header:
   - This header, and anything in this section, will be ignored.
+
+Rules:
+  Fruit Mention:
+    For a fruit to be considered mentioned, 
+    the report must use at least 6 words
