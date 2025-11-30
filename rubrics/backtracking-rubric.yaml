@@ -5,17 +5,17 @@ Project Report - Backtracking:
       - Provide a brief summary of your conversation
     Theoretical Analysis - Greedy:
       Time:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of time complexity
-        - State all assumptions regarding the time complexity clearly
-        - Bold final time complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
       Space:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of space complexity
-        - State all assumptions regarding the space complexity clearly
-        - Bold final space complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Time complexity explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
     Empirical Data - Greedy:
       - Fill in table
     Comparison of Theoretical and Empirical Results - Greedy:
@@ -31,17 +31,17 @@ Project Report - Backtracking:
       - Provide a brief summary of your conversation
     Theoretical Analysis - Backtracking:
       Time:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of time complexity
-        - State all assumptions regarding the time complexity clearly
-        - Bold final time complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
       Space:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of space complexity
-        - State all assumptions regarding the space complexity clearly
-        - Bold final space complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Time complexity explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
     Empirical Data - Backtracking:
       - Fill in table
     Comparison of Theoretical and Empirical Results - Backtracking:

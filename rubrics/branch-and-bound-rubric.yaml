@@ -5,34 +5,34 @@ Project Report - Branch and Bound:
       - Provide a brief summary of your conversation
     Theoretical Analysis - Reduced Cost Matrix:
       Time:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of time complexity
-        - State all assumptions regarding the time complexity clearly
-        - Bold final time complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
       Space:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of space complexity
-        - State all assumptions regarding the space complexity clearly
-        - Bold final space complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Time complexity explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
   Core:
     Design Experience:
       - State your discussion partner
       - Provide a brief summary of your conversation
     Theoretical Analysis - Branch and Bound TSP:
       Time:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of time complexity
-        - State all assumptions clearly regarding the time complexity clearly
-        - Bold final time complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
       Space:
-        - Include annotated code in report
-        - Annotate all non-trivial parts of your code
-        - Provide explanation of space complexity using the branching factor approach
-        - State all assumptions clearly regarding the space complexity clearly, including your predicted branching factor
-        - Bold final space complexity
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Time complexity explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
     Empirical Data:
       - Fill in empirical runtimes table
     Comparison of Theoretical and Empirical Results:
