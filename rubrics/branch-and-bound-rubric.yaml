@@ -13,7 +13,7 @@ Project Report - Branch and Bound:
       Space:
         - Include annotated code in report [Annotated code]
         - Annotate all non-trivial parts of your code [Non-trivial annotated code]
-        - Provide explanation of space complexity [Time complexity explanation]
+        - Provide explanation of space complexity [Space Complexity Explanation]
         - State all assumptions regarding the space complexity clearly [State all assumptions]
         - Bold final space complexity [Bold complexity]
   Core:
@@ -30,7 +30,7 @@ Project Report - Branch and Bound:
       Space:
         - Include annotated code in report [Annotated code]
         - Annotate all non-trivial parts of your code [Non-trivial annotated code]
-        - Provide explanation of space complexity [Time complexity explanation]
+        - Provide explanation of space complexity [Space Complexity Explanation]
         - State all assumptions regarding the space complexity clearly [State all assumptions]
         - Bold final space complexity [Bold complexity]
     Empirical Data:
