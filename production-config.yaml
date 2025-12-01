@@ -260,7 +260,7 @@ servers:
             duck_type: assignment_feedback
             settings:
               name: cs312-projects
-              initial_instructions: |                  
+              initial_instructions: |
                 This AI tool takes a report in markdown format and determines if it meets a set of rubric requirements.
                 
                 The feedback provided by this tool is intended to be a helpful "second set of eyes" on your report; 
@@ -269,23 +269,27 @@ servers:
                 Note:
                 - This generated feedback does **not** check images and may give inaccurate feedback regarding images.
                 - The rubrics used the tool to grade your project may differ slightly from the ones in Canvas and might not include the coding requirements.
-        
+                
                 Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
 
               gradable_assignments:
-                - name: Project Demo Fruit
-                  rubric_path: rubrics/demo-fruit-rubric.yaml
-                  message: |
-                    Please note this is a demo project (:
+                - name: Project Report - Alignment
+                  rubric_path: [rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml]
 
-                - name: Project Backtracking
-                  rubric_path: rubrics/backtracking-rubric.yaml
+                - name: Project Report - Backtracking
+                  rubric_path: [rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml]
 
-                - name: Project Branch and Bound
-                  rubric_path: rubrics/branch-and-bound-rubric.yaml
+                - name: Project Report - Branch and Bound
+                  rubric_path: [rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml]
 
                 - name: Project Leetcode
-                  rubric_path: rubrics/leetcode-rubric.yaml
+                  rubric_path: [rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml]
+
+                - name: Project Demo Fruit
+                  rubric_path: [rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml]
+                  message: |
+                    Please note this is a demo project
+        
 
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
@@ -311,7 +315,7 @@ servers:
                         satisfactory:
                           type: boolean
                           description: Indicates if the report provided meets the given rubric item
-                      required: ["rubric_item", "justification", "satisfactory"]
+                      required: [ "rubric_item", "justification", "satisfactory" ]
                       additionalProperties: false
 
               project_scanner_agent:
@@ -331,7 +335,7 @@ servers:
                         project_name:
                           type: string
                           description: the name of the project
-                      required: ["project_name"]
+                      required: [ "project_name" ]
                       additionalProperties: false
 
                 reasoning: minimal
