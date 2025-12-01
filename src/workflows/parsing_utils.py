@@ -42,7 +42,7 @@ See an example of a corresponding report in rubric/demo-fruit-project-report.md
 
 
 def is_filled_in_report(report_section):
-    cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section))
+    cleaned_report_section = re.sub(r"[^A-Za-z0-9\s]", "", str(report_section).lower())
     return (content := cleaned_report_section.strip()) and content != 'fill me in'
 
 
