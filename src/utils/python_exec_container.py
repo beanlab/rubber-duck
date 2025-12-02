@@ -38,10 +38,22 @@ class PythonExecContainer:
         for name, meta in self.data_store.get_dataset_metadata().items():
             location = meta["location"]
             if not location.startswith("s3://"):
-                host_path = Path(location).parent.resolve()
-                # duck_logger.info(f"Mounting {name} to /datasets")
+                host_file = str(Path(location).resolve())
+
+                # clean filename
+                clean_name = name.replace(" ", "_") + ".csv"
+                container_target = f"/datasets/{clean_name}"
+                duck_logger.info(f"Mounting {clean_name} to /datasets")
+                # mount the file directly
                 self._mounts.append(
-                    Mount(target=f"/datasets/{name.replace(" ", "_")}", source=str(host_path), type="bind", read_only=True))
+                    Mount(
+                        target=container_target,
+                        source=host_file,
+                        type="bind",
+                        read_only=True
+                    )
+                )
+
 
     def __enter__(self):
         # start container
@@ -197,10 +209,8 @@ class PythonExecContainer:
         filenames = dirs.decode().splitlines()
         json_files = {f for f in filenames if f.endswith(".json")}
 
-        print("\nFiles found:")
         for filename in filenames:
             # skip json files
-            print("\t", filename)
             if filename.endswith(".json"):
                 continue
 
@@ -293,14 +303,14 @@ class PythonExecContainer:
     def _run_code(self, code: str, files: dict = None) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
-        duck_logger.info(f"=== CONTAINER ===\nCode to execute:\n{code}\n")
+        duck_logger.info(f"=== CONTAINER === Code to execute:\n{code}\n")
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
         stdout, stderr = self._wrap_and_execute(code, dir_path)
         files = self._read_files(dir_path)
 
-        duck_logger.info(f"=== CONTAINER ===\nResult:\n stdout: {stdout}\n stderr: {stderr}")
+        duck_logger.info(f"=== CONTAINER === Result:\nStdout: {stdout}Stderr: {stderr}")
 
         output = {
             'stdout': stdout,
