@@ -39,7 +39,7 @@ class PythonExecContainer:
             location = meta["location"]
             if not location.startswith("s3://"):
                 host_path = Path(location).parent.resolve()
-                duck_logger.info(f"Mounting {name} to /datasets")
+                # duck_logger.info(f"Mounting {name} to /datasets")
                 self._mounts.append(
                     Mount(target=f"/datasets/{name.replace(" ", "_")}", source=str(host_path), type="bind", read_only=True))
 
@@ -59,7 +59,7 @@ class PythonExecContainer:
             if location.startswith("s3://"):
                 df = self.data_store.get_dataset(name)
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
-                duck_logger.info(f"Copying {name} into /datasets")
+                # duck_logger.info(f"Copying {name} into /datasets")
                 self._write_file(f"{name}.csv", csv_bytes, "/datasets")
 
         return self
@@ -88,7 +88,7 @@ class PythonExecContainer:
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
         dest_path = os.path.join(container_dir, rel_path)  # full path to file
-        duck_logger.info(f"Writing {dest_path}")
+        # duck_logger.info(f"Writing {dest_path}")
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
         self.container.exec_run(["mkdir", "-p", parent_dir])
@@ -210,11 +210,11 @@ class PythonExecContainer:
 
             out_files[filename] = {
                 "description": description,
-                "data": file_data
+                "bytes": file_data
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str) -> str:
+    def _wrap_and_execute(self, code: str, path: str) -> tuple[str]:
         """Wraps the code before execution and returns the stdout/stderr"""
         wrapped_code = dedent(f"""\
             import sys
@@ -285,24 +285,28 @@ class PythonExecContainer:
 
         # execute inside the container
         result = self.container.exec_run(["python3", "-u", "-c", wrapped_code], demux=True)
-        return result.output
+        stdout_bytes, stderr_bytes = result.output
+        stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
+        stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
+        return stdout, stderr
 
-    def _run_code(self, code: str, files: dict = None) -> dict[str, str | dict[str, bytes]]:
+    def _run_code(self, code: str, files: dict = None) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
-        duck_logger.info(f"Code to execute:\n{code}\n\nDir: {dir_path}\nContains Files: {files is not None}")
+        duck_logger.info(f"=== CONTAINER ===\nCode to execute:\n{code}\n")
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
-        result = self._wrap_and_execute(code, dir_path)
+        stdout, stderr = self._wrap_and_execute(code, dir_path)
         files = self._read_files(dir_path)
+
+        duck_logger.info(f"=== CONTAINER ===\nResult:\n stdout: {stdout}\n stderr: {stderr}")
+
         output = {
-            'stdout': result[0],
-            'stderr': result[1],
+            'stdout': stdout,
+            'stderr': stderr,
             'files': files
         }
-        if output:
-            duck_logger.info(f"Code execution stdout: {output['stdout']}\nCode execution stderr: {output['stderr']}\n Files: {output['files']}")
         return output
 
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:

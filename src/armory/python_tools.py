@@ -22,28 +22,27 @@ class PythonTools:
             'stdout': str,
             'stderr': str,
             'files': {
-                "filename": {
-                    "description": str,
-                }
+                "filename": str (description)
             }
         }
         """
         with PythonExecContainer(self.image, self.data_store) as container:
             results = await container.run_code(code)
+        stdout = results.get('stdout')
+        stderr = results.get('stderr')
+        files = results.get('files')
 
-        if results.get('stdout'):
-            await self._send_message(ctx.thread_id, results['stdout'])
+        # send the images directly to avoid adding them to the context
+        for filename, file in files.items():
+            await self._send_message(ctx.thread_id, file=FileData(filename=filename, bytes=file['bytes']))
 
-        if results.get('stderr'):
-            duck_logger.warning(results['stderr'])
-            await self._send_message(ctx.thread_id, f'```\n{results['stderr']}\n```')
-
-        for name, file in results['files'].items():
-            await self._send_message(ctx.thread_id, file=FileData(filename=name, bytes=file['bytes']))
-
+        # return the stdout, stderr, and image descriptions to the agent to add to context
+        duck_logger.info("=== PYTHON TOOLS ===\nFile descriptions:")
+        for filename, file in files.items():
+            duck_logger.info(f" {filename}: {file['description']}")
         return {
-            'stdout': results['stdout'],
-            'stderr': results['stderr'],
-            'files': {filename: file['description'] for filename, file in results['files'].items()},
+            'stdout': stdout,
+            'stderr': stderr,
+            'files': {filename: file['description'] for filename, file in files.items()},
         }
 
