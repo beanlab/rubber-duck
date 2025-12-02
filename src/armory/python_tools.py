@@ -36,13 +36,15 @@ class PythonTools:
         for filename, file in files.items():
             await self._send_message(ctx.thread_id, file=FileData(filename=filename, bytes=file['bytes']))
 
-        # return the stdout, stderr, and image descriptions to the agent to add to context
         duck_logger.info("=== PYTHON TOOLS ===\nFile descriptions:")
         for filename, file in files.items():
             duck_logger.info(f" {filename}: {file['description']}")
+
+        # return the stdout, stderr, and image descriptions to the agent to add to context
         return {
             'stdout': stdout,
             'stderr': stderr,
             'files': {filename: file['description'] for filename, file in files.items()},
+            'code': code
         }
 
