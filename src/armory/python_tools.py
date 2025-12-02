@@ -36,7 +36,8 @@ class PythonTools:
         for filename, file in files.items():
             await self._send_message(ctx.thread_id, file=FileData(filename=filename, bytes=file['bytes']))
 
-        duck_logger.info("=== PYTHON TOOLS ===\nFile descriptions:")
+        if files.items():
+            duck_logger.info("=== PYTHON TOOLS === File descriptions:")
         for filename, file in files.items():
             duck_logger.info(f" {filename}: {file['description']}")
 
