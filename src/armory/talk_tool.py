@@ -13,6 +13,10 @@ class TalkTool:
 
     @register_tool
     async def conclude_conversation(self, ctx: DuckContext):
+        """
+        Ends the session with the user. This tool should only be used after meeting explicit concluding criteria.
+        :param ctx:
+        """
         raise ConversationComplete()
 
     @register_tool
