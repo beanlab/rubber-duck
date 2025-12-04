@@ -73,7 +73,7 @@ agents_as_tools:
       prompt_files:
         - prompts/312-project-design/generate-code-complexity.md
       engine: gpt-4.1
-      tools: []
+      tools: [ ]
 
 ducks:
   - name: standard-rubber-duck
@@ -260,6 +260,7 @@ servers:
     channels:
       - channel_id: 1407761075226542120
         channel_name: register
+        timeout: 300
         ducks:
           - name: Registration-Workflow-CS312
             duck_type: registration
@@ -274,6 +275,107 @@ servers:
                   - name: Lecture Sections
                     pattern: "lecture-"
                     description: Who teaches your lecture?
+      - channel_id: 1442908120488743113
+        channel_name: duck-pond
+        timeout: 600
+        ducks:
+          - standard-rubber-duck
+      - channel_id: 1442908158757437502
+        channel_name: project-review
+        timeout: 300
+        ducks:
+          - name: cs312-grader
+            duck_type: assignment_feedback
+            settings:
+              name: cs312-projects
+              initial_instructions: |
+                This AI tool takes a report in markdown format and determines if it meets a set of rubric requirements.
+                
+                The feedback provided by this tool is intended to be a helpful "second set of eyes" on your report; 
+                it is not intended as a definitive statement on whether your report is correct.
+                
+                Note:
+                - This generated feedback does **not** check images and may give inaccurate feedback regarding images.
+                - The rubrics used the tool to grade your project may differ slightly from the ones in Canvas and might not include the coding requirements.
+                
+                Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
+
+              gradable_assignments:
+                - name: Project Report - Alignment
+                  rubric_path: [rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml]
+
+                - name: Project Report - Backtracking
+                  rubric_path: [rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml]
+
+                - name: Project Report - Branch and Bound
+                  rubric_path: [rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml]
+
+                - name: Project Leetcode
+                  rubric_path: [rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml]
+
+                - name: Project Demo Fruit
+                  rubric_path: [rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml]
+                  message: |
+                    Please note this is a demo project
+        
+
+              single_rubric_item_grader:
+                # This agent expects a part of a report and a single requirement
+                name: grader
+                engine: gpt-5-mini
+                prompt_files:
+                  - prompts/assignment-feedback/tier-grader-structured-output-single.md
+                reasoning: minimal
+                output_format:
+                  format:
+                    type: json_schema
+                    name: grading_output
+                    strict: true
+                    schema:
+                      type: object
+                      properties:
+                        rubric_item:
+                          type: string
+                          description: same exact rubric item provided to you
+                        justification:
+                          type: string
+                          description: Justification for if the report satisfied the requirement
+                        satisfactory:
+                          type: boolean
+                          description: Indicates if the report provided meets the given rubric item
+                      required: [ "rubric_item", "justification", "satisfactory" ]
+                      additionalProperties: false
+
+              project_scanner_agent:
+                # This agent gets the desired report and section name(s) from the user based on the report
+                name: project_scanner
+                engine: gpt-5-mini
+                prompt_files:
+                  - prompts/assignment-feedback/project-determiner.md
+                output_format:
+                  format:
+                    type: json_schema
+                    name: project_name
+                    strict: true
+                    schema:
+                      type: object
+                      properties:
+                        project_name:
+                          type: string
+                          description: the name of the project
+                      required: [ "project_name" ]
+                      additionalProperties: false
+
+                reasoning: minimal
+      - channel_id: 1442908515147710558
+        channel_name: duck-review
+        ducks:
+          - name: Conversation-Review-CS312
+            duck_type: conversation_review
+            settings:
+              target_channel_ids:
+                - 1442908120488743113
+                - 1442908158757437502
         timeout: 600
 
 
@@ -385,7 +487,7 @@ servers:
                 engine: gpt-4.1
                 prompt_files:
                   - prompts/production-prompts/emoji.txt
-                tools: []
+                tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
         timeout: 2000
@@ -398,7 +500,7 @@ servers:
             duck_type: agent_led_conversation
             settings:
               file_size_limit: 5100
-              file_type_ext: ["py", "java", "cpp", "c", "h", "hpp", "ts", "js"]
+              file_type_ext: [ "py", "java", "cpp", "c", "h", "hpp", "ts", "js" ]
               agent:
                 name: ComplexityDuck
                 prompt: |
@@ -425,7 +527,7 @@ servers:
                 prompt_files:
                   - prompts/production-prompts/socratic-duck.txt
                 engine: gpt-4.1
-                tools: []
+                tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
         timeout: 600
@@ -464,7 +566,7 @@ servers:
                 prompt_files:
                   - prompts/312-project-design/phd-duck.txt
                   - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
-                tools: []
+                tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
         timeout: 600
@@ -496,6 +598,13 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   gpt_pricing:
+    "gpt-5": [ 1.25, 10.00 ]
+    "gpt-5-mini": [ 0.25, 2.00 ]
+    "gpt-5-nano": [ 0.05, 0.40 ]
+    "gpt-4.1": [ 2.00, 8.00 ]
+    "gpt-4.1-mini": [ 0.40, 1.60 ]
+    "gpt-4.1-nano": [ 0.01, 0.04 ]
+
     "gpt-4": [ 0.03, 0.06 ]
     "gpt-4o": [ 0.0025, 0.01 ]
     "gpt-4-1106-preview": [ 0.01, 0.03 ]
