@@ -11,6 +11,7 @@ import docker
 from textwrap import dedent, indent
 from docker.types import Mount
 
+from .config_types import Config
 from .data_store import DataStore
 from .logger import duck_logger
 
@@ -34,6 +35,7 @@ class PythonExecContainer:
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
 
+        # TODO: move mounting to `__enter__`
         # prepare mounts for local datasets
         for name, meta in self.data_store.get_dataset_metadata().items():
             location = meta["location"]
@@ -71,6 +73,8 @@ class PythonExecContainer:
             if location.startswith("s3://"):
                 df = self.data_store.get_dataset(name)
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
+                # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
+                # TODO - for every file in DataStore, get the bytes and write them
                 # duck_logger.info(f"Copying {name} into /datasets")
                 self._write_file(f"{name}.csv", csv_bytes, "/datasets")
 
@@ -322,6 +326,16 @@ class PythonExecContainer:
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
+
+
+def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonExecContainer]:
+    # setup container dictionary
+    config_containers = config.get('containers', [])
+    container_config = {}
+    for c in config_containers:
+        container_config[c['name']] = PythonExecContainer(c['image'], datastore)
+    return container_config
+
 
 
 async def run_code_test():

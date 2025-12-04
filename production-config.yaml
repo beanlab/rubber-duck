@@ -21,7 +21,7 @@ sql:
   database: /rubber-duck.db
 
 containers:
-  - python-sandbox:
+  - name: python-sandbox
     image: byucscourseops/python-tools-sandbox:latest
     cpu_limit: 1
     memory_limit: 512m
@@ -29,7 +29,7 @@ containers:
     timeout: 30
 
 tools:
-  - run_python:
+  - name: run_python
     type: container_exec
     container: python-sandbox
 

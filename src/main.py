@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools
 from .armory.armory import Armory
 from .utils.data_store import DataStore
@@ -229,30 +230,28 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def build_armory(config: Config, send_message) -> tuple[Armory, TalkTool]:
-    armory = Armory(send_message)
-
+def build_datastore(config: Config) -> DataStore:
     dataset_dirs = config.get("dataset_folder_locations", [])
     if not dataset_dirs:
         duck_logger.warning("**No dataset folder locations provided in config**")
 
     data_store = DataStore(dataset_dirs)
+    return data_store
+
+
+def build_armory(config: Config, send_message, data_store: DataStore, containers: dict[str, PythonExecContainer]) -> \
+tuple[Armory, TalkTool]:
+    armory = Armory(send_message)
+
     stat_tools = StatsTools(data_store)
     armory.scrub_tools(stat_tools)
-
-    # setup container dictionary
-    config_containers = config.get('containers')
-    container_config = {}
-    for c in config_containers:
-        container_config[c.get('name')] = c
 
     # setup tools
     config_tools = config.get("tools", [])
     for tool_config in config_tools:
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            container_image = container_config[container_name]['image']
-            python_tools = PythonTools(container_image, data_store, send_message)
+            python_tools = PythonTools(containers[container_name], data_store, send_message)
             armory.add_tool(python_tools.run_code, name=tool_config['name'], description=tool_config.get('description'))
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
@@ -295,53 +294,55 @@ async def _main(config: Config, log_dir: Path):
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
+            datastore = build_datastore(config)
 
-            armory, talk_tool = build_armory(config, bot.send_message)
-            ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
-            add_agent_tools_to_armory(config, armory, ai_client)
+            with these(build_containers(config, datastore)) as containers:
+                armory, talk_tool = build_armory(config, bot.send_message, datastore, containers)
+                ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
+                add_agent_tools_to_armory(config, armory, ai_client)
 
-            ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
+                ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
 
-            duck_orchestrator = DuckOrchestrator(
-                setup_thread,
-                bot.send_message,
-                bot.add_reaction,
-                ducks,
-                feedback_manager.remember_conversation
-            )
-
-            channel_configs = {
-                channel_config['channel_id']: channel_config
-                for server_config in config['servers'].values()
-                for channel_config in server_config['channels']
-            }
-
-            async with setup_workflow_manager(
-                    config,
-                    duck_orchestrator,
-                    sql_session,
-                    metrics_handler,
+                duck_orchestrator = DuckOrchestrator(
+                    setup_thread,
                     bot.send_message,
-                    log_dir
-            ) as workflow_manager:
-                tasks = []
-
-                admin_channel_id = config['admin_settings']['admin_channel_id']
-                rubber_duck = RubberDuckApp(
-                    admin_channel_id,
-                    channel_configs,
-                    workflow_manager
+                    bot.add_reaction,
+                    ducks,
+                    feedback_manager.remember_conversation
                 )
-                bot.set_duck_app(rubber_duck, admin_channel_id)
-                tasks.append(bot.start(os.environ['DISCORD_TOKEN']))
 
-                if 'feedback_notifier_settings' in config:
-                    # Set up the notifier thread.
-                    notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
-                                                config['feedback_notifier_settings'])
-                    tasks.append(notifier.start())
+                channel_configs = {
+                    channel_config['channel_id']: channel_config
+                    for server_config in config['servers'].values()
+                    for channel_config in server_config['channels']
+                }
 
-                await asyncio.gather(*tasks)
+                async with setup_workflow_manager(
+                        config,
+                        duck_orchestrator,
+                        sql_session,
+                        metrics_handler,
+                        bot.send_message,
+                        log_dir
+                ) as workflow_manager:
+                    tasks = []
+
+                    admin_channel_id = config['admin_settings']['admin_channel_id']
+                    rubber_duck = RubberDuckApp(
+                        admin_channel_id,
+                        channel_configs,
+                        workflow_manager
+                    )
+                    bot.set_duck_app(rubber_duck, admin_channel_id)
+                    tasks.append(bot.start(os.environ['DISCORD_TOKEN']))
+
+                    if 'feedback_notifier_settings' in config:
+                        # Set up the notifier thread.
+                        notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
+                                                    config['feedback_notifier_settings'])
+                        tasks.append(notifier.start())
+
+                    await asyncio.gather(*tasks)
 
 
 if __name__ == '__main__':
