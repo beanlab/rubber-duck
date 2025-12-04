@@ -120,8 +120,7 @@ class PythonExecContainer:
         tarstream.seek(0)
 
         # Send archive into the correct directory
-        res = self.container.put_archive(parent_dir, tarstream.getvalue())
-        return res.exit_code
+        return self.container.put_archive(parent_dir, tarstream.getvalue())
 
     def _get_plot_description(self, path: str, filename: str, json_files: set[str]) -> str:
         """Returns the description of a plot contained in its corresponding json file"""
