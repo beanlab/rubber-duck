@@ -149,16 +149,7 @@ ducks:
         engine: gpt-5-mini
         reasoning: minimal
         tools:
-          - talk_to_user
-          - run_python_return_text
-          - run_python_return_img
-        allowed_libraries:
-          - math
-          - numpy
-          - pandas
-          - matplotlib
-          - seaborn
-          - statsmodels
+          - run_python
         file_size_limit: *file_size_limit
         file_type_ext: *file_type_ext
 
