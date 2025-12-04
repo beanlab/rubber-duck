@@ -7,6 +7,7 @@ from openai.types.responses import FunctionToolParam
 
 from .tools import generate_function_schema
 from ..utils.config_types import DuckContext
+from ..utils.protocols import ConcludesResponse
 
 
 class Armory:
@@ -72,10 +73,16 @@ class Armory:
 
         if inspect.iscoroutinefunction(wrapped):
             async def wrapper(ctx: DuckContext, *args, **kwargs):
-                return await wrapped(ctx, *args, **kwargs), completes_response
+                result = await wrapped(ctx, *args, **kwargs)
+                if isinstance(result, ConcludesResponse):
+                    return result.result, True
+                return result, completes_response
         else:
             def wrapper(ctx: DuckContext, *args, **kwargs):
-                return wrapped(ctx, *args, **kwargs), completes_response
+                result = wrapped(ctx, *args, **kwargs)
+                if isinstance(result, ConcludesResponse):
+                    return result.result, True
+                return result, completes_response
 
         self._tools[_tool.__name__] = wrapper
 

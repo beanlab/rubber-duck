@@ -1,9 +1,29 @@
-from ..utils.python_exec_container import PythonExecContainer
-from ..utils.data_store import DataStore
-from ..utils.config_types import DuckContext, FileData
-from ..utils.logger import duck_logger
-from ..utils.protocols import SendMessage
+import io
+import os.path
+
+import pandas as pd
+
 from .tools import register_tool
+from ..utils.config_types import DuckContext, FileData
+from ..utils.data_store import DataStore
+from ..utils.logger import duck_logger
+from ..utils.protocols import SendMessage, ConcludesResponse
+from ..utils.python_exec_container import PythonExecContainer
+
+
+def is_image(filename):
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['png', 'svg', 'jpg', 'jpeg', 'tiff']
+
+
+def is_table(filename):
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['csv']
+
+
+def is_text(filename):
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['txt']
 
 
 class PythonTools:
@@ -15,9 +35,14 @@ class PythonTools:
     # TODO: change it so images are sent as images, csv are sent as table using our own function "send_table" what converts it to a markdown table
     # TODO: markdown tables can be displayed in discord using md code fence
 
-    def send_table(*args):
+    async def _send_table(self, thread_id, filecontent):
         """sends a csv file formatted as a md table"""
-        pass
+        table = pd.read_csv(io.StringIO(filecontent))
+        for i in range(0, table.shape[1], 3):
+            # for each chunk of 3 columns, send those columns
+            md_table = table.iloc[:, i:i + 3].to_markdown()
+            msg = f'```md\n{md_table}\n```'
+            await self._send_message(thread_id, msg)
 
     @register_tool
     async def run_code(self, ctx: DuckContext, code: str) -> dict[str, dict[str, str] | bytes]:
@@ -35,25 +60,39 @@ class PythonTools:
         results = await self._container.run_code(code)
         stdout = results.get('stdout')
         stderr = results.get('stderr')
+
         files = results.get('files')
+        if files:
+            duck_logger.debug(" files ".center(20, '-'))
 
-        # TODO: also send std out directly to user
-
-        # send the images directly to avoid adding them to the context
         for filename, file in files.items():
-            await self._send_message(ctx.thread_id, file=FileData(filename=filename, bytes=file['bytes']))
+            duck_logger.debug(f" {filename}: {file['description']}")
 
-        if files.items():
-            duck_logger.info("=== PYTHON TOOLS === File descriptions:")
+        # send files directly to avoid adding them to the context
         for filename, file in files.items():
-            duck_logger.info(f" {filename}: {file['description']}")
+            if is_image(filename):
+                await self._send_message(ctx.thread_id, file=FileData(filename=filename, bytes=file['bytes']))
+
+            elif is_table(filename):
+                await self._send_table(ctx.thread_id, file['bytes'].decode())
+
+            elif is_text(filename):
+                await self._send_message(ctx.thread_id, message=file['bytes'].decode())
 
         # return the stdout, stderr, and image descriptions to the agent to add to context
-        # TODO - prompt: do not send any of this data; stdout will be automatically sent to user
-        return {
+        user_facing = '__USER_FACING__' in stdout
+        stdout = stdout.replace('__USER_FACING__', '')
+
+        output = {
             'stdout': stdout,
             'stderr': stderr,
             'files': {filename: file['description'] for filename, file in files.items()},
             'code': code
         }
 
+        if user_facing:
+            # If the tool results are user-facing, then we can conclude our completion response
+            # This keeps the LLM from running again after this tool
+            output = ConcludesResponse(output)
+
+        return output

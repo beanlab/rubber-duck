@@ -9,6 +9,7 @@ from textwrap import dedent, indent
 from typing import TypedDict
 
 import docker
+from docker.errors import NotFound
 from docker.types import Mount
 
 from .config_types import Config
@@ -22,24 +23,28 @@ class FileResult(TypedDict):
 
 
 class ExecutionResult(TypedDict):
+    exit_code: int
     stdout: str
     stderr: str
     files: dict[str, FileResult]
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, data_store: DataStore):
-        self.image = image
-        self.data_store = data_store
-        self.client: docker.Client = docker.from_env()
-        self.container = None
+    def __init__(self, image: str, name: str, data_store: DataStore):
+        self._image = image
+        self._name = name
+        self._data_store = data_store
+        self._client: docker.Client = docker.from_env()
+        self._container = None
         self._data_dir = '/home/sandbox/datasets'
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
 
+        # TODO - pull the image if necessary...?
+
         # TODO: move mounting to `__enter__`
         # prepare mounts for local datasets
-        for name, meta in self.data_store.get_dataset_metadata().items():
+        for name, meta in self._data_store.get_dataset_metadata().items():
             location = meta["location"]
             if not location.startswith("s3://"):
                 host_file = str(Path(location).resolve())
@@ -58,10 +63,25 @@ class PythonExecContainer:
                     )
                 )
 
+    def name_in_use(self, name: str) -> bool:
+        try:
+            # Docker treats names as "/name" internally, but the SDK matches automatically
+            self._client.containers.get(name)
+            return True
+        except NotFound:
+            return False
+
     def __enter__(self):
         # start container
-        self.container = self.client.containers.run(
-            self.image,
+        # TODO - if container is already present, delete it, then make a new one
+        if self.name_in_use(self._name):
+            cont = self._client.containers.get(self._name)
+            cont.stop()
+            cont.remove()
+
+        self._container = self._client.containers.run(
+            self._image,
+            name=self._name,
             command="sleep infinity",
             detach=True,
             mounts=self._mounts
@@ -69,10 +89,10 @@ class PythonExecContainer:
         duck_logger.info("Container started")
 
         # copy S3 datasets into container
-        for name, meta in self.data_store.get_dataset_metadata().items():
+        for name, meta in self._data_store.get_dataset_metadata().items():
             location = meta["location"]
             if location.startswith("s3://"):
-                df = self.data_store.get_dataset(name)
+                df = self._data_store.get_dataset(name)
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
                 # TODO - for every file in DataStore, get the bytes and write them
@@ -83,13 +103,13 @@ class PythonExecContainer:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         # Stop and remove container
-        if self.container:
-            self.container.stop()
-            self.container.remove()
+        if self._container:
+            self._container.stop()
+            self._container.remove()
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the tmpfs /out directory and returns the path"""
-        self.container.exec_run(["mkdir", "-p", path])
+        self._container.exec_run(["mkdir", "-p", path])
         return path
 
     def _write_file(self, rel_path: str, data: bytes, container_dir: str) -> int:
@@ -108,7 +128,7 @@ class PythonExecContainer:
         # duck_logger.info(f"Writing {dest_path}")
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
-        self.container.exec_run(["mkdir", "-p", parent_dir])
+        self._container.exec_run(["mkdir", "-p", parent_dir])
 
         # create a tar archive containing just this file
         tarstream = io.BytesIO()
@@ -120,7 +140,7 @@ class PythonExecContainer:
         tarstream.seek(0)
 
         # Send archive into the correct directory
-        return self.container.put_archive(parent_dir, tarstream.getvalue())
+        return self._container.put_archive(parent_dir, tarstream.getvalue())
 
     def _get_plot_description(self, path: str, filename: str, json_files: set[str]) -> str:
         """Returns the description of a plot contained in its corresponding json file"""
@@ -180,7 +200,7 @@ class PythonExecContainer:
 
     def _read_file(self, path) -> bytes:
         """Reads a file from a full path, e.g. '/out/<uuid>/file.txt' and returns its contents"""
-        stream, _ = self.container.get_archive(path)
+        stream, _ = self._container.get_archive(path)
         tar_bytes = b"".join(stream)
         tarstream = io.BytesIO(tar_bytes)
 
@@ -205,7 +225,7 @@ class PythonExecContainer:
         out_files = {}
 
         # run ls inside container to list directory contents
-        exit_code, dirs = self.container.exec_run(f"ls -1 {path}")
+        exit_code, dirs = self._container.exec_run(f"ls -1 {path}")
 
         if exit_code != 0:
             raise FileNotFoundError(f"Directory not found in container: {path}")
@@ -228,7 +248,7 @@ class PythonExecContainer:
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str) -> tuple[str]:
+    def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
         """Wraps the code before execution and returns the stdout/stderr"""
         wrapped_code = dedent(f"""\
             import sys
@@ -236,7 +256,10 @@ class PythonExecContainer:
             import os
             import json
             from pathlib import Path
-
+            
+            def user_facing():
+                print('__USER_FACING__')
+            
             outdir = Path({path!r})  # full container path for outputs
 
             # ===== Patch matplotlib to auto-save metadata ===== #
@@ -298,25 +321,36 @@ class PythonExecContainer:
         """)
 
         # execute inside the container
-        result = self.container.exec_run(["python3", "-u", "-c", wrapped_code], demux=True)
+        result = self._container.exec_run(
+            ["python3", "-u", "-c", wrapped_code],
+            workdir=path,
+            demux=True
+        )
         stdout_bytes, stderr_bytes = result.output
         stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
         stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
-        return stdout, stderr
+        return result.exit_code, stdout, stderr
 
     def _run_code(self, code: str, files: dict = None) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
-        duck_logger.info(f"=== CONTAINER === Code to execute:\n{code}\n")
+        duck_logger.debug(f'Running code in {self._container.name}:\n{code}')
+
         if files:
             for rel_path, data in files.items():
                 self._write_file(rel_path, data, dir_path)
-        stdout, stderr = self._wrap_and_execute(code, dir_path)
+        exit_code, stdout, stderr = self._wrap_and_execute(code, dir_path)
+
+        duck_logger.debug(f'Exit code: {exit_code}')
+        duck_logger.debug(' stdout '.center(20, '-'))
+        duck_logger.debug(stdout)
+        duck_logger.debug(' stderr '.center(20, '-'))
+        duck_logger.debug(stderr)
+
         files = self._read_files(dir_path)
 
-        duck_logger.info(f"=== CONTAINER === Result:\nStdout: {stdout}Stderr: {stderr}")
-
         output = {
+            'exit_code': exit_code,
             'stdout': stdout,
             'stderr': stderr,
             'files': files
@@ -333,14 +367,14 @@ def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonEx
     config_containers = config.get('containers', [])
     container_config = {}
     for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], datastore)
+        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], datastore)
     return container_config
 
 
 async def run_code_test():
     data_store = DataStore(["datasets/"])
 
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", data_store) as container:
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', data_store) as container:
         code = dedent("""\
             import os
             datasets = os.listdir("/datasets")
@@ -351,7 +385,7 @@ async def run_code_test():
 
 
 async def async_run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", DataStore([])) as container:
+    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', DataStore([])) as container:
         code = dedent("""\
             import time
             import matplotlib.pyplot as plt

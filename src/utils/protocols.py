@@ -1,4 +1,5 @@
-from typing import Protocol, TypedDict
+import dataclasses
+from typing import Protocol, TypedDict, Any
 
 from ..utils.config_types import FileData
 
@@ -56,3 +57,8 @@ class CreateThread(Protocol):
 class ConversationComplete(BaseException):
     def __init__(self, message=None):
         super().__init__(message)
+
+
+@dataclasses.dataclass
+class ConcludesResponse:
+    result: Any

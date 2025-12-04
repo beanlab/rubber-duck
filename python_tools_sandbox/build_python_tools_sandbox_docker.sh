@@ -25,7 +25,8 @@ RUN pip install --no-cache-dir \
     pandas \
     matplotlib \
     seaborn \
-    statsmodels
+    statsmodels \
+    tabulate
 
 # Create a non-root user for security
 RUN useradd -m sandbox
