@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NotRequired
+from typing import NotRequired, Literal, Union
 
 from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
@@ -167,8 +167,31 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list]
 
 
+class ContainerConfig(TypedDict):
+    name: str
+    image: str
+    # TODO - use these?
+    # cpu_limit: int
+    # memory_limit: str
+    # network: str
+    # timeout: int
+    # mount_output_dir: bool
+
+
+class ContainerTool(TypedDict):
+    type: Literal['container_exec']
+    name: str
+    description: str
+    container: str
+
+
+ToolConfig = Union[ContainerTool]
+
+
 class Config(TypedDict):
     sql: SQLConfig
+    containers: list[ContainerConfig]
+    tools: list[ToolConfig]
     ducks: list[DuckConfig]
     agents_as_tools: list[AgentAsToolSettings]
     servers: dict[str, ServerConfig]

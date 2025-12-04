@@ -20,6 +20,19 @@ sql:
   db_type: sqlite
   database: /rubber-duck.db
 
+containers:
+  - name: python-sandbox
+    image: byucscourseops/python-tools-sandbox:latest
+    cpu_limit: 1
+    memory_limit: 512m
+    network: disabled
+    timeout: 30
+
+tools:
+  - name: run_python
+    type: container_exec
+    container: python-sandbox
+
 agents_as_tools:
   - tool_name: check_suspicion_bot
     doc_string: |
@@ -78,13 +91,13 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
-  - name: stats-duck
+  - name: stats-duck-legacy
     duck_type: user_led_conversation
     settings:
       agent:
-        name: stats_duck
+        name: stats_duck_legacy
         prompt_files:
-          - prompts/production-prompts/stats.txt
+          - prompts/production-prompts/stats-legacy.txt
         engine: gpt-5
         reasoning: minimal
         tools:
@@ -124,6 +137,21 @@ ducks:
       introduction: "Hi, I can help with your stats questions! Let me know what you're thinking"
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
+
+  - name: stats-duck
+    duck_type: user_led_conversation
+    settings:
+      introduction: How can I help you with stats?
+      agent:
+        name: stats_duck
+        prompt_files:
+          - prompts/production-prompts/stats.md
+        engine: gpt-5-mini
+        reasoning: minimal
+        tools:
+          - run_python
+        file_size_limit: *file_size_limit
+        file_type_ext: *file_type_ext
 
 servers:
   927616651409649675:

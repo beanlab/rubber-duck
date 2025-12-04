@@ -1,3 +1,4 @@
+import functools
 import inspect
 from functools import wraps
 from typing import Callable
@@ -47,15 +48,27 @@ class Armory:
 
         return wrapper
 
-    def add_tool(self, tool_function: Callable):
-        wrapped = self._wrap_tool_with_context(tool_function)
+    def add_tool(self, tool_function: Callable, name=None, description=None):
+        if name is None:
+            name = tool_function.__name__
+        if description is None:
+            description = tool_function.__doc__
 
-        if hasattr(tool_function, "sends_image"):
+        @functools.wraps(tool_function)
+        async def _tool(*args, **kwargs):
+            return await tool_function(*args, **kwargs)
+
+        _tool.__name__ = name
+        _tool.__doc__ = description
+
+        wrapped = self._wrap_tool_with_context(_tool)
+
+        if hasattr(_tool, "sends_image"):
             wrapped = self.send_image_directly(wrapped)
 
-        self._schemas[tool_function.__name__] = generate_function_schema(tool_function)
+        self._schemas[_tool.__name__] = generate_function_schema(_tool)
 
-        completes_response = hasattr(tool_function, 'complete_response')
+        completes_response = hasattr(_tool, 'complete_response')
 
         if inspect.iscoroutinefunction(wrapped):
             async def wrapper(ctx: DuckContext, *args, **kwargs):
@@ -64,7 +77,7 @@ class Armory:
             def wrapper(ctx: DuckContext, *args, **kwargs):
                 return wrapped(ctx, *args, **kwargs), completes_response
 
-        self._tools[tool_function.__name__] = wrapper
+        self._tools[_tool.__name__] = wrapper
 
     def get_specific_tool(self, tool_name: str):
         if tool_name in self._tools:
