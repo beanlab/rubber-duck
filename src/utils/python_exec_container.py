@@ -5,15 +5,16 @@ import os
 import tarfile
 import uuid
 from pathlib import Path
+from textwrap import dedent, indent
 from typing import TypedDict
 
 import docker
-from textwrap import dedent, indent
 from docker.types import Mount
 
 from .config_types import Config
 from .data_store import DataStore
 from .logger import duck_logger
+
 
 class FileResult(TypedDict):
     description: str
@@ -55,7 +56,6 @@ class PythonExecContainer:
                         read_only=True
                     )
                 )
-
 
     def __enter__(self):
         # start container
@@ -335,7 +335,6 @@ def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonEx
     for c in config_containers:
         container_config[c['name']] = PythonExecContainer(c['image'], datastore)
     return container_config
-
 
 
 async def run_code_test():
