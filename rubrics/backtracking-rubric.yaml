@@ -1,0 +1,90 @@
+Project Report - Backtracking:
+  Baseline:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Theoretical Analysis - Greedy:
+      Time:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
+      Space:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Space Complexity Explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
+    Empirical Data - Greedy:
+      - Fill in table
+    Comparison of Theoretical and Empirical Results - Greedy:
+      - Provide plot comparing theoretical time complexity to observed runtimes
+      - If theoretical and empirical results match
+          - Simply state this
+      - If they do not match
+          - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
+          - Provide a brief discussion explaining what sections of your code might account for the difference.
+  Core:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Theoretical Analysis - Backtracking:
+      Time:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
+      Space:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Space Complexity Explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
+    Empirical Data - Backtracking:
+      - Fill in table
+    Comparison of Theoretical and Empirical Results - Backtracking:
+      - Provide plot comparing theoretical time complexity to observed runtimes
+      - If theoretical and empirical results match
+          - Simply state this
+      - If they do not match
+          - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
+          - Provide a brief discussion explaining what sections of your code might account for the difference.
+    Greedy v Backtracking:
+      - Briefly comment on any differences you notice between Greedy and Backtracking
+      - Create a plot with both greedy and backtracking size vs runtimes
+    Water Bottle Scenario:
+      Scenario 1:
+        - Include the algorithm you would recommend (if applicable, describe any modifications you would make the algorithm)
+        - Justify why you would select that algorithm
+      Scenario 2:
+        - Include the algorithm you would recommend (if applicable, describe any modifications you would make the algorithm)
+        - Justify why you would select that algorithm
+  Stretch 1:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Demonstrate BSSF Backtracking Works Better than No-BSSF Backtracking:
+      - Demonstrate at least one case (seed, size, runtime, scores) where your BSSF Backtracking algorithm does better than your Backtracking algorithm
+      - In addition to the scores of each algorithm, specify the seed, size, and runtime for your example.
+    BSSF Backtracking v Backtracking Complexity Differences:
+      - Comment on whether the theoretical complexity from your previous Backtracking theoretical analysis has changed. Justify your response.
+    Time v Solution Cost:
+      - Collect empirical data
+      - Create plots for time vs solution cost for Greedy, Basic Backtracking, BSSF Backtracking, and Random (we have provided this last algorithm in random_tour)
+      - Use the same generated graph and same timeout for each algorithm so there is a fair comparison
+      - Use as large a number of nodes as you can while still getting meaningful results (for most machines, this is somewhere between 15 and 30 nodes)
+      - Discuss the results from your plots for time vs solution cost. What do you notice? Was there anything unexpected? How do the algorithms differ?
+  Stretch 2:
+    Design Experience:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Cut Tree:
+      - Look at the cuttree.py file and provide a brief description of how the CutTree class works
+    Plots:
+      - Fill in the remaining SolutionStat metrics for Backtracking
+      - Create at least 4 more interesting plots using the additional metrics from SolutionStats (i.e., max_queue_size, n_nodes_expanded, n_nodes_pruned, n_leaves_covered, fraction_leaves_covered)
+      - For each plot, briefly discuss your results and what insights you gain
+  Project Review:
+    - Includes name of partner and a summary of the project review

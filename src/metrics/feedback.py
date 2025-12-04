@@ -103,7 +103,7 @@ class HaveTAGradingConversation:
                     )
 
                 except asyncio.TimeoutError:
-                    duck_logger.warning(f"Feedback timeout for conversation {data}")
+                    duck_logger.info(f"Feedback timeout for conversation {data}")
                     self._feedback_manager.remember_conversation(data)
                     await self._add_reaction(thread_id, message_id, '❌')
                     raise
@@ -132,5 +132,5 @@ class HaveTAGradingConversation:
             await self._serve_messages(thread_id, context.timeout)
 
         except asyncio.TimeoutError:
-            duck_logger.warning(f"TA review session timed out in thread {thread_id}")
+            duck_logger.info(f"TA review session timed out in thread {thread_id}")
             await self._send_message(thread_id, "*This conversation has timed out.*")

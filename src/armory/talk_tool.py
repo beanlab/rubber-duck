@@ -5,11 +5,7 @@ from quest import queue, step
 from .tools import register_tool
 from ..utils.config_types import DuckContext
 from ..utils.protocols import Message
-
-
-class ConversationComplete(BaseException):
-    pass
-
+from ..utils.protocols import ConversationComplete
 
 class TalkTool:
     def __init__(self, send_message):

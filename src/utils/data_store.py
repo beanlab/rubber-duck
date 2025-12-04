@@ -7,7 +7,7 @@ import boto3
 import botocore.exceptions
 import pandas as pd
 
-from ..utils.logger import duck_logger
+from .logger import duck_logger
 
 
 class ColumnMetadata(TypedDict, total=False):
