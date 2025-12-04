@@ -33,6 +33,7 @@ class PythonExecContainer:
         self.data_store = data_store
         self.client: docker.Client = docker.from_env()
         self.container = None
+        self._data_dir = '/home/sandbox/datasets'
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
 
@@ -45,8 +46,8 @@ class PythonExecContainer:
 
                 # clean filename
                 clean_name = name.replace(" ", "_") + ".csv"
-                container_target = f"/datasets/{clean_name}"
-                duck_logger.info(f"Mounting {clean_name} to /datasets")
+                container_target = f"{self._data_dir}/{clean_name}"
+                duck_logger.info(f"Mounting {clean_name} to {self._data_dir}")
                 # mount the file directly
                 self._mounts.append(
                     Mount(
@@ -75,8 +76,8 @@ class PythonExecContainer:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
                 # TODO - for every file in DataStore, get the bytes and write them
-                # duck_logger.info(f"Copying {name} into /datasets")
-                self._write_file(f"{name}.csv", csv_bytes, "/datasets")
+                # duck_logger.info(f"Copying {name} into /home/sandbox/datasets")
+                self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
 
         return self
 
