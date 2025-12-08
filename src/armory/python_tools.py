@@ -8,22 +8,7 @@ from ..utils.config_types import DuckContext, FileData
 from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
-from ..utils.python_exec_container import PythonExecContainer
-
-
-def is_image(filename) -> bool:
-    _, ext = os.path.splitext(filename)
-    return ext[1:] in ['png', 'svg', 'jpg', 'jpeg', 'tiff']
-
-
-def is_table(filename) -> bool:
-    _, ext = os.path.splitext(filename)
-    return ext[1:] in ['csv']
-
-
-def is_text(filename) -> bool:
-    _, ext = os.path.splitext(filename)
-    return ext[1:] in ['txt']
+from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, is_text
 
 
 class PythonTools:
