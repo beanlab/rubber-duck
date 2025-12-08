@@ -80,7 +80,7 @@ class PythonTools:
 
         user_facing = '__USER_FACING__' in stdout
         stdout = stdout.replace('__USER_FACING__', '')
-        # TODO - raises error: "Cannot send an empty message" ^^^
+        # TODO - raises error: "Cannot send an empty message when __USER_FACING__ is the only contents" ^^^
 
         # return the stdout, stderr, and image descriptions to the agent to add to context
         output = {
