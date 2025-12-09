@@ -58,8 +58,8 @@ class PythonTools:
         }
         """
         results = await self._container.run_code(code)
-        stdout = results.get('stdout')
-        stderr = results.get('stderr')
+        stdout = results.get('stdout').strip()
+        stderr = results.get('stderr').strip()
 
         files = results.get('files')
         if files:
@@ -80,8 +80,8 @@ class PythonTools:
                 await self._send_message(ctx.thread_id, message=file['bytes'].decode())
 
         # return the stdout, stderr, and image descriptions to the agent to add to context
-        user_facing = '__USER_FACING__' in stdout
-        stdout = stdout.replace('__USER_FACING__', '')
+        if stdout:
+            await self._send_message(ctx.thread_id, stdout)
 
         output = {
             'stdout': stdout,
@@ -90,9 +90,11 @@ class PythonTools:
             'code': code
         }
 
-        if user_facing:
-            # If the tool results are user-facing, then we can conclude our completion response
+        if results['exit_code'] == 0:
+            # If there was no error, conclude the result
             # This keeps the LLM from running again after this tool
+            # But if there was an error, the LLM gets to run again before the user has a chance to provide input
+            # This lets the LLM correct the errors in the code and try again
             output = ConcludesResponse(output)
 
         return output
