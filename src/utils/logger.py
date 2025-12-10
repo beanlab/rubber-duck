@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextvars import ContextVar
 from logging.handlers import TimedRotatingFileHandler, QueueHandler
 from queue import Queue
 
@@ -7,15 +8,25 @@ from quest.utils import quest_logger
 
 from ..utils.config_types import AdminSettings
 
+thread_id_context = ContextVar("thread_id", default='-')
+
+class ThreadIdFieldFilter(logging.Filter):
+    def filter(self, record):
+        record.thread_id = thread_id_context.get()
+        return True
+
+
 formatter = logging.Formatter(
-    fmt='%(asctime)s %(levelname).4s %(name)s - %(task)s - %(message)s',
+    fmt='%(asctime)s %(levelname).4s <#%(thread_id)s> %(name)s - %(task)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
 # Set up loggers
 duck_logger = logging.getLogger("duck")
 duck_logger.setLevel(logging.DEBUG)
+duck_logger.addFilter(ThreadIdFieldFilter())
 quest_logger.setLevel(logging.INFO)
+quest_logger.addFilter(ThreadIdFieldFilter())
 
 
 def add_console_handler():
@@ -69,7 +80,7 @@ async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
         message = record.getMessage()
 
         try:
-            await send_message(channel_id, f"[{record.levelname}] {message}")
+            await send_message(channel_id, message)
         except Exception as e:
             duck_logger.debug(f"Failed to send log message to Discord: {e}")
-            duck_logger.debug(f"[{record.levelname}] {message}")
+            duck_logger.debug(message)
