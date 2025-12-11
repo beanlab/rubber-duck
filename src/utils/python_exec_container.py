@@ -4,16 +4,16 @@ import json
 import os
 import tarfile
 import uuid
+import boto3
+import botocore.exceptions
 from pathlib import Path
 from textwrap import dedent, indent
 from typing import TypedDict
 
 import docker
 from docker.errors import NotFound
-from docker.types import Mount
 
 from .config_types import Config
-from .data_store import DataStore
 from .logger import duck_logger
 
 
@@ -55,15 +55,13 @@ class PythonExecContainer:
             cont.stop()
             cont.remove()
 
-        self._mount_local_datasets()
-        self._copy_s3_datasets()
+        self._mount_files()
 
         self._container = self._client.containers.run(
             self._image,
             name=self._name,
             command="sleep infinity",
             detach=True,
-            mounts=self._mounts
         )
         duck_logger.info("Container started")
 
@@ -75,59 +73,76 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
-    def _is_s3(self, path: str) -> bool:
-        return path.startswith("s3://")
+    def _get_local_bytes(self, path: str) -> bytes:
+        """Read raw bytes from a local file."""
+        return Path(path).read_bytes()
+
+    def _get_s3_bytes(self, path: str) -> bytes:
+        """Read raw bytes from an S3 path s3://bucket/key"""
+        s3_client = boto3.client("s3")
+        bucket, key = self._get_s3_info(path)
+        obj = s3_client.get_object(Bucket=bucket, Key=key)
+        return obj["Body"].read()
+
+    def _get_s3_info(self, path: str) -> tuple[str, str]:
+        """Return (bucket, key) for s3://bucket/key path."""
+        path = path.replace("s3://", "")
+        bucket, key = path.split("/", 1)
+        return bucket, key
+
+    def _get_dataset_description(self, path: str) -> str:
+        """Return dataset description from a .meta.json file if present."""
+        meta_bytes = None
+        if is_s3(path):
+            bucket, key = self._get_s3_info(path)
+            meta_key = key.rsplit(".", 1)[0] + ".meta.json"
+            s3_client = boto3.client("s3")
+            try:
+                obj = s3_client.get_object(Bucket=bucket, Key=meta_key)
+                meta_bytes = obj["Body"].read()
+            except botocore.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] not in ["404", "NoSuchKey"]:
+                    raise
+        else:
+            meta_path = Path(path).with_suffix(".meta.json")
+            if meta_path.exists():
+                meta_bytes = meta_path.read_bytes()
+
+        if meta_bytes:
+            try:
+                return json.dumps(json.loads(safe_decode(meta_bytes)), indent=2)
+            except Exception:
+                return "Failed to parse metadata JSON."
+        return "No metadata available."
 
     def _mount_files(self):
-        for mount_info in self._mount_data:
-            remote_path, container_path = mount_info.items()
+        for mount in self._mount_data:
+            remote_path = mount["source"]
+            container_path = mount["target"]
+
             filename = os.path.basename(remote_path)
-            remote_bytes = _get_s3_bytes(remote_path) if _is_s3(remote_path) else _get_local_bytes(remote_path)
-            self._write_file(filename, remote_bytes, container_path)
-            description = _get_file_description(remote_path)
-            self._resource_metadata.append({'path': os.path.join(container_path, filename), 'description': description})
+            remote_bytes = (
+                self._get_s3_bytes(remote_path)
+                if is_s3(remote_path)
+                else self._get_local_bytes(remote_path)
+            )
 
-    def _mount_local_datasets(self):
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if not location.startswith("s3://"):
-                host_file = str(Path(location).resolve())
+            dest_path = self._write_file(filename, remote_bytes, container_path)
+            description = self._get_dataset_description(remote_path)
 
-                # clean filename
-                clean_name = name.replace(" ", "_") + ".csv"
-                container_target = f"{self._data_dir}/{clean_name}"
-                duck_logger.debug(f"Mounting {clean_name} to {self._data_dir}")
-                # mount the file directly
-                self._mounts.append(
-                    Mount(
-                        target=container_target,
-                        source=host_file,
-                        type="bind",
-                        read_only=True
-                    )
-                )
-
-    def _copy_s3_datasets(self):
-        # copy S3 datasets into container
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if location.startswith("s3://"):
-                df = self._data_store.get_dataset(name)
-                csv_bytes = df.to_csv(index=False).encode("utf-8")
-                # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
-                # TODO - for every file in DataStore, get the bytes and write them
-                # TODO - want metadata for each dataset in the context so that it matches the location in container
-                duck_logger.debug(f"Copying {name} into /home/sandbox/datasets")
-                self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
+            self._resource_metadata.append({
+                "path": dest_path,
+                "description": description
+            })
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the tmpfs /out directory and returns the path"""
         self._container.exec_run(["mkdir", "-p", path])
         return path
 
-    def _write_file(self, filename: str, data: bytes, container_dir: str) -> int:
+    def _write_file(self, filename: str, data: bytes, container_dir: str) -> str:
         """
-        Writes a dict of {relative_path: bytes} to the container directory and returns exit code
+        Writes a dict of {relative_path: bytes} to the container directory and returns the destination path
 
         Example:
             files = {
@@ -152,7 +167,8 @@ class PythonExecContainer:
         tarstream.seek(0)
 
         # Send archive into the correct directory
-        return self._container.put_archive(parent_dir, tarstream.getvalue())
+        self._container.put_archive(parent_dir, tarstream.getvalue())
+        return dest_path
 
     def _get_plot_description(self, path: str, filename: str, json_files: set[str]) -> str:
         """Returns the description of a plot contained in its corresponding json file"""
@@ -386,12 +402,12 @@ class PythonExecContainer:
         return 'Available Files:\n'
 
 
-def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonExecContainer]:
+def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     # setup container dictionary
     config_containers = config.get('containers', [])
     container_config = {}
     for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], datastore)
+        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'])
     return container_config
 
 
@@ -410,51 +426,15 @@ def is_text(filename) -> bool:
     return ext[1:] in ['txt']
 
 
-async def run_code_test():
-    data_store = DataStore(["datasets/"])
-
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', data_store) as container:
-        code = dedent("""\
-            import os
-            datasets = os.listdir("/datasets")
-            for dataset in datasets:
-                print(dataset)
-                """)
-        return await container.run_code(code)
+def is_s3(path: str) -> bool:
+    return path.startswith("s3://")
 
 
-async def async_run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', DataStore([])) as container:
-        code = dedent("""\
-            import time
-            import matplotlib.pyplot as plt
-            print("start", time.time())
-            
-            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
-            plt.title('Example Plot')
-            plt.savefig('plot.png')
-            time.sleep(1)
-            print("end", time.time())
-            """)
-
-        task1 = asyncio.create_task(container.run_code(code))
-        task2 = asyncio.create_task(container.run_code(code))
-        results = await asyncio.gather(task1, task2)
-        return results
-
-
-if __name__ == "__main__":
-    output = asyncio.run(run_code_test())
-    print("\nOutput:")
-    print("\tstdout: ", output['stdout'])
-    print("\tstderr: ", output['stderr'])
-    print("\tfiles: {")
-    for file in output['files']:
-        print("\t\t", file, end=": ")
-        print(output['files'][file]['description'])
-    print("\t}")
-    # output1 = asyncio.run(async_run_code_test())
-    # for dict in output1:
-    #     for file in dict:
-    #         print(file, end=": ")
-    #         print(dict[file]['description'])
+def safe_decode(data: bytes) -> str:
+    """Try multiple encodings to decode bytes into a string."""
+    for encoding in ["utf-8", "utf-16", "latin-1"]:
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise UnicodeDecodeError("Unable to decode bytes with tried encodings.")

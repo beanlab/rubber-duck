@@ -5,16 +5,14 @@ import pandas as pd
 
 from .tools import register_tool
 from ..utils.config_types import DuckContext, FileData
-from ..utils.data_store import DataStore
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, is_text
 
 
 class PythonTools:
-    def __init__(self, container: PythonExecContainer, data_store: DataStore, send_message: SendMessage):
+    def __init__(self, container: PythonExecContainer, send_message: SendMessage):
         self._container = container
-        self._data_store = data_store
         self._send_message = send_message
 
     async def _send_table(self, thread_id, filecontent):
