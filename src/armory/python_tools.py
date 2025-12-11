@@ -90,8 +90,6 @@ class PythonTools:
             'code': code
         }
 
-        duck_logger.error("this is an error message")
-
         if user_facing:
             # If the tool results are user-facing, then we can conclude our completion response
             # This keeps the LLM from running again after this tool
