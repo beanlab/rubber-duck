@@ -30,15 +30,15 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, data_store: DataStore):
+    def __init__(self, image: str, name: str, mounts: list[dict[str, str]]):
         self._image = image
         self._name = name
-        self._data_store = data_store
+        self._mount_data = mounts
+        self._resource_metadata = []
         self._client: docker.Client = docker.from_env()
         self._container = None
         self._data_dir = '/home/sandbox/datasets'
         self._working_dir = "/home/sandbox/out"
-        self._mounts = []
 
     def name_in_use(self, name: str) -> bool:
         try:
@@ -69,13 +69,25 @@ class PythonExecContainer:
 
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type, exc_val, exc_tb):
         # Stop and remove container
         if self._container:
             self._container.stop()
             self._container.remove()
 
-    def _mount_local_datasets(self) -> None:
+    def _is_s3(self, path: str) -> bool:
+        return path.startswith("s3://")
+
+    def _mount_files(self):
+        for mount_info in self._mount_data:
+            remote_path, container_path = mount_info.items()
+            filename = os.path.basename(remote_path)
+            remote_bytes = _get_s3_bytes(remote_path) if _is_s3(remote_path) else _get_local_bytes(remote_path)
+            self._write_file(filename, remote_bytes, container_path)
+            description = _get_file_description(remote_path)
+            self._resource_metadata.append({'path': os.path.join(container_path, filename), 'description': description})
+
+    def _mount_local_datasets(self):
         for name, meta in self._data_store.get_dataset_metadata().items():
             location = meta["location"]
             if not location.startswith("s3://"):
@@ -95,7 +107,7 @@ class PythonExecContainer:
                     )
                 )
 
-    def _copy_s3_datasets(self) -> None:
+    def _copy_s3_datasets(self):
         # copy S3 datasets into container
         for name, meta in self._data_store.get_dataset_metadata().items():
             location = meta["location"]
@@ -104,6 +116,7 @@ class PythonExecContainer:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
                 # TODO - for every file in DataStore, get the bytes and write them
+                # TODO - want metadata for each dataset in the context so that it matches the location in container
                 duck_logger.debug(f"Copying {name} into /home/sandbox/datasets")
                 self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
 
@@ -112,7 +125,7 @@ class PythonExecContainer:
         self._container.exec_run(["mkdir", "-p", path])
         return path
 
-    def _write_file(self, rel_path: str, data: bytes, container_dir: str) -> int:
+    def _write_file(self, filename: str, data: bytes, container_dir: str) -> int:
         """
         Writes a dict of {relative_path: bytes} to the container directory and returns exit code
 
@@ -124,7 +137,7 @@ class PythonExecContainer:
 
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
-        dest_path = os.path.join(container_dir, rel_path)  # full path to file
+        dest_path = os.path.join(container_dir, filename)  # full path to file
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
         self._container.exec_run(["mkdir", "-p", parent_dir])
@@ -265,9 +278,7 @@ class PythonExecContainer:
             import os
             import json
             from pathlib import Path
-            
-            def user_facing():
-                print('__USER_FACING__')
+
             
             outdir = Path({path!r})  # full container path for outputs
 
@@ -369,6 +380,10 @@ class PythonExecContainer:
     async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
+
+    def get_resource_descriptions(self) -> str:
+        """Return prompt content describing each file mounted in the container"""
+        return 'Available Files:\n'
 
 
 def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonExecContainer]:

@@ -170,6 +170,8 @@ class ReporterConfig(TypedDict):
 class ContainerConfig(TypedDict):
     name: str
     image: str
+    mounts: list[dict[str, str]]
+
     # TODO - use these?
     # cpu_limit: int
     # memory_limit: str

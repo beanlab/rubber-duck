@@ -21,17 +21,21 @@ sql:
   database: /rubber-duck.db
 
 containers:
-  - name: python-sandbox
+  - name: stats-python-sandbox
     image: byucscourseops/python-tools-sandbox:latest
     cpu_limit: 1
     memory_limit: 512m
     network: disabled
     timeout: 30
+    mounts:
+      - s3://bucket/file.txt: /data/file.txt
+      - datasets/foo.csv: /data/foo.csv
 
 tools:
   - name: run_python
     type: container_exec
-    container: python-sandbox
+    container: stats-python-sandbox
+
 
 agents_as_tools:
   - tool_name: check_suspicion_bot
