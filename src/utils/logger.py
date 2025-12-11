@@ -106,8 +106,7 @@ def format_error_message(raw: str) -> str:
         return raw
 
     formatted = (
-        f"**Error in thread:** <#{thread_id}>\n"
-        f"**Error Message:**\n```\n{error_msg}\n```"
+        f"**Error in thread:** <#{thread_id}>\n```\n{error_msg}\n```"
     )
     return formatted
 
