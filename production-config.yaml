@@ -29,10 +29,9 @@ containers:
       network: disabled
       timeout: 30
     mounts:
-    - source: s3://bucket/file.txt
-      target: /data/file.txt
-    - source: datasets/foo.csv
-      target : /data/foo.csv
+    - { source: s3://bucket/file.txt, target: /data/file.txt }
+    - { source: datasets/foo.csv, target: /data/foo.csv }
+#    - { source: , target: }
 
 tools:
   - name: run_python
