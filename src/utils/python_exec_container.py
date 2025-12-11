@@ -40,29 +40,6 @@ class PythonExecContainer:
         self._working_dir = "/home/sandbox/out"
         self._mounts = []
 
-        # TODO - pull the image if necessary...?
-
-        # TODO: move mounting to `__enter__`
-        # prepare mounts for local datasets
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if not location.startswith("s3://"):
-                host_file = str(Path(location).resolve())
-
-                # clean filename
-                clean_name = name.replace(" ", "_") + ".csv"
-                container_target = f"{self._data_dir}/{clean_name}"
-                duck_logger.info(f"Mounting {clean_name} to {self._data_dir}")
-                # mount the file directly
-                self._mounts.append(
-                    Mount(
-                        target=container_target,
-                        source=host_file,
-                        type="bind",
-                        read_only=True
-                    )
-                )
-
     def name_in_use(self, name: str) -> bool:
         try:
             # Docker treats names as "/name" internally, but the SDK matches automatically
@@ -73,11 +50,13 @@ class PythonExecContainer:
 
     def __enter__(self):
         # start container
-        # TODO - if container is already present, delete it, then make a new one
         if self.name_in_use(self._name):
             cont = self._client.containers.get(self._name)
             cont.stop()
             cont.remove()
+
+        self._mount_local_datasets()
+        self._copy_s3_datasets()
 
         self._container = self._client.containers.run(
             self._image,
@@ -88,6 +67,35 @@ class PythonExecContainer:
         )
         duck_logger.info("Container started")
 
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        # Stop and remove container
+        if self._container:
+            self._container.stop()
+            self._container.remove()
+
+    def _mount_local_datasets(self) -> None:
+        for name, meta in self._data_store.get_dataset_metadata().items():
+            location = meta["location"]
+            if not location.startswith("s3://"):
+                host_file = str(Path(location).resolve())
+
+                # clean filename
+                clean_name = name.replace(" ", "_") + ".csv"
+                container_target = f"{self._data_dir}/{clean_name}"
+                duck_logger.debug(f"Mounting {clean_name} to {self._data_dir}")
+                # mount the file directly
+                self._mounts.append(
+                    Mount(
+                        target=container_target,
+                        source=host_file,
+                        type="bind",
+                        read_only=True
+                    )
+                )
+
+    def _copy_s3_datasets(self) -> None:
         # copy S3 datasets into container
         for name, meta in self._data_store.get_dataset_metadata().items():
             location = meta["location"]
@@ -96,16 +104,8 @@ class PythonExecContainer:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
                 # TODO - for every file in DataStore, get the bytes and write them
-                # duck_logger.info(f"Copying {name} into /home/sandbox/datasets")
+                duck_logger.debug(f"Copying {name} into /home/sandbox/datasets")
                 self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        # Stop and remove container
-        if self._container:
-            self._container.stop()
-            self._container.remove()
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the tmpfs /out directory and returns the path"""
@@ -125,7 +125,6 @@ class PythonExecContainer:
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
         dest_path = os.path.join(container_dir, rel_path)  # full path to file
-        # duck_logger.info(f"Writing {dest_path}")
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
         self._container.exec_run(["mkdir", "-p", parent_dir])
@@ -156,12 +155,12 @@ class PythonExecContainer:
                     meta = json.loads(json_bytes.decode())
 
                     subplot_descriptions[json_name] = (
-                        f"{meta.get('plot_type', 'unknown')} plot titled "
+                        f"{meta.get('plot_type', 'unknown type of')} plot titled "
                         f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
                         f"ylabel='{meta.get('ylabel', '')}'"
                     )
                 except Exception:
-                    subplot_descriptions[json_name] = "unknown subplot"
+                    subplot_descriptions[json_name] = "subplot without description"
 
         # ===== if subplots found, make combined description ===== #
         if subplot_descriptions:
@@ -188,15 +187,25 @@ class PythonExecContainer:
                 json_bytes = self._read_file(description_path)
                 meta = json.loads(json_bytes.decode())
                 return (
-                    f"{meta.get('plot_type', 'unknown')} plot titled "
+                    f"{meta.get('plot_type', 'unknown type of')} plot titled "
                     f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
                     f"ylabel='{meta.get('ylabel', '')}'"
                 )
             except Exception:
-                return "unknown image"
+                return "image without description"
 
         # if no metadata found
-        return "unknown image"
+        return "image without description"
+
+    def _get_file_description(self, path: str, filename: str, json_files: set[str]) -> str:
+        """Returns the description of a file"""
+        if is_image(filename):
+            return self._get_plot_description(path, filename, json_files)
+        elif is_table(filename):
+            name, ext = os.path.splitext(filename)
+            return f"table titled '{name}'"
+        else:
+            return "file without saved description"
 
     def _read_file(self, path) -> bytes:
         """Reads a file from a full path, e.g. '/out/<uuid>/file.txt' and returns its contents"""
@@ -240,7 +249,7 @@ class PythonExecContainer:
 
             full_path = os.path.join(path, filename)
             file_data = self._read_file(full_path)
-            description = self._get_plot_description(path, filename, json_files)
+            description = self._get_file_description(path, filename, json_files)
 
             out_files[filename] = {
                 "description": description,
@@ -369,6 +378,21 @@ def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonEx
     for c in config_containers:
         container_config[c['name']] = PythonExecContainer(c['image'], c['name'], datastore)
     return container_config
+
+
+def is_image(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['png', 'svg', 'jpg', 'jpeg', 'tiff']
+
+
+def is_table(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['csv']
+
+
+def is_text(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['txt']
 
 
 async def run_code_test():
