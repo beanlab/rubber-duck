@@ -32,9 +32,6 @@ class PythonTools:
         self._data_store = data_store
         self._send_message = send_message
 
-    # TODO: change it so images are sent as images, csv are sent as table using our own function "send_table" what converts it to a markdown table
-    # TODO: markdown tables can be displayed in discord using md code fence
-
     async def _send_table(self, thread_id, filecontent):
         """sends a csv file formatted as a md table"""
         table = pd.read_csv(io.StringIO(filecontent))
