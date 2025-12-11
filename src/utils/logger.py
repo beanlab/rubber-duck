@@ -75,13 +75,14 @@ MAX_FRAMES = 10
 MAX_MESSAGE_LENGTH = 1990
 ERROR_RE = re.compile(
     r"""
-    ^\S+\s+\S+\s+ERRO\s+
-    <#(?P<thread_id>\d+)>\s+
-    (?P<prefix>[\w\-]+)\s*-\s*
-    (?P<channel_id>\d+)-(?P<message_id>\d+)\.[^-\s]+\s*-\s*
+    ^\S+\s+\S+
+    \s+ERRO\s+
+    <\#(?P<thread_id>\d+|-)>\s+
+    (?P<prefix>[\w\-]+)\s*-\s*(?P<extra>[\w\-]+)\s*-\s*
+    (?P<channel_id>\d+)-(?P<message_id>\d+)\.[^\s]+\s*-\s*
     (?P<error_msg>.*)
     """,
-    re.VERBOSE,
+    re.VERBOSE
 )
 
 
@@ -99,15 +100,20 @@ def format_error_message(raw: str) -> str:
 
     yyyy-mm-dd hh:mm:ss ERRO <#thread_id> duck - duck-<channel_id>-<msg_id>.main - this is a sample error message
     """
+    duck_logger.debug(f"raw: \n\n{raw}\n\n")
     m = ERROR_RE.match(raw)
     if not m:
-        # if not matched, use simple code fence
-        return f"```\n{raw}\n```"
-
-    thread_id = m.group("thread_id")
-    channel_id = m.group("channel_id")
-    message_id = m.group("message_id")
-    error_msg = m.group("error_msg")
+        # if not matched, just return the raw message without formatting
+        duck_logger.debug("error message wasn't matched")
+        return raw
+    try:
+        thread_id = m.group("thread_id")
+        channel_id = m.group("channel_id")
+        message_id = m.group("message_id")
+        error_msg = m.group("error_msg")
+    except IndexError:
+        duck_logger.debug(f"one or more groups weren't parsed. groups: {m.groups()}")
+        return raw
 
     # truncate only the error message, keeping the end of the message and not the beginning
     error_msg = truncate_message(error_msg)
@@ -116,7 +122,7 @@ def format_error_message(raw: str) -> str:
         f"**Error in thread:** <#{thread_id}>\n"
         f"**Channel ID:** `{channel_id}`\n"
         f"**Message ID:** `{message_id}`\n\n"
-        f"Traceback:\n```\n{error_msg}\n```"
+        f"**Traceback:**\n```\n{error_msg}\n```"
     )
     return formatted
 
@@ -131,7 +137,7 @@ async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
         record = await loop.run_in_executor(None, _blocking_get)
         message = record.getMessage()
         formatted_message = format_error_message(message)
-
+        duck_logger.debug(f"\n\n{formatted_message}\n\n")
         try:
             await send_message(channel_id, formatted_message)
         except Exception as e:
