@@ -3,7 +3,7 @@ from ..utils.protocols import Message
 import asyncio
 
 
-async def wait_for_message(self, timeout=300) -> Message | None:
+async def wait_for_message(timeout=300) -> Message | None:
     async with queue('messages', None) as messages:
         try:
             message: Message = await asyncio.wait_for(messages.get(), timeout)

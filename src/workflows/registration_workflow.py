@@ -5,12 +5,17 @@ from typing import Callable
 
 import discord
 from discord import Guild, utils
-from quest import step, queue
+from quest import step
 
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
+from ..utils.message_utils import wait_for_message as _wait_for_message
 from ..utils.send_email import EmailSender
-from ..utils.message_utils import wait_for_message
+
+
+async def wait_for_message(*args, **kwargs) -> str:
+    return (await _wait_for_message(*args, **kwargs))['content']
+
 
 class RegistrationWorkflow:
     def __init__(self,
@@ -39,7 +44,8 @@ class RegistrationWorkflow:
             return
 
         if not self._check_netid(net_id):
-            await self._send_message(thread_id, "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
+            await self._send_message(thread_id,
+                                     "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
             return
 
         server_id = context.guild_id
@@ -84,7 +90,8 @@ class RegistrationWorkflow:
             duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during name collection. Thread: <#{thread_id}")
+                await self._send_message(self._settings['ta_channel_id'],
+                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}")
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
@@ -99,8 +106,8 @@ class RegistrationWorkflow:
             duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during net id collection. Thread: <#{thread_id}")
-
+                await self._send_message(self._settings['ta_channel_id'],
+                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}")
 
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
@@ -239,9 +246,8 @@ class RegistrationWorkflow:
             duck_logger.info(f"Error getting guild roles: {str(e)}")
             await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed to get available roles. Thread: <#{thread_id}")
-
-
+                await self._send_message(self._settings['ta_channel_id'],
+                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}")
 
     @step
     async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
@@ -303,9 +309,8 @@ class RegistrationWorkflow:
                 if already_roles:
                     already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
                     already_added_role_names = ", ".join(role.name for role in already_added_roles)
-                    await self._send_message(thread_id, f"You already have these selected roles: {already_added_role_names}")
-
-
+                    await self._send_message(thread_id,
+                                             f"You already have these selected roles: {already_added_role_names}")
 
             # Send confirmation message
             role_names = ", ".join(role.name for role in selected_roles)
@@ -318,8 +323,8 @@ class RegistrationWorkflow:
             duck_logger.info(f"Error in role assignment process: {str(e)}")
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],f"Registration workflow failed during role assignment. Thread: <#{thread_id}")
-
+                await self._send_message(self._settings['ta_channel_id'],
+                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}")
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:

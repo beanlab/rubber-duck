@@ -7,7 +7,7 @@ from quest import step, alias
 
 from .metrics.feedback_manager import FeedbackData
 from .utils.config_types import ChannelConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
-from .utils.logger import duck_logger
+from .utils.logger import duck_logger, thread_id_context
 from .utils.protocols import Message
 
 
@@ -73,6 +73,8 @@ class DuckOrchestrator:
             initial_message['author_mention'],
             initial_message['content']
         )
+
+        thread_id_context.set(thread_id)
 
         context = DuckContext(
             guild_id=initial_message['guild_id'],
