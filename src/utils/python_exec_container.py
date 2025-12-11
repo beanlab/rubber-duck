@@ -50,8 +50,6 @@ class PythonExecContainer:
 
     def __enter__(self):
         # start container
-        # TODO - pull the image if necessary...?
-        # TODO - if container is already present, delete it, then make a new one
         if self.name_in_use(self._name):
             cont = self._client.containers.get(self._name)
             cont.stop()
