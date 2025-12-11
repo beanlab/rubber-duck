@@ -23,13 +23,16 @@ sql:
 containers:
   - name: stats-python-sandbox
     image: byucscourseops/python-tools-sandbox:latest
-    cpu_limit: 1
-    memory_limit: 512m
-    network: disabled
-    timeout: 30
+    settings:
+      cpu_limit: 1
+      memory_limit: 512m
+      network: disabled
+      timeout: 30
     mounts:
-      - s3://bucket/file.txt: /data/file.txt
-      - datasets/foo.csv: /data/foo.csv
+    - source: s3://bucket/file.txt
+      target: /data/file.txt
+    - source: datasets/foo.csv
+      target : /data/foo.csv
 
 tools:
   - name: run_python
