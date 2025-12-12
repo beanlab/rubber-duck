@@ -24,9 +24,9 @@ containers:
   - name: stats-python-sandbox
     image: byucscourseops/python-tools-sandbox:latest
     settings:
-      cpu_limit: 1
-      memory_limit: 512m
-      network: disabled
+      command: sleep infinity
+      mem_limit: 512
+      network_mode: none
       timeout: 30
     mounts:
     - { source: s3://bucket/file.txt, target: /data/file.txt }

@@ -30,11 +30,12 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, mounts: list[dict[str, str]]):
+    def __init__(self, image: str, name: str, mounts: list[dict[str, str]], settings: dict[str, str]):
         self._image = image
         self._name = name
         self._mount_data = mounts
         self._resource_metadata = []
+        self._settings = settings
         self._client: docker.Client = docker.from_env()
         self._container = None
         self._data_dir = '/home/sandbox/datasets'
@@ -58,10 +59,13 @@ class PythonExecContainer:
         self._mount_files()
 
         self._container = self._client.containers.run(
-            self._image,
+            image=self._image,
             name=self._name,
-            command="sleep infinity",
-            detach=True,
+            command=self._settings.get("command", "sleep infinity"),
+            detach=True,  # runs in the background
+            network_mode=self._settings.get("network_mode", "none"),  # network access
+            mem_limit=self._settings.get("mem_limit", 512),  # memory cap
+
         )
         duck_logger.info("Container started")
 
@@ -356,11 +360,14 @@ class PythonExecContainer:
                 sys.stdout.close()
         """)
 
+        timeout_seconds = int(self._settings.get("timeout", "30"))
+
         # execute inside the container
         result = self._container.exec_run(
             ["python3", "-u", "-c", wrapped_code],
             workdir=path,
-            demux=True
+            demux=True,
+            timeout=timeout_seconds
         )
         stdout_bytes, stderr_bytes = result.output
         stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
