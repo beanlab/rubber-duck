@@ -56,7 +56,6 @@ class PythonExecContainer:
             cont.stop()
             cont.remove()
 
-        self._mount_files()
 
         self._container = self._client.containers.run(
             image=self._image,
@@ -64,9 +63,10 @@ class PythonExecContainer:
             command=self._settings.get("command", "sleep infinity"),
             detach=True,  # runs in the background
             network_mode=self._settings.get("network_mode", "none"),  # network access
-            mem_limit=self._settings.get("mem_limit", 512),  # memory cap
-
+            mem_limit=self._settings.get("mem_limit", "512m"),  # memory cap
         )
+
+        self._mount_files()
         duck_logger.info("Container started")
 
         return self
@@ -79,6 +79,7 @@ class PythonExecContainer:
 
     def _get_local_bytes(self, path: str) -> bytes:
         """Read raw bytes from a local file."""
+        duck_logger.debug(f"Reading local file path: {path}")
         return Path(path).read_bytes()
 
     def _get_s3_bytes(self, path: str) -> bytes:
@@ -122,7 +123,11 @@ class PythonExecContainer:
     def _mount_files(self):
         for mount in self._mount_data:
             remote_path = mount["source"]
-            container_path = mount["target"]
+            container_filename = mount["target"] # remove if container_filename matches filename
+
+            if remote_path is None or container_filename is None:
+                duck_logger.warning("Skipping file mount attempt due to missing remote path")
+                continue
 
             filename = os.path.basename(remote_path)
             remote_bytes = (
@@ -131,7 +136,7 @@ class PythonExecContainer:
                 else self._get_local_bytes(remote_path)
             )
 
-            dest_path = self._write_file(filename, remote_bytes, container_path)
+            dest_path = self._write_file(filename, remote_bytes, self._data_dir)
             description = self._get_dataset_description(remote_path)
 
             self._resource_metadata.append({
@@ -146,16 +151,10 @@ class PythonExecContainer:
 
     def _write_file(self, filename: str, data: bytes, container_dir: str) -> str:
         """
-        Writes a dict of {relative_path: bytes} to the container directory and returns the destination path
-
-        Example:
-            files = {
-                "input.txt": b"...",
-                "subdir/data.json": b"..."
-            }
-
+        Writes a file to the container directory and returns the destination path
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
+        duck_logger.debug(f"Writing file '{filename}' to directory '{container_dir}'")
         dest_path = os.path.join(container_dir, filename)  # full path to file
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
@@ -291,7 +290,32 @@ class PythonExecContainer:
         return out_files
 
     def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
-        """Wraps the code before execution and returns the stdout/stderr"""
+        wrapped_code = self._wrap(code, path)
+
+        timeout = int(self._settings.get("timeout", 30))
+
+        wrapped_code_with_timeout = dedent(f"""\
+import subprocess, sys
+try:
+    subprocess.run(['python3', '-u', '-c', '''{wrapped_code}'''], timeout={timeout})
+except subprocess.TimeoutExpired:
+    sys.exit(124)
+        """)
+
+        result = self._container.exec_run(
+            ["python3", "-u", "-c", wrapped_code],
+            workdir=path,
+            demux=True
+        )
+
+        stdout_bytes, stderr_bytes = result.output
+        stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
+        stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
+
+        return result.exit_code, stdout, stderr
+
+    def _wrap(self, code: str, path: str) -> str:
+        code = dedent(code)
         wrapped_code = dedent(f"""\
             import sys
             import traceback
@@ -299,24 +323,18 @@ class PythonExecContainer:
             import json
             from pathlib import Path
 
-            
-            outdir = Path({path!r})  # full container path for outputs
+            outdir = Path({path!r})
 
-            # ===== Patch matplotlib to auto-save metadata ===== #
             try:
                 import matplotlib.pyplot as plt
 
                 _original_savefig = plt.Figure.savefig
 
                 def detect_plot_type(ax):
-                    if ax.lines:
-                        return "line"
-                    if ax.collections:
-                        return "scatter_or_heatmap"
-                    if ax.patches:
-                        return "bar_or_hist"
-                    if ax.images:
-                        return "image"
+                    if ax.lines: return "line"
+                    if ax.collections: return "scatter_or_heatmap"
+                    if ax.patches: return "bar_or_hist"
+                    if ax.images: return "image"
                     return "unknown"
 
                 def savefig_with_metadata(self, *args, **kwargs):
@@ -345,34 +363,18 @@ class PythonExecContainer:
                             meta_path = f"{{base}}_ax{{i}}.json"
                         with open(meta_path, "w") as f:
                             json.dump(metadata, f)
-
                 plt.Figure.savefig = savefig_with_metadata
             except ImportError:
                 pass
 
-            # ===== Execute user code safely ===== #
             try:
 {indent(code, '                ')}
             except Exception:
                 traceback.print_exc(file=sys.stdout)
             finally:
                 sys.stdout.flush()
-                sys.stdout.close()
         """)
-
-        timeout_seconds = int(self._settings.get("timeout", "30"))
-
-        # execute inside the container
-        result = self._container.exec_run(
-            ["python3", "-u", "-c", wrapped_code],
-            workdir=path,
-            demux=True,
-            timeout=timeout_seconds
-        )
-        stdout_bytes, stderr_bytes = result.output
-        stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
-        stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
-        return result.exit_code, stdout, stderr
+        return wrapped_code
 
     def _run_code(self, code: str, files: dict = None) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
@@ -414,7 +416,7 @@ def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     config_containers = config.get('containers', [])
     container_config = {}
     for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'])
+        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'], c['settings'])
     return container_config
 
 

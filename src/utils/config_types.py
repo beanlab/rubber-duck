@@ -171,8 +171,7 @@ class ContainerConfig(TypedDict):
     name: str
     image: str
     mounts: dict[str, str]
-    # TODO - use these?
-    # settings: dict[str, str] # cpu_limit, memory_limit, network, timeout
+    settings: dict[str, str] # command, mem_limit, network_mode, timeout
 
 class ContainerTool(TypedDict):
     type: Literal['container_exec']

@@ -25,7 +25,7 @@ containers:
     image: byucscourseops/python-tools-sandbox:latest
     settings:
       command: sleep infinity
-      mem_limit: 512
+      mem_limit: 512m
       network_mode: none
       timeout: 30
     mounts:
