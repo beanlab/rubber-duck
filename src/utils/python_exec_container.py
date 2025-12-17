@@ -4,13 +4,11 @@ import json
 import os
 import tarfile
 import uuid
-from pathlib import Path
 from textwrap import dedent, indent
 from typing import TypedDict
 
 import docker
 from docker.errors import NotFound
-from docker.types import Mount
 
 from .config_types import Config
 from .logger import duck_logger
@@ -75,11 +73,19 @@ class PythonExecContainer:
 
     def _mount_files(self):
         for mount_info in self._mount_data:
-            remote_path, container_path = mount_info.items()
+            remote_path = mount_info.get("source")
+            target_path = mount_info.get("target")
+            if not remote_path or not target_path:
+                duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
+                continue
+
             filename = os.path.basename(remote_path)
             description, remote_bytes = get_dataset_info(remote_path)
-            self._write_file(filename, remote_bytes, container_path)
-            self._resource_metadata.append({'path': os.path.join(container_path, filename), 'description': description})
+            self._write_file(filename, remote_bytes, self._data_dir)
+            self._resource_metadata.append({
+                'path': os.path.join(self._data_dir, filename),
+                'description': description
+            })
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the /out directory and returns the path"""
