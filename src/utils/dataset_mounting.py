@@ -4,7 +4,7 @@ import boto3
 from .logger import duck_logger
 
 
-def is_s3(path: str) -> bool:
+def _is_s3(path: str) -> bool:
     return path.startswith("s3://")
 
 
@@ -22,7 +22,7 @@ def _format_description(metadata: dict) -> str:
 
     name = metadata.get("name")
     if name:
-        lines.append(f"Dataset: {name}")
+        lines.append(f"Dataset name: {name}")
 
     columns = metadata.get("columns", [])
     if columns:
@@ -34,7 +34,7 @@ def _format_description(metadata: dict) -> str:
 
             line = f"- {col_name}"
             if dtype:
-                line += f" ({dtype})"
+                line += f" ({dtype})" # TODO: update the metadata files to include dtype to test it (chat)
             if desc:
                 line += f": {desc}"
 
@@ -43,7 +43,7 @@ def _format_description(metadata: dict) -> str:
     return "\n".join(lines)
 
 
-def get_local_desc(path: str) -> str:
+def _get_local_desc(path: str) -> str:
     duck_logger.debug(f"Loading local metadata for dataset: {path}")
 
     file_path = Path(path)
@@ -63,7 +63,7 @@ def get_local_desc(path: str) -> str:
         return f"Dataset file: {file_path.name}"
 
 
-def get_local_bytes(path: str) -> bytes:
+def _get_local_bytes(path: str) -> bytes:
     duck_logger.debug(f"Reading local dataset bytes: {path}")
 
     data = Path(path).read_bytes()
@@ -71,7 +71,7 @@ def get_local_bytes(path: str) -> bytes:
     return data
 
 
-def get_s3_desc(path: str) -> str:
+def _get_s3_desc(path: str) -> str:
     duck_logger.debug(f"Loading S3 metadata for dataset: {path}")
 
     bucket, key = _split_s3_path(path)
@@ -96,7 +96,7 @@ def get_s3_desc(path: str) -> str:
         return f"Dataset file: {key.split('/')[-1]}"
 
 
-def get_s3_bytes(path: str) -> bytes:
+def _get_s3_bytes(path: str) -> bytes:
     duck_logger.debug(f"Reading S3 dataset bytes: {path}")
 
     bucket, key = _split_s3_path(path)
@@ -115,13 +115,13 @@ def get_dataset_info(path: str) -> tuple[str, bytes]:
     """
     duck_logger.debug(f"Preparing dataset for mount: {path}")
 
-    if is_s3(path):
+    if _is_s3(path):
         duck_logger.debug(f"Detected S3 dataset path: {path}")
-        description = get_s3_desc(path)
-        data = get_s3_bytes(path)
+        description = _get_s3_desc(path)
+        data = _get_s3_bytes(path)
     else:
         duck_logger.debug(f"Detected local dataset path: {path}")
-        description = get_local_desc(path)
-        data = get_local_bytes(path)
+        description = _get_local_desc(path)
+        data = _get_local_bytes(path)
 
     return description, data
