@@ -170,13 +170,8 @@ class ReporterConfig(TypedDict):
 class ContainerConfig(TypedDict):
     name: str
     image: str
-    # TODO - use these?
-    # cpu_limit: int
-    # memory_limit: str
-    # network: str
-    # timeout: int
-    # mount_output_dir: bool
-
+    mounts: dict[str, str]
+    settings: dict[str, str] # command, mem_limit, network_mode, timeout
 
 class ContainerTool(TypedDict):
     type: Literal['container_exec']
