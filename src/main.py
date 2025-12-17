@@ -269,7 +269,7 @@ def build_armory(config: Config, send_message, data_store: DataStore, containers
             amended_description = (
                     tool_config.get('description', python_tools.run_code.__doc__)
                     + '\n'
-                    + containers[container_name].get_resource_descriptions()
+                    + containers[container_name].get_resource_metadata()
             )
             armory.add_tool(python_tools.run_code, name=tool_config['name'], description=amended_description)
         else:
