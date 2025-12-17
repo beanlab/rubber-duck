@@ -55,17 +55,15 @@ class PythonExecContainer:
             cont.stop()
             cont.remove()
 
-        self._mount_local_datasets()
-        self._copy_s3_datasets()
-
         self._container = self._client.containers.run(
             self._image,
             name=self._name,
             command="sleep infinity",
             detach=True,
-            mounts=self._mounts
         )
         duck_logger.info("Container started")
+
+        self._mount_files()
 
         return self
 
@@ -121,7 +119,7 @@ class PythonExecContainer:
                 self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
 
     def _mkdir(self, path: str) -> str:
-        """Makes a directory in the tmpfs /out directory and returns the path"""
+        """Makes a directory in the /out directory and returns the path"""
         self._container.exec_run(["mkdir", "-p", path])
         return path
 
@@ -270,8 +268,7 @@ class PythonExecContainer:
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
-        """Wraps the code before execution and returns the stdout/stderr"""
+    def _wrap_code(self, path: str, code: str) -> str:
         wrapped_code = dedent(f"""\
             import sys
             import traceback
@@ -279,7 +276,7 @@ class PythonExecContainer:
             import json
             from pathlib import Path
 
-            
+
             outdir = Path({path!r})  # full container path for outputs
 
             # ===== Patch matplotlib to auto-save metadata ===== #
@@ -339,6 +336,11 @@ class PythonExecContainer:
                 sys.stdout.flush()
                 sys.stdout.close()
         """)
+        return wrapped_code
+
+    def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
+        """Wraps the code before execution and returns the stdout/stderr"""
+        wrapped_code = self._wrap_code(path, code)
 
         # execute inside the container
         result = self._container.exec_run(
@@ -409,52 +411,5 @@ def is_text(filename) -> bool:
     _, ext = os.path.splitext(filename)
     return ext[1:] in ['txt']
 
-
-async def run_code_test():
-    data_store = DataStore(["datasets/"])
-
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', data_store) as container:
-        code = dedent("""\
-            import os
-            datasets = os.listdir("/datasets")
-            for dataset in datasets:
-                print(dataset)
-                """)
-        return await container.run_code(code)
-
-
-async def async_run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', DataStore([])) as container:
-        code = dedent("""\
-            import time
-            import matplotlib.pyplot as plt
-            print("start", time.time())
-            
-            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
-            plt.title('Example Plot')
-            plt.savefig('plot.png')
-            time.sleep(1)
-            print("end", time.time())
-            """)
-
-        task1 = asyncio.create_task(container.run_code(code))
-        task2 = asyncio.create_task(container.run_code(code))
-        results = await asyncio.gather(task1, task2)
-        return results
-
-
-if __name__ == "__main__":
-    output = asyncio.run(run_code_test())
-    print("\nOutput:")
-    print("\tstdout: ", output['stdout'])
-    print("\tstderr: ", output['stderr'])
-    print("\tfiles: {")
-    for file in output['files']:
-        print("\t\t", file, end=": ")
-        print(output['files'][file]['description'])
-    print("\t}")
-    # output1 = asyncio.run(async_run_code_test())
-    # for dict in output1:
-    #     for file in dict:
-    #         print(file, end=": ")
-    #         print(dict[file]['description'])
+def is_s3(filename) -> bool:
+    return filename.startswith('s3://')
