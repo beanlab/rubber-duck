@@ -292,16 +292,6 @@ class PythonExecContainer:
     def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
         wrapped_code = self._wrap(code, path)
 
-        timeout = int(self._settings.get("timeout", 30))
-
-        wrapped_code_with_timeout = dedent(f"""\
-import subprocess, sys
-try:
-    subprocess.run(['python3', '-u', '-c', '''{wrapped_code}'''], timeout={timeout})
-except subprocess.TimeoutExpired:
-    sys.exit(124)
-        """)
-
         result = self._container.exec_run(
             ["python3", "-u", "-c", wrapped_code],
             workdir=path,
