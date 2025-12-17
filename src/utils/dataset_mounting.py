@@ -23,7 +23,6 @@ def _format_description(metadata: dict) -> str:
     name = metadata.get("name")
     if name:
         lines.append(f"Dataset: {name}")
-        lines.append("")
 
     columns = metadata.get("columns", [])
     if columns:
@@ -125,5 +124,4 @@ def get_dataset_info(path: str) -> tuple[str, bytes]:
         description = get_local_desc(path)
         data = get_local_bytes(path)
 
-    duck_logger.debug(f"Dataset ready for mount: {path}")
     return description, data
