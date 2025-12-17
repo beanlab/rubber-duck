@@ -315,7 +315,7 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
             datastore = build_datastore(config)
 
-            with these(build_containers(config, datastore)) as containers:
+            with these(build_containers(config)) as containers:
                 armory, talk_tool = build_armory(config, bot.send_message, datastore, containers)
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)

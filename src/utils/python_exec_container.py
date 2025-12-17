@@ -13,7 +13,6 @@ from docker.errors import NotFound
 from docker.types import Mount
 
 from .config_types import Config
-from .data_store import DataStore
 from .logger import duck_logger
 from .dataset_mounting import get_dataset_info
 
@@ -31,10 +30,10 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, mounts: list[dict[str, str]]):
+    def __init__(self, image: str, name: str, mount_data: list[dict[str, str]]):
         self._image = image
         self._name = name
-        self._mount_data = mounts
+        self._mount_data = mount_data
         self._resource_metadata = []
         self._client: docker.Client = docker.from_env()
         self._container = None
@@ -81,39 +80,6 @@ class PythonExecContainer:
             description, remote_bytes = get_dataset_info(remote_path)
             self._write_file(filename, remote_bytes, container_path)
             self._resource_metadata.append({'path': os.path.join(container_path, filename), 'description': description})
-
-    def _mount_local_datasets(self):
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if not location.startswith("s3://"):
-                host_file = str(Path(location).resolve())
-
-                # clean filename
-                clean_name = name.replace(" ", "_") + ".csv"
-                container_target = f"{self._data_dir}/{clean_name}"
-                duck_logger.debug(f"Mounting {clean_name} to {self._data_dir}")
-                # mount the file directly
-                self._mounts.append(
-                    Mount(
-                        target=container_target,
-                        source=host_file,
-                        type="bind",
-                        read_only=True
-                    )
-                )
-
-    def _copy_s3_datasets(self):
-        # copy S3 datasets into container
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if location.startswith("s3://"):
-                df = self._data_store.get_dataset(name)
-                csv_bytes = df.to_csv(index=False).encode("utf-8")
-                # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
-                # TODO - for every file in DataStore, get the bytes and write them
-                # TODO - want metadata for each dataset in the context so that it matches the location in container
-                duck_logger.debug(f"Copying {name} into /home/sandbox/datasets")
-                self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the /out directory and returns the path"""
@@ -385,12 +351,12 @@ class PythonExecContainer:
         return 'Available Files:\n'
 
 
-def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonExecContainer]:
+def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     # setup container dictionary
     config_containers = config.get('containers', [])
     container_config = {}
     for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], datastore)
+        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'])
     return container_config
 
 
@@ -407,6 +373,7 @@ def is_table(filename) -> bool:
 def is_text(filename) -> bool:
     _, ext = os.path.splitext(filename)
     return ext[1:] in ['txt']
+
 
 def is_s3(filename) -> bool:
     return filename.startswith('s3://')
