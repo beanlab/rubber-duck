@@ -83,7 +83,7 @@ class PythonExecContainer:
             description, remote_bytes = get_dataset_info(remote_path)
             self._write_file(filename, remote_bytes, self._data_dir)
             self._resource_metadata.append({
-                'path': os.path.join(self._data_dir, filename),
+                'path': filename,
                 'description': description
             })
 
@@ -360,7 +360,7 @@ class PythonExecContainer:
             path = resource.get("path", "unknown")
             description = resource.get("description", "")
 
-            lines.append(f"\nFile: {path}")
+            lines.append(f"\nFilename: {path}")
             if description:
                 lines.append(description)
 
