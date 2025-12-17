@@ -265,7 +265,7 @@ def build_armory(config: Config, send_message, data_store: DataStore, containers
     for tool_config in config_tools:
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            python_tools = PythonTools(containers[container_name], data_store, send_message)
+            python_tools = PythonTools(containers[container_name], send_message)
             amended_description = (
                     tool_config.get('description', python_tools.run_code.__doc__)
                     + '\n'
