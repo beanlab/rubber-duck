@@ -15,6 +15,7 @@ from docker.types import Mount
 from .config_types import Config
 from .data_store import DataStore
 from .logger import duck_logger
+from .dataset_mounting import get_dataset_info
 
 
 class FileResult(TypedDict):
@@ -73,16 +74,12 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
-    def _is_s3(self, path: str) -> bool:
-        return path.startswith("s3://")
-
     def _mount_files(self):
         for mount_info in self._mount_data:
             remote_path, container_path = mount_info.items()
             filename = os.path.basename(remote_path)
-            remote_bytes = _get_s3_bytes(remote_path) if _is_s3(remote_path) else _get_local_bytes(remote_path)
+            description, remote_bytes = get_dataset_info(remote_path)
             self._write_file(filename, remote_bytes, container_path)
-            description = _get_file_description(remote_path)
             self._resource_metadata.append({'path': os.path.join(container_path, filename), 'description': description})
 
     def _mount_local_datasets(self):
@@ -383,7 +380,7 @@ class PythonExecContainer:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
-    def get_resource_descriptions(self) -> str:
+    def get_dataset_descriptions(self) -> str:
         """Return prompt content describing each file mounted in the container"""
         return 'Available Files:\n'
 
