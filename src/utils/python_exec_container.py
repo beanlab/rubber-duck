@@ -346,9 +346,21 @@ class PythonExecContainer:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
-    def get_dataset_descriptions(self) -> str:
+    def get_resource_metadata(self) -> str:
         """Return prompt content describing each file mounted in the container"""
-        return 'Available Files:\n'
+        lines = ["\n### Available Files:"]
+
+        for resource in self._resource_metadata:
+            path = resource.get("path", "unknown")
+            description = resource.get("description", "")
+
+            lines.append(f"\nFile: {path}")
+            if description:
+                lines.append(description)
+
+        prompt_add_on = "\n".join(lines)
+        duck_logger.debug(f"Resource descriptions to add to prompt:\n{prompt_add_on}")
+        return prompt_add_on
 
 
 def build_containers(config: Config) -> dict[str, PythonExecContainer]:
