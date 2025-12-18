@@ -31,6 +31,12 @@ containers:
     mounts:
     - { source: s3://bucket/file.txt, target: /data/file.txt }
     - { source: datasets/foo.csv, target : /data/foo.csv }
+    # TODO: do directory level mounting (determine if file or directory and call list files on it)
+    # use s3://stats121-datasets/datasets/ <- directory of s3 datasets
+    # TODO: map folder: folder, file: folder/, file: folder/file - remove hardcoded self._data_dir in container
+    # TODO: let Nic know Dr. Bean would like to redo registration to be agent let
+    # if student doesn't successfully read instructions, then pass into a customer service bot that resolves the concern
+    # look at all the registration problems, what would the agent fix, maybe just make the code easier
 
 tools:
   - name: run_python
@@ -146,7 +152,7 @@ ducks:
   - name: stats-duck
     duck_type: user_led_conversation
     settings:
-      introduction: How can I help you with stats?
+      introduction: I can perform many statistical operations on a list of provided datasets. Feel free to ask me questions to elaborate on my abilities. How can I help you with stats?
       agent:
         name: stats_duck
         prompt_files:
