@@ -1,81 +1,96 @@
 {
   "name": "Car Price Data",
-  "description": "Dataset containing details about cars and their prices.",
+  "description": "Dataset containing technical specifications, fuel characteristics, and performance metrics of cars, along with their market prices.",
   "columns": [
     {
       "name": "car_ID",
-      "display_name": "Car Id",
-      "description": "Information about Car Id."
+      "display_name": "Car ID",
+      "description": "Unique identifier assigned to each car record in the dataset.",
+      "dtype": "int"
     },
     {
       "name": "gas",
-      "display_name": "Gas",
-      "description": "Information about Gas."
+      "display_name": "Fuel Type (Gasoline)",
+      "description": "Indicates whether the car uses gasoline as its fuel type.",
+      "dtype": "string: Yes or No"
     },
     {
       "name": "turbo",
-      "display_name": "Turbo",
-      "description": "Information about Turbo."
+      "display_name": "Turbocharged",
+      "description": "Indicates whether the car’s engine is turbocharged.",
+      "dtype": "string: Yes or No"
     },
     {
       "name": "four.door",
-      "display_name": "Four.Door",
-      "description": "Information about Four.Door."
+      "display_name": "Four Doors",
+      "description": "Indicates whether the car has four doors.",
+      "dtype": "string: Yes or No"
     },
     {
       "name": "front.engine",
-      "display_name": "Front.Engine",
-      "description": "Engine specifications of the car."
+      "display_name": "Front Engine",
+      "description": "Indicates whether the car has a front-mounted engine configuration.",
+      "dtype": "string: Yes or No"
     },
     {
       "name": "wheelbase",
       "display_name": "Wheelbase",
-      "description": "Information about Wheelbase."
+      "description": "Distance between the centers of the front and rear wheels of the car, measured in inches.",
+      "dtype": "float"
     },
     {
       "name": "carlength",
-      "display_name": "Carlength",
-      "description": "Information about Carlength."
+      "display_name": "Car Length",
+      "description": "Overall length of the car, measured in inches.",
+      "dtype": "float"
     },
     {
       "name": "carwidth",
-      "display_name": "Carwidth",
-      "description": "Information about Carwidth."
+      "display_name": "Car Width",
+      "description": "Overall width of the car, measured in inches.",
+      "dtype": "float"
     },
     {
       "name": "carheight",
-      "display_name": "Carheight",
-      "description": "Information about Carheight."
+      "display_name": "Car Height",
+      "description": "Overall height of the car, measured in inches.",
+      "dtype": "float"
     },
     {
       "name": "enginesize",
-      "display_name": "Enginesize",
-      "description": "Engine specifications of the car."
+      "display_name": "Engine Size",
+      "description": "Total displacement volume of the car’s engine, measured in cubic centimeters (cc).",
+      "dtype": "int"
     },
     {
       "name": "horsepower",
       "display_name": "Horsepower",
-      "description": "Horsepower of the car\u2019s engine."
+      "description": "Maximum power output of the car’s engine, measured in horsepower (hp).",
+      "dtype": "int"
     },
     {
       "name": "peakrpm",
-      "display_name": "Peakrpm",
-      "description": "Information about Peakrpm."
+      "display_name": "Peak RPM",
+      "description": "Engine speed (in revolutions per minute) at which maximum horsepower is achieved.",
+      "dtype": "int"
     },
     {
       "name": "citympg",
-      "display_name": "Citympg",
-      "description": "Information about Citympg."
+      "display_name": "City MPG",
+      "description": "Fuel efficiency of the car in city driving conditions, measured in miles per gallon.",
+      "dtype": "int"
     },
     {
       "name": "highwaympg",
-      "display_name": "Highwaympg",
-      "description": "Information about Highwaympg."
+      "display_name": "Highway MPG",
+      "description": "Fuel efficiency of the car during highway driving, measured in miles per gallon.",
+      "dtype": "int"
     },
     {
       "name": "price",
       "display_name": "Price",
-      "description": "Price of the car."
+      "description": "Manufacturer’s suggested retail price or market price of the car, expressed in monetary units.",
+      "dtype": "float"
     }
   ]
 }
