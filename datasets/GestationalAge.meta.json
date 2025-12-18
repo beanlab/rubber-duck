@@ -1,71 +1,84 @@
 {
   "name": "Gestational Age Data",
-  "description": "Dataset containing gestational age measurements and related maternal/infant attributes.",
+  "description": "Dataset containing gestational age, parental demographics, prenatal care information, and infant birth outcomes.",
   "columns": [
     {
       "name": "fage",
-      "display_name": "Fage",
-      "description": "Information about Fage."
+      "display_name": "Father's Age",
+      "description": "Age of the infant’s father at the time of birth, measured in years.",
+      "dtype": "int"
     },
     {
       "name": "mage",
-      "display_name": "Mage",
-      "description": "Information about Mage."
+      "display_name": "Mother's Age",
+      "description": "Age of the infant’s mother at the time of birth, measured in years.",
+      "dtype": "int"
     },
     {
       "name": "mature",
-      "display_name": "Mature",
-      "description": "Information about Mature."
+      "display_name": "Mother Age Category",
+      "description": "Categorical indicator of whether the mother is a younger or mature mother.",
+      "dtype": "string: younger mom, mature mom"
     },
     {
       "name": "weeks",
-      "display_name": "Weeks",
-      "description": "Information about Weeks."
+      "display_name": "Gestational Age (Weeks)",
+      "description": "Length of the pregnancy measured in completed weeks of gestation.",
+      "dtype": "int"
     },
     {
       "name": "premie",
-      "display_name": "Premie",
-      "description": "Information about Premie."
+      "display_name": "Gestational Outcome",
+      "description": "Indicates whether the birth was full term or premature.",
+      "dtype": "string: full term, premie"
     },
     {
       "name": "visits",
-      "display_name": "Visits",
-      "description": "Information about Visits."
+      "display_name": "Prenatal Visits",
+      "description": "Number of prenatal care visits attended by the mother during pregnancy.",
+      "dtype": "int"
     },
     {
       "name": "weight",
-      "display_name": "Weight",
-      "description": "Information about Weight."
+      "display_name": "Birth Weight",
+      "description": "Weight of the infant at birth, typically measured in grams.",
+      "dtype": "float"
     },
     {
       "name": "lowbirthweight",
-      "display_name": "Lowbirthweight",
-      "description": "Information about Lowbirthweight."
+      "display_name": "Low Birth Weight",
+      "description": "Categorical indicator of whether the infant’s birth weight is classified as low.",
+      "dtype": "string: not low, low"
     },
     {
       "name": "sex",
-      "display_name": "Sex",
-      "description": "Information about Sex."
+      "display_name": "Infant Sex",
+      "description": "Biological sex of the infant at birth.",
+      "dtype": "string: male, female"
     },
     {
       "name": "habit",
-      "display_name": "Habit",
-      "description": "Information about Habit."
+      "display_name": "Maternal Smoking Habit",
+      "description": "Indicates whether the mother smoked during pregnancy.",
+      "dtype": "string: nonsmoker, smoker"
     },
     {
       "name": "marital",
-      "display_name": "Marital",
-      "description": "Information about Marital."
+      "display_name": "Marital Status",
+      "description": "Marital status of the mother at the time of birth.",
+      "dtype": "string: married, not married"
     },
     {
       "name": "whitemom",
-      "display_name": "Whitemom",
-      "description": "Information about Whitemom."
+      "display_name": "Maternal Race Indicator",
+      "description": "Indicates whether the mother identifies as White.",
+      "dtype": "string: white, not white"
     },
     {
       "name": "WeightGain",
-      "display_name": "Weightgain",
-      "description": "Information about Weightgain."
+      "display_name": "Maternal Weight Gain Category",
+      "description": "Categorical classification of the mother’s weight gain during pregnancy.",
+      "dtype": "string: Healthy, High, Low"
     }
   ]
 }
