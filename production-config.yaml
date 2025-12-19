@@ -28,9 +28,10 @@ containers:
       memory_limit: 512m
       network: none
       timeout: 30
-    mounts:
-    - { source: s3://bucket/file.txt, target: /data/file.txt }
-    - { source: datasets/foo.csv, target : /data/foo.csv }
+    mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+      - { source: datasets/Admission_Predict.csv, target: /home/sandbox/datasets/Admission_Predict.csv }
+      - { source: datasets/carprice.csv, target: /home/sandbox/datasets/carprice.csv }
+      - { source: datasets/GestationalAge.csv, target: /home/sandbox/datasets/GestationalAge.csv }
     # TODO: do directory level mounting (determine if file or directory and call list files on it)
     # use s3://stats121-datasets/datasets/ <- directory of s3 datasets
     # TODO: map folder: folder, file: folder/, file: folder/file - remove hardcoded self._data_dir in container

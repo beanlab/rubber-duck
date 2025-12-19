@@ -34,7 +34,7 @@ def _format_description(metadata: dict) -> str:
 
             line = f"- {col_name}"
             if dtype:
-                line += f" ({dtype})" # TODO: update the metadata files to include dtype to test it (chat)
+                line += f", ({dtype})"
             if desc:
                 line += f": {desc}"
 
