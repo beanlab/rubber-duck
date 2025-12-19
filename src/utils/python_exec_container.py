@@ -35,7 +35,6 @@ class PythonExecContainer:
         self._resource_metadata = []
         self._client: docker.Client = docker.from_env()
         self._container = None
-        self._data_dir = '/home/sandbox/datasets'
         self._working_dir = "/home/sandbox/out"
 
     def name_in_use(self, name: str) -> bool:
@@ -79,11 +78,12 @@ class PythonExecContainer:
                 duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
                 continue
 
-            filename = os.path.basename(remote_path)
+            filename = os.path.basename(target_path)
+            target_directory = os.path.dirname(target_path)
             description, remote_bytes = get_dataset_info(remote_path)
-            self._write_file(filename, remote_bytes, self._data_dir)
+            self._write_file(filename, remote_bytes, target_directory)
             self._resource_metadata.append({
-                'path': filename,
+                'path': target_path,
                 'description': description
             })
 
@@ -360,7 +360,7 @@ class PythonExecContainer:
             path = resource.get("path", "unknown")
             description = resource.get("description", "")
 
-            lines.append(f"\nFilename: {path}")
+            lines.append(f"\nDataset file path: {path}")
             if description:
                 lines.append(description)
 
