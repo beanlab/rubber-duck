@@ -12,7 +12,7 @@ from docker.errors import NotFound
 
 from .config_types import Config
 from .logger import duck_logger
-from .dataset_mounting import get_dataset_info
+from .dataset_mounting import determine_mount_case, get_dataset_info
 
 
 class FileResult(TypedDict):
@@ -70,6 +70,15 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
+    def _mount_file(self, filename: str, remote_path: str, target_path: str):
+        target_directory = os.path.dirname(target_path)
+        description, remote_bytes = get_dataset_info(remote_path)
+        self._write_file(filename, remote_bytes, target_directory)
+        self._resource_metadata.append({
+            'path': target_path,
+            'description': description
+        })
+
     def _mount_files(self):
         for mount_info in self._mount_data:
             remote_path = mount_info.get("source")
@@ -78,14 +87,21 @@ class PythonExecContainer:
                 duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
                 continue
 
-            filename = os.path.basename(target_path)
-            target_directory = os.path.dirname(target_path)
-            description, remote_bytes = get_dataset_info(remote_path)
-            self._write_file(filename, remote_bytes, target_directory)
-            self._resource_metadata.append({
-                'path': target_path,
-                'description': description
-            })
+            # determine which case:
+            # - folder: folder
+            # - file: folder
+            # - file: folder/file
+            case = determine_mount_case(remote_path, target_path)
+            match case:
+                case "file: file":
+                    filename = os.path.basename(target_path)
+                    target_dir = os.path.dirname(target_path)
+                    self._mount_file(filename, remote_path, target_dir)
+                case "file: folder":
+                    filename = os.path.basename(remote_path)
+                    self._mount_file(filename, remote_path, target_path)
+                case "folder: folder":
+                    pass
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the /out directory and returns the path"""

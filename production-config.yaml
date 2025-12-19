@@ -29,6 +29,7 @@ containers:
       network: none
       timeout: 30
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/}
       - { source: datasets/Admission_Predict.csv, target: /home/sandbox/datasets/Admission_Predict.csv }
       - { source: datasets/carprice.csv, target: /home/sandbox/datasets/carprice.csv }
       - { source: datasets/GestationalAge.csv, target: /home/sandbox/datasets/GestationalAge.csv }
