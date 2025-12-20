@@ -1,7 +1,39 @@
 import json
-import boto3
 from pathlib import Path
+from typing import Iterable
+from dataclasses import dataclass
+from typing import Optional
+
+import boto3
+from botocore.exceptions import ClientError
+
 from .logger import duck_logger
+
+
+@dataclass(frozen=True)
+class DatasetInfo:
+    filename: str
+    description: str
+    data: bytes
+
+    # Optional future metadata
+    size: Optional[int] = None
+    source_path: Optional[str] = None
+
+
+# ======================= #
+# ======== config ======= #
+# ======================= #
+
+
+DATASET_EXTENSIONS = {".csv"}
+
+_s3_client = boto3.client("s3")
+
+
+# ======================= #
+# ======= helpers ======= #
+# ======================= #
 
 
 def _is_s3(path: str) -> bool:
@@ -12,11 +44,12 @@ def _is_metadata(name: str) -> bool:
     return name.endswith(".meta.json")
 
 
-_s3_client = boto3.client("s3")
+def _is_dataset(name: str) -> bool:
+    return Path(name).suffix in DATASET_EXTENSIONS
 
 
 def _format_description(metadata: dict) -> str:
-    lines = []
+    lines: list[str] = []
 
     name = metadata.get("name")
     if name:
@@ -56,25 +89,18 @@ def _get_s3_desc(path: str) -> str:
     duck_logger.debug(f"Loading S3 metadata for dataset: {path}")
 
     bucket, key = _split_s3_path(path)
-    meta_key = key.rsplit(".", 1)[0] + ".meta.json"
+    meta_key = f"{key.rsplit('.', 1)[0]}.meta.json"
 
     try:
         obj = _s3_client.get_object(Bucket=bucket, Key=meta_key)
         metadata = json.loads(obj["Body"].read().decode("utf-8"))
-
-        duck_logger.debug(f"S3 metadata loaded successfully: s3://{bucket}/{meta_key}")
+        duck_logger.debug(f"S3 metadata loaded: s3://{bucket}/{meta_key}")
         return _format_description(metadata)
 
-    except _s3_client.exceptions.NoSuchKey:
-        duck_logger.warn(f"No S3 metadata found, using fallback description: {path}")
-        return f"Dataset file: {key.split('/')[-1]}"
-
-    except Exception:
-        duck_logger.error(
-            f"Failed to load or parse S3 metadata JSON: s3://{bucket}/{meta_key}",
-            exc_info=True,
-        )
-        return f"Dataset file: {key.split('/')[-1]}"
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "NoSuchKey":
+            duck_logger.error(f"Failed to load S3 metadata: s3://{bucket}/{meta_key}", exc_info=True)
+        return f"Dataset name: {Path(key).name}"
 
 
 def _get_s3_bytes(path: str) -> bytes:
@@ -83,42 +109,46 @@ def _get_s3_bytes(path: str) -> bytes:
     bucket, key = _split_s3_path(path)
     obj = _s3_client.get_object(Bucket=bucket, Key=key)
     data = obj["Body"].read()
-
-    duck_logger.debug(f"Read {len(data)} bytes from S3 dataset: {path}")
     return data
 
 
-def _get_s3_folder_info(path: str) -> list[tuple[str, bytes]]:
+def _iter_s3_dataset_keys(bucket: str, prefix: str) -> Iterable[str]:
+    paginator = _s3_client.get_paginator("list_objects_v2")
+
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in sorted(page.get("Contents", []), key=lambda o: o["Key"]):
+            key = obj["Key"]
+            if key.endswith("/"):
+                continue
+            if _is_metadata(key) or not _is_dataset(key):
+                continue
+            yield key
+
+
+def _get_s3_folder_info(path: str) -> list[DatasetInfo]:
     duck_logger.debug(f"Loading S3 folder datasets: {path}")
 
     bucket, prefix = _split_s3_path(path)
     if not prefix.endswith("/"):
         prefix += "/"
 
-    paginator = _s3_client.get_paginator("list_objects_v2")
+    datasets: list[DatasetInfo] = []
 
-    results: list[tuple[str, bytes]] = []
+    for key in _iter_s3_dataset_keys(bucket, prefix):
+        dataset_path = f"s3://{bucket}/{key}"
+        data = _get_s3_bytes(dataset_path)
 
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
+        datasets.append(
+            DatasetInfo(
+                filename=Path(key).name,
+                description=_get_s3_desc(dataset_path),
+                data=data,
+                size=len(data),
+                source_path=dataset_path,
+            )
+        )
 
-            # skip folders
-            if key.endswith("/"):
-                continue
-
-            filename = key.split("/")[-1]
-            if _is_metadata(filename):
-                continue
-
-            dataset_path = f"s3://{bucket}/{key}"
-            duck_logger.debug(f"Processing S3 dataset file: {dataset_path}")
-
-            desc = _get_s3_desc(dataset_path)
-            data = _get_s3_bytes(dataset_path)
-            results.append((desc, data))
-
-    return results
+    return datasets
 
 
 # ===================== #
@@ -127,54 +157,58 @@ def _get_s3_folder_info(path: str) -> list[tuple[str, bytes]]:
 
 
 def _get_local_desc(path: str) -> str:
+    """Returns the description of the local file"""
     duck_logger.debug(f"Loading local metadata for dataset: {path}")
 
     file_path = Path(path)
     meta_path = file_path.with_suffix(".meta.json")
 
     if not meta_path.exists():
-        duck_logger.warn(f"No local metadata found, using fallback description: {path}")
-        return f"Dataset file: {file_path.name}"
+        return f"Dataset name: {file_path.name}"
 
     try:
         metadata = json.loads(meta_path.read_text())
-        duck_logger.debug(f"Local metadata loaded successfully: {meta_path}")
+        duck_logger.debug(f"Local metadata loaded: {meta_path}")
         return _format_description(metadata)
 
     except Exception:
         duck_logger.error(f"Failed to parse local metadata JSON: {meta_path}", exc_info=True)
-        return f"Dataset file: {file_path.name}"
+        return f"Dataset name: {file_path.name}"
 
 
 def _get_local_bytes(path: str) -> bytes:
     duck_logger.debug(f"Reading local dataset bytes: {path}")
-
     data = Path(path).read_bytes()
-    duck_logger.debug(f"Read {len(data)} bytes from local dataset: {path}")
     return data
 
 
-def _get_local_folder_info(path: str) -> list[tuple[str, bytes]]:
+def _get_local_folder_info(path: str) -> list[DatasetInfo]:
     duck_logger.debug(f"Loading local folder datasets: {path}")
 
     folder = Path(path)
     if not folder.is_dir():
         raise ValueError(f"Local path is not a directory: {path}")
 
-    results: list[tuple[str, bytes]] = []
+    datasets: list[DatasetInfo] = []
 
-    for file_path in folder.iterdir():
+    for file_path in sorted(folder.iterdir()):
         if not file_path.is_file():
             continue
-        if _is_metadata(file_path.name):
+        if _is_metadata(file_path.name) or not _is_dataset(file_path.name):
             continue
 
-        duck_logger.debug(f"Processing local dataset file: {file_path}")
-        desc = _get_local_desc(str(file_path))
         data = _get_local_bytes(str(file_path))
-        results.append((desc, data))
+        datasets.append(
+            DatasetInfo(
+                filename=file_path.name,
+                description=_get_local_desc(str(file_path)),
+                data=data,
+                size=len(data),
+                source_path=str(file_path),
+            )
+        )
 
-    return results
+    return datasets
 
 
 # ======================== #
@@ -184,50 +218,85 @@ def _get_local_folder_info(path: str) -> list[tuple[str, bytes]]:
 
 def determine_mount_case(remote_path: str, target_path: str) -> str:
     """
-    Returns the mount case for the given remote path and target path and returns the filename
-        - folder: folder
-        - file: folder
-        - file: folder/file
-    :returns: case, filename
+    Determines the mount case based on path semantics.
+
+    Returns one of:
+        - "folder: folder"
+        - "file: folder"
+        - "file: file"
     """
-    # check if both are directories
     if remote_path.endswith("/") and target_path.endswith("/"):
         return "folder: folder"
-    # check if file: folder
-    elif not remote_path.endswith("/") and target_path.endswith("/"):
+    if not remote_path.endswith("/") and target_path.endswith("/"):
         return "file: folder"
-    # check if file: file
-    elif not remote_path.endswith("/") and not target_path.endswith("/"):
+    if not remote_path.endswith("/") and not target_path.endswith("/"):
         return "file: file"
-    else:
-        duck_logger.error(f"Invalid mount case - remote path: {remote_path}, target path: {target_path}")
-        return ""
+
+    duck_logger.warn(f"Invalid mount case - remote path: {remote_path}, target path: {target_path}")
+    return ""
 
 
-def get_folder_info(folder_path: str) -> list[tuple[str, bytes]]:
-    """Returns a list of all descriptions and bytes of every dataset in the folder"""
-    # a folder will have dataset-metadata pairs in the format <dataset_name>.csv and <dataset_name>.meta.json
-    if _is_s3(folder_path):
-        return _get_s3_folder_info(folder_path)
-    else:
-        return _get_local_folder_info(folder_path)
+def get_folder_info(folder_path: str) -> list[DatasetInfo]:
+    return (
+        _get_s3_folder_info(folder_path)
+        if _is_s3(folder_path)
+        else _get_local_folder_info(folder_path)
+    )
 
 
-def get_dataset_info(file_path: str) -> tuple[str, bytes]:
-    """
-    Returns the description and bytes of a dataset
-    :param file_path: automatically parses s3 and local file paths
-    :return:
-    """
+def get_dataset_info(file_path: str) -> DatasetInfo:
     duck_logger.debug(f"Preparing dataset for mount: {file_path}")
 
+    filename = Path(file_path).name
+
     if _is_s3(file_path):
-        duck_logger.debug(f"Detected S3 dataset path: {file_path}")
         description = _get_s3_desc(file_path)
         data = _get_s3_bytes(file_path)
     else:
-        duck_logger.debug(f"Detected local dataset path: {file_path}")
         description = _get_local_desc(file_path)
         data = _get_local_bytes(file_path)
 
-    return description, data
+    return DatasetInfo(
+        filename=filename,
+        description=description,
+        data=data,
+        size=len(data),
+        source_path=file_path,
+    )
+
+
+# DEBUG
+
+
+def debug_list_s3_prefix(path: str, max_keys: int = 1000) -> list[str]:
+    """
+    Lists all object keys under an S3 prefix for debugging purposes.
+    """
+    bucket, prefix = _split_s3_path(path)
+    if prefix and not prefix.endswith("/"):
+        prefix += "/"
+
+    print(f"Listing S3 objects under s3://{bucket}/{prefix}")
+
+    paginator = _s3_client.get_paginator("list_objects_v2")
+    keys: list[str] = []
+
+    for page in paginator.paginate(
+            Bucket=bucket,
+            Prefix=prefix,
+            PaginationConfig={"MaxItems": max_keys},
+    ):
+        for obj in page.get("Contents", []):
+            keys.append(obj["Key"])
+
+    for key in keys:
+        print(f"  s3://{bucket}/{key}")
+
+    if not keys:
+        print("No objects found under this prefix.")
+
+    return keys
+
+
+if __name__ == "__main__":
+    debug_list_s3_prefix("s3://stats121-datasets/datasets/")

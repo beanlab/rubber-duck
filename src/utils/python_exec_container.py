@@ -12,7 +12,7 @@ from docker.errors import NotFound
 
 from .config_types import Config
 from .logger import duck_logger
-from .dataset_mounting import determine_mount_case, get_dataset_info
+from .dataset_mounting import determine_mount_case, get_dataset_info, get_folder_info, DatasetInfo
 
 
 class FileResult(TypedDict):
@@ -70,13 +70,11 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
-    def _mount_file(self, filename: str, remote_path: str, target_path: str):
-        target_directory = os.path.dirname(target_path)
-        description, remote_bytes = get_dataset_info(remote_path)
-        self._write_file(filename, remote_bytes, target_directory)
+    def _mount_file(self, target_path: str, dataset: DatasetInfo):
+        self._write_file(dataset.filename, dataset.data, target_path)
         self._resource_metadata.append({
-            'path': target_path,
-            'description': description
+            "path": os.path.join(target_path, dataset.filename),
+            "description": dataset.description,
         })
 
     def _mount_files(self):
@@ -88,20 +86,18 @@ class PythonExecContainer:
                 continue
 
             # determine which case:
-            # - folder: folder
-            # - file: folder
-            # - file: folder/file
             case = determine_mount_case(remote_path, target_path)
             match case:
                 case "file: file":
-                    filename = os.path.basename(target_path)
                     target_dir = os.path.dirname(target_path)
-                    self._mount_file(filename, remote_path, target_dir)
+                    dataset = get_dataset_info(remote_path)
+                    self._mount_file(target_dir, dataset)
                 case "file: folder":
-                    filename = os.path.basename(remote_path)
-                    self._mount_file(filename, remote_path, target_path)
+                    dataset = get_dataset_info(remote_path)
+                    self._mount_file(target_path, dataset)
                 case "folder: folder":
-                    pass
+                    for dataset in get_folder_info(remote_path):
+                        self._mount_file(target_path, dataset)
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the /out directory and returns the path"""
