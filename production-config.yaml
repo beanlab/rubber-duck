@@ -23,7 +23,7 @@ sql:
 containers:
   - name: stats-python-sandbox
     image: byucscourseops/python-tools-sandbox:latest
-    settings: # TODO: use this?
+    settings: # TODO: use this
       cpu_limit: 1
       memory_limit: 512m
       network: none
@@ -33,12 +33,6 @@ containers:
       - { source: datasets/Admission_Predict.csv, target: /home/sandbox/datasets/Admission_Predict.csv }
       - { source: datasets/carprice.csv, target: /home/sandbox/datasets/carprice.csv }
       - { source: datasets/GestationalAge.csv, target: /home/sandbox/datasets/GestationalAge.csv }
-    # TODO: do directory level mounting (determine if file or directory and call list files on it)
-    # use s3://stats121-datasets/datasets/ <- directory of s3 datasets
-    # TODO: map folder: folder, file: folder/, file: folder/file - remove hardcoded self._data_dir in container
-    # TODO: let Nic know Dr. Bean would like to redo registration to be agent let
-    # if student doesn't successfully read instructions, then pass into a customer service bot that resolves the concern
-    # look at all the registration problems, what would the agent fix, maybe just make the code easier
 
 tools:
   - name: run_python
