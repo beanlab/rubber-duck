@@ -254,7 +254,7 @@ def build_datastore(config: Config) -> DataStore:
 
 
 def build_armory(config: Config, send_message, data_store: DataStore, containers: dict[str, PythonExecContainer]) -> \
-tuple[Armory, TalkTool]:
+        tuple[Armory, TalkTool]:
     armory = Armory(send_message)
 
     stat_tools = StatsTools(data_store)
@@ -265,8 +265,13 @@ tuple[Armory, TalkTool]:
     for tool_config in config_tools:
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            python_tools = PythonTools(containers[container_name], data_store, send_message)
-            armory.add_tool(python_tools.run_code, name=tool_config['name'], description=tool_config.get('description'))
+            python_tools = PythonTools(containers[container_name], send_message)
+            amended_description = (
+                    tool_config.get('description', python_tools.run_code.__doc__)
+                    + '\n'
+                    + containers[container_name].get_resource_metadata()
+            )
+            armory.add_tool(python_tools.run_code, name=tool_config['name'], description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 
@@ -310,7 +315,7 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
             datastore = build_datastore(config)
 
-            with these(build_containers(config, datastore)) as containers:
+            with these(build_containers(config)) as containers:
                 armory, talk_tool = build_armory(config, bot.send_message, datastore, containers)
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
