@@ -10,7 +10,7 @@
     },
     {
       "name": "gas",
-      "display_name": "Fuel Type (Gasoline)",
+      "display_name": "Gas",
       "description": "Indicates whether the car uses gasoline as its fuel type.",
       "dtype": "string: Yes or No"
     },
