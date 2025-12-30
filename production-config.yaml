@@ -235,6 +235,19 @@ servers:
                     description: Sorted by teacher name (e.g. smith-section-001)
         timeout: 600
 
+  1404656370757664929:
+    server_name: CS 301R - Agent Engineering
+    channels:
+      - channel_id: 1455309626378813470
+        channel_name: register
+        ducks:
+          - name: Registration-Workflow-CS301R-Agents
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: Student
+              email_domain: byu.edu
+              roles: [ ]
 
   1235303213796691998:
     server_name: CS 111
@@ -302,22 +315,22 @@ servers:
 
               gradable_assignments:
                 - name: Project Report - Alignment
-                  rubric_path: [rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml]
+                  rubric_path: [ rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
                 - name: Project Report - Backtracking
-                  rubric_path: [rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml]
+                  rubric_path: [ rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
                 - name: Project Report - Branch and Bound
-                  rubric_path: [rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml]
+                  rubric_path: [ rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
                 - name: Project Leetcode
-                  rubric_path: [rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml]
+                  rubric_path: [ rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
                 - name: Project Demo Fruit
-                  rubric_path: [rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml]
+                  rubric_path: [ rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml ]
                   message: |
                     Please note this is a demo project
-        
+              
 
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
