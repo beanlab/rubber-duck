@@ -30,9 +30,6 @@ containers:
       timeout: 30
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/}
-      - { source: datasets/Admission_Predict.csv, target: /home/sandbox/datasets/Admission_Predict.csv }
-      - { source: datasets/carprice.csv, target: /home/sandbox/datasets/carprice.csv }
-      - { source: datasets/GestationalAge.csv, target: /home/sandbox/datasets/GestationalAge.csv }
 
 tools:
   - name: run_python
@@ -148,7 +145,7 @@ ducks:
   - name: stats-duck
     duck_type: user_led_conversation
     settings:
-      introduction: I can perform many statistical operations on a list of provided datasets. Feel free to ask me questions to elaborate on my abilities. How can I help you with stats?
+      introduction: I can perform many statistical operations on a list of provided datasets. If you want more specifics, please ask. How can I help you with stats?
       agent:
         name: stats_duck
         prompt_files:
