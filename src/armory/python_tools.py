@@ -1,13 +1,10 @@
 import io
-import os.path
-
 import pandas as pd
 
-from .tools import register_tool
 from ..utils.config_types import DuckContext, FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
-from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, is_text
+from ..utils.python_exec_container import PythonExecContainer, is_image, is_table
 
 
 class PythonTools:
@@ -18,9 +15,9 @@ class PythonTools:
     async def _send_table(self, thread_id, filecontent):
         """sends a csv file formatted as a md table"""
         table = pd.read_csv(io.StringIO(filecontent))
-        for i in range(0, table.shape[1], 3):
-            # for each chunk of 3 columns, send those columns
-            md_table = table.iloc[:, i:i + 3].to_markdown()
+        for i in range(0, table.shape[1], 5):
+            # for each chunk of 5 columns, send those columns
+            md_table = table.iloc[:, i:i + 5].to_markdown()
             msg = f'```\n{md_table}\n```'
             await self._send_message(thread_id, msg)
 
