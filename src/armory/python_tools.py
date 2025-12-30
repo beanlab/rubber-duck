@@ -6,12 +6,6 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
 
-STATUS_KEYWORDS = {
-    "saved", "saving", "wrote", "written",
-    "output", "file", "files",
-    "done", "finished", "complete", "success"
-}
-
 def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
     file_names = set(files.keys())
 
@@ -26,10 +20,6 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
 
         # drop lines mentioning filenames
         if any(name in stripped for name in file_names):
-            continue
-
-        # drop status chatter
-        if any(word in lower for word in STATUS_KEYWORDS):
             continue
 
         filtered_lines.append(line)
