@@ -4,17 +4,15 @@ import json
 import os
 import tarfile
 import uuid
-from pathlib import Path
 from textwrap import dedent, indent
 from typing import TypedDict
 
 import docker
 from docker.errors import NotFound
-from docker.types import Mount
 
 from .config_types import Config
-from .data_store import DataStore
 from .logger import duck_logger
+from .dataset_mounting import determine_mount_case, get_dataset_info, get_folder_info, DatasetInfo
 
 
 class FileResult(TypedDict):
@@ -30,38 +28,14 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, data_store: DataStore):
+    def __init__(self, image: str, name: str, mount_data: list[dict[str, str]]):
         self._image = image
         self._name = name
-        self._data_store = data_store
+        self._mount_data = mount_data
+        self._resource_metadata = []
         self._client: docker.Client = docker.from_env()
         self._container = None
-        self._data_dir = '/home/sandbox/datasets'
         self._working_dir = "/home/sandbox/out"
-        self._mounts = []
-
-        # TODO - pull the image if necessary...?
-
-        # TODO: move mounting to `__enter__`
-        # prepare mounts for local datasets
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if not location.startswith("s3://"):
-                host_file = str(Path(location).resolve())
-
-                # clean filename
-                clean_name = name.replace(" ", "_") + ".csv"
-                container_target = f"{self._data_dir}/{clean_name}"
-                duck_logger.info(f"Mounting {clean_name} to {self._data_dir}")
-                # mount the file directly
-                self._mounts.append(
-                    Mount(
-                        target=container_target,
-                        source=host_file,
-                        type="bind",
-                        read_only=True
-                    )
-                )
 
     def name_in_use(self, name: str) -> bool:
         try:
@@ -73,7 +47,6 @@ class PythonExecContainer:
 
     def __enter__(self):
         # start container
-        # TODO - if container is already present, delete it, then make a new one
         if self.name_in_use(self._name):
             cont = self._client.containers.get(self._name)
             cont.stop()
@@ -84,35 +57,54 @@ class PythonExecContainer:
             name=self._name,
             command="sleep infinity",
             detach=True,
-            mounts=self._mounts
         )
         duck_logger.info("Container started")
 
-        # copy S3 datasets into container
-        for name, meta in self._data_store.get_dataset_metadata().items():
-            location = meta["location"]
-            if location.startswith("s3://"):
-                df = self._data_store.get_dataset(name)
-                csv_bytes = df.to_csv(index=False).encode("utf-8")
-                # TODO - break up logic in DataStore for get_dataset_bytes() -> filename, bytes
-                # TODO - for every file in DataStore, get the bytes and write them
-                # duck_logger.info(f"Copying {name} into /home/sandbox/datasets")
-                self._write_file(f"{name}.csv", csv_bytes, self._data_dir)
+        self._mount_files()
 
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type, exc_val, exc_tb):
         # Stop and remove container
         if self._container:
             self._container.stop()
             self._container.remove()
 
+    def _mount_file(self, target_path: str, dataset: DatasetInfo):
+        self._write_file(dataset.filename, dataset.data, target_path)
+        self._resource_metadata.append({
+            "path": os.path.join(target_path, dataset.filename),
+            "description": dataset.description,
+        })
+
+    def _mount_files(self):
+        for mount_info in self._mount_data:
+            remote_path = mount_info.get("source")
+            target_path = mount_info.get("target")
+            if not remote_path or not target_path:
+                duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
+                continue
+
+            # determine which case:
+            case = determine_mount_case(remote_path, target_path)
+            match case:
+                case "file: file":
+                    target_dir = os.path.dirname(target_path)
+                    dataset = get_dataset_info(remote_path)
+                    self._mount_file(target_dir, dataset)
+                case "file: folder":
+                    dataset = get_dataset_info(remote_path)
+                    self._mount_file(target_path, dataset)
+                case "folder: folder":
+                    for dataset in get_folder_info(remote_path):
+                        self._mount_file(target_path, dataset)
+
     def _mkdir(self, path: str) -> str:
-        """Makes a directory in the tmpfs /out directory and returns the path"""
+        """Makes a directory in the /out directory and returns the path"""
         self._container.exec_run(["mkdir", "-p", path])
         return path
 
-    def _write_file(self, rel_path: str, data: bytes, container_dir: str) -> int:
+    def _write_file(self, filename: str, data: bytes, container_dir: str) -> int:
         """
         Writes a dict of {relative_path: bytes} to the container directory and returns exit code
 
@@ -124,8 +116,7 @@ class PythonExecContainer:
 
         container_dir should be a full container path, e.g. "/out/<uuid>"
         """
-        dest_path = os.path.join(container_dir, rel_path)  # full path to file
-        # duck_logger.info(f"Writing {dest_path}")
+        dest_path = os.path.join(container_dir, filename)  # full path to file
         # make sure the directory exists in the container
         parent_dir = os.path.dirname(dest_path)
         self._container.exec_run(["mkdir", "-p", parent_dir])
@@ -156,12 +147,12 @@ class PythonExecContainer:
                     meta = json.loads(json_bytes.decode())
 
                     subplot_descriptions[json_name] = (
-                        f"{meta.get('plot_type', 'unknown')} plot titled "
+                        f"{meta.get('plot_type', 'unknown type of')} plot titled "
                         f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
                         f"ylabel='{meta.get('ylabel', '')}'"
                     )
                 except Exception:
-                    subplot_descriptions[json_name] = "unknown subplot"
+                    subplot_descriptions[json_name] = "subplot without description"
 
         # ===== if subplots found, make combined description ===== #
         if subplot_descriptions:
@@ -188,15 +179,25 @@ class PythonExecContainer:
                 json_bytes = self._read_file(description_path)
                 meta = json.loads(json_bytes.decode())
                 return (
-                    f"{meta.get('plot_type', 'unknown')} plot titled "
+                    f"{meta.get('plot_type', 'unknown type of')} plot titled "
                     f"'{meta.get('title', '')}', xlabel='{meta.get('xlabel', '')}', "
                     f"ylabel='{meta.get('ylabel', '')}'"
                 )
             except Exception:
-                return "unknown image"
+                return "image without description"
 
         # if no metadata found
-        return "unknown image"
+        return "image without description"
+
+    def _get_file_description(self, path: str, filename: str, json_files: set[str]) -> str:
+        """Returns the description of a file"""
+        if is_image(filename):
+            return self._get_plot_description(path, filename, json_files)
+        elif is_table(filename):
+            name, ext = os.path.splitext(filename)
+            return f"table titled '{name}'"
+        else:
+            return "file without saved description"
 
     def _read_file(self, path) -> bytes:
         """Reads a file from a full path, e.g. '/out/<uuid>/file.txt' and returns its contents"""
@@ -240,7 +241,7 @@ class PythonExecContainer:
 
             full_path = os.path.join(path, filename)
             file_data = self._read_file(full_path)
-            description = self._get_plot_description(path, filename, json_files)
+            description = self._get_file_description(path, filename, json_files)
 
             out_files[filename] = {
                 "description": description,
@@ -248,18 +249,15 @@ class PythonExecContainer:
             }
         return out_files
 
-    def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
-        """Wraps the code before execution and returns the stdout/stderr"""
+    def _wrap_code(self, path: str, code: str) -> str:
         wrapped_code = dedent(f"""\
             import sys
             import traceback
             import os
             import json
             from pathlib import Path
-            
-            def user_facing():
-                print('__USER_FACING__')
-            
+
+
             outdir = Path({path!r})  # full container path for outputs
 
             # ===== Patch matplotlib to auto-save metadata ===== #
@@ -319,6 +317,11 @@ class PythonExecContainer:
                 sys.stdout.flush()
                 sys.stdout.close()
         """)
+        return wrapped_code
+
+    def _wrap_and_execute(self, code: str, path: str) -> tuple[int, str, str]:
+        """Wraps the code before execution and returns the stdout/stderr"""
+        wrapped_code = self._wrap_code(path, code)
 
         # execute inside the container
         result = self._container.exec_run(
@@ -361,61 +364,46 @@ class PythonExecContainer:
         """Takes python code to execute and an optional dict of files to reference"""
         return await asyncio.to_thread(self._run_code, code, files)
 
+    def get_resource_metadata(self) -> str:
+        """Return prompt content describing each file mounted in the container"""
+        lines = ["\n### Available Files:"]
 
-def build_containers(config: Config, datastore: DataStore) -> dict[str, PythonExecContainer]:
+        for resource in self._resource_metadata:
+            path = resource.get("path", "unknown")
+            description = resource.get("description", "")
+
+            lines.append(f"\nDataset file path: {path}")
+            if description:
+                lines.append(description)
+
+        prompt_add_on = "\n".join(lines)
+        duck_logger.debug(f"Resource descriptions to add to prompt:\n{prompt_add_on}")
+        return prompt_add_on
+
+
+def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     # setup container dictionary
     config_containers = config.get('containers', [])
     container_config = {}
     for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], datastore)
+        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'])
     return container_config
 
 
-async def run_code_test():
-    data_store = DataStore(["datasets/"])
-
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', data_store) as container:
-        code = dedent("""\
-            import os
-            datasets = os.listdir("/datasets")
-            for dataset in datasets:
-                print(dataset)
-                """)
-        return await container.run_code(code)
+def is_image(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['png', 'svg', 'jpg', 'jpeg', 'tiff']
 
 
-async def async_run_code_test():
-    with PythonExecContainer("byucscourseops/python-tools-sandbox:latest", 'test-sandbox', DataStore([])) as container:
-        code = dedent("""\
-            import time
-            import matplotlib.pyplot as plt
-            print("start", time.time())
-            
-            plt.plot([1, 2, 3, 4], [10, 20, 25, 30])
-            plt.title('Example Plot')
-            plt.savefig('plot.png')
-            time.sleep(1)
-            print("end", time.time())
-            """)
-
-        task1 = asyncio.create_task(container.run_code(code))
-        task2 = asyncio.create_task(container.run_code(code))
-        results = await asyncio.gather(task1, task2)
-        return results
+def is_table(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['csv']
 
 
-if __name__ == "__main__":
-    output = asyncio.run(run_code_test())
-    print("\nOutput:")
-    print("\tstdout: ", output['stdout'])
-    print("\tstderr: ", output['stderr'])
-    print("\tfiles: {")
-    for file in output['files']:
-        print("\t\t", file, end=": ")
-        print(output['files'][file]['description'])
-    print("\t}")
-    # output1 = asyncio.run(async_run_code_test())
-    # for dict in output1:
-    #     for file in dict:
-    #         print(file, end=": ")
-    #         print(dict[file]['description'])
+def is_text(filename) -> bool:
+    _, ext = os.path.splitext(filename)
+    return ext[1:] in ['txt']
+
+
+def is_s3(filename) -> bool:
+    return filename.startswith('s3://')

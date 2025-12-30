@@ -10,7 +10,7 @@
     },
     {
       "name": "gas",
-      "display_name": "Fuel Type (Gasoline)",
+      "display_name": "Gas",
       "description": "Indicates whether the car uses gasoline as its fuel type.",
       "dtype": "string: Yes or No"
     },
@@ -59,7 +59,7 @@
     {
       "name": "enginesize",
       "display_name": "Engine Size",
-      "description": "Total displacement volume of the car’s engine, typically measured in cubic centimeters (cc).",
+      "description": "Total displacement volume of the car’s engine, measured in cubic centimeters (cc).",
       "dtype": "int"
     },
     {

@@ -33,7 +33,7 @@
       "dtype": "float"
     },
     {
-      "name": "LOR ",
+      "name": "LOR",
       "display_name": "LOR Strength",
       "description": "Strength of the applicants Letters of Recommendation (scale 1-5).",
       "dtype": "float"
@@ -51,7 +51,7 @@
       "dtype": "int"
     },
     {
-      "name": "Chance of Admit ",
+      "name": "Chance of Admit",
       "display_name": "Chance of Admission",
       "description": "Probability of admission, expressed as a decimal between 0 and 1.",
       "dtype": "float"
