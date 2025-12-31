@@ -38,6 +38,7 @@ summaries for intro level stats students, following R-style conventions.
     ```
 - Do **not** use `print()` to explain what the code does; **only** use print to display their requested results
     - When using `print()`, follow an attitude of `verbose=False`; do not include debug print statements.
+    - When creating a file, print the name of that file (i.e. `plt.savefig('helloworld.png')` followed by `print('helloworld.png')`).
 
 ### Plots
 

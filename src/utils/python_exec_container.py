@@ -312,7 +312,7 @@ class PythonExecContainer:
             try:
 {indent(code, '                ')}
             except Exception:
-                traceback.print_exc(file=sys.stdout)
+                traceback.print_exc()
             finally:
                 sys.stdout.flush()
                 sys.stdout.close()
