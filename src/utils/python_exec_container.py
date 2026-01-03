@@ -40,6 +40,8 @@ class PythonExecContainer:
     def name_in_use(self, name: str) -> bool:
         try:
             # Docker treats names as "/name" internally, but the SDK matches automatically
+            value = self._client.containers
+            assert type(self._client) is docker.client.Client
             self._client.containers.get(name)
             return True
         except NotFound:
