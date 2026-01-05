@@ -25,7 +25,8 @@ class RegistrationWorkflow:
                  fetch_guild,
                  email_sender: EmailSender,
                  settings: RegistrationSettings,
-                 agent_suspicion_tool: Callable | None
+                 agent_suspicion_tool: Callable | None,
+                 registration_resolver: Callable | None
                  ):
         self.name = name
         self._send_message = step(send_message)
@@ -34,6 +35,7 @@ class RegistrationWorkflow:
         self._email_sender = email_sender
         self._settings = settings
         self._suspicion_tool = agent_suspicion_tool
+        self._registration_resolver = registration_resolver
 
     async def __call__(self, context: DuckContext):
         # Start the registration process
@@ -62,7 +64,9 @@ class RegistrationWorkflow:
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
         # Get and assign nickname
-        await self._nickname_flow(context, server_id, author_id, thread_id)
+        reason = await self._nickname_flow(context, server_id, author_id, thread_id)
+        if reason:
+            self._registration_resolver(context, )
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -91,11 +95,13 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}>")
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
         try:
+            await self._send_message(thread_id, "You are beginning the registration process, please follow the instructions given below.")
+            await self._send_message(thread_id, "This is not a conversational ai, so only input the requested information. Questions cannot be answered at this time.")
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
@@ -107,7 +113,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}>")
 
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
@@ -247,7 +253,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}")
+                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}>")
 
     @step
     async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
@@ -324,7 +330,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}>")
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
@@ -348,6 +354,10 @@ class RegistrationWorkflow:
                 duck_logger.info(f"Suspicion tool failed: {e}")
 
         return False, "Name looks normal"
+
+    @step
+    async def _resolve(self, context: DuckContext):
+        pass
 
     @step
     async def _assign_nickname(
@@ -388,16 +398,18 @@ class RegistrationWorkflow:
         """Handle full nickname assignment flow with retries and TA escalation."""
         guild: Guild = await self._get_guild(server_id)
         member = await guild.fetch_member(author_id)
+        names_tried = []
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, context.timeout)
+            names_tried.append(name)
             if not name:
                 await self._send_message(thread_id, "Registration incomplete: No name provided. Please start over.")
-                return
+                return [], None
 
             success, reason = await self._assign_nickname(context, server_id, author_id, name)
             if success:
                 await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
-                break
+                return [], None
             if attempt < max_retries:
                 await self._send_message(thread_id, f"Please try again.")
             else:
@@ -411,4 +423,4 @@ class RegistrationWorkflow:
                     f"Reason: {reason}\n"
                     f"Thread: <#{thread_id}>"
                 )
-                break
+                return names_tried, reason
