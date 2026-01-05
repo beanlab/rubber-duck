@@ -93,6 +93,7 @@ def build_registration_duck(
 ):
     agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get(
         'suspicion_checker_tool') else None
+    resolver_tool = armory.get_specific_tool(settings['resolver_tool']) if settings.get('resolver_tool') else None
 
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -104,6 +105,7 @@ def build_registration_duck(
         email_confirmation,
         settings,
         agent_suspicion_tool,
+        resolver_tool
     )
     return registration_workflow
 

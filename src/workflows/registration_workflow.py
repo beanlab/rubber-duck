@@ -40,33 +40,35 @@ class RegistrationWorkflow:
     async def __call__(self, context: DuckContext):
         # Start the registration process
         thread_id = context.thread_id
-        net_id = await self._get_net_id(thread_id, context.timeout)
-        if not net_id:
-            await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
-            return
-
-        if not self._check_netid(net_id):
-            await self._send_message(thread_id,
-                                     "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
-            return
-
+        # net_id = await self._get_net_id(thread_id, context.timeout)
+        # if not net_id:
+        #     await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
+        #     return
+        #
+        # if not self._check_netid(net_id):
+        #     await self._send_message(thread_id,
+        #                              "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
+        #     return
+        #
         server_id = context.guild_id
         author_id = context.author_id
-
-        # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
-                                                          context.timeout):
-            await self._send_message(thread_id,
-                                     'Unable to validate your email. Please talk to a TA or your instructor.')
-            return
-
-        # Assign Discord roles
-        await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
+        #
+        # # Get and verify the email
+        # if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
+        #                                                   context.timeout):
+        #     await self._send_message(thread_id,
+        #                              'Unable to validate your email. Please talk to a TA or your instructor.')
+        #     return
+        #
+        # # Assign Discord roles
+        # await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
         # Get and assign nickname
-        reason = await self._nickname_flow(context, server_id, author_id, thread_id)
-        if reason:
-            self._registration_resolver(context, )
+        tried_names, reason = await self._nickname_flow(context, server_id, author_id, thread_id)
+        if tried_names and reason:
+            query = f"The user used this/these names in previous tries: {", ".join(tried_names)}. The reason the name was rejected was: {reason}."
+            name, _ = await self._registration_resolver(context, query)
+            await self._assign_nickname(context, server_id, author_id, name)
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -347,7 +349,7 @@ class RegistrationWorkflow:
 
         if self._suspicion_tool:
             try:
-                raw = await self._suspicion_tool(context, name)
+                raw, _ = await self._suspicion_tool(context, name)
                 result = json.loads(raw)
                 return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
             except Exception as e:
@@ -413,10 +415,6 @@ class RegistrationWorkflow:
             if attempt < max_retries:
                 await self._send_message(thread_id, f"Please try again.")
             else:
-                await self._send_message(
-                    thread_id,
-                    "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
-                )
                 await self._send_message(
                     self._settings['ta_channel_id'],
                     f"Student {member.mention} needs nickname approval.\n"

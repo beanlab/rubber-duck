@@ -53,6 +53,7 @@ class RegistrationSettings(TypedDict):
     roles: RolesSettings
     sender_email: str
     suspicion_checker_tool: NotRequired[str]
+    resolver_tool: NotRequired[str]
     ta_channel_id: int
 
 
