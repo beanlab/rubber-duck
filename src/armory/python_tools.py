@@ -6,6 +6,39 @@ from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
 
+def _estimate_column_widths(df, sample_rows=20):
+    widths = {}
+    for col in df.columns:
+        header_width = len(str(col))
+        sample_width = (
+            df[col]
+            .astype(str)
+            .head(sample_rows)
+            .map(len)
+            .max()
+        )
+        widths[col] = max(header_width, sample_width)
+    return widths
+
+def _determine_col_chunk(df, max_table_width=90):
+    col_widths = _estimate_column_widths(df)
+
+    current_width = 0
+    current_chunk = 0
+
+    for width in col_widths.values():
+        # +3 accounts for markdown separators and padding
+        projected = current_width + width + 4
+
+        if projected > max_table_width and current_chunk > 0:
+            break
+
+        current_width = projected
+        current_chunk += 1
+
+    # ensure it's between 2 and 6
+    return max(2, min(current_chunk, 6))
+
 def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
     file_names = set(files.keys())
 
@@ -33,11 +66,14 @@ class PythonTools:
         self._send_message = send_message
 
     async def _send_table(self, thread_id, filecontent):
-        """sends a csv file formatted as a md table"""
+        """sends a csv file formatted as a md table in chunks of 3-6 columns"""
         table = pd.read_csv(io.StringIO(filecontent))
-        for i in range(0, table.shape[1], 5):
+
+        col_chunk = _determine_col_chunk(table)
+
+        for i in range(0, table.shape[1], col_chunk):
             # for each chunk of 5 columns, send those columns
-            md_table = table.iloc[:, i:i + 5].to_markdown()
+            md_table = table.iloc[:, i:i + col_chunk].to_markdown()
             msg = f'```\n{md_table}\n```'
             await self._send_message(thread_id, msg)
 

@@ -38,7 +38,8 @@ summaries for intro level stats students, following R-style conventions.
     ```
 - Do **not** use `print()` to explain what the code does; **only** use print to display their requested results
     - When using `print()`, follow an attitude of `verbose=False`; do not include debug print statements.
-    - When creating a file, print the name of that file (i.e. `plt.savefig('helloworld.png')` followed by `print('helloworld.png')`).
+    - When creating a file, print the name of that file (i.e. `plt.savefig('helloworld.png')` followed by
+      `print('helloworld.png')`).
 
 ### Plots
 
@@ -50,7 +51,7 @@ summaries for intro level stats students, following R-style conventions.
 
 ### Table Rendering Rules
 
-- To send a table to the user, save the table as a CSV file.
+- To send a table to the user (header, `.head()`, etc.), save the table as a CSV file.
     - This will automatically be sent to the user in a table format.
 - Round numeric values as needed to ensure readability.
 - Do **not** use `print()` or return text for pandas DataFrames (save them as CSVs).
