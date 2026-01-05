@@ -16,7 +16,7 @@ Note: We support a diverse community of many cultural backgrounds, so non-Englis
 > The reason the name was rejected was: Name contains numbers.
 
 **Agent Output**
-> Hi, your chosen name **“John123 Doe”** was rejected because it contains numbers. Usernames must resemble a real first and last name and should not include numbers. Please provide a corrected name in the format `firstname_lastname`.
+> Hi, your chosen name **“John123 Doe”** was rejected because it contains numbers. Usernames must resemble a real first and last name and should not include numbers. Please provide a corrected name in the format `Firstname Lastname`.
 
 **User Input**
 > Lots of people have numbers in their name online.
