@@ -112,7 +112,7 @@ class RegistrationWorkflow:
     async def _get_net_id(self, thread_id, timeout: int = 300):
         try:
             await self._send_message(thread_id, "You are beginning the registration process, please follow the instructions given below.")
-            await self._send_message(thread_id, "This is not a conversational ai, so only input the requested information. Questions cannot be answered at this time.")
+            await self._send_message(thread_id, "This is not a conversational AI, so only input the requested information. Questions cannot be answered at this time.")
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
@@ -365,10 +365,6 @@ class RegistrationWorkflow:
                 duck_logger.info(f"Suspicion tool failed: {e}")
 
         return False, "Name looks normal"
-
-    @step
-    async def _resolve(self, context: DuckContext):
-        pass
 
     @step
     async def _assign_nickname(
