@@ -1,7 +1,7 @@
 # Build the Python Tools Execution Environment Docker
 set -e # Exit immediately if a command exits with a non-zero status.
 
-IMAGE_NAME="niclewis17/python-tools-sandbox"
+IMAGE_NAME="byucscourseops/python-tools-sandbox"
 IMAGE_TAG="latest"
 
 docker buildx build \
