@@ -63,7 +63,7 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        # Get and assign nickname
+        # Get and assign nickname as well as resolve issues with questionable names
         tried_names, reason = await self._nickname_flow(context, server_id, author_id, thread_id)
         if tried_names and reason:
             query = f"The user used this/these names in previous tries: {", ".join(tried_names)}. The reason the name was rejected was: {reason}."
@@ -72,9 +72,10 @@ class RegistrationWorkflow:
             if suspicious:
                 guild: Guild = await self._get_guild(server_id)
                 member = await guild.fetch_member(author_id)
+                await member.edit(nick=name, reason="Student registration")
                 await self._send_message(
                 self._settings['ta_channel_id'],
-                f"Student {member.mention} needs nickname approval.\n"
+                f"Student {member.mention} nickname was changed to {name}, but looked suspicious.\n"
                 f"Reason: {reason}\n"
                 f"Thread: <#{thread_id}>"
             )
