@@ -91,7 +91,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}>")
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
@@ -107,7 +107,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}>")
 
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
@@ -247,7 +247,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}")
+                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}>")
 
     @step
     async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
@@ -324,7 +324,7 @@ class RegistrationWorkflow:
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
                 await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}")
+                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}>")
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
