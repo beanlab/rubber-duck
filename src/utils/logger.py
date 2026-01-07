@@ -78,10 +78,16 @@ ERROR_RE = re.compile(
     <\#(?P<thread_id>\d+|-)>\s+
     (?P<prefix>[\w\-]+)\s*-\s*(?P<extra>[\w\-]+)\s*-\s*
     (?P<channel_id>\d+)-(?P<message_id>\d+)\.[^\s]+\s*-\s*
-    (?P<error_msg>.*)
+    (?P<error_msg>[^\n]*)
+    (?:\n
+        (?P<traceback>Traceback[\s\S]*?)
+        \n
+        (?P<final_exception>[A-Za-z_][A-Za-z0-9_]*Error:\s+.*)
+    )?
     """,
-    re.VERBOSE
+    re.VERBOSE | re.DOTALL
 )
+
 
 
 def format_error_message(raw: str) -> str:
@@ -101,12 +107,14 @@ def format_error_message(raw: str) -> str:
         channel_id = m.group("channel_id")
         message_id = m.group("message_id")
         error_msg = m.group("error_msg")
+        traceback = m.group("traceback")
+        final_exception = m.group("final_exception")
     except IndexError:
         duck_logger.debug(f"one or more groups weren't parsed. groups: {m.groups()}")
         return raw
 
     formatted = (
-        f"**Error in thread:** <#{thread_id}>\n```\n{error_msg}\n```"
+        f"**Error in thread:** <#{thread_id}>\n{error_msg}\n```\n{traceback}\n```\n{final_exception}"
     )
     return formatted
 
