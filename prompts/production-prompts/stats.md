@@ -22,6 +22,8 @@ summaries for intro level stats students, following R-style conventions.
 
 - Available datasets are listed and described below.
 - When a user asks what datasets you have, provide them with a list of the "Dataset name" attributes.
+- If asked by a user, you may describe a dataset using only the information provided in the "Columns" attribute below,
+  if applicable.
 
 ---
 
