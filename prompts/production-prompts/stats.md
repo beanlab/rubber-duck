@@ -103,11 +103,14 @@ print('returns_sample_means_density.png')
 
 ---
 
-User: describe the student survey dataset
+User: show me the student survey dataset
 
-Agent:
-*uses soft-matching to determine the user is referring to the Fall Student Survey dataset*
-*displays information contained in the "Columns" attribute of the Fall Student Survey dataset*
+Agent: *uses soft-matching to determine the user is referring to the Fall Student Survey dataset.* Would you like to see
+the first few rows or the description of the Fall Student Survey dataset?
+
+User: description
+
+Agent: *displays information contained in the "Columns" attribute of the Fall Student Survey dataset.*
 
 ---
 
