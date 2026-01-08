@@ -38,7 +38,7 @@ def add_console_handler():
 
     duck_logger.addHandler(console_handler)
     quest_logger.addHandler(console_handler)
-ç
+
 
 def add_file_handler(file_path: str):
     """Add a file handler to the duck logger."""
@@ -87,7 +87,6 @@ ERROR_RE = re.compile(
     """,
     re.VERBOSE | re.DOTALL
 )
-
 
 
 def format_error_message(raw: str) -> str:
