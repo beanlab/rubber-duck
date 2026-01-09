@@ -83,8 +83,7 @@ def _convert_txt_to_csv_in_s3(
                 raise
 
     print(f"[DEBUG] Converting TXT to CSV: {txt_key}")
-    obj = s3.get_object(Bucket=bucket, Key=txt_key)
-    txt_body = obj["Body"].read().decode("utf-8")
+    txt_body = _load_from_s3(s3, bucket, txt_key)
 
     delimiter_trials = [
         ("whitespace", {"sep": r"\s+"}),
@@ -130,7 +129,7 @@ def _convert_txt_to_csv_in_s3(
     print(f"[DEBUG] CSV written to s3://{bucket}/{csv_key} (delimiter={best_label})")
     return csv_key
 
-def _load_csv_from_s3(s3, bucket: str, key: str) -> pd.DataFrame:
+def _load_from_s3(s3, bucket: str, key: str) -> pd.DataFrame:
     """Load a CSV from S3 with UTF-8 fallback encoding."""
     obj = s3.get_object(Bucket=bucket, Key=key)
     data_bytes = obj["Body"].read()
@@ -250,7 +249,7 @@ def _process_dataset(s3, bucket: str, key: str, mode: str) -> dict | None:
         print(f"[DEBUG] Metadata exists for {dataset_name}, skipping.")
         return None
 
-    df = _load_csv_from_s3(s3, bucket, key)
+    df = _load_from_s3(s3, bucket, key)
     draft_meta = _draft_metadata(df, dataset_name, bucket, key)
     refined_meta = _refine_metadata_with_gpt(draft_meta)
     _write_metadata_to_s3(s3, bucket, meta_key, refined_meta)
