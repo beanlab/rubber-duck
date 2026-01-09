@@ -68,6 +68,8 @@ class PythonTools:
     async def _send_table(self, thread_id, filecontent):
         """sends a csv file formatted as a md table in chunks of 3-6 columns"""
         table = pd.read_csv(io.StringIO(filecontent))
+        # limit to 100 rows
+        table = table.head(100)
 
         col_chunk = _determine_col_chunk(table)
 
