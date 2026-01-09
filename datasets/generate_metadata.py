@@ -196,7 +196,7 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
         print(f"[DEBUG] Column {col}: dtype={dtype}")
     draft_meta = {
         "name": dataset_name,
-        "description": f"Dataset loaded from s3://{bucket}/{key}",
+        "description": "",
         "columns": columns
     }
     return draft_meta
