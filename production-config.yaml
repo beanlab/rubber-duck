@@ -251,7 +251,8 @@ servers:
               cache_timeout: 60800
               authenticated_user_role_name: Student
               email_domain: byu.edu
-              roles: [ ]
+              roles:
+                patterns: []
 
   1235303213796691998:
     server_name: CS 111
