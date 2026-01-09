@@ -251,6 +251,7 @@ servers:
               cache_timeout: 60800
               authenticated_user_role_name: Student
               email_domain: byu.edu
+              ta_channel_id: 1459310107904184330
               roles:
                 patterns: []
 
