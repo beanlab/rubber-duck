@@ -11,10 +11,14 @@ from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message as _wait_for_message
 from ..utils.send_email import EmailSender
+from ..utils.protocols import ConversationComplete
 
 
 async def wait_for_message(*args, **kwargs) -> str:
-    return (await _wait_for_message(*args, **kwargs))['content']
+    response = await _wait_for_message(*args, **kwargs)
+    if response is None:
+        raise ConversationComplete("This conversation has timed out.")
+    return response['content']
 
 
 class RegistrationWorkflow:
@@ -37,32 +41,36 @@ class RegistrationWorkflow:
 
     async def __call__(self, context: DuckContext):
         # Start the registration process
-        thread_id = context.thread_id
-        net_id = await self._get_net_id(thread_id, context.timeout)
-        if not net_id:
-            await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
-            return
+        try:
+            thread_id = context.thread_id
+            net_id = await self._get_net_id(thread_id, context.timeout)
+            if not net_id:
+                await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
+                return
 
-        if not self._check_netid(net_id):
-            await self._send_message(thread_id,
-                                     "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
-            return
+            if not self._check_netid(net_id):
+                await self._send_message(thread_id,
+                                         "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
+                return
 
-        server_id = context.guild_id
-        author_id = context.author_id
+            server_id = context.guild_id
+            author_id = context.author_id
 
-        # Get and verify the email
-        if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
-                                                          context.timeout):
-            await self._send_message(thread_id,
-                                     'Unable to validate your email. Please talk to a TA or your instructor.')
-            return
+            # Get and verify the email
+            if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
+                                                              context.timeout):
+                await self._send_message(thread_id,
+                                         'Unable to validate your email. Please talk to a TA or your instructor.')
+                return
 
-        # Assign Discord roles
-        await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
+            # Assign Discord roles
+            await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        # Get and assign nickname
-        await self._nickname_flow(context, server_id, author_id, thread_id)
+            # Get and assign nickname
+            await self._nickname_flow(context, server_id, author_id, thread_id)
+        except ConversationComplete:
+            await self._send_message(context.thread_id,
+                                     "This registration session has timed out. Please start again when you’re ready.")
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -86,6 +94,8 @@ class RegistrationWorkflow:
             name = await wait_for_message(timeout)
             return name
 
+        except ConversationComplete:
+            raise
         except Exception as e:
             duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
@@ -102,6 +112,8 @@ class RegistrationWorkflow:
             net_id = await wait_for_message(timeout)
             return net_id
 
+        except ConversationComplete:
+            raise
         except Exception as e:
             duck_logger.info(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
@@ -112,48 +124,48 @@ class RegistrationWorkflow:
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
                                               timeout: int = 300) -> bool:
-        email = f"{net_id}@{email_domain}"
-        token = self._generate_token()
-        if not self._email_sender.send_email(email, token):
-            return False
-
-        max_attempts = 3
-        attempts = 0
-
-        while attempts < max_attempts:
-            await self._send_message(thread_id,
-                                     "Email Verification:\n"
-                                     f"We sent a verification code to: {email}\n"
-                                     "Enter the code in the chat\n"
-                                     "or type *resend* to get a new code")
-
-            # Wait for user response
-            response = await wait_for_message(timeout)
-            if not response:
-                await self._send_message(thread_id, "No response received. Please start a new chat.")
+        try:
+            email = f"{net_id}@{email_domain}"
+            token = self._generate_token()
+            if not self._email_sender.send_email(email, token):
                 return False
 
-            if response.lower() == 'resend':
-                token = self._email_sender.send_email(email, token)
-                if not token:
-                    return False
-                continue
+            max_attempts = 3
+            attempts = 0
 
-            if response == token:
-                await self._send_message(thread_id, "Successfully verified your email!")
-                return True
+            while attempts < max_attempts:
+                await self._send_message(thread_id,
+                                         "Email Verification:\n"
+                                         f"We sent a verification code to: {email}\n"
+                                         "Enter the code in the chat\n"
+                                         "or type *resend* to get a new code")
 
-            else:
-                attempts += 1
-                if attempts < max_attempts:
-                    await self._send_message(thread_id,
-                                             f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
+                # Wait for user response
+                response = await wait_for_message(timeout)
+
+                if response.lower() == 'resend':
+                    token = self._email_sender.send_email(email, token)
+                    if not token:
+                        return False
+                    continue
+
+                if response == token:
+                    await self._send_message(thread_id, "Successfully verified your email!")
+                    return True
+
                 else:
-                    await self._send_message(thread_id,
-                                             "Too many invalid attempts. Please exit the thread and start again.")
-                    return False
+                    attempts += 1
+                    if attempts < max_attempts:
+                        await self._send_message(thread_id,
+                                                 f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
+                    else:
+                        await self._send_message(thread_id,
+                                                 "Too many invalid attempts. Please exit the thread and start again.")
+                        return False
 
-        return False
+            return False
+        except ConversationComplete:
+            raise
 
     async def get_user_roles(self, member: discord.Member) -> list[int]:
         roles = [role.id for role in member.roles if role.name != "@everyone"]
@@ -161,48 +173,48 @@ class RegistrationWorkflow:
 
     @step
     async def _select_roles(self, thread_id, available_roles, timeout: int = 300):
-        while True:
-            # Display available roles
-            role_list = "\n".join([f"{i + 1}. {role['name']}"
-                                   for i, role in enumerate(available_roles)])
-            await self._send_message(thread_id,
-                                     "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
-                                     "- These may include lecture section or lab section\n\n"
-                                     "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
-                                     "**Example: '1,3,4'**\n\n"
-                                     f"Available roles:\n{role_list}")
+        try:
+            while True:
+                # Display available roles
+                role_list = "\n".join([f"{i + 1}. {role['name']}"
+                                       for i, role in enumerate(available_roles)])
+                await self._send_message(thread_id,
+                                         "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
+                                         "- These may include lecture section or lab section\n\n"
+                                         "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
+                                         "**Example: '1,3,4'**\n\n"
+                                         f"Available roles:\n{role_list}")
 
-            # Wait for user response
-            response = await wait_for_message(timeout)
-            if response is None or not response.strip():
-                await self._send_message(thread_id, "No response received. No additional roles will be assigned.")
-                return []
+                # Wait for user response
+                response = await wait_for_message(timeout)
 
-            if 'skip' in response.lower():
-                await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
-                return []
+                if 'skip' in response.lower():
+                    await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
+                    return []
 
-            # Split by comma and convert to integers
-            selected_indices = []
-            errors = []
-            for idx in response.split(','):
-                try:
-                    num = int(idx.strip())
-                    if 1 <= num <= len(available_roles):
-                        selected_indices.append(num - 1)
-                except ValueError:
-                    errors.append(f'"{idx}" is not a valid role number')
+                # Split by comma and convert to integers
+                selected_indices = []
+                errors = []
+                for idx in response.split(','):
+                    try:
+                        num = int(idx.strip())
+                        if 1 <= num <= len(available_roles):
+                            selected_indices.append(num - 1)
+                    except ValueError:
+                        errors.append(f'"{idx}" is not a valid role number')
 
-            if errors:
-                await self._send_message(thread_id, "\n".join(errors))
-                continue
+                if errors:
+                    await self._send_message(thread_id, "\n".join(errors))
+                    continue
 
-            selected_roles = [
-                available_roles[idx]['id']
-                for idx in selected_indices
-            ]
+                selected_roles = [
+                    available_roles[idx]['id']
+                    for idx in selected_indices
+                ]
 
-            return selected_roles
+                return selected_roles
+        except ConversationComplete:
+            raise
 
     @step
     async def _get_available_roles(
@@ -241,7 +253,8 @@ class RegistrationWorkflow:
                                  '(or it didn\'t match any existing role names).')
 
             return available_roles, authenticated_user_role_id
-
+        except ConversationComplete:
+            raise
         except Exception as e:
             duck_logger.info(f"Error getting guild roles: {str(e)}")
             await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
@@ -319,6 +332,8 @@ class RegistrationWorkflow:
             else:
                 await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
 
+        except ConversationComplete:
+            raise
         except Exception as e:
             duck_logger.info(f"Error in role assignment process: {str(e)}")
             await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
@@ -386,29 +401,29 @@ class RegistrationWorkflow:
             max_retries: int = 1
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        guild: Guild = await self._get_guild(server_id)
-        member = await guild.fetch_member(author_id)
-        for attempt in range(max_retries + 1):
-            name = await self._get_names(thread_id, context.timeout)
-            if not name:
-                await self._send_message(thread_id, "Registration incomplete: No name provided. Please start over.")
-                return
+        try:
+            guild: Guild = await self._get_guild(server_id)
+            member = await guild.fetch_member(author_id)
+            for attempt in range(max_retries + 1):
+                name = await self._get_names(thread_id, context.timeout)
 
-            success, reason = await self._assign_nickname(context, server_id, author_id, name)
-            if success:
-                await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
-                break
-            if attempt < max_retries:
-                await self._send_message(thread_id, f"Please try again.")
-            else:
-                await self._send_message(
-                    thread_id,
-                    "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
-                )
-                await self._send_message(
-                    self._settings['ta_channel_id'],
-                    f"Student {member.mention} needs nickname approval.\n"
-                    f"Reason: {reason}\n"
-                    f"Thread: <#{thread_id}>"
-                )
-                break
+                success, reason = await self._assign_nickname(context, server_id, author_id, name)
+                if success:
+                    await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
+                    break
+                if attempt < max_retries:
+                    await self._send_message(thread_id, f"Please try again.")
+                else:
+                    await self._send_message(
+                        thread_id,
+                        "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
+                    )
+                    await self._send_message(
+                        self._settings['ta_channel_id'],
+                        f"Student {member.mention} needs nickname approval.\n"
+                        f"Reason: {reason}\n"
+                        f"Thread: <#{thread_id}>"
+                    )
+                    break
+        except ConversationComplete:
+            raise
