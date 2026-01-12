@@ -25,7 +25,8 @@ class RegistrationWorkflow:
                  fetch_guild,
                  email_sender: EmailSender,
                  settings: RegistrationSettings,
-                 agent_suspicion_tool: Callable | None
+                 agent_suspicion_tool: Callable | None,
+                 registration_resolver: Callable | None
                  ):
         self.name = name
         self._send_message = step(send_message)
@@ -34,6 +35,7 @@ class RegistrationWorkflow:
         self._email_sender = email_sender
         self._settings = settings
         self._suspicion_tool = agent_suspicion_tool
+        self._registration_resolver = registration_resolver
 
     async def __call__(self, context: DuckContext):
         # Start the registration process
@@ -61,8 +63,22 @@ class RegistrationWorkflow:
         # Assign Discord roles
         await self._assign_roles(server_id, thread_id, author_id, self._settings, context.timeout)
 
-        # Get and assign nickname
-        await self._nickname_flow(context, server_id, author_id, thread_id)
+        # Get and assign nickname as well as resolve issues with questionable names
+        tried_names, reason = await self._nickname_flow(context, server_id, author_id, thread_id)
+        if tried_names and reason:
+            query = f"The user used this/these names in previous tries: {", ".join(tried_names)}. The reason the name was rejected was: {reason}."
+            name, _ = await self._registration_resolver(context, query)
+            suspicious, reason = await self._assign_nickname(context, server_id, author_id, name)
+            if suspicious:
+                guild: Guild = await self._get_guild(server_id)
+                member = await guild.fetch_member(author_id)
+                await member.edit(nick=name, reason="Student registration")
+                await self._send_message(
+                self._settings['ta_channel_id'],
+                f"Student {member.mention} nickname was changed to {name}, but looked suspicious.\n"
+                f"Reason: {reason}\n"
+                f"Thread: <#{thread_id}>"
+            )
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -96,6 +112,8 @@ class RegistrationWorkflow:
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
         try:
+            await self._send_message(thread_id, "You are beginning the registration process, please follow the instructions given below.")
+            await self._send_message(thread_id, "This is not a conversational AI, so only input the requested information. Questions cannot be answered at this time.")
             await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
             # Wait for user response
@@ -341,7 +359,7 @@ class RegistrationWorkflow:
 
         if self._suspicion_tool:
             try:
-                raw = await self._suspicion_tool(context, name)
+                raw, _ = await self._suspicion_tool(context, name)
                 result = json.loads(raw)
                 return bool(result.get("suspicious", False)), result.get("reason", "No reason provided")
             except Exception as e:
@@ -386,29 +404,19 @@ class RegistrationWorkflow:
             max_retries: int = 1
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        guild: Guild = await self._get_guild(server_id)
-        member = await guild.fetch_member(author_id)
+        names_tried = []
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, context.timeout)
+            names_tried.append(name)
             if not name:
                 await self._send_message(thread_id, "Registration incomplete: No name provided. Please start over.")
-                return
+                return [], None
 
             success, reason = await self._assign_nickname(context, server_id, author_id, name)
             if success:
                 await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
-                break
+                return [], None
             if attempt < max_retries:
                 await self._send_message(thread_id, f"Please try again.")
             else:
-                await self._send_message(
-                    thread_id,
-                    "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
-                )
-                await self._send_message(
-                    self._settings['ta_channel_id'],
-                    f"Student {member.mention} needs nickname approval.\n"
-                    f"Reason: {reason}\n"
-                    f"Thread: <#{thread_id}>"
-                )
-                break
+                return names_tried, reason

@@ -20,7 +20,7 @@ github_secrets.txt
 pre-production.env
 
 v2-production-config.json
-v2-production-config.yaml
+nic.yaml
 
 *.db
 *.env
