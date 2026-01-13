@@ -14,13 +14,6 @@ from ..utils.send_email import EmailSender
 from ..utils.protocols import ConversationComplete
 
 
-class RegistrationError(Exception):
-    def __init__(self, step: str, message: str, *, cause: Exception | None = None):
-        super().__init__(message)
-        self.step = step
-        self.__cause__ = cause
-
-
 async def wait_for_message(*args, **kwargs) -> str:
     response = await _wait_for_message(*args, **kwargs)
     if response is None:
