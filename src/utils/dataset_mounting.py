@@ -103,8 +103,6 @@ def _get_s3_desc(path: str) -> str:
 
 
 def _get_s3_bytes(path: str) -> bytes:
-    duck_logger.debug(f"Reading S3 dataset bytes: {path}")
-
     bucket, key = _split_s3_path(path)
     obj = _s3_client.get_object(Bucket=bucket, Key=key)
     data = obj["Body"].read()
