@@ -51,7 +51,7 @@ def _is_dataset(name: str) -> bool:
 def _format_description(metadata: dict) -> str:
     lines: list[str] = []
 
-    name = metadata.get("name")
+    name = metadata.get("dataset_name")
     if name:
         lines.append(f"Dataset name: {name}")
 
@@ -59,7 +59,7 @@ def _format_description(metadata: dict) -> str:
     if columns:
         lines.append("Columns:")
         for col in columns:
-            col_name = col.get("name", "unknown")
+            col_name = col.get("col_name", "unknown")
             dtype = col.get("dtype", "")
             desc = col.get("description", "")
 

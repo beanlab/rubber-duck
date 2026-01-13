@@ -188,14 +188,14 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
     for col in df.columns:
         dtype = _infer_dtype_dynamic(df[col])
         columns.append({
-            "name": col,
+            "col_name": col,
             "display_name": col.replace("_", " ").title(),
             "description": "",
             "dtype": dtype
         })
         print(f"[DEBUG] Column {col}: dtype={dtype}")
     draft_meta = {
-        "name": dataset_name,
+        "dataset_name": dataset_name,
         "description": "",
         "columns": columns
     }
@@ -212,7 +212,8 @@ def _refine_metadata_with_gpt(draft_meta: dict) -> dict:
 You are a data catalog assistant.
 
 Rules:
-- Improve display_name capitalization and wording
+- Improve "name" capitalization and wording
+- Improve `display_name` capitalization and wording
 - Write concise, professional column descriptions
 - Normalize dtype to one of: int, float, string, string: value1, value2, ...
 - If string is of a specified format (date, time, etc.) set the dtype to that format
