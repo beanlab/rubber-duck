@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools
@@ -91,22 +92,21 @@ def build_conversation_review_duck(
 def build_registration_duck(
         name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
-    agent_suspicion_tool = armory.get_specific_tool(settings['suspicion_checker_tool']) if settings.get(
-        'suspicion_checker_tool') else None
-    resolver_tool = armory.get_specific_tool(settings['resolver_tool']) if settings.get('resolver_tool') else None
+    registration_bot = armory.get_specific_tool(settings['registration_bot']) if settings.get(
+        'registration_bot') else None
 
     email_confirmation = EmailSender(config['sender_email'])
 
-    registration_workflow = RegistrationWorkflow(
-        name,
+    registration = Registration(
         bot.send_message,
         bot.get_channel,
         bot.fetch_guild,
         email_confirmation,
-        settings,
-        agent_suspicion_tool,
-        resolver_tool
+        settings
     )
+    armory.scrub_tools(registration)
+    registration_workflow = RegistrationWorkflow(name, registration, registration_bot, bot.send_message)
+
     return registration_workflow
 
 
@@ -164,6 +164,7 @@ def build_ducks(
 
         elif duck_type == 'registration':
             ducks[name] = build_registration_duck(name, bot, config, settings, armory)
+
 
         elif duck_type == 'assignment_feedback':
             single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])

@@ -52,8 +52,8 @@ class RegistrationSettings(TypedDict):
     "This is the domain used for email verification. For example, 'byu.edu'."
     roles: RolesSettings
     sender_email: str
-    suspicion_checker_tool: NotRequired[str]
-    resolver_tool: NotRequired[str]
+    max_retries: NotRequired[int]
+    registration_bot: NotRequired[str]
     ta_channel_id: int
 
 

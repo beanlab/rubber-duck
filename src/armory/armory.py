@@ -14,7 +14,6 @@ class Armory:
     def __init__(self, send_message: Callable):
         self._tools: dict[str, Callable] = {}
         self._schemas: dict[str, FunctionToolParam] = {}
-
         self._send_message = send_message
 
     def scrub_tools(self, tool_instance: object):
