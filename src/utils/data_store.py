@@ -125,11 +125,11 @@ class DataStore:
         content = s3_obj["Body"].read()
         content = safe_decode(content)
         md = json.loads(content)
-        return md["name"], md
+        return md["dataset_name"], md
 
     def _load_md_from_local_json(self, location: Path, original_location: Path) -> tuple[str, DatasetMetadata]:
         metadata = json.loads(location.read_text())
-        return metadata["name"], metadata
+        return metadata["dataset_name"], metadata
 
     # Data loading
 
@@ -152,7 +152,7 @@ class DataStore:
         if self._metadata[dataset_name] is not None:
             column_dict = {}
             for column in self._metadata[dataset_name]["columns"]:
-                column_dict[column["name"]] = column["display_name"]
+                column_dict[column["col_name"]] = column["display_name"]
             dataframe.rename(columns=column_dict, inplace=True)
         return dataframe
 
