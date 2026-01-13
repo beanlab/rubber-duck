@@ -56,18 +56,26 @@ class RegistrationWorkflow:
                 return
 
             if not self._check_netid(net_id):
-                await self._send_message(thread_id,
-                                         "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')")
+                await self._send_message(
+                    thread_id,
+                    "Your provided NetID looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')"
+                )
                 return
 
             server_id = context.guild_id
             author_id = context.author_id
 
             # Get and verify the email
-            if not await self._confirm_registration_via_email(net_id, thread_id, self._settings['email_domain'],
-                                                              context.timeout):
-                await self._send_message(thread_id,
-                                         'Unable to validate your email. Please talk to a TA or your instructor.')
+            if not await self._confirm_registration_via_email(
+                    net_id,
+                    thread_id,
+                    self._settings['email_domain'],
+                    context.timeout
+            ):
+                await self._send_message(
+                    thread_id,
+                    'Unable to validate your email. Please talk to a TA or your instructor.'
+                )
                 return
 
             # Assign Discord roles
@@ -81,8 +89,10 @@ class RegistrationWorkflow:
             duck_logger.exception(f"Setup failed: {e}")
             await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
             if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed. Thread: <#{thread_id}>")
+                await self._send_message(
+                    self._settings['ta_channel_id'],
+                    f"Registration workflow failed. Thread: <#{thread_id}>"
+                )
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -147,11 +157,15 @@ class RegistrationWorkflow:
             else:
                 attempts += 1
                 if attempts < max_attempts:
-                    await self._send_message(thread_id,
-                                             f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
+                    await self._send_message(
+                        thread_id,
+                        f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})"
+                    )
                 else:
-                    await self._send_message(thread_id,
-                                             "Too many invalid attempts. Please exit the thread and start again.")
+                    await self._send_message(
+                        thread_id,
+                        "Too many invalid attempts. Please exit the thread and start again."
+                    )
                     return False
         return False
 
@@ -241,8 +255,14 @@ class RegistrationWorkflow:
         return available_roles, authenticated_user_role_id
 
     @step
-    async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
-                            timeout: int = 300):
+    async def _assign_roles(
+            self,
+            server_id: int,
+            thread_id: int,
+            user_id: int,
+            settings: RegistrationSettings,
+            timeout: int = 300
+    ):
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
         # Get roles and selection
         if settings.get('roles') is None:
@@ -299,8 +319,10 @@ class RegistrationWorkflow:
             if already_roles:
                 already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
                 already_added_role_names = ", ".join(role.name for role in already_added_roles)
-                await self._send_message(thread_id,
-                                         f"You already have these selected roles: {already_added_role_names}")
+                await self._send_message(
+                    thread_id,
+                    f"You already have these selected roles: {already_added_role_names}"
+                )
 
         # Send confirmation message
         role_names = ", ".join(role.name for role in selected_roles)
