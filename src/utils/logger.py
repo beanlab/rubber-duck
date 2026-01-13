@@ -111,7 +111,7 @@ def format_error_message(raw: str) -> str:
     """
     m = ERROR_RE.match(raw)
     if not m:
-        duck_logger.debug("unrecognized error message format")
+        duck_logger.debug(f"unrecognized error message format: {raw}")
         return raw
 
     try:
