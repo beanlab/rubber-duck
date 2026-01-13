@@ -207,12 +207,12 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
 
 def _refine_metadata_with_gpt(draft_meta: dict) -> dict:
     """Uses GPT to improve display_name, descriptions, and normalize dtypes."""
-    print(f"[DEBUG] Sending draft metadata to GPT: {draft_meta['name']}")
+    print(f"[DEBUG] Sending draft metadata to GPT: {draft_meta['dataset_name']}")
     prompt = f"""
 You are a data catalog assistant.
 
 Rules:
-- Improve "name" capitalization and wording
+- Improve `dataset_name` capitalization, spacing, and wording
 - Improve `display_name` capitalization and wording
 - Write concise, professional column descriptions
 - Normalize dtype to one of: int, float, string, string: value1, value2, ...
@@ -234,8 +234,25 @@ Draft metadata:
         ],
         temperature=0
     )
-    refined = json.loads(response.choices[0].message.content)
-    print(f"[DEBUG] Received refined metadata from GPT for {draft_meta['name']}")
+
+    content = response.choices[0].message.content.strip()
+
+    # Strip ```json code blocks if present
+    if content.startswith("```"):
+        content = "\n".join(content.split("\n")[1:])  # remove the first ```json line
+        if content.endswith("```"):
+            content = "\n".join(content.split("\n")[:-1])  # remove the last ``` line
+        content = content.strip()
+
+    try:
+        refined = json.loads(content)
+    except json.JSONDecodeError as e:
+        print("[ERROR] Raw GPT response:", response)
+        content = response.choices[0].message.content
+        print("[ERROR] GPT message content:", repr(content))
+        raise e
+
+    print(f"[DEBUG] Received refined metadata from GPT for {draft_meta['dataset_name']}")
     return refined
 
 # ---------------------------
