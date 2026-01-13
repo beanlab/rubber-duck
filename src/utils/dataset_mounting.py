@@ -94,7 +94,6 @@ def _get_s3_desc(path: str) -> str:
     try:
         obj = _s3_client.get_object(Bucket=bucket, Key=meta_key)
         metadata = json.loads(obj["Body"].read().decode("utf-8"))
-        duck_logger.debug(f"S3 metadata loaded: s3://{bucket}/{meta_key}")
         return _format_description(metadata)
 
     except ClientError as e:
