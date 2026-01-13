@@ -1,81 +1,81 @@
 {
-  "name": "Gestational Age Data",
+  "dataset_name": "Gestational Age Data",
   "description": "Dataset containing gestational age, parental demographics, prenatal care information, and infant birth outcomes.",
   "columns": [
     {
-      "name": "fage",
+      "col_name": "fage",
       "display_name": "Father's Age",
       "description": "Age of the infant’s father at the time of birth, measured in years.",
       "dtype": "int"
     },
     {
-      "name": "mage",
+      "col_name": "mage",
       "display_name": "Mother's Age",
       "description": "Age of the infant’s mother at the time of birth, measured in years.",
       "dtype": "int"
     },
     {
-      "name": "mature",
+      "col_name": "mature",
       "display_name": "Mother Age Category",
       "description": "Categorical indicator of whether the mother is a younger or mature mother.",
       "dtype": "string: younger mom, mature mom"
     },
     {
-      "name": "weeks",
+      "col_name": "weeks",
       "display_name": "Gestational Age (Weeks)",
       "description": "Length of the pregnancy measured in completed weeks of gestation.",
       "dtype": "int"
     },
     {
-      "name": "premie",
+      "col_name": "premie",
       "display_name": "Gestational Outcome",
       "description": "Indicates whether the birth was full term or premature.",
       "dtype": "string: full term, premie"
     },
     {
-      "name": "visits",
+      "col_name": "visits",
       "display_name": "Prenatal Visits",
       "description": "Number of prenatal care visits attended by the mother during pregnancy.",
       "dtype": "int"
     },
     {
-      "name": "weight",
+      "col_name": "weight",
       "display_name": "Birth Weight",
       "description": "Weight of the infant at birth, typically measured in grams.",
       "dtype": "float"
     },
     {
-      "name": "lowbirthweight",
+      "col_name": "lowbirthweight",
       "display_name": "Low Birth Weight",
       "description": "Categorical indicator of whether the infant’s birth weight is classified as low.",
       "dtype": "string: not low, low"
     },
     {
-      "name": "sex",
+      "col_name": "sex",
       "display_name": "Infant Sex",
       "description": "Biological sex of the infant at birth.",
       "dtype": "string: male, female"
     },
     {
-      "name": "habit",
+      "col_name": "habit",
       "display_name": "Maternal Smoking Habit",
       "description": "Indicates whether the mother smoked during pregnancy.",
       "dtype": "string: nonsmoker, smoker"
     },
     {
-      "name": "marital",
+      "col_name": "marital",
       "display_name": "Marital Status",
       "description": "Marital status of the mother at the time of birth.",
       "dtype": "string: married, not married"
     },
     {
-      "name": "whitemom",
+      "col_name": "whitemom",
       "display_name": "Maternal Race Indicator",
       "description": "Indicates whether the mother identifies as White.",
       "dtype": "string: white, not white"
     },
     {
-      "name": "WeightGain",
+      "col_name": "WeightGain",
       "display_name": "Maternal Weight Gain Category",
       "description": "Categorical classification of the mother’s weight gain during pregnancy.",
       "dtype": "string: Healthy, High, Low"

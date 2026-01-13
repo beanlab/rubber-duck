@@ -1,93 +1,93 @@
 {
-  "name": "Car Price Data",
+  "dataset_name": "Car Price Data",
   "description": "Dataset containing technical specifications, fuel characteristics, and performance metrics of cars, along with their market prices.",
   "columns": [
     {
-      "name": "car_ID",
+      "col_name": "car_ID",
       "display_name": "Car ID",
       "description": "Unique identifier assigned to each car record in the dataset.",
       "dtype": "int"
     },
     {
-      "name": "gas",
+      "col_name": "gas",
       "display_name": "Gas",
       "description": "Indicates whether the car uses gasoline as its fuel type.",
       "dtype": "string: Yes or No"
     },
     {
-      "name": "turbo",
+      "col_name": "turbo",
       "display_name": "Turbocharged",
       "description": "Indicates whether the car’s engine is turbocharged.",
       "dtype": "string: Yes or No"
     },
     {
-      "name": "four.door",
+      "col_name": "four.door",
       "display_name": "Four Doors",
       "description": "Indicates whether the car has four doors.",
       "dtype": "string: Yes or No"
     },
     {
-      "name": "front.engine",
+      "col_name": "front.engine",
       "display_name": "Front Engine",
       "description": "Indicates whether the car has a front-mounted engine configuration.",
       "dtype": "string: Yes or No"
     },
     {
-      "name": "wheelbase",
+      "col_name": "wheelbase",
       "display_name": "Wheelbase",
       "description": "Distance between the centers of the front and rear wheels of the car, measured in inches.",
       "dtype": "float"
     },
     {
-      "name": "carlength",
+      "col_name": "carlength",
       "display_name": "Car Length",
       "description": "Overall length of the car, measured in inches.",
       "dtype": "float"
     },
     {
-      "name": "carwidth",
+      "col_name": "carwidth",
       "display_name": "Car Width",
       "description": "Overall width of the car, measured in inches.",
       "dtype": "float"
     },
     {
-      "name": "carheight",
+      "col_name": "carheight",
       "display_name": "Car Height",
       "description": "Overall height of the car, measured in inches.",
       "dtype": "float"
     },
     {
-      "name": "enginesize",
+      "col_name": "enginesize",
       "display_name": "Engine Size",
       "description": "Total displacement volume of the car’s engine, measured in cubic centimeters (cc).",
       "dtype": "int"
     },
     {
-      "name": "horsepower",
+      "col_name": "horsepower",
       "display_name": "Horsepower",
       "description": "Maximum power output of the car’s engine, measured in horsepower (hp).",
       "dtype": "int"
     },
     {
-      "name": "peakrpm",
+      "col_name": "peakrpm",
       "display_name": "Peak RPM",
       "description": "Engine speed (in revolutions per minute) at which maximum horsepower is achieved.",
       "dtype": "int"
     },
     {
-      "name": "citympg",
+      "col_name": "citympg",
       "display_name": "City MPG",
       "description": "Fuel efficiency of the car in city driving conditions, measured in miles per gallon.",
       "dtype": "int"
     },
     {
-      "name": "highwaympg",
+      "col_name": "highwaympg",
       "display_name": "Highway MPG",
       "description": "Fuel efficiency of the car during highway driving, measured in miles per gallon.",
       "dtype": "int"
     },
     {
-      "name": "price",
+      "col_name": "price",
       "display_name": "Price",
       "description": "Manufacturer’s suggested retail price or market price of the car, expressed in monetary units.",
       "dtype": "float"
