@@ -14,6 +14,13 @@ from ..utils.send_email import EmailSender
 from ..utils.protocols import ConversationComplete
 
 
+class RegistrationError(Exception):
+    def __init__(self, step: str, message: str, *, cause: Exception | None = None):
+        super().__init__(message)
+        self.step = step
+        self.__cause__ = cause
+
+
 async def wait_for_message(*args, **kwargs) -> str:
     response = await _wait_for_message(*args, **kwargs)
     if response is None:
@@ -41,8 +48,8 @@ class RegistrationWorkflow:
 
     async def __call__(self, context: DuckContext):
         # Start the registration process
+        thread_id = context.thread_id
         try:
-            thread_id = context.thread_id
             net_id = await self._get_net_id(thread_id, context.timeout)
             if not net_id:
                 await self._send_message(thread_id, "Registration failed: No Net ID provided. Please start over.")
@@ -69,8 +76,13 @@ class RegistrationWorkflow:
             # Get and assign nickname
             await self._nickname_flow(context, server_id, author_id, thread_id)
         except ConversationComplete:
-            await self._send_message(context.thread_id,
-                                     "This registration session has timed out. Please start again when you’re ready.")
+            await self._send_message(thread_id, "This conversation has timed out.")
+        except Exception as e:
+            duck_logger.exception(f"Setup failed: {e}")
+            await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
+            if self._settings.get('ta_channel_id'):
+                await self._send_message(self._settings['ta_channel_id'],
+                                         f"Registration workflow failed. Thread: <#{thread_id}>")
 
     def _check_netid(self, netid: str) -> bool:
         if not netid:
@@ -87,85 +99,61 @@ class RegistrationWorkflow:
 
     @step
     async def _get_names(self, thread_id, timeout):
-        try:
-            await self._send_message(thread_id, "Please enter your preferred first and last name, e.g. 'Shane Reese'")
+        await self._send_message(thread_id, "Please enter your preferred first and last name, e.g. 'Shane Reese'")
 
-            # Wait for user response
-            name = await wait_for_message(timeout)
-            return name
-
-        except ConversationComplete:
-            raise
-        except Exception as e:
-            duck_logger.info(f"Setup failed: {e}")
-            await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
-            if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during name collection. Thread: <#{thread_id}>")
+        # Wait for user response
+        name = await wait_for_message(timeout)
+        return name
 
     @step
     async def _get_net_id(self, thread_id, timeout: int = 300):
-        try:
-            await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
+        await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
-            # Wait for user response
-            net_id = await wait_for_message(timeout)
-            return net_id
-
-        except ConversationComplete:
-            raise
-        except Exception as e:
-            duck_logger.info(f"Setup failed: {e}")
-            await self._send_message(thread_id, "Registration setup failed. Please contact an administrator.")
-            if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during net id collection. Thread: <#{thread_id}>")
+        # Wait for user response
+        net_id = await wait_for_message(timeout)
+        return net_id
 
     @step
     async def _confirm_registration_via_email(self, net_id: str, thread_id, email_domain: str,
                                               timeout: int = 300) -> bool:
-        try:
-            email = f"{net_id}@{email_domain}"
-            token = self._generate_token()
-            if not self._email_sender.send_email(email, token):
-                return False
-
-            max_attempts = 3
-            attempts = 0
-
-            while attempts < max_attempts:
-                await self._send_message(thread_id,
-                                         "Email Verification:\n"
-                                         f"We sent a verification code to: {email}\n"
-                                         "Enter the code in the chat\n"
-                                         "or type *resend* to get a new code")
-
-                # Wait for user response
-                response = await wait_for_message(timeout)
-
-                if response.lower() == 'resend':
-                    token = self._email_sender.send_email(email, token)
-                    if not token:
-                        return False
-                    continue
-
-                if response == token:
-                    await self._send_message(thread_id, "Successfully verified your email!")
-                    return True
-
-                else:
-                    attempts += 1
-                    if attempts < max_attempts:
-                        await self._send_message(thread_id,
-                                                 f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
-                    else:
-                        await self._send_message(thread_id,
-                                                 "Too many invalid attempts. Please exit the thread and start again.")
-                        return False
-
+        email = f"{net_id}@{email_domain}"
+        token = self._generate_token()
+        if not self._email_sender.send_email(email, token):
             return False
-        except ConversationComplete:
-            raise
+
+        max_attempts = 3
+        attempts = 0
+
+        while attempts < max_attempts:
+            await self._send_message(thread_id,
+                                     "Email Verification:\n"
+                                     f"We sent a verification code to: {email}\n"
+                                     "Enter the code in the chat\n"
+                                     "or type *resend* to get a new code")
+
+            # Wait for user response
+            response = await wait_for_message(timeout)
+
+            if response.lower() == 'resend':
+                token = self._email_sender.send_email(email, token)
+                if not token:
+                    return False
+                continue
+
+            if response == token:
+                await self._send_message(thread_id, "Successfully verified your email!")
+                return True
+
+            else:
+                attempts += 1
+                if attempts < max_attempts:
+                    await self._send_message(thread_id,
+                                             f"Unexpected token. Please enter the token again. ({attempts}/{max_attempts})")
+                else:
+                    await self._send_message(thread_id,
+                                             "Too many invalid attempts. Please exit the thread and start again.")
+                    return False
+        return False
 
     async def get_user_roles(self, member: discord.Member) -> list[int]:
         roles = [role.id for role in member.roles if role.name != "@everyone"]
@@ -173,173 +161,153 @@ class RegistrationWorkflow:
 
     @step
     async def _select_roles(self, thread_id, available_roles, timeout: int = 300):
-        try:
-            while True:
-                # Display available roles
-                role_list = "\n".join([f"{i + 1}. {role['name']}"
-                                       for i, role in enumerate(available_roles)])
-                await self._send_message(thread_id,
-                                         "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
-                                         "- These may include lecture section or lab section\n\n"
-                                         "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
-                                         "**Example: '1,3,4'**\n\n"
-                                         f"Available roles:\n{role_list}")
+        while True:
+            # Display available roles
+            role_list = "\n".join([f"{i + 1}. {role['name']}"
+                                   for i, role in enumerate(available_roles)])
+            await self._send_message(
+                thread_id,
+                "These are the available roles you can select. Please indicate which roles are applicable to you:\n\n"
+                "- These may include lecture section or lab section\n\n"
+                "Enter the numbers of your roles separated by commas. Or say 'skip' to skip this step.\n"
+                "**Example: '1,3,4'**\n\n"
+                f"Available roles:\n{role_list}"
+            )
 
-                # Wait for user response
-                response = await wait_for_message(timeout)
+            # Wait for user response
+            response = await wait_for_message(timeout)
 
-                if 'skip' in response.lower():
-                    await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
-                    return []
+            if 'skip' in response.lower():
+                await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
+                return []
 
-                # Split by comma and convert to integers
-                selected_indices = []
-                errors = []
-                for idx in response.split(','):
-                    try:
-                        num = int(idx.strip())
-                        if 1 <= num <= len(available_roles):
-                            selected_indices.append(num - 1)
-                    except ValueError:
-                        errors.append(f'"{idx}" is not a valid role number')
+            # Split by comma and convert to integers
+            selected_indices = []
+            errors = []
+            for idx in response.split(','):
+                try:
+                    num = int(idx.strip())
+                    if 1 <= num <= len(available_roles):
+                        selected_indices.append(num - 1)
+                except ValueError:
+                    errors.append(f'"{idx}" is not a valid role number')
 
-                if errors:
-                    await self._send_message(thread_id, "\n".join(errors))
-                    continue
+            if errors:
+                await self._send_message(thread_id, "\n".join(errors))
+                continue
 
-                selected_roles = [
-                    available_roles[idx]['id']
-                    for idx in selected_indices
-                ]
+            selected_roles = [
+                available_roles[idx]['id']
+                for idx in selected_indices
+            ]
 
-                return selected_roles
-        except ConversationComplete:
-            raise
+            return selected_roles
 
     @step
     async def _get_available_roles(
             self, thread_id: int, server_id: int, settings: RegistrationSettings
     ) -> tuple[list[int], int]:
         """Gets available guild roles and the authenticated user role"""
-        try:
-            # Get all roles from the guild
-            guild = await self._get_guild(server_id)
-            if not guild:
-                raise ValueError(f"Guild {server_id} not found")
+        # Get all roles from the guild
+        guild = await self._get_guild(server_id)
+        if not guild:
+            raise ValueError(f"Guild {server_id} not found")
 
-            # Get role patterns from config
-            role_patterns = settings.get("roles", {}).get("patterns", [])
-            if not role_patterns:
-                duck_logger.info("No role patterns configured for this server")
+        # Get role patterns from config
+        role_patterns = settings.get("roles", {}).get("patterns", [])
+        if not role_patterns:
+            duck_logger.info("No role patterns configured for this server")
 
-            # Filter roles based on patterns
-            available_roles = []
-            authenticated_user_role_id = None
-            for role in guild.roles:
-                if role.name == settings['authenticated_user_role_name']:
-                    authenticated_user_role_id = role.id
-                    continue
+        # Filter roles based on patterns
+        available_roles = []
+        authenticated_user_role_id = None
+        for role in guild.roles:
+            if role.name == settings['authenticated_user_role_name']:
+                authenticated_user_role_id = role.id
+                continue
 
-                # If no patterns are configured, skip additional role filtering
-                for pattern_info in role_patterns:
-                    if re.search(pattern_info["pattern"], role.name):
-                        available_roles.append({
-                            "id": role.id,
-                            "name": role.name
-                        })
+            # If no patterns are configured, skip additional role filtering
+            for pattern_info in role_patterns:
+                if re.search(pattern_info["pattern"], role.name):
+                    available_roles.append({
+                        "id": role.id,
+                        "name": role.name
+                    })
 
-            if authenticated_user_role_id is None:
-                raise ValueError('No authenticated_user_role_name configured for this server '
-                                 '(or it didn\'t match any existing role names).')
+        if authenticated_user_role_id is None:
+            raise ValueError('No authenticated_user_role_name configured for this server '
+                             '(or it didn\'t match any existing role names).')
 
-            return available_roles, authenticated_user_role_id
-        except ConversationComplete:
-            raise
-        except Exception as e:
-            duck_logger.info(f"Error getting guild roles: {str(e)}")
-            await self._send_message(thread_id, "Error getting available roles. Please contact an administrator.")
-            if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed to get available roles. Thread: <#{thread_id}>")
+        return available_roles, authenticated_user_role_id
 
     @step
     async def _assign_roles(self, server_id: int, thread_id: int, user_id: int, settings: RegistrationSettings,
                             timeout: int = 300):
         """Gets available roles, lets the user select the relevant ones, and assigns them"""
-        try:
-            # Get roles and selection
-            if settings.get('roles') is None:
-                duck_logger.info("No roles configured for this server. Using authenticated user role only.")
-                role_name = settings['authenticated_user_role_name']
-                guild: Guild = await self._get_guild(server_id)
-                member = await guild.fetch_member(user_id)
+        # Get roles and selection
+        if settings.get('roles') is None:
+            duck_logger.info("No roles configured for this server. Using authenticated user role only.")
+            role_name = settings['authenticated_user_role_name']
+            guild: Guild = await self._get_guild(server_id)
+            member = await guild.fetch_member(user_id)
 
-                # Find role by name instead of ID
-                role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
-                if not role:
-                    raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
+            # Find role by name instead of ID
+            role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
+            if not role:
+                raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
 
-                selected_roles = [role]
-                await member.add_roles(role, reason="User registration")
+            selected_roles = [role]
+            await member.add_roles(role, reason="User registration")
 
+        else:
+            available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
+            if available_roles:
+                selected_role_ids = await self._select_roles(thread_id, available_roles, timeout)
             else:
-                available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
-                if available_roles:
-                    selected_role_ids = await self._select_roles(thread_id, available_roles, timeout)
-                else:
-                    selected_role_ids = []
+                selected_role_ids = []
 
-                selected_role_ids.append(authenticated_role_id)
+            selected_role_ids.append(authenticated_role_id)
 
-                # Get Discord guild and member
-                guild: Guild = await self._get_guild(server_id)
-                member = await guild.fetch_member(user_id)
+            # Get Discord guild and member
+            guild: Guild = await self._get_guild(server_id)
+            member = await guild.fetch_member(user_id)
 
-                # Get member's current roles
-                current_role_ids = await self.get_user_roles(member)
+            # Get member's current roles
+            current_role_ids = await self.get_user_roles(member)
 
-                # Get the role objects
-                selected_roles = []
-                already_roles = []
-                for role_id in selected_role_ids:
-                    if role_id in current_role_ids:
-                        already_roles.append(role_id)
-                        continue
-                    role = guild.get_role(role_id)
-                    if role:
-                        selected_roles.append(role)
+            # Get the role objects
+            selected_roles = []
+            already_roles = []
+            for role_id in selected_role_ids:
+                if role_id in current_role_ids:
+                    already_roles.append(role_id)
+                    continue
+                role = guild.get_role(role_id)
+                if role:
+                    selected_roles.append(role)
 
-                if not selected_roles and already_roles:
-                    duck_logger.info('User already has selected roles, no need to add')
-                elif not selected_roles:
-                    duck_logger.info('Could not lookup role objects from the selected role IDs.')
+            if not selected_roles and already_roles:
+                duck_logger.info('User already has selected roles, no need to add')
+            elif not selected_roles:
+                duck_logger.info('Could not lookup role objects from the selected role IDs.')
 
-                # Assign roles
-                new_roles = [role for role in selected_roles if role not in member.roles]
-                if new_roles:
-                    await member.add_roles(*new_roles, reason="User registration")
+            # Assign roles
+            new_roles = [role for role in selected_roles if role not in member.roles]
+            if new_roles:
+                await member.add_roles(*new_roles, reason="User registration")
 
-                if already_roles:
-                    already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
-                    already_added_role_names = ", ".join(role.name for role in already_added_roles)
-                    await self._send_message(thread_id,
-                                             f"You already have these selected roles: {already_added_role_names}")
+            if already_roles:
+                already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
+                already_added_role_names = ", ".join(role.name for role in already_added_roles)
+                await self._send_message(thread_id,
+                                         f"You already have these selected roles: {already_added_role_names}")
 
-            # Send confirmation message
-            role_names = ", ".join(role.name for role in selected_roles)
-            if not selected_roles:
-                await self._send_message(thread_id, f"No new roles added")
-            else:
-                await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
-
-        except ConversationComplete:
-            raise
-        except Exception as e:
-            duck_logger.info(f"Error in role assignment process: {str(e)}")
-            await self._send_message(thread_id, "Error in role assignment process. Please contact an administrator.")
-            if self._settings.get('ta_channel_id'):
-                await self._send_message(self._settings['ta_channel_id'],
-                                         f"Registration workflow failed during role assignment. Thread: <#{thread_id}>")
+        # Send confirmation message
+        role_names = ", ".join(role.name for role in selected_roles)
+        if not selected_roles:
+            await self._send_message(thread_id, f"No new roles added")
+        else:
+            await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
 
     @step
     async def _is_suspicious(self, context: DuckContext, name: str) -> tuple[bool, str]:
@@ -401,29 +369,26 @@ class RegistrationWorkflow:
             max_retries: int = 1
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        try:
-            guild: Guild = await self._get_guild(server_id)
-            member = await guild.fetch_member(author_id)
-            for attempt in range(max_retries + 1):
-                name = await self._get_names(thread_id, context.timeout)
+        guild: Guild = await self._get_guild(server_id)
+        member = await guild.fetch_member(author_id)
+        for attempt in range(max_retries + 1):
+            name = await self._get_names(thread_id, context.timeout)
 
-                success, reason = await self._assign_nickname(context, server_id, author_id, name)
-                if success:
-                    await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
-                    break
-                if attempt < max_retries:
-                    await self._send_message(thread_id, f"Please try again.")
-                else:
-                    await self._send_message(
-                        thread_id,
-                        "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
-                    )
-                    await self._send_message(
-                        self._settings['ta_channel_id'],
-                        f"Student {member.mention} needs nickname approval.\n"
-                        f"Reason: {reason}\n"
-                        f"Thread: <#{thread_id}>"
-                    )
-                    break
-        except ConversationComplete:
-            raise
+            success, reason = await self._assign_nickname(context, server_id, author_id, name)
+            if success:
+                await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
+                break
+            if attempt < max_retries:
+                await self._send_message(thread_id, f"Please try again.")
+            else:
+                await self._send_message(
+                    thread_id,
+                    "I'm sorry, this is likely my problem, but I couldn’t set your nickname. A TA will need to approve it manually."
+                )
+                await self._send_message(
+                    self._settings['ta_channel_id'],
+                    f"Student {member.mention} needs nickname approval.\n"
+                    f"Reason: {reason}\n"
+                    f"Thread: <#{thread_id}>"
+                )
+                break
