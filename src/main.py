@@ -13,6 +13,8 @@ from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools
 from .armory.armory import Armory
+from .utils.data_store import DataStore
+from .armory.stat_tools import StatsTools
 from .armory.talk_tool import TalkTool
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
@@ -242,8 +244,21 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> tuple[Armory, TalkTool]:
+def build_datastore(config: Config) -> DataStore:
+    dataset_dirs = config.get("dataset_folder_locations", [])
+    if not dataset_dirs:
+        duck_logger.warning("**No dataset folder locations provided in config**")
+
+    data_store = DataStore(dataset_dirs)
+    return data_store
+
+
+def build_armory(config: Config, send_message, data_store: DataStore, containers: dict[str, PythonExecContainer]) -> \
+        tuple[Armory, TalkTool]:
     armory = Armory(send_message)
+
+    stat_tools = StatsTools(data_store)
+    armory.scrub_tools(stat_tools)
 
     # setup tools
     config_tools = config.get("tools", [])
@@ -298,9 +313,10 @@ async def _main(config: Config, log_dir: Path):
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
             metrics_handler = SQLMetricsHandler(sql_session)
+            datastore = build_datastore(config)
 
             with these(build_containers(config)) as containers:
-                armory, talk_tool = build_armory(config, bot.send_message, containers)
+                armory, talk_tool = build_armory(config, bot.send_message, datastore, containers)
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
 
