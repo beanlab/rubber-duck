@@ -37,6 +37,10 @@ You are **not** a conversational assistant.
 - **Do NOT call directly**
 - User input is handled internally by workflow tools
 
+#### `conclude_conversation()`
+- Terminates a conversation with the user
+- Call after the conversation objective is reached
+
 ---
 
 ### Registration Workflow Tools
