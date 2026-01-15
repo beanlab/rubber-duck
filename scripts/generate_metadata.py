@@ -8,6 +8,7 @@ import pandas as pd
 from io import BytesIO, StringIO
 from openai import OpenAI
 from pathlib import Path
+from textwrap import dedent
 
 from ..src.utils.logger import duck_logger, add_console_handler
 
@@ -221,24 +222,24 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
 def _refine_metadata_with_gpt(draft_meta: dict) -> dict:
     """Uses GPT to improve display_name, descriptions, and normalize dtypes."""
     duck_logger.debug(f"Sending draft metadata to GPT: {draft_meta['dataset_name']}")
-    prompt = f"""
-You are a data catalog assistant.
-
-Rules:
-- Improve `dataset_name` capitalization, spacing, and wording
-- Improve `display_name` capitalization and wording
-- Write concise, professional column descriptions
-- Normalize dtype to one of: int, float, string, string: value1, value2, ...
-- If string is of a specified format (date, time, etc.) set the dtype to that format
-- Do NOT invent categories
-- Do NOT rename columns
-- Output valid JSON only
-
----
-
-Draft metadata:
-{json.dumps(draft_meta, indent=2)}
-"""
+    prompt = dedent(f"""\
+        You are a data catalog assistant.
+        
+        Rules:
+        - Improve `dataset_name` capitalization, spacing, and wording
+        - Improve `display_name` capitalization and wording
+        - Write concise, professional column descriptions
+        - Normalize dtype to one of: int, float, string, string: value1, value2, ...
+        - If string is of a specified format (date, time, etc.) set the dtype to that format
+        - Do NOT invent categories
+        - Do NOT rename columns
+        - Output valid JSON only
+        
+        ---
+        
+        Draft metadata:
+        {json.dumps(draft_meta, indent=2)}
+        """)
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -330,6 +331,17 @@ def generate_s3_metadata(s3_prefix: str, bucket: str, mode: str = "create") -> d
 # Script Entry Point
 # ---------------------------
 
+def main():
+    bucket = "stats121-datasets"
+    prefix = "datasets/"
+
+    duck_logger.debug("Starting metadata generation...")
+    all_meta = generate_s3_metadata(prefix, bucket)
+
+    for dataset_name, meta in all_meta.items():
+        duck_logger.debug(f"\n--- Metadata for {dataset_name} ---\n")
+        duck_logger.debug(json.dumps(meta, indent=2))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
@@ -342,12 +354,6 @@ if __name__ == "__main__":
 
     add_console_handler()
 
-    bucket = "stats121-datasets"
-    prefix = "datasets/"
+    main()
 
-    duck_logger.debug("Starting metadata generation...")
-    all_meta = generate_s3_metadata(prefix, bucket)
 
-    for dataset_name, meta in all_meta.items():
-        duck_logger.debug(f"\n--- Metadata for {dataset_name} ---\n")
-        duck_logger.debug(json.dumps(meta, indent=2))
