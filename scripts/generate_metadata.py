@@ -1,13 +1,15 @@
-import os
-import json
-from pathlib import Path
-from io import BytesIO, StringIO
-
-import pandas as pd
+import argparse
 import boto3
-from openai import OpenAI
+import json
+import logging
+import os
+import pandas as pd
 
-from ..src.utils.logger import duck_logger
+from io import BytesIO, StringIO
+from openai import OpenAI
+from pathlib import Path
+
+from ..src.utils.logger import duck_logger, add_console_handler
 
 # ---------------------------
 # CONFIGURATION
@@ -25,6 +27,7 @@ if not client.api_key:
     raise RuntimeError("OPENAI_API_KEY environment variable not set")
 duck_logger.debug("OpenAI client initialized successfully.")
 
+
 # ---------------------------
 # File Type Helpers
 # ---------------------------
@@ -32,8 +35,10 @@ duck_logger.debug("OpenAI client initialized successfully.")
 def _is_csv(key: str) -> bool:
     return key.lower().endswith(".csv")
 
+
 def _is_txt(key: str) -> bool:
     return key.lower().endswith(".txt")
+
 
 # ---------------------------
 # S3 Helpers
@@ -49,6 +54,7 @@ def _metadata_exists(s3, bucket: str, meta_key: str) -> bool:
             return False
         raise
 
+
 def _write_metadata_to_s3(s3, bucket: str, key: str, metadata: dict):
     """Write a metadata dict as JSON to S3."""
     json_body = json.dumps(metadata, indent=2)
@@ -59,6 +65,7 @@ def _write_metadata_to_s3(s3, bucket: str, key: str, metadata: dict):
         ContentType="application/json"
     )
     duck_logger.debug(f"Metadata written to s3://{bucket}/{key}")
+
 
 def _convert_txt_to_csv_in_s3(
         s3,
@@ -137,6 +144,7 @@ def _convert_txt_to_csv_in_s3(
     duck_logger.debug(f"CSV written to s3://{bucket}/{csv_key} (delimiter={best_label})")
     return csv_key
 
+
 def _load_csv_from_s3(s3, bucket: str, key: str) -> pd.DataFrame:
     """Load a CSV from S3 with UTF-8 fallback encoding."""
     obj = s3.get_object(Bucket=bucket, Key=key)
@@ -147,6 +155,7 @@ def _load_csv_from_s3(s3, bucket: str, key: str) -> pd.DataFrame:
         duck_logger.warn(f"UTF-8 decoding failed for {key}, trying latin-1...")
         df = pd.read_csv(BytesIO(data_bytes), encoding="latin-1")
     return df
+
 
 # ---------------------------
 # Data Helpers
@@ -184,6 +193,7 @@ def _infer_dtype_dynamic(series: pd.Series, max_categories: int = MAX_CATEGORIES
     else:
         return f"string: {', '.join(unique_vals[:max_categories])}, etc."
 
+
 def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) -> dict:
     """Create draft metadata dict from a DataFrame."""
     columns = []
@@ -202,6 +212,7 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
         "columns": columns
     }
     return draft_meta
+
 
 # ---------------------------
 # GPT Helpers
@@ -256,6 +267,7 @@ Draft metadata:
     duck_logger.debug(f"Received refined metadata from GPT for {draft_meta['dataset_name']}")
     return refined
 
+
 # ---------------------------
 # Dataset Processing Helper
 # ---------------------------
@@ -279,6 +291,7 @@ def _process_dataset(s3, bucket: str, key: str, mode: str) -> dict | None:
     refined_meta = _refine_metadata_with_gpt(draft_meta)
     _write_metadata_to_s3(s3, bucket, meta_key, refined_meta)
     return refined_meta
+
 
 # ---------------------------
 # Main S3 Metadata Generator
@@ -312,11 +325,23 @@ def generate_s3_metadata(s3_prefix: str, bucket: str, mode: str = "create") -> d
     duck_logger.debug(f"Metadata generation complete. Total metadata files created: {len(metadata_dict)}")
     return metadata_dict
 
+
 # ---------------------------
 # Script Entry Point
 # ---------------------------
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    args = parser.parse_args()
+
+    if args.debug:
+        duck_logger.setLevel(logging.DEBUG)
+    else:
+        duck_logger.setLevel(logging.INFO)
+
+    add_console_handler()
+
     bucket = "stats121-datasets"
     prefix = "datasets/"
 
