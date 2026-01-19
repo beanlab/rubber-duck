@@ -18,7 +18,9 @@ class RegistrationWorkflow:
 
     async def __call__(self, context: DuckContext):
         try:
-            await self._registration.run(context)
+            finished = await self._registration.run(context)
+            if finished:
+                await self._registration_bot(context, f"Hi, can you help me with registration this is the reason the workflow failed last time: {finished}")
         except Exception as e:
             if self._registration_bot:
                 await self._registration_bot(context, f"Hi, can you help me with registration this is the reason the workflow failed last time: {str(e)}")
