@@ -29,7 +29,7 @@ containers:
       network: none
       timeout: 30
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
-      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/}
+      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
 tools:
   - name: run_python
@@ -241,9 +241,10 @@ servers:
               cache_timeout: 60800
               authenticated_user_role_name: Student
               email_domain: byu.edu
-              roles: [ ]
               registration_tool: registration
 
+              roles:
+                patterns: []
 
   1235303213796691998:
     server_name: CS 111
@@ -417,7 +418,7 @@ servers:
         timeout: 600
 
       - channel_id: 1371951696061661215
-        channel_name: duck-pond
+        channel_name: stats-gpt
         ducks:
           - standard-rubber-duck
         timeout: 600
