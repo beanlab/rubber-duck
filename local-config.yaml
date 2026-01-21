@@ -1,0 +1,49 @@
+# Include pulls from production config
+# Overrides adds new sections or patches sections from config
+
+include:
+  defaults: true
+  # includes
+  # - file_size_limit
+  # - file_type_ext
+  # - reporter_settings
+  # - ai_completion_retry_protocol
+
+  containers:
+    - stats-python-sandbox
+
+  ducks:
+    - standard-rubber-duck
+    - stats-duck
+
+  tools:
+    - run_python
+
+overrides:
+  sql:
+    database: local-testing-configs/local.db
+
+  containers:
+    - name: stats-python-sandbox
+      mounts:
+        - { source: datasets/, target: /home/sandbox/datasets/ }
+
+  ducks:
+    - name: standard-rubber-duck
+      settings:
+        agent:
+          engine: gpt-4.1-mini
+
+  servers:
+    "<insert server id>":
+      server_name: BeanLab
+      channels:
+        - channel_id: <insert channel id>
+          channel_name: Ducks/tyler-chat-bot
+          timeout: 30
+          ducks:
+            - stats-duck
+
+  admin_settings:
+    admin_channel_id: <insert admin id>
+    admin_role_id: <insert role id>
