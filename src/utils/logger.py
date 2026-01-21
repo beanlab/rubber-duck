@@ -117,7 +117,7 @@ def format_error_message(raw: str) -> str:
     parts: list[str] = [
         f"## Error in thread: <#{thread_id}>",
         "",
-        "*" + error_msg + "*",
+        "**" + error_msg + "**",
         ""
     ]
 
