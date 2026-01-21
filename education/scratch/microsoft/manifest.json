@@ -1,0 +1,22 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "344143e5-d267-422f-9485-2589a9a1b02c",
+  "packageName": "com.simple.teams.bot",
+  "name": {
+    "short": "AI Bot"
+  },
+  "description": {
+    "short": "Simple Teams bot",
+    "full": "Simple Teams bot backed by OpenAI"
+  },
+  "bots": [
+    {
+      "botId": "344143e5-d267-422f-9485-2589a9a1b02c",
+      "scopes": ["personal", "team", "groupchat"]
+    }
+  ],
+  "permissions": ["identity"],
+  "accentColor": "#6264A7"
+}
