@@ -97,14 +97,6 @@ def split_chained_tracebacks(tracebacks: str) -> list[str]:
     return tracebacks.strip().split(CHAIN_MARKER)
 
 
-def extract_final_exception(block: str) -> str:
-    """
-    Extract the final exception line from a traceback block.
-    """
-    lines = [line.rstrip() for line in block.splitlines() if line.strip()]
-    return lines[-1]
-
-
 def format_error_message(raw: str) -> str:
     """
     Parse and format an error message for Discord readability.
@@ -125,7 +117,7 @@ def format_error_message(raw: str) -> str:
     parts: list[str] = [
         f"## Error in thread: <#{thread_id}>",
         "",
-        error_msg,
+        "*" + error_msg + "*",
         ""
     ]
 
@@ -135,12 +127,10 @@ def format_error_message(raw: str) -> str:
     chained_blocks = split_chained_tracebacks(tracebacks)
 
     for i, block in enumerate(chained_blocks):
-        final_exc = extract_final_exception(block)
 
         parts.append("```")
         parts.append(block.strip())
         parts.append("```")
-        parts.append(f"**CAUSE --** {final_exc}")
 
         if i < len(chained_blocks) - 1:
             parts.append("\n---\n")
