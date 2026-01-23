@@ -1,25 +1,34 @@
-# Include pulls from production config
-# Overrides adds new sections or patches sections from config
+# Include: pulls from production config without changing anything
+# Override: patches sections from config or adds new sections
 
 include:
-  defaults: true
-  # includes
-  # - file_size_limit
-  # - file_type_ext
-  # - reporter_settings
-  # - ai_completion_retry_protocol
+  include_all: false # if true, includes all sections from production (can still override)
 
+  # list of all sections (keys) to include from production verbatim
+  include_these:
+    - file_size_limit
+    - file_type_ext
+    - reporter_settings
+    - ai_completion_retry_protocol
+
+  # custom specific pieces of production to include
+  # list of the main attribute of the section (usually `name:`, but could be other things)
   containers:
-    - stats-python-sandbox
+    - name: stats-python-sandbox
 
   ducks:
-    - standard-rubber-duck
-    - stats-duck
+    - name: stats-duck
 
   tools:
-    - run_python
+    - name: run_python
 
-overrides:
+  agents_as_tools:
+    tool_name: check_suspicion_bot
+
+  servers:
+    - 1407758127608365157 # this one is a key by itself
+
+override:
   sql:
     database: local-testing-configs/local.db
 
@@ -28,6 +37,7 @@ overrides:
       mounts:
         - { source: datasets/, target: /home/sandbox/datasets/ }
 
+  # Includes just the standard rubber duck and all of its production settings, modifying only the "engine" attribute
   ducks:
     - name: standard-rubber-duck
       settings:
@@ -35,15 +45,17 @@ overrides:
           engine: gpt-4.1-mini
 
   servers:
-    "<insert server id>":
+    # If <server id> (int) exists in production, it includes and modifies its contents
+    # If the id does not exist, it adds this as a new server
+    <server id>:
       server_name: BeanLab
       channels:
-        - channel_id: <insert channel id>
+        - channel_id: <channel id>
           channel_name: Ducks/tyler-chat-bot
           timeout: 30
           ducks:
             - stats-duck
 
   admin_settings:
-    admin_channel_id: <insert admin id>
-    admin_role_id: <insert role id>
+    admin_channel_id: <admin id>
+    admin_role_id: <role id>
