@@ -107,6 +107,14 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
             result[key] = deep_merge_dict(result[key], value)
+        elif isinstance(result.get(key), list) and isinstance(value, list):
+            merged_list = []
+            for i, v in enumerate(value):
+                if i < len(result[key]) and isinstance(result[key][i], dict) and isinstance(v, dict):
+                    merged_list.append(deep_merge_dict(result[key][i], v))
+                else:
+                    merged_list.append(copy.deepcopy(v))
+            result[key] = merged_list
         else:
             result[key] = copy.deepcopy(value)
     return result
@@ -172,30 +180,26 @@ def _apply_overrides(config: Config, override: OverrideConfig) -> Config:
     duck_logger.debug("Applying overrides...")
     result = copy.deepcopy(config)
 
-    if override.get("sql"):
-        result["sql"] = deep_merge_dict(result.get("sql", {}), override["sql"])
+    def to_dict(obj):
+        if isinstance(obj, dict):
+            return {k: to_dict(v) for k, v in obj.items()}
+        elif hasattr(obj, "__dict__"):
+            return {k: to_dict(v) for k, v in obj.__dict__.items()}
+        elif isinstance(obj, list):
+            return [to_dict(x) for x in obj]
+        else:
+            return obj
 
-    if override.get("containers"):
-        result["containers"] = merge_named_list(result.get("containers", []), override["containers"])
+    override_dict = to_dict(override)
 
-    if override.get("ducks"):
-        result["ducks"] = merge_named_list(result.get("ducks", []), override["ducks"])
-
-    if override.get("tools"):
-        result["tools"] = merge_named_list(result.get("tools", []), override["tools"])
-
-    if override.get("agents_as_tools"):
-        result["agents_as_tools"] = merge_named_list(
-            result.get("agents_as_tools", []),
-            override["agents_as_tools"],
-            name_key="tool_name"
-        )
-
-    if override.get("servers"):
-        result["servers"] = merge_servers(result.get("servers", {}), override["servers"])
-
-    if override.get("admin_settings"):
-        result["admin_settings"] = deep_merge_dict(result.get("admin_settings", {}), override["admin_settings"])
+    for key, value in override_dict.items():
+        if isinstance(value, dict):
+            result[key] = deep_merge_dict(result.get(key, {}), value)
+        elif isinstance(value, list) and key in ["ducks", "containers", "tools", "agents_as_tools"]:
+            result[key] = merge_named_list(result.get(key, []), value,
+                                           name_key="tool_name" if key=="agents_as_tools" else "name")
+        else:
+            result[key] = value
 
     duck_logger.debug("Overrides applied successfully")
     return result
@@ -204,13 +208,17 @@ def _apply_overrides(config: Config, override: OverrideConfig) -> Config:
 def override_configuration(base_config: Config, local_config_path: str) -> Config:
     duck_logger.debug("Loading local config...")
     local: LocalConfig = _load_local_config(local_config_path)
-    local_dict = local if isinstance(local, dict) else local.__dict__
+
+    # Convert TypedDicts to regular dicts for easier merging
+    local_dict = copy.deepcopy(local)
 
     include_config = local_dict.get("include", {})
     final_config = _apply_includes(base_config, include_config)
 
     override_config = local_dict.get("override", {})
-    final_config = _apply_overrides(final_config, override_config)
+    # Ensure we convert the TypedDict override to a normal dict before merging
+    override_dict = copy.deepcopy(override_config)
+    final_config = _apply_overrides(final_config, override_dict)
 
     duck_logger.debug("Final config ready")
     return final_config
