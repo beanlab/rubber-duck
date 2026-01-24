@@ -9,6 +9,7 @@ include:
     - file_size_limit
     - file_type_ext
     - reporter_settings
+    - feedback_notifier_settings
     - ai_completion_retry_protocol
 
   # custom specific pieces of production to include
@@ -22,16 +23,13 @@ include:
   tools:
     - name: run_python
 
-  agents_as_tools:
-    tool_name: check_suspicion_bot
-
-  servers:
-    - 1407758127608365157 # this one is a key by itself
 
 override:
+  # sql is a dictionary of dictionaries, and so it adds the entire sql section but overrides the database dictionary
   sql:
     database: local-testing-configs/local.db
 
+  # includes only the one container from production, but includes all settings except overrides mounts
   containers:
     - name: stats-python-sandbox
       mounts:
@@ -44,18 +42,22 @@ override:
         agent:
           engine: gpt-4.1-mini
 
+  # could do the same for all sections of the production config
+
   servers:
     # If <server id> (int) exists in production, it includes and modifies its contents
     # If the id does not exist, it adds this as a new server
-    <server id>:
+    "1058490579799003187":
       server_name: BeanLab
       channels:
-        - channel_id: <channel id>
+        - channel_id: 1428518677287796756
           channel_name: Ducks/tyler-chat-bot
           timeout: 30
           ducks:
+  #          - standard-rubber-duck
+  #          - emoji-duck
             - stats-duck
 
   admin_settings:
-    admin_channel_id: <admin id>
-    admin_role_id: <role id>
+    admin_channel_id: 1429899217890967663
+    admin_role_id: 1149033209821134858
