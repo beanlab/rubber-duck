@@ -1,5 +1,6 @@
 import re
 import uuid
+from dataclasses import dataclass
 
 import discord
 from discord import Guild, utils
@@ -19,6 +20,14 @@ async def wait_for_message(*args, **kwargs) -> str:
         raise ConversationComplete("This conversation has timed out.")
     return response['content']
 
+@dataclass
+class RegistrationInfo:
+    net_id: str | None
+    net_id_checked: bool
+    email_verified: bool
+    nickname: str | None
+    nickname_reason: str | None
+    roles_assigned: list[str] | None
 
 class Registration:
     def __init__(self,
@@ -34,20 +43,25 @@ class Registration:
         self._email_sender = email_sender
         self._settings = settings
 
-    async def run(self, ctx: DuckContext):
+    async def run(self, ctx: DuckContext) -> RegistrationInfo | None:
         # Start the registration process
+        registration_info = RegistrationInfo(None, False, False, None, None, None)
         try:
             net_id = await self.get_net_id(ctx)
             if not net_id:
                 await self._send_message(ctx.thread_id, "Registration failed: No Net ID provided. Please start over.")
-                return "Registration failed: No Net ID provided. Please start over."
+                return registration_info
+            registration_info.net_id = net_id
+
 
             if not self.check_net_id(net_id):
                 await self._send_message(
                     ctx.thread_id,
                     f"Your provided NetID: {net_id} looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')"
                 )
-                return f"Your provided NetID: {net_id} looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')"
+                return registration_info
+            registration_info.net_id_checked = True
+
 
             # Get and verify the email
             if not await self.confirm_registration_via_email(ctx, net_id):
@@ -55,15 +69,22 @@ class Registration:
                     ctx.thread_id,
                     f'Unable to validate your email with NetID: {net_id}. Please talk to a TA or your instructor.'
                 )
-                return f'Unable to validate your email with NetID: {net_id}. Please talk to a TA or your instructor.'
+                return registration_info
+            registration_info.email_verified = True
 
             # Get and assign nickname
-            reason = await self.nickname_flow(ctx)
+            name, reason = await self.nickname_flow(ctx)
+            registration_info.nickname = name
+            registration_info.nickname_reason = reason
             if reason:
-                return reason
+                return registration_info
 
             # Assign Discord roles
-            await self.assign_roles(ctx)
+            roles = await self.assign_roles(ctx)
+            if roles:
+                registration_info.roles = roles
+            else:
+                return registration_info
 
         except ConversationComplete:
             await self._send_message(ctx.thread_id, "This conversation has timed out.")
@@ -75,6 +96,7 @@ class Registration:
                     self._settings['ta_channel_id'],
                     f"Registration workflow failed. Thread: <#{ctx.thread_id}>"
                 )
+
     @register_tool
     def check_net_id(self, netid: str) -> bool:
         if not netid:
@@ -266,6 +288,7 @@ class Registration:
 
             selected_roles = [role]
             await member.add_roles(role, reason="User registration")
+            return selected_roles
 
         else:
             available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)
@@ -318,6 +341,7 @@ class Registration:
             await self._send_message(thread_id, f"No new roles added")
         else:
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
+        return role_names
 
     @step
     async def _is_suspicious(self, name: str) -> tuple[bool, str]:
@@ -345,7 +369,7 @@ class Registration:
             guild: Guild = await self._get_guild(ctx.guild_id)
             member = await guild.fetch_member(ctx.author_id)
 
-            suspicious, reason = await self._is_suspicious(ctx, name)
+            suspicious, reason = await self._is_suspicious(name)
             if suspicious:
                 return False, reason
 
@@ -375,8 +399,8 @@ class Registration:
             success, reason = await self._assign_nickname(ctx, name)
             if success:
                 await self._send_message(thread_id, f"Your nickname has been set to **{name}**")
-                break
+                return name, None
             if attempt < max_retries:
                 await self._send_message(thread_id, f"Please try again.")
             else:
-                return reason
+                return name, reason
