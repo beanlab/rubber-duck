@@ -49,26 +49,15 @@ class Registration:
         try:
             net_id = await self.get_net_id(ctx)
             if not net_id:
-                await self._send_message(ctx.thread_id, "Registration failed: No Net ID provided. Please start over.")
                 return registration_info
             registration_info.net_id = net_id
 
-
             if not self.check_net_id(net_id):
-                await self._send_message(
-                    ctx.thread_id,
-                    f"Your provided NetID: {net_id} looks unusual. Please start over and provide your BYU NetID (e.g. 'jsmith2')"
-                )
                 return registration_info
             registration_info.net_id_checked = True
 
-
             # Get and verify the email
             if not await self.confirm_registration_via_email(ctx, net_id):
-                await self._send_message(
-                    ctx.thread_id,
-                    f'Unable to validate your email with NetID: {net_id}. Please talk to a TA or your instructor.'
-                )
                 return registration_info
             registration_info.email_verified = True
 
