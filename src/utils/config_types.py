@@ -56,6 +56,7 @@ class RegistrationSettings(TypedDict):
 
 
 class SingleAgentSettings(TypedDict):
+    name: str
     engine: str
     tools: list[str]
     prompt: NotRequired[str]
@@ -112,13 +113,9 @@ class DuckConfig(TypedDict):
     settings: dict
 
 
-class ChannelDuckConfig(TypedDict):
-    weight: NotRequired[DUCK_WEIGHT]
-
-
 class ChannelConfig(TypedDict):
     channel_id: int
-    ducks: dict[DUCK_NAME, ChannelDuckConfig]
+    duck: DUCK_NAME | DuckConfig
     timeout: int
     channel_name: NotRequired[str]
 
