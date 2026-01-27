@@ -119,7 +119,7 @@ servers:
       review-cs-110:
         channel_id: 1296158078017736725
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-cs110:
             duck_type: conversation_review
             settings:
@@ -129,13 +129,13 @@ servers:
       general/duck-pond:
         channel_id: 1234556460453597276
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
       join-the-server:
         channel_id: 1399777118380097648
         timeout: 600
-        ducks:
+        duck:
           Registration-Workflow-CS110:
             duck_type: registration
             settings:
@@ -156,8 +156,8 @@ servers:
       Duck Pond:
         channel_id: 1146906576788140154
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
   CS 235:
     server_id: 747510855536738336
@@ -165,7 +165,7 @@ servers:
       review-cs-235:
         channel_id: 1327385245036838912
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-CS235:
             duck_type: conversation_review
             settings:
@@ -175,13 +175,13 @@ servers:
       student-text-channels/duck-pond:
         channel_id: 1195490291134779502
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
       join-the-server:
         channel_id: 1399788047981351042
         timeout: 600
-        ducks:
+        duck:
           Registration-Workflow-CS235:
             duck_type: registration
             settings:
@@ -199,7 +199,7 @@ servers:
     channels:
       register:
         channel_id: 1455309626378813470
-        ducks:
+        duck:
           Registration-Workflow-CS301R-Agents:
             duck_type: registration
             settings:
@@ -215,7 +215,7 @@ servers:
       review-cs-111:
         channel_id: 1329934513333338244
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-CS111:
             duck_type: conversation_review
             settings:
@@ -225,8 +225,8 @@ servers:
       Student Text Channels/duck-pond:
         channel_id: 1406039546721730582
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
   BYU - CS 312:
     server_id: 1407758127608365157
@@ -234,7 +234,7 @@ servers:
       register:
         channel_id: 1407761075226542120
         timeout: 300
-        ducks:
+        duck:
           Registration-Workflow-CS312:
             duck_type: registration
             settings:
@@ -251,12 +251,12 @@ servers:
       duck-pond:
         channel_id: 1442908120488743113
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
       project-review:
         channel_id: 1442908158757437502
         timeout: 300
-        ducks:
+        duck:
           cs312-grader:
             duck_type: assignment_feedback
             settings:
@@ -342,7 +342,7 @@ servers:
                 reasoning: minimal
       duck-review:
         channel_id: 1442908515147710558
-        ducks:
+        duck:
           Conversation-Review-CS312:
             duck_type: conversation_review
             settings:
@@ -358,7 +358,7 @@ servers:
       ta-review:
         channel_id: 1371951756149260298
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-Stats:
             duck_type: conversation_review
             settings:
@@ -369,7 +369,7 @@ servers:
       join-the-server:
         channel_id: 1404899692210553033
         timeout: 600
-        ducks:
+        duck:
           Registration-Workflow-Stats:
             duck_type: registration
             settings:
@@ -382,14 +382,14 @@ servers:
       stats-gpt:
         channel_id: 1371951696061661215
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
       stats-tool:
         channel_id: 1374066971523678279
         timeout: 600
-        ducks:
-          stats-duck: {}
+        duck:
+          stats-duck
 
 
   Physics:
@@ -397,7 +397,7 @@ servers:
     channels:
       review-phys-230:
         channel_id: 1363949553102880869
-        ducks:
+        duck:
           Conversation-Review-Phys-230:
             duck_type: conversation_review
             settings:
@@ -408,13 +408,13 @@ servers:
       physics-230-phys230:
         channel_id: 1363949528201564170
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
       review-phys-430:
         channel_id: 1359587713749094700
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-Phys-430:
             duck_type: conversation_review
             settings:
@@ -424,8 +424,8 @@ servers:
       physics-430-phys430:
         channel_id: 1359587525605458030
         timeout: 600
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
 
 
   Rubber Duck Demo Server:
@@ -434,22 +434,21 @@ servers:
       vintage-duck-review:
         channel_id: 1338619665789751337
         timeout: 300
-        ducks:
+        duck:
           Conversation-Review-Demo:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1338616283671040000
       vintage-duck:
-        channel_name: vintage-duck
-        ducks:
-          standard-rubber-duck: {}
+        duck:
+          standard-rubber-duck
         timeout: 600
 
       emoji-duck:
         channel_id: 1401960218870419647
         timeout: 2000
-        ducks:
+        duck:
           Emoji-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
@@ -465,7 +464,7 @@ servers:
       code-complexity-analysis-duck:
         channel_id: 1385293810782965830
         timeout: 600
-        ducks:
+        duck:
           Code-Complexity-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
@@ -487,7 +486,7 @@ servers:
       socratic-duck:
         channel_id: 1379953844540407969
         timeout: 600
-        ducks:
+        duck:
           Socratic-Rubber-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
@@ -503,7 +502,7 @@ servers:
       join-the-server:
         channel_id: 1379959992110546995
         timeout: 600
-        ducks:
+        duck:
           Registration-Workflow-Demo:
             duck_type: registration
             settings:
@@ -524,7 +523,7 @@ servers:
       designer-duck:
         channel_id: 1384678077694480434
         timeout: 600
-        ducks:
+        duck:
           Phd-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
@@ -540,8 +539,8 @@ servers:
 
       stats-tool:
         channel_id: 1379955387587104829
-        ducks:
-          stats-duck: {}
+        duck:
+          stats-duck
         timeout: 600
 
 feedback_notifier_settings:
