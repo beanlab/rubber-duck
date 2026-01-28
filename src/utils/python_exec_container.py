@@ -383,10 +383,9 @@ class PythonExecContainer:
 
 def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     # setup container dictionary
-    config_containers = config.get('containers', [])
     container_config = {}
-    for c in config_containers:
-        container_config[c['name']] = PythonExecContainer(c['image'], c['name'], c['mounts'])
+    for name, c in config.get('containers', {}).items():
+        container_config[name] = PythonExecContainer(c['image'], name, c['mounts'])
     return container_config
 
 

@@ -255,7 +255,7 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
 
     # setup tools
     config_tools = config.get("tools", [])
-    for tool_config in config_tools:
+    for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
             python_tools = PythonTools(containers[container_name], send_message)
@@ -264,7 +264,7 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
                     + '\n'
                     + containers[container_name].get_resource_metadata()
             )
-            armory.add_tool(python_tools.run_code, name=tool_config['name'], description=amended_description)
+            armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 
@@ -275,11 +275,10 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
 
 
 def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
-    agents_as_tools: list[AgentAsToolSettings] = config.get("agents_as_tools", [])
-    for settings in agents_as_tools:
+    for name, settings in config.get("agents_as_tools", {}).items():
         agent = build_agent(settings["agent"])
         tool = ai_client.build_agent_tool(
-            agent, settings["tool_name"], settings["doc_string"]
+            agent, name, settings["doc_string"]
         )
         armory.add_tool(tool)
 
