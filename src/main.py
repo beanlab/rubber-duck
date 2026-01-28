@@ -189,34 +189,43 @@ def _setup_ducks(
         ai_client,
         armory,
         talk_tool
-) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
+) -> dict[CHANNEL_ID, list[DuckConversation]]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
     all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
 
-    channel_ducks = {}
+    channel_ducks: dict[CHANNEL_ID, list[DuckConversation]] = {}
 
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            channel_ducks[channel_config['channel_id']] = []
-            for duck_config in channel_config['ducks']:
-                if isinstance(duck_config, str):
-                    name, weight = duck_config, 1
+    for server_config in config["servers"].values():
+        for channel_name, channel_config in server_config["channels"].items():
+            channel_id = channel_config["channel_id"]
 
-                elif isinstance(duck_config, dict) and 'weight' in duck_config:
-                    name = duck_config['name']
-                    weight = duck_config['weight']
+            duck_cfg = channel_config.get("duck")
+            if duck_cfg is None:
+                continue  # channel intentionally has no duck
 
-                elif isinstance(duck_config, dict):
-                    name, weight = duck_config['name'], 1
+            if isinstance(duck_cfg, str):
+                name = duck_cfg
 
-                else:
-                    raise ValueError(f'Incorrect format for duck config: {channel_config["channel_id"]}')
+            elif isinstance(duck_cfg, dict):
+                name = duck_cfg.get("name")
+                if not name:
+                    raise ValueError(
+                        f"Inline duck config missing name in channel {channel_id}"
+                    )
 
-                channel_ducks[channel_config['channel_id']].append((weight, all_ducks[name]))
+            else:
+                raise ValueError(
+                    f"Invalid duck config for channel {channel_id}: {duck_cfg}"
+                )
 
-    return channel_ducks
+            try:
+                channel_ducks[channel_id] = [all_ducks[name]]
+            except KeyError:
+                raise KeyError(
+                    f"Duck '{name}' referenced in channel {channel_id} was not built"
+                )
 
 
 def _build_feedback_queues(config: Config, sql_session):
