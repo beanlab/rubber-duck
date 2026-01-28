@@ -107,27 +107,25 @@ def build_registration_duck(
     return registration_workflow
 
 
-def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
-    # Look for global configs
-    yield from config['ducks']
+def _iterate_duck_configs(config: Config) -> Iterable[tuple[DUCK_NAME, DuckConfig]]:
+    # Global ducks
+    for name, duck_cfg in config["ducks"].items():
+        yield name, duck_cfg
 
-    # Look for inline duck configs
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            if not isinstance(channel_config.get('ducks'), list):
-                duck_logger.error(
-                    f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
-            for item in channel_config.get('ducks') or []:
-                if isinstance(item, DUCK_NAME):
-                    continue
-                elif isinstance(item, dict):
-                    if 'weight' in item:
-                        duck = item['duck']
-                        if isinstance(duck, DUCK_NAME):
-                            continue
-                        yield duck
-                    else:
-                        yield item
+    # Inline channel ducks
+    for server in config["servers"].values():
+        for channel in server["channels"].values():
+            duck = channel.get("duck")
+
+            # Reference to global duck
+            if isinstance(duck, DUCK_NAME):
+                continue
+
+            # Inline definition(s)
+            if isinstance(duck, dict):
+                for name, duck_cfg in duck.items():
+                    if isinstance(duck_cfg, dict) and "duck_type" in duck_cfg:
+                        yield name, duck_cfg
 
 
 def build_ducks(
@@ -141,10 +139,9 @@ def build_ducks(
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
-    for duck_config in _iterate_duck_configs(config):
+    for name, duck_config in _iterate_duck_configs(config):
         duck_type = duck_config['duck_type']
         settings = duck_config['settings']
-        name = duck_config['name']
 
         if duck_type == 'agent_led_conversation':
             starting_agent = build_agent(settings["agent"])
@@ -166,7 +163,7 @@ def build_ducks(
             single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
             project_scanner_agent = build_agent(settings["project_scanner_agent"])
             ducks[name] = AssignmentFeedbackWorkflow(
-                settings['name'],
+                name,
                 bot.send_message,
                 settings,
                 single_rubric_item_grader,
