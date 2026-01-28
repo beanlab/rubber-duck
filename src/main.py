@@ -189,13 +189,13 @@ def _setup_ducks(
         ai_client,
         armory,
         talk_tool
-) -> dict[CHANNEL_ID, list[DuckConversation]]:
+) -> dict[CHANNEL_ID, DuckConversation]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
     all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
 
-    channel_ducks: dict[CHANNEL_ID, list[DuckConversation]] = {}
+    channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
 
     for server_config in config["servers"].values():
         for channel_name, channel_config in server_config["channels"].items():
@@ -206,14 +206,10 @@ def _setup_ducks(
                 continue  # channel intentionally has no duck
 
             if isinstance(duck_cfg, str):
-                name = duck_cfg
+                duck_name = duck_cfg
 
             elif isinstance(duck_cfg, dict):
-                name = duck_cfg.get("name")
-                if not name:
-                    raise ValueError(
-                        f"Inline duck config missing name in channel {channel_id}"
-                    )
+                duck_name, duck_cfg = next(iter(duck_cfg.items()))
 
             else:
                 raise ValueError(
@@ -221,11 +217,12 @@ def _setup_ducks(
                 )
 
             try:
-                channel_ducks[channel_id] = [all_ducks[name]]
+                channel_ducks[channel_id] = all_ducks[duck_name]
             except KeyError:
                 raise KeyError(
-                    f"Duck '{name}' referenced in channel {channel_id} was not built"
+                    f"Duck '{duck_name}' referenced in channel {channel_id} was not built"
                 )
+    return channel_ducks
 
 
 def _build_feedback_queues(config: Config, sql_session):
