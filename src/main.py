@@ -324,7 +324,7 @@ async def _main(config: Config, log_dir: Path):
                 channel_configs = {
                     channel_config['channel_id']: channel_config
                     for server_config in config['servers'].values()
-                    for channel_config in server_config['channels']
+                    for channel_config in server_config['channels'].values()
                 }
 
                 async with setup_workflow_manager(
