@@ -38,7 +38,7 @@ class DuckOrchestrator:
                  setup_thread: SetupThread,
                  send_message,
                  add_reaction,
-                 ducks: dict[CHANNEL_ID, list[DuckConversation]],
+                 ducks: dict[CHANNEL_ID, DuckConversation],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
@@ -49,17 +49,10 @@ class DuckOrchestrator:
         self._remember_conversation = remember_conversation
 
     def _get_duck(self, channel_id: int) -> DuckConversation:
-        possible_ducks = self._ducks.get(channel_id)
-
-        if not possible_ducks:
+        duck = self._ducks.get(channel_id)
+        if not duck:
             raise ValueError(f'No duck configured for channel {channel_id}')
-
-        if len(possible_ducks) == 1:
-            return possible_ducks[0][1]
-
-        else:
-            weights = [w for w, dk in possible_ducks]
-            return random.choices(possible_ducks, weights=weights, k=1)[0][1]
+        return duck
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
 
