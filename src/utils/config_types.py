@@ -48,7 +48,7 @@ class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
     email_domain: str
-    "This is the domain used for email verification. For example, 'byu.edu'."
+    # This is the domain used for email verification. For example, 'byu.edu'.
     roles: RolesSettings
     sender_email: str
     suspicion_checker_tool: NotRequired[str]
@@ -110,7 +110,7 @@ class DuckContext:
 
 class DuckConfig(TypedDict):
     duck_type: str  # validated in build_ducks
-    settings: dict
+    settings: dict # could specify further
 
 
 class ChannelConfig(TypedDict):
@@ -144,16 +144,23 @@ class AdminSettings(TypedDict):
     admin_channel_id: int
     admin_role_id: int
     log_level: str
-    "This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'."
+    # This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'.
 
 
 class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list[float]]
 
 
+class MountConfig(TypedDict):
+    source: str
+    target: str
+
+
 class ContainerConfig(TypedDict):
     image: str
-    mounts: dict[str, str]
+    mounts: list[MountConfig]
+    # TODO: use these?
+    # settings: dict[str, str] # cpu_limit, memory_limit, network, timeout
 
 
 class ContainerTool(TypedDict):
