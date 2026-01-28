@@ -33,9 +33,19 @@ class PythonExecContainer:
         self._name = name
         self._mount_data = mount_data
         self._resource_metadata = []
-        self._client: docker.Client = docker.from_env()
         self._container = None
         self._working_dir = "/home/sandbox/out"
+
+        try:
+            self._client: docker.Client = docker.from_env()
+            # optionally test connection immediately
+            self._client.ping()
+        except Exception as e:
+            duck_logger.error(f"Error connecting to docker client, make sure Docker is running: {e}")
+            raise RuntimeError(
+                f"Cannot connect to Docker daemon. Make sure Docker is running. "
+                f"Original error: {e}"
+            ) from e
 
     def name_in_use(self, name: str) -> bool:
         try:
