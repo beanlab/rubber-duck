@@ -38,7 +38,7 @@ class DuckOrchestrator:
                  setup_thread: SetupThread,
                  send_message,
                  add_reaction,
-                 ducks: dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]],
+                 ducks: dict[CHANNEL_ID, list[DuckConversation]],
                  remember_conversation: Callable[[FeedbackData], None]
                  ):
 
