@@ -382,8 +382,4 @@ if __name__ == '__main__':
 
     config: Config = load_configuration(args.config)
 
-    # override selected production settings using an include/override yaml
-    # if args.local:
-    #     config: Config = override_configuration(config, args.local)
-
     asyncio.run(main(config, args.log_path))
