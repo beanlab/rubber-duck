@@ -146,7 +146,7 @@ servers:
               suspicion_checker_tool: check_suspicion_bot
               roles:
                 patterns:
-                  Teacher-Sections:
+                  Teacher Sections:
                     pattern: "-section-"
                     description: Sorted by teacher's name (e.g. smith-section-000)
 
@@ -190,7 +190,7 @@ servers:
               email_domain: byu.edu
               roles:
                 patterns:
-                  Teacher-Sections:
+                  Teacher Sections:
                     pattern: "-section-"
                     description: Sorted by teacher name (e.g. smith-section-001)
 
@@ -207,7 +207,7 @@ servers:
               authenticated_user_role_name: Student
               email_domain: byu.edu
               roles:
-                patterns: []
+                patterns: {}
 
   CS 111:
     server_id: 1235303213796691998
@@ -513,10 +513,10 @@ servers:
               email_domain: byu.edu
               roles:
                 patterns:
-                  Teacher-Sections:
+                  Teacher Sections:
                     pattern: "-section-\\d{3}$"
                     description: Teacher name followed by section number (e.g. smith-section-001)
-                  Lab-Sections:
+                  Lab Sections:
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
 
