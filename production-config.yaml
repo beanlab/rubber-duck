@@ -431,7 +431,7 @@ servers:
   Rubber Duck Demo Server:
     server_id: 1338616224858374287
     channels:
-      vintage-duck-review:
+      standard-duck-review:
         channel_id: 1338619665789751337
         timeout: 300
         duck:
@@ -440,7 +440,7 @@ servers:
             settings:
               target_channel_ids:
                 - 1338616283671040000
-      vintage-duck:
+      standard-duck:
         duck:
           standard-rubber-duck
         timeout: 600
