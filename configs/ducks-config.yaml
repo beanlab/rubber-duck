@@ -1,0 +1,49 @@
+# Anchors
+_file_size_limit: &file_size_limit 4096 # 4KB limit
+_file_type_ext:
+  &file_type_ext [
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
+  ]
+
+standard-rubber-duck:
+  duck_type: agent_led_conversation
+  settings:
+    agent:
+      name: RubberDuck
+      prompt_files:
+        - prompts/production-prompts/standard-rubber-duck.md
+      engine: gpt-5-mini
+      reasoning: minimal
+      tools:
+        - talk_to_user
+        - conclude_conversation
+    file_size_limit: *file_size_limit
+    file_type_ext: *file_type_ext
+
+stats-duck:
+  duck_type: user_led_conversation
+  settings:
+    introduction: >
+      I can perform many statistical operations on a list of provided datasets. 
+      If you want more specifics, please ask. How can I help you with stats?
+    agent:
+      name: stats_duck
+      prompt_files:
+        - prompts/production-prompts/stats.md
+      engine: gpt-5-mini
+      reasoning: minimal
+      tools:
+        - run_python
+      file_size_limit: *file_size_limit
+      file_type_ext: *file_type_ext

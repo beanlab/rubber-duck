@@ -1,0 +1,73 @@
+# Everything from base-config is included by default
+# Everything here will override what is in base-config
+# Set as empty dict to exclude
+
+# Anchors
+file_size_limit: &file_size_limit 4096 # 4KB limit
+file_type_ext:
+  &file_type_ext [
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
+  ]
+
+sql:
+  database: local-testing-configs/local_reese_database.db
+
+containers: { }
+
+tools: { }
+
+# include one duck with overrides
+ducks:
+  !include_keys
+  key: standard-rubber-duck
+  from: configs/ducks-config.yaml
+  overrides:
+    settings:
+      agent:
+        engine: gpt-5-nano
+
+# OR include one duck without overrides
+ducks:
+  !include_keys standard-rubber-duck from configs/ducks-config.yaml
+
+# OR include all ducks (no overrides)
+ducks: !include_keys all from configs/ducks-config.yaml
+
+# OR include multiple specific ducks (no overrides)
+ducks: !include_keys standard-rubber-duck, stats-duck from configs/ducks-config.yaml
+
+
+servers:
+  BeanLab:
+    server_id: <id>
+    channels:
+      Ducks/tyler-chat-bot:
+        channel_id: <id>
+        timeout: 300
+        duck:
+          standard-rubber-duck
+
+      Ducks/tyler-ta-channel:
+        channel_id: <id>
+        timeout: 300
+        duck:
+          Conversation-Review:
+            duck_type: conversation_review
+            settings:
+              target_channel_ids:
+                - <id>
+
+admin_settings:
+  admin_channel_id: <id>
+  admin_role_id: <id>

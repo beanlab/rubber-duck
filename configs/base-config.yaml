@@ -1,0 +1,66 @@
+# Anchors
+file_size_limit: &file_size_limit 4096 # 4KB limit
+file_type_ext:
+  &file_type_ext [
+    "txt",
+    "py",
+    "java",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "js",
+    "ts",
+    "html",
+    "css",
+    "md",
+  ]
+
+sql:
+  db_type: sqlite
+
+containers: { }
+
+tools: { }
+
+agents_as_tools: { }
+
+ducks: { }
+
+servers: { }
+
+
+feedback_notifier_settings:
+  feedback_check_hour: 9
+  feedback_check_minute: 0
+
+admin_settings:
+  log_level: WARNING
+
+sender_email: byu-cs-course-ops@cs.byu.edu
+
+dataset_folder_locations: [ ]
+
+ai_completion_retry_protocol:
+  max_retries: 2
+  delay: 2
+  backoff: 2
+
+reporter_settings:
+  gpt_pricing:
+    "gpt-5": [ 1.25, 10.00 ]
+    "gpt-5-mini": [ 0.25, 2.00 ]
+    "gpt-5-nano": [ 0.05, 0.40 ]
+    "gpt-4.1": [ 2.00, 8.00 ]
+    "gpt-4.1-mini": [ 0.40, 1.60 ]
+    "gpt-4.1-nano": [ 0.01, 0.04 ]
+
+    "gpt-4": [ 0.03, 0.06 ]
+    "gpt-4o": [ 0.0025, 0.01 ]
+    "gpt-4-1106-preview": [ 0.01, 0.03 ]
+    "gpt-4-0125-preview": [ 0.01, 0.03 ]
+    "o4-mini": [ 0.000150, 0.0006 ]
+    "gpt-4-turbo": [ 0.01, 0.03 ]
+    "gpt-4-turbo-preview": [ 0.01, 0.03 ]
+    "gpt-3.5-turbo-1106": [ 0.001, 0.002 ]
+    "gpt-3.5-turbo": [ 0.001, 0.003 ]
