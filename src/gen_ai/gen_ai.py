@@ -154,7 +154,7 @@ class AIClient:
             try:
                 user_message = await get_user_message(ctx)
 
-            except TimeoutError:
+            except ConversationComplete:
                 break
 
             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
