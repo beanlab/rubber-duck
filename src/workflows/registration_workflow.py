@@ -213,7 +213,7 @@ class RegistrationWorkflow:
     @step
     async def _get_available_roles(
             self, thread_id: int, server_id: int, settings: RegistrationSettings
-    ) -> tuple[list[int], int]:
+    ) -> tuple[list[dict[str, int | str]], int]:
         """Gets available guild roles and the authenticated user role"""
         # Get all roles from the guild
         guild = await self._get_guild(server_id)
@@ -221,7 +221,7 @@ class RegistrationWorkflow:
             raise ValueError(f"Guild {server_id} not found")
 
         # Get role patterns from config
-        role_patterns = settings.get("roles", {}).get("patterns", [])
+        role_patterns = settings.get("roles", {}).get("patterns", {})
         if not role_patterns:
             duck_logger.info("No role patterns configured for this server")
 
@@ -234,7 +234,7 @@ class RegistrationWorkflow:
                 continue
 
             # If no patterns are configured, skip additional role filtering
-            for pattern_info in role_patterns:
+            for pattern_info in role_patterns.values():
                 if re.search(pattern_info["pattern"], role.name):
                     available_roles.append({
                         "id": role.id,
