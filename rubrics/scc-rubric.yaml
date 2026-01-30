@@ -1,9 +1,9 @@
-Project Report - Alignment:
+Project Report - Network Analysis SCCs:
   Baseline:
     Design Experience:
       - State your discussion partner
       - Provide a brief summary of your conversation
-    Theoretical Analysis - Unrestricted Alignment:
+    Theoretical Analysis - Pre/Post Order Traversal:
       Time:
         - Include annotated code in report [Annotated code]
         - Annotate all non-trivial parts of your code [Non-trivial annotated code]
@@ -16,9 +16,9 @@ Project Report - Alignment:
         - Provide explanation of space complexity [Space Complexity Explanation]
         - State all assumptions regarding the space complexity clearly [State all assumptions]
         - Bold final space complexity [Bold complexity]
-    Empirical Data - Unrestricted Alignment:
+    Empirical Data:
       - Fill in empirical runtimes table
-    Comparison of Theoretical and Empirical Results - Unrestricted Alignment:
+    Comparison of Theoretical and Empirical Results:
       - Provide plot comparing theoretical time complexity to observed runtimes
       - If theoretical and empirical results match
         - Simply state this
@@ -29,7 +29,7 @@ Project Report - Alignment:
     Design Experience:
       - State your discussion partner
       - Provide a brief summary of your conversation
-    Theoretical Analysis - Banded Alignment:
+    Theoretical Analysis - SCC:
       Time:
         - Include annotated code in report [Annotated code]
         - Annotate all non-trivial parts of your code [Non-trivial annotated code]
@@ -42,30 +42,40 @@ Project Report - Alignment:
         - Provide explanation of space complexity [Space Complexity Explanation]
         - State all assumptions regarding the space complexity clearly [State all assumptions]
         - Bold final space complexity [Bold complexity]
-    Empirical Data - Banded Alignment:
+    Empirical Data:
       - Fill in empirical runtimes table
-    Comparison of Theoretical and Empirical Results - Banded Alignment:
+    Comparison of Theoretical and Empirical Results:
       - Provide plot comparing theoretical time complexity to observed runtimes
       - If theoretical and empirical results match
         - Simply state this
       - If they do not match
         - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
         - Provide a brief discussion explaining what sections of your code might account for the difference
-    Relative Performance Of Unrestricted Alignment versus Banded Alignment:
-      - Briefly remark on the relative performance between the two algorithms
   Stretch 1:
     Design Experience:
-      - States a person's name
-      - Provides something related to the design experience
-    Alignment Scores:
-      - Include the scores you found for each sequence
-      - Who opened the lock to the enclosure (The correct answer is rat)
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Articulation Points Discussion:
+      - Comment on why identifying articulation points in a graph is useful
+      - In your own words, explain what an articulation point is
+      - Provide at least two real-world examples of articulation points
+      - Bold the name of your examples
+      - Explain what the nodes and edges represent in your examples
+      - Explain what the articulation point represents in your examples
+      - Discuss why it would be useful to know the articulation point in your given examples
   Stretch 2:
     Design Experience:
       - State your discussion partner
       - Provide a brief summary of your conversation
-    Alignment Outcome Comparisons:
-      - Briefly discuss the differences in alignment outcomes between using and not using affine penalties
-      - Compare alignment outcomes by selecting a set of alignment sequences, including the sequences and their alignments, and what parameters were used to find the alignments. Discusses how the parameters were selected.
+    Dataset Description:
+      - Pick a real-world dataset
+      - Your dataset should use directed edges
+      - Describe the dataset in your report
+      - How many nodes and edges
+      - What do the nodes and edges mean
+    Findings Discussion:
+      - Adapt the data for your algorithm
+      - Run your SCC algorithm on the graph
+      - Provide a discussion on your findings
   Project Review:
     - Compared code and results with a classmate

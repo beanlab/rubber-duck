@@ -1,21 +1,21 @@
 Rules:
   Annotated code: |
+    
+    The is an example of an annotation: 
+    
     <correct>
     
-    ```py
     for i in range(): # this is an example of an annotation
       print("10")
-    ```
     
     </correct>
     
     
     This code is not annotated:   
+    
     <incorrect>
-    ```py
     for i in range():
       print("10")
-    ```
     </incorrect>
     
     
@@ -42,14 +42,24 @@ Rules:
 
   Time complexity explanation: |
     
-    <correct>
+    For a time complexity explanation to be correct, it needs to include an explanation. 
+
+    Including the time complexity without an explanation should be marked incorrect. 
+    
+    An example correct response:
       The largest operation is the for loop. 
       The loop loops n times with a constant time complexity for each loop leading to an overall time complexity of **O(n)**.
-    <correct>
     
-    <incorrect>
+    An example incorrect response:
       **O(n)**.
-    <incorrect>
+
+    An example correct response:
+      There are no loops and the largest time complexity operation is assigning variables. Thus overeall time complexity is **O(1)**.
+    
+    An example incorrect response:
+      **O(1)**.
+
+
 
   State all assumptions: |
       When explaining the complexity, the responses should the assumptions. 
@@ -95,6 +105,7 @@ Rules:
     </incorrect-example>
 
   Space Complexity Explanation: |
+    
     This example is correct because it explains what the space complexity is. 
     
       <correct>
@@ -109,12 +120,14 @@ Rules:
     
       </correct>
   
-      This is missing any explanations.
+      This is missing any explanations and thus it is incorrect.
     
       <incorrect>
         
         The overall space complexity is **O(n)**. 
     
       </incorrect>
+    
+    
   
   
