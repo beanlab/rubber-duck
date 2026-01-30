@@ -51,8 +51,10 @@ class AssignmentFeedbackWorkflow:
             if message := self._settings.get('initial_instructions'):
                 await self._send_message(context.thread_id, message)
 
+            supported_assignments_bulleted_list = "".join(f"\n - {assignment}" for assignment in self._assignments)
+
             await self._send_message(context.thread_id,
-                                     f"The supported assignments for grading are {', '.join(self._assignments)}")
+                                     f"The supported assignments for grading are {supported_assignments_bulleted_list}")
 
             report_contents = await self._query_user_for_report(context)
 
