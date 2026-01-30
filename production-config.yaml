@@ -29,7 +29,7 @@ containers:
       network: none
       timeout: 30
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
-      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/}
+      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
 tools:
   - name: run_python
@@ -92,53 +92,6 @@ ducks:
         tools:
           - talk_to_user
           - conclude_conversation
-      file_size_limit: *file_size_limit
-      file_type_ext: *file_type_ext
-
-  - name: stats-duck-legacy
-    duck_type: user_led_conversation
-    settings:
-      agent:
-        name: stats_duck_legacy
-        prompt_files:
-          - prompts/production-prompts/stats-legacy.txt
-        engine: gpt-5
-        reasoning: minimal
-        tools:
-          - describe_dataset
-          - list_categories
-          - explain_capabilities
-          - get_dataset_names
-          - get_variable_names
-          - show_dataset_head
-          - plot_histogram
-          - plot_density
-          - plot_boxplot
-          - plot_dotplot
-          - plot_barplot
-          - plot_pie_chart
-          - plot_proportion_barplot
-          - plot_scatterplot
-          - calculate_mean
-          - calculate_skewness
-          - calculate_std
-          - calculate_median
-          - calculate_mode
-          - calculate_five_number_summary
-          - calculate_table_of_counts
-          - calculate_proportions
-          - calculate_z_score
-          - calculate_probability_from_normal_distribution
-          - calculate_percentiles_from_normal_distribution
-          - plot_normal_distribution
-          - calculate_confidence_interval_and_t_test
-          - plot_confidence_interval_and_t_distribution
-          - calculate_two_mean_t_test
-          - calculate_one_way_anova
-          - calculate_one_sample_proportion_z_test
-          - calculate_two_sample_proportion_z_test
-          - simple_linear_regression
-      introduction: "Hi, I can help with your stats questions! Let me know what you're thinking"
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -427,7 +380,7 @@ servers:
         timeout: 600
 
       - channel_id: 1371951696061661215
-        channel_name: duck-pond
+        channel_name: stats-gpt
         ducks:
           - standard-rubber-duck
         timeout: 600

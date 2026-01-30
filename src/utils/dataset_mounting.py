@@ -51,7 +51,7 @@ def _is_dataset(name: str) -> bool:
 def _format_description(metadata: dict) -> str:
     lines: list[str] = []
 
-    name = metadata.get("name")
+    name = metadata.get("dataset_name")
     if name:
         lines.append(f"Dataset name: {name}")
 
@@ -59,7 +59,7 @@ def _format_description(metadata: dict) -> str:
     if columns:
         lines.append("Columns:")
         for col in columns:
-            col_name = col.get("name", "unknown")
+            col_name = col.get("col_name", "unknown")
             dtype = col.get("dtype", "")
             desc = col.get("description", "")
 
@@ -94,7 +94,6 @@ def _get_s3_desc(path: str) -> str:
     try:
         obj = _s3_client.get_object(Bucket=bucket, Key=meta_key)
         metadata = json.loads(obj["Body"].read().decode("utf-8"))
-        duck_logger.debug(f"S3 metadata loaded: s3://{bucket}/{meta_key}")
         return _format_description(metadata)
 
     except ClientError as e:
@@ -104,8 +103,6 @@ def _get_s3_desc(path: str) -> str:
 
 
 def _get_s3_bytes(path: str) -> bytes:
-    duck_logger.debug(f"Reading S3 dataset bytes: {path}")
-
     bucket, key = _split_s3_path(path)
     obj = _s3_client.get_object(Bucket=bucket, Key=key)
     data = obj["Body"].read()
