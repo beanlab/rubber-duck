@@ -1,6 +1,6 @@
 # Anchors
-file_size_limit: &file_size_limit 4096 # 4KB limit
-file_type_ext:
+_file_size_limit: &file_size_limit 4096 # 4KB limit
+_file_type_ext:
   &file_type_ext [
     "txt",
     "py",
