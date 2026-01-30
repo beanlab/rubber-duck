@@ -354,7 +354,6 @@ async def _main(config: Config, log_dir: Path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
-    parser.add_argument('--local', type=str, help='Path to local config to override production settings')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
 
@@ -378,7 +377,13 @@ if __name__ == '__main__':
 
     # Add console handler to the duck logger
     add_console_handler()
+    base_config = "./configs/base-config.yaml"
 
-    config: Config = load_configuration(args.config)
+    config: Config = load_configuration(base_config, args.config)
+
+    # Optional: log keys to verify merge
+    duck_logger.debug("Config loaded successfully. Top-level keys: %s", list(config.keys()))
+
+    duck_logger.debug("Config loaded successfully. Full config: %s", config)
 
     asyncio.run(main(config, args.log_path))
