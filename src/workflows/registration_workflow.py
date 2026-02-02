@@ -58,7 +58,7 @@ class RegistrationWorkflow:
                  registration_bot: Callable | None,
                  send_message
                  ):
-        self._name = name
+        self.name = name
         self._registration = registration
         self._registration_bot = registration_bot
         self._send_message = send_message
@@ -66,7 +66,8 @@ class RegistrationWorkflow:
     async def __call__(self, context: DuckContext):
         info = await self._registration.run(context)
         if info:
-            await self._registration_bot(context, f"Hi, can you help me with registration this is all of the information about where I left off: {describe_registration_progress(info)}")
+            user_query = describe_registration_progress(info)
+            await self._registration_bot(context, f"Hi, can you help me with registration this is all of the information about where I left off: {user_query}")
 
 
 

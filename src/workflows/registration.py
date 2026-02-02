@@ -52,7 +52,7 @@ class Registration:
                 return registration_info
             registration_info.net_id = net_id
 
-            if not self.check_net_id(net_id):
+            if not await self.check_net_id(net_id):
                 return registration_info
             registration_info.net_id_checked = True
 
@@ -87,7 +87,7 @@ class Registration:
                 )
 
     @register_tool
-    def check_net_id(self, netid: str) -> bool:
+    async def check_net_id(self, netid: str):
         if not netid:
             return False
 
