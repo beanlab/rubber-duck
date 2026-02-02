@@ -28,111 +28,74 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict:
     return result
 
 
-class IncludeLoader(yaml.SafeLoader):
-    pass
+def resolve_json_pointer(data: Any, pointer: str) -> Any:
+    if not pointer:
+        return deepcopy(data)
+
+    if not pointer.startswith("/"):
+        raise ValueError(f"Invalid JSON pointer: {pointer}")
+
+    current = data
+    for part in pointer.lstrip("/").split("/"):
+        part = part.replace("~1", "/").replace("~0", "~")
+        current = current[part]
+
+    return deepcopy(current)
 
 
-def include_constructor(loader: IncludeLoader, node):
-    """Load another YAML file relative to the current file."""
-    base_path = Path(loader.name).parent
-    include_path = base_path / loader.construct_scalar(node)
+def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
+    if "#" in ref:
+        path_part, pointer = ref.split("#", 1)
+        pointer = pointer or ""
+    else:
+        path_part, pointer = ref, ""
+
+    include_path = (base_path / path_part).resolve()
+
+    key = (include_path, pointer)
+    if key in seen:
+        raise ValueError(f"Cyclic $include detected: {include_path}#{pointer}")
+
+    seen.add(key)
 
     if not include_path.exists():
         raise FileNotFoundError(f"Included config not found: {include_path}")
 
-    with include_path.open() as f:
-        return yaml.load(f, IncludeLoader)
+    content = include_path.read_text()
+    data = load_config(include_path.suffix, content, source_path=include_path)
+
+    return resolve_json_pointer(data, pointer)
 
 
-IncludeLoader.add_constructor("!include", include_constructor)
+def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
+    if seen is None:
+        seen = set()
 
-def _include_single_with_overrides(loader: IncludeLoader, node):
-    """
-    Handles the YAML mapping case:
-    key: !include_keys
-      key: some-key
-      from: path/to/file.yaml
-      overrides: {...}
-    """
-    data = loader.construct_mapping(node, deep=True)
-    key = data["key"]
-    from_path = data["from"]
-    overrides = data.get("overrides", {})
+    if isinstance(data, dict):
+        if "$include" in data:
+            include_ref = data["$include"]
+            overrides = {k: v for k, v in data.items() if k != "$include"}
 
-    included = _load_keys_from_file(from_path, [key])
-    return {key: deep_merge(included[key], overrides)}
+            included = load_include(include_ref, base_path, seen)
 
+            resolved_overrides = resolve_includes(
+                overrides, base_path=base_path, seen=seen
+            )
 
-def _include_multiple_keys(loader: IncludeLoader, node):
-    """
-    Handles the scalar string form with multiple keys or wildcard:
-    !include_keys key1, key2 from path/to/file.yaml
-    !include_keys all from path/to/file.yaml
-    Excludes keys that start with '_'
-    """
-    text = loader.construct_scalar(node)
+            return deep_merge(included, resolved_overrides)
 
-    # parse "keys from path" pattern
-    if " from " not in text:
-        raise ValueError(f"Malformed !include_keys: {text}")
-    keys_part, from_part = text.split(" from ", 1)
-    from_path = from_part.strip()
-    keys_part = keys_part.strip()
+        return {
+            k: resolve_includes(v, base_path=base_path, seen=seen)
+            for k, v in data.items()
+        }
 
-    # load all keys
-    loaded = _load_keys_from_file(from_path, None)
+    if isinstance(data, list):
+        return [
+            resolve_includes(item, base_path=base_path, seen=seen)
+            for item in data
+        ]
 
-    # determine keys to load
-    if keys_part == "all":
-        # exclude keys starting with "_"
-        return {k: v for k, v in loaded.items() if not k.startswith("_")}
-    else:
-        keys = [k.strip() for k in keys_part.split(",")]
-        return {k: loaded[k] for k in keys if k in loaded}
-
-def _load_keys_from_file(file_path: str, keys: list[str] | None):
-    """
-    Loads specific keys (or all keys if keys=None) from a YAML file
-    relative to the current loader file.
-    """
-    base_path = Path(file_path)
-    if not base_path.is_absolute():
-        base_path = Path.cwd() / file_path  # fallback
-
-    if not base_path.exists():
-        raise FileNotFoundError(f"Included config not found: {base_path}")
-
-    with base_path.open() as f:
-        content = yaml.load(f, IncludeLoader)
-        if keys is None:
-            return content  # return everything
-        else:
-            return {k: content[k] for k in keys if k in content}
-
-
-def include_keys(loader: IncludeLoader, node):
-    """
-    Usage 1 (single, multiple, or 'all'):
-      !include_keys standard-rubber-duck, stats-duck from configs/ducks-config.yaml
-
-    Usage 2 (single key with overrides):
-      standard-rubber-duck: !include_keys
-        key: standard-rubber-duck
-        from: configs/ducks-config.yaml
-        overrides:
-          settings:
-            agent:
-              engine: gpt-5-nano
-    """
-    if isinstance(node, yaml.ScalarNode):
-        return _include_multiple_keys(loader, node)
-    elif isinstance(node, yaml.MappingNode):
-        return _include_single_with_overrides(loader, node)
-    else:
-        raise TypeError(f"!include_keys cannot handle node type: {type(node)}")
-
-
-IncludeLoader.add_constructor("!include_keys", include_keys)
+    return data
 
 
 def fetch_config_from_s3(config_path) -> Config:
@@ -161,28 +124,27 @@ def fetch_config_from_s3(config_path) -> Config:
 
 def read_yaml(content: str, source_path: Path | None = None) -> Config:
     """Parse YAML content into a dictionary, with !include support"""
-    stream = io.StringIO(content)
-    loader = IncludeLoader(stream)
+    data = yaml.safe_load(content)
     if source_path:
-        loader.name = str(source_path)
-    try:
-        return loader.get_single_data()
-    finally:
-        loader.dispose()
+        return resolve_includes(data, base_path=source_path.parent)
+    return data
 
 
-def read_json(content: str) -> Config:
+def read_json(content: str, source_path: Path | None = None) -> Config:
     """Parse JSON content into a dictionary"""
-    return json.loads(content)
+    data = json.loads(content)
+    if source_path:
+        return resolve_includes(data, base_path=source_path.parent)
+    return data
 
 
 def load_config(file_type: str, content: str, source_path: Path | None = None) -> Config:
     """Load configuration based on file type, supporting !include in YAML"""
     match file_type:
         case '.json':
-            return read_json(content)
+            return read_json(content, source_path=source_path)
         case '.yaml' | '.yml':
-            return read_yaml(content, source_path=source_path)  # <-- MODIFIED
+            return read_yaml(content, source_path=source_path)
         case _:
             raise NotImplementedError(f'Unsupported config extension: {file_type}')
 
