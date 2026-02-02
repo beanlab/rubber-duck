@@ -270,27 +270,41 @@ servers:
                 Note:
                 - This generated feedback does **not** check images and may give inaccurate feedback regarding images.
                 - The rubrics used the tool to grade your project may differ slightly from the ones in Canvas and might not include the coding requirements.
+                - It may take a few minutes to run
+                - Use the same formatting given in the markdown report provided to you or the autograder may not work  
                 
                 Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
 
               gradable_assignments:
-                Project Report - Alignment:
+                - name: Project Report - RSA and Primality Tests
+                  rubric_path: [ rubrics/rsa-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+
+                - name: Project Report - Network Analysis SCCs
+                  rubric_path: [ rubrics/scc-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+
+                - name: Project Report - Network Routing
+                  rubric_path: [ rubrics/dijkstras-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+
+                - name: Project Report - Alignment
                   rubric_path: [ rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                Project Report - Backtracking:
-                  rubric_path: [ rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+                - name: Project Report - Convex Hull
+                  rubric_path: [ rubrics/convex-hull-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                Project Report - Branch and Bound:
-                  rubric_path: [ rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml ]
-
-                Project Leetcode:
+                - name: Project Leetcode
                   rubric_path: [ rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                Project Demo Fruit:
+                - name: Project Report - Backtracking
+                  rubric_path: [ rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+
+                - name: Project Report - Branch and Bound
+                  rubric_path: [ rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml ]
+
+                - name: Project Demo Fruit
                   rubric_path: [ rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml ]
                   message: |
                     Please note this is a demo project
-              
+
 
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
