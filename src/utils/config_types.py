@@ -89,6 +89,11 @@ class AgentAsToolSettings(TypedDict):
     agent: SingleAgentSettings
 
 
+class MultiAgentSettings(TypedDict):
+    agent: SingleAgentSettings
+    agents_as_tools: dict[str, AgentAsToolSettings]
+
+
 class AgentConversationSettings(TypedDict):
     agent: SingleAgentSettings
     introduction: NotRequired[str]
@@ -110,7 +115,7 @@ class DuckContext:
 
 class DuckConfig(TypedDict):
     duck_type: str  # validated in build_ducks
-    settings: dict # could specify further
+    settings: dict  # could specify further
 
 
 class ChannelConfig(TypedDict):
