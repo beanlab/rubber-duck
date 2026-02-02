@@ -1,4 +1,5 @@
 sql:
+  $include: configs/settings-config.yaml#/sql
   database: /rubber-duck.db
 
 containers:
@@ -60,15 +61,16 @@ agents_as_tools:
       engine: gpt-4.1
       tools: []
 
-ducks: !include_keys all from configs/ducks-config.yaml
+ducks:
+  $include: configs/ducks-config.yaml#/
 
-servers: !include_keys all from configs/servers-config.yaml
+servers:
+  $include: configs/servers-config.yaml#/
 
 feedback_notifier_settings:
-  feedback_check_hour: 9
-  feedback_check_minute: 0
+  $include: configs/settings-config.yaml#/feedback_notifier_settings
 
 admin_settings:
+  $include: configs/settings-config.yaml#/admin_settings
   admin_channel_id: 1192895746672951340
   admin_role_id: 933123843038535741
-  log_level: WARNING
