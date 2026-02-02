@@ -88,9 +88,9 @@ class FeedbackNotifier:
                 if duck['duck_type'] == 'conversation_review':
                     target_channels.extend(duck['settings']['target_channel_ids'])
 
-                if target_channels:
-                    feedback_mapping[channel_id] = target_channels
-                    duck_logger.debug(
-                        f"Mapped TA channel {channel_id} to {len(target_channels)} target channels")
+                    if target_channels:
+                        feedback_mapping[channel_id] = target_channels
+                        duck_logger.debug(
+                            f"Mapped TA channel {channel_id} to {len(target_channels)} target channels")
 
         return feedback_mapping

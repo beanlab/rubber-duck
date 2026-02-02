@@ -1,0 +1,53 @@
+Project Report - Convex Hull:
+  Baseline:
+    Design Discussion:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Theoretical Analysis - Convex Hull Divide-and-Conquer:
+      Time:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of time complexity [Time complexity explanation]
+        - State all assumptions regarding the time complexity clearly [State all assumptions]
+        - Bold final time complexity [Bold complexity]
+        - Compute the time complexity of the high-level divide-and-conquer algorithm using the Master's Theorem.
+        - Correctly identify, explain, and justify the values of a, b, and d for the Master's Theorem in the context of the Convex Hull algorithm
+      Space:
+        - Include annotated code in report [Annotated code]
+        - Annotate all non-trivial parts of your code [Non-trivial annotated code]
+        - Provide explanation of space complexity [Space Complexity Explanation]
+        - State all assumptions regarding the space complexity clearly [State all assumptions]
+        - Bold final space complexity [Bold complexity]
+  Core:
+    Design Discussion:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Empirical Data - Convex Hull Divide-and-Conquer:
+      - Fill in empirical runtimes table
+    Comparison of Theoretical and Empirical Results:
+      - Provide plot comparing theoretical time complexity to observed runtimes
+      - If theoretical and empirical results match
+        - Simply state this
+      - If they do not match
+        - Provide a plot showing a theoretical time complexity that more closely follows the observed runtimes
+        - Provide a brief discussion explaining what sections of your code might account for the difference
+  Stretch 1:
+    Design Discussion:
+      - State your discussion partner
+      - Provide a brief summary of your conversation
+    Chosen Convex Hull Implementation Description:
+      - Select an alternative convex-hull algorithm and provide a high-level description of how it works
+    Empirical Data:
+      - The table is filled in
+    Comparison of Chosen Algorithm with Divide-and-Conquer Convex Hull:
+        - Present a plot that shows the performance differences between the algorithm
+        - Provide a thoughtful discussion on why the performance differences might exist
+  Stretch 2:
+    Design Discussion:
+        - State your discussion partner
+        - Provide a brief summary of your conversation
+    Dataset:
+        - Describe your dataset where you found it, what it means, what relevance a convex hull has for your data
+        - Provide at least 3 plots showing the result of your algorithm on that data
+  Project Review:
+    - Compared code and results with a classmate
