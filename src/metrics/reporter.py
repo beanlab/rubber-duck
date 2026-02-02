@@ -113,12 +113,10 @@ class Reporter:
     def _make_reporting_config(self, server_configs: dict[str, ServerConfig]) -> dict:
         """This function converts the server_config into a dictionary that maps server names to their channels."""
         reporting_config = {}
-        for server in server_configs.values():
-            server_name = server['server_name']
+        for server_name, server in server_configs.items():
             channel_dict = {}
-            for channel in server['channels']:
+            for channel_name, channel in server['channels'].items():
                 channel_id = channel['channel_id']
-                channel_name = channel['channel_name']
                 channel_dict[channel_id] = channel_name
             reporting_config[server_name] = channel_dict
         return reporting_config

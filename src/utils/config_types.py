@@ -36,20 +36,19 @@ class FeedbackConfig(TypedDict):
 
 
 class RolePattern(TypedDict):
-    name: str
     pattern: str
     description: str
 
 
 class RolesSettings(TypedDict):
-    patterns: list[RolePattern]
+    patterns: dict[str, RolePattern]
 
 
 class RegistrationSettings(TypedDict):
     cache_timeout: int
     authenticated_user_role_name: str
     email_domain: str
-    "This is the domain used for email verification. For example, 'byu.edu'."
+    # This is the domain used for email verification. For example, 'byu.edu'.
     roles: RolesSettings
     sender_email: str
     suspicion_checker_tool: NotRequired[str]
@@ -68,16 +67,16 @@ class SingleAgentSettings(TypedDict):
 
 
 class Gradable(TypedDict):
-    name: str
-    rubric_path: str
+    rubric_path: list[str]
     message: NotRequired[str]
 
+
 class AssignmentFeedbackSettings(TypedDict):
-    name: str
     initial_instructions: str
-    gradable_assignments: list[Gradable]
+    gradable_assignments: dict[str, Gradable]
     single_rubric_item_grader: SingleAgentSettings
     project_scanner_agent: SingleAgentSettings
+
 
 class RubricItemResponse(TypedDict):
     rubric_item: str
@@ -86,18 +85,18 @@ class RubricItemResponse(TypedDict):
 
 
 class AgentAsToolSettings(TypedDict):
-    tool_name: str
     doc_string: str
     agent: SingleAgentSettings
 
 
 class MultiAgentSettings(TypedDict):
     agent: SingleAgentSettings
-    agents_as_tools: list[AgentAsToolSettings]
+    agents_as_tools: dict[str, AgentAsToolSettings]
 
 
-class AgentConversationSettings(MultiAgentSettings):
-    introduction: str
+class AgentConversationSettings(TypedDict):
+    agent: SingleAgentSettings
+    introduction: NotRequired[str]
     file_size_limit: int
     file_type_ext: list[str]
 
@@ -115,30 +114,20 @@ class DuckContext:
 
 
 class DuckConfig(TypedDict):
-    name: str
-    "The channel name is not used in the code. It provides a description of the duck."
-    duck_type: str  # Supported options found in main.py::build_ducks
-    settings: dict
-
-
-class WeightedDuck(TypedDict):
-    weight: int
-    duck: DUCK_NAME | DuckConfig
+    duck_type: str  # validated in build_ducks
+    settings: dict  # could specify further
 
 
 class ChannelConfig(TypedDict):
     channel_id: int
-    channel_name: str
-    "The channel name is not used in the code. It is used to indicate the name of Discord channel."
-    ducks: list[DUCK_NAME | DuckConfig | WeightedDuck]
-    "Either the name of the duck"
+    duck: DUCK_NAME | DuckConfig
     timeout: int
+    channel_name: NotRequired[str]
 
 
 class ServerConfig(TypedDict):
-    server_name: str
-    "The channel name is not used in the code. It is used to indicate the name of the server."
-    channels: list[ChannelConfig]
+    server_id: int
+    channels: dict[str, ChannelConfig]
 
 
 class SQLConfig(TypedDict):
@@ -160,40 +149,44 @@ class AdminSettings(TypedDict):
     admin_channel_id: int
     admin_role_id: int
     log_level: str
-    "This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'."
+    # This is the log level for the admin channel. It can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'.
 
 
 class ReporterConfig(TypedDict):
-    gpt_pricing: dict[str, list]
+    gpt_pricing: dict[str, list[float]]
+
+
+class MountConfig(TypedDict):
+    source: str
+    target: str
 
 
 class ContainerConfig(TypedDict):
-    name: str
     image: str
-    mounts: dict[str, str]
-    # TODO - use these?
+    mounts: list[MountConfig]
+    # TODO: use these?
     # settings: dict[str, str] # cpu_limit, memory_limit, network, timeout
 
+
 class ContainerTool(TypedDict):
-    type: Literal['container_exec']
-    name: str
-    description: str
+    type: Literal["container_exec"]
     container: str
+    description: NotRequired[str]
 
 
-ToolConfig = Union[ContainerTool]
+ToolConfig = ContainerTool
 
 
 class Config(TypedDict):
     sql: SQLConfig
-    containers: list[ContainerConfig]
-    tools: list[ToolConfig]
-    ducks: list[DuckConfig]
-    agents_as_tools: list[AgentAsToolSettings]
+    containers: dict[str, ContainerConfig]
+    tools: dict[str, ToolConfig]
+    ducks: dict[DUCK_NAME, DuckConfig]
+    agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
     dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
-    feedback_notifier_settings: FeedbackNotifierSettings
+    feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
     reporter_settings: ReporterConfig
     sender_email: str

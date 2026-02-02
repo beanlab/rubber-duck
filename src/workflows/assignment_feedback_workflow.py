@@ -41,9 +41,9 @@ class AssignmentFeedbackWorkflow:
         self._ai_client = ai_client
         self._read_url = step(read_url)
 
-        self._assignments: dict[ASSIGNMENT_NAME: Gradable] = {
-            assignment['name']: assignment
-            for assignment in (self._settings)["gradable_assignments"]
+        self._assignments: dict[ASSIGNMENT_NAME, Gradable] = {
+            name: assignment
+            for name, assignment in self._settings["gradable_assignments"].items()
         }
 
     async def __call__(self, context: DuckContext):

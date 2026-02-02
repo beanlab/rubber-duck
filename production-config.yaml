@@ -21,7 +21,7 @@ sql:
   database: /rubber-duck.db
 
 containers:
-  - name: stats-python-sandbox
+  stats-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
     settings: # TODO: use this
       cpu_limit: 1
@@ -32,13 +32,13 @@ containers:
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
 tools:
-  - name: run_python
+  run_python:
     type: container_exec
     container: stats-python-sandbox
 
 
 agents_as_tools:
-  - tool_name: check_suspicion_bot
+  check_suspicion_bot:
     doc_string: |
       This tool determines if a user's message is suspicious. Suspicious messages are those that do not appear to follow the format
       of a user's name (first_name_last_name). The tool checks for profanity, unusual characters, and other indicators of suspicious behavior.
@@ -50,7 +50,7 @@ agents_as_tools:
         - prompts/production-prompts/suspicion-checker.txt
       engine: gpt-5-mini
       reasoning: minimal
-      tools: [ ]
+      tools: []
       output_format:
         format:
           type: json_schema
@@ -68,7 +68,7 @@ agents_as_tools:
             required: [ "suspicious", "reason" ]
             additionalProperties: false
 
-  - tool_name: code_complexity_agent
+  code_complexity_agent:
     doc_string: |
       This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
       This tool takes source code as a string and returns a string describing the order of complexity (Big-O analysis) of the provided code.
@@ -77,10 +77,10 @@ agents_as_tools:
       prompt_files:
         - prompts/312-project-design/generate-code-complexity.md
       engine: gpt-4.1
-      tools: [ ]
+      tools: []
 
 ducks:
-  - name: standard-rubber-duck
+  standard-rubber-duck:
     duck_type: agent_led_conversation
     settings:
       agent:
@@ -95,10 +95,12 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
-  - name: stats-duck
+  stats-duck:
     duck_type: user_led_conversation
     settings:
-      introduction: I can perform many statistical operations on a list of provided datasets. If you want more specifics, please ask. How can I help you with stats?
+      introduction: >
+        I can perform many statistical operations on a list of provided datasets. 
+        If you want more specifics, please ask. How can I help you with stats?
       agent:
         name: stats_duck
         prompt_files:
@@ -111,29 +113,30 @@ ducks:
         file_type_ext: *file_type_ext
 
 servers:
-  927616651409649675:
-    server_name: CS 110
+  CS 110:
+    server_id: 927616651409649675
     channels:
-      - channel_id: 1296158078017736725
-        channel_name: review-cs-110
-        ducks:
-          - name: Conversation-Review-cs110
+      review-cs-110:
+        channel_id: 1296158078017736725
+        timeout: 300
+        duck:
+          Conversation-Review-cs110:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1234556460453597276
-        timeout: 300
 
-      - channel_id: 1234556460453597276
-        channel_name: general/duck-pond
-        ducks:
-          - standard-rubber-duck
+      general/duck-pond:
+        channel_id: 1234556460453597276
         timeout: 600
+        duck:
+          standard-rubber-duck
 
-      - channel_id: 1399777118380097648
-        channel_name: join-the-server
-        ducks:
-          - name: Registration-Workflow-CS110
+      join-the-server:
+        channel_id: 1399777118380097648
+        timeout: 600
+        duck:
+          Registration-Workflow-CS110:
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -143,43 +146,43 @@ servers:
               suspicion_checker_tool: check_suspicion_bot
               roles:
                 patterns:
-                  - name: Teacher Sections
+                  Teacher Sections:
                     pattern: "-section-"
                     description: Sorted by teacher's name (e.g. smith-section-000)
-        timeout: 600
 
-  911014551263268916:
-    server_name: CS Faculty
+  CS Faculty:
+    server_id: 911014551263268916
     channels:
-      - channel_id: 1146906576788140154
-        channel_name: Duck Pond
+      Duck Pond:
+        channel_id: 1146906576788140154
         timeout: 600
-        ducks:
-          - standard-rubber-duck
+        duck:
+          standard-rubber-duck
 
-  747510855536738336:
-    server_name: CS 235
+  CS 235:
+    server_id: 747510855536738336
     channels:
-      - channel_id: 1327385245036838912
-        channel_name: review-cs-235
-        ducks:
-          - name: Conversation-Review-CS235
+      review-cs-235:
+        channel_id: 1327385245036838912
+        timeout: 300
+        duck:
+          Conversation-Review-CS235:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1195490291134779502
-        timeout: 300
 
-      - channel_id: 1195490291134779502
-        channel_name: student-text-channels/duck-pond
-        ducks:
-          - standard-rubber-duck
+      student-text-channels/duck-pond:
+        channel_id: 1195490291134779502
         timeout: 600
+        duck:
+          standard-rubber-duck
 
-      - channel_id: 1399788047981351042
-        channel_name: join-the-server
-        ducks:
-          - name: Registration-Workflow-CS235
+      join-the-server:
+        channel_id: 1399788047981351042
+        timeout: 600
+        duck:
+          Registration-Workflow-CS235:
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -187,53 +190,52 @@ servers:
               email_domain: byu.edu
               roles:
                 patterns:
-                  - name: Teacher Sections
+                  Teacher Sections:
                     pattern: "-section-"
                     description: Sorted by teacher name (e.g. smith-section-001)
-        timeout: 600
 
-  1404656370757664929:
-    server_name: CS 301R - Agent Engineering
+  CS 301R - Agent Engineering:
+    server_id: 1404656370757664929
     channels:
-      - channel_id: 1455309626378813470
-        channel_name: register
-        ducks:
-          - name: Registration-Workflow-CS301R-Agents
+      register:
+        channel_id: 1455309626378813470
+        duck:
+          Registration-Workflow-CS301R-Agents:
             duck_type: registration
             settings:
               cache_timeout: 60800
               authenticated_user_role_name: Student
               email_domain: byu.edu
               roles:
-                patterns: []
+                patterns: {}
 
-  1235303213796691998:
-    server_name: CS 111
+  CS 111:
+    server_id: 1235303213796691998
     channels:
-      - channel_id: 1329934513333338244
-        channel_name: review-cs-111
-        ducks:
-          - name: Conversation-Review-CS111
+      review-cs-111:
+        channel_id: 1329934513333338244
+        timeout: 300
+        duck:
+          Conversation-Review-CS111:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1406039546721730582
-        timeout: 300
 
-      - channel_id: 1406039546721730582
-        channel_name: Student Text Channels/duck-pond
-        ducks:
-          - standard-rubber-duck
+      Student Text Channels/duck-pond:
+        channel_id: 1406039546721730582
         timeout: 600
+        duck:
+          standard-rubber-duck
 
-  1407758127608365157:
-    server_name: BYU - CS 312
+  BYU - CS 312:
+    server_id: 1407758127608365157
     channels:
-      - channel_id: 1407761075226542120
-        channel_name: register
+      register:
+        channel_id: 1407761075226542120
         timeout: 300
-        ducks:
-          - name: Registration-Workflow-CS312
+        duck:
+          Registration-Workflow-CS312:
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -243,19 +245,19 @@ servers:
               suspicion_checker_tool: check_suspicion_bot
               roles:
                 patterns:
-                  - name: Lecture Sections
+                  Lecture-Sections:
                     pattern: "lecture-"
                     description: Who teaches your lecture?
-      - channel_id: 1442908120488743113
-        channel_name: duck-pond
+      duck-pond:
+        channel_id: 1442908120488743113
         timeout: 600
-        ducks:
-          - standard-rubber-duck
-      - channel_id: 1442908158757437502
-        channel_name: project-review
+        duck:
+          standard-rubber-duck
+      project-review:
+        channel_id: 1442908158757437502
         timeout: 300
-        ducks:
-          - name: cs312-grader
+        duck:
+          cs312-grader:
             duck_type: assignment_feedback
             settings:
               name: cs312-projects
@@ -274,31 +276,31 @@ servers:
                 Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
 
               gradable_assignments:
-                - name: Project Report - RSA and Primality Tests
+                Project Report - RSA and Primality Tests:
                   rubric_path: [ rubrics/rsa-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Network Analysis SCCs
+                Project Report - Network Analysis SCCs:
                   rubric_path: [ rubrics/scc-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Network Routing
+                Project Report - Network Routing:
                   rubric_path: [ rubrics/dijkstras-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Alignment
+                Project Report - Alignment:
                   rubric_path: [ rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Convex Hull
+                Project Report - Convex Hull:
                   rubric_path: [ rubrics/convex-hull-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Leetcode
+                Project Leetcode:
                   rubric_path: [ rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Backtracking
+                Project Report - Backtracking:
                   rubric_path: [ rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Branch and Bound
+                Project Report - Branch and Bound:
                   rubric_path: [ rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Demo Fruit
+                Project Demo Fruit:
                   rubric_path: [ rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml ]
                   message: |
                     Please note this is a demo project
@@ -352,10 +354,10 @@ servers:
                       additionalProperties: false
 
                 reasoning: minimal
-      - channel_id: 1442908515147710558
-        channel_name: duck-review
-        ducks:
-          - name: Conversation-Review-CS312
+      duck-review:
+        channel_id: 1442908515147710558
+        duck:
+          Conversation-Review-CS312:
             duck_type: conversation_review
             settings:
               target_channel_ids:
@@ -364,24 +366,25 @@ servers:
         timeout: 600
 
 
-  1371951485629370458:
-    server_name: Stats
+  Stats:
+    server_id: 1371951485629370458
     channels:
-      - channel_id: 1371951756149260298
-        channel_name: ta-review
-        ducks:
-          - name: Conversation-Review-Stats
+      ta-review:
+        channel_id: 1371951756149260298
+        timeout: 300
+        duck:
+          Conversation-Review-Stats:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1371951696061661215
                 - 1374066971523678279
-        timeout: 300
 
-      - channel_id: 1404899692210553033
-        channel_name: join-the-server
-        ducks:
-          - name: Registration-Workflow-Stats
+      join-the-server:
+        channel_id: 1404899692210553033
+        timeout: 600
+        duck:
+          Registration-Workflow-Stats:
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -390,81 +393,77 @@ servers:
               sender_email: byu-cs-course-ops@cs.byu.edu
               ta_channel_id: 1371951756149260298
               suspicion_checker_tool: check_suspicion_bot
+      stats-gpt:
+        channel_id: 1371951696061661215
         timeout: 600
+        duck:
+          standard-rubber-duck
 
-      - channel_id: 1371951696061661215
-        channel_name: stats-gpt
-        ducks:
-          - standard-rubber-duck
+      stats-tool:
+        channel_id: 1374066971523678279
         timeout: 600
-
-      - channel_id: 1374066971523678279
-        channel_name: stats-tool
-        ducks:
-          - stats-duck
-        timeout: 600
+        duck:
+          stats-duck
 
 
-  1354902266246598928:
-    server_name: Physics
+  Physics:
+    server_id: 1354902266246598928
     channels:
-      - channel_id: 1363949553102880869
-        channel_name: review-phys-230
-        ducks:
-          - name: Conversation-Review-Phys-230
+      review-phys-230:
+        channel_id: 1363949553102880869
+        duck:
+          Conversation-Review-Phys-230:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1363949528201564170
         timeout: 300
 
-      - channel_id: 1363949528201564170
-        channel_name: physics-230-phys230
-        ducks:
-          - standard-rubber-duck
+      physics-230-phys230:
+        channel_id: 1363949528201564170
         timeout: 600
+        duck:
+          standard-rubber-duck
 
-      - channel_id: 1359587713749094700
-        channel_name: review-phys-430
-        ducks:
-          - name: Conversation-Review-Phys-430
+      review-phys-430:
+        channel_id: 1359587713749094700
+        timeout: 300
+        duck:
+          Conversation-Review-Phys-430:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1359587525605458030
-        timeout: 300
 
-      - channel_id: 1359587525605458030
-        channel_name: physics-430-phys430
-        ducks:
-          - standard-rubber-duck
+      physics-430-phys430:
+        channel_id: 1359587525605458030
         timeout: 600
+        duck:
+          standard-rubber-duck
 
 
-  1338616224858374287:
-    server_name: Rubber Duck Demo Server
+  Rubber Duck Demo Server:
+    server_id: 1338616224858374287
     channels:
-      - channel_id: 1338619665789751337
-        channel_name: vintage-duck-review
-        ducks:
-          - name: Conversation-Review-Demo
+      standard-duck-review:
+        channel_id: 1338619665789751337
+        timeout: 300
+        duck:
+          Conversation-Review-Demo:
             duck_type: conversation_review
             settings:
               target_channel_ids:
                 - 1338616283671040000
-        timeout: 300
-
-      - channel_id: 1338616283671040000
-        channel_name: vintage-duck
-        ducks:
-          - standard-rubber-duck
+      standard-duck:
+        duck:
+          standard-rubber-duck
         timeout: 600
 
-
-      - channel_id: 1401960218870419647
-        channel_name: emoji-duck
-        ducks:
-          - name: Emoji-Duck-Demo
+      emoji-duck:
+        channel_id: 1401960218870419647
+        timeout: 2000
+        duck:
+          Emoji-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
               agent:
@@ -472,16 +471,15 @@ servers:
                 engine: gpt-4.1
                 prompt_files:
                   - prompts/production-prompts/emoji.txt
-                tools: [ ]
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
-        timeout: 2000
 
-
-      - channel_id: 1385293810782965830
-        channel_name: code-complexity-analysis-duck
-        ducks:
-          - name: Code-Complexity-Duck-Demo
+      code-complexity-analysis-duck:
+        channel_id: 1385293810782965830
+        timeout: 600
+        duck:
+          Code-Complexity-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
               file_size_limit: 5100
@@ -498,13 +496,12 @@ servers:
                   - generate_code_complexity_analysis
                 engine: gpt-5-mini
                 reasoning: minimal
+
+      socratic-duck:
+        channel_id: 1379953844540407969
         timeout: 600
-
-
-      - channel_id: 1379953844540407969
-        channel_name: socratic-duck
-        ducks:
-          - name: Socratic-Rubber-Duck-Demo
+        duck:
+          Socratic-Rubber-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
               agent:
@@ -512,15 +509,15 @@ servers:
                 prompt_files:
                   - prompts/production-prompts/socratic-duck.txt
                 engine: gpt-4.1
-                tools: [ ]
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
-        timeout: 600
 
-      - channel_id: 1379959992110546995
-        channel_name: join-the-server
-        ducks:
-          - name: Registration-Workflow-Demo
+      join-the-server:
+        channel_id: 1379959992110546995
+        timeout: 600
+        duck:
+          Registration-Workflow-Demo:
             duck_type: registration
             settings:
               cache_timeout: 60800
@@ -530,19 +527,18 @@ servers:
               email_domain: byu.edu
               roles:
                 patterns:
-                  - name: Teacher Sections
+                  Teacher Sections:
                     pattern: "-section-\\d{3}$"
                     description: Teacher name followed by section number (e.g. smith-section-001)
-                  - name: Lab Sections
+                  Lab Sections:
                     pattern: "^lab-section-\\d{3}$"
                     description: Lab section number (e.g. lab-section-002)
+
+      designer-duck:
+        channel_id: 1384678077694480434
         timeout: 600
-
-
-      - channel_id: 1384678077694480434
-        channel_name: designer-duck
-        ducks:
-          - name: Phd-Duck-Demo
+        duck:
+          Phd-Duck-Demo:
             duck_type: agent_led_conversation
             settings:
               agent:
@@ -551,15 +547,14 @@ servers:
                 prompt_files:
                   - prompts/312-project-design/phd-duck.txt
                   - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
-                tools: [ ]
+                tools: []
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
-        timeout: 600
 
-      - channel_id: 1379955387587104829
-        channel_name: stats-tool
-        ducks:
-          - stats-duck
+      stats-tool:
+        channel_id: 1379955387587104829
+        duck:
+          stats-duck
         timeout: 600
 
 feedback_notifier_settings:
