@@ -1,21 +1,3 @@
-# Anchors
-_file_size_limit: &file_size_limit 4096 # 4KB limit
-_file_type_ext:
-  &file_type_ext [
-    "txt",
-    "py",
-    "java",
-    "cpp",
-    "c",
-    "h",
-    "hpp",
-    "js",
-    "ts",
-    "html",
-    "css",
-    "md",
-  ]
-
 standard-rubber-duck:
   duck_type: agent_led_conversation
   settings:
@@ -28,8 +10,7 @@ standard-rubber-duck:
       tools:
         - talk_to_user
         - conclude_conversation
-    file_size_limit: *file_size_limit
-    file_type_ext: *file_type_ext
+    $include: settings-config.yaml#/file_settings
 
 stats-duck:
   duck_type: user_led_conversation
@@ -45,5 +26,4 @@ stats-duck:
       reasoning: minimal
       tools:
         - run_python
-      file_size_limit: *file_size_limit
-      file_type_ext: *file_type_ext
+    $include: settings-config.yaml#/file_settings

@@ -1,21 +1,3 @@
-# Anchors
-_file_size_limit: &file_size_limit 4096 # 4KB limit
-_file_type_ext:
-  &file_type_ext [
-    "txt",
-    "py",
-    "java",
-    "cpp",
-    "c",
-    "h",
-    "hpp",
-    "js",
-    "ts",
-    "html",
-    "css",
-    "md",
-  ]
-
 CS 110:
   server_id: 927616651409649675
   channels:
@@ -374,8 +356,7 @@ Rubber Duck Demo Server:
               prompt_files:
                 - prompts/production-prompts/emoji.txt
               tools: [ ]
-            file_size_limit: *file_size_limit
-            file_type_ext: *file_type_ext
+            $include: settings-config.yaml#/file_settings
 
     code-complexity-analysis-duck:
       channel_id: 1385293810782965830
@@ -412,8 +393,7 @@ Rubber Duck Demo Server:
                 - prompts/production-prompts/socratic-duck.txt
               engine: gpt-4.1
               tools: [ ]
-            file_size_limit: *file_size_limit
-            file_type_ext: *file_type_ext
+            $include: settings-config.yaml#/file_settings
 
     join-the-server:
       channel_id: 1379959992110546995
@@ -450,8 +430,7 @@ Rubber Duck Demo Server:
                 - prompts/312-project-design/phd-duck.txt
                 - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
               tools: [ ]
-            file_size_limit: *file_size_limit
-            file_type_ext: *file_type_ext
+            $include: settings-config.yaml#/file_settings
 
     stats-tool:
       channel_id: 1379955387587104829
