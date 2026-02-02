@@ -276,31 +276,31 @@ servers:
                 Provide your feedback about using this tool in #ai-feedback . When relevant, please include a link to this thread in your feedback.
 
               gradable_assignments:
-                - name: Project Report - RSA and Primality Tests
+                Project Report - RSA and Primality Tests:
                   rubric_path: [ rubrics/rsa-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Network Analysis SCCs
+                Project Report - Network Analysis SCCs:
                   rubric_path: [ rubrics/scc-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Network Routing
+                Project Report - Network Routing:
                   rubric_path: [ rubrics/dijkstras-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Alignment
+                Project Report - Alignment:
                   rubric_path: [ rubrics/alignment-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Convex Hull
+                Project Report - Convex Hull:
                   rubric_path: [ rubrics/convex-hull-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Leetcode
+                Project Leetcode:
                   rubric_path: [ rubrics/leetcode-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Backtracking
+                Project Report - Backtracking:
                   rubric_path: [ rubrics/backtracking-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Report - Branch and Bound
+                Project Report - Branch and Bound:
                   rubric_path: [ rubrics/branch-and-bound-rubric.yaml, rubrics/cs312-project-rules.yaml ]
 
-                - name: Project Demo Fruit
+                Project Demo Fruit:
                   rubric_path: [ rubrics/demo-fruit-rubric.yaml, rubrics/fruit-demo-rules.yaml ]
                   message: |
                     Please note this is a demo project
