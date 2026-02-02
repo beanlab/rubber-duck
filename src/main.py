@@ -377,12 +377,8 @@ if __name__ == '__main__':
 
     # Add console handler to the duck logger
     add_console_handler()
-    base_config = "./configs/base-config.yaml"
 
-    config: Config = load_configuration(base_config, args.config)
-
-    # Optional: log keys to verify merge
-    duck_logger.debug("Config loaded successfully. Top-level keys: %s", list(config.keys()))
+    config: Config = load_configuration(args.config)
 
     duck_logger.debug("Config loaded successfully. Full config: %s", config)
 
