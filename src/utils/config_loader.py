@@ -60,15 +60,16 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     if key in seen:
         raise ValueError(f"Cyclic $include detected: {include_path}:{pointer}")
 
-    seen.add(key)
+    new_seen = seen.union({key})
 
     if not include_path.exists():
         raise FileNotFoundError(f"Included config not found: {include_path}")
 
     content = include_path.read_text()
+    duck_logger.debug(f"loading: {content}")
     data = load_config(include_path.suffix, content, source_path=include_path)
 
-    resolved_data = resolve_includes(data, base_path=include_path.parent, seen=seen)
+    resolved_data = resolve_includes(data, base_path=include_path.parent, seen=new_seen)
     duck_logger.debug(f"Resolved includes: {resolved_data}")
 
     return resolve_jsonpath(resolved_data, pointer)
@@ -77,10 +78,10 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
 def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
     if seen is None:
         seen = set()
-    duck_logger.debug(f"seen: {seen}")
     if isinstance(data, dict):
         if "$include" in data:
             include_ref = data["$include"]
+            duck_logger.debug(f"including: {include_ref}")
             overrides = {k: v for k, v in data.items() if k != "$include"}
 
             included = load_include(include_ref, base_path, seen)
@@ -96,6 +97,7 @@ def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] 
             for k, v in data.items()
         }
 
+    # allow includes within lists
     if isinstance(data, list):
         return [
             resolve_includes(item, base_path=base_path, seen=seen)
