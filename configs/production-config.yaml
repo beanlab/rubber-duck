@@ -62,10 +62,10 @@ agents_as_tools:
       tools: []
 
 ducks:
-  $include: ducks-config.yaml:$.
+  $include: ducks-config.yaml:$
 
 servers:
-  $include: servers-config.yaml:$.
+  $include: servers-config.yaml:$
 
 feedback_notifier_settings:
   $include: settings-config.yaml:$.feedback_notifier_settings
@@ -74,3 +74,9 @@ admin_settings:
   $include: settings-config.yaml:$.admin_settings
   admin_channel_id: 1192895746672951340
   admin_role_id: 933123843038535741
+
+ai_completion_retry_protocol:
+  $include: settings-config.yaml:$.ai_completion_retry_protocol
+
+reporter_settings:
+  $include: settings-config.yaml:$.reporter_settings

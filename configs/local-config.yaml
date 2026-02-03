@@ -1,4 +1,5 @@
 sql:
+  $include: settings-config.yaml:$.sql
   database: local-testing-configs/local_reese_database.db
 
 containers: { }
@@ -34,24 +35,33 @@ ducks:
 
 servers:
   BeanLab:
-    server_id: <id>
+    server_id: 1058490579799003187
     channels:
       Ducks/tyler-chat-bot:
-        channel_id: <id>
+        channel_id: 1428518677287796756
         timeout: 300
         duck:
           standard-rubber-duck
 
       Ducks/tyler-ta-channel:
-        channel_id: <id>
+        channel_id: 1466558248726560880
         timeout: 300
         duck:
           Conversation-Review:
             duck_type: conversation_review
             settings:
               target_channel_ids:
-                - <id>
+                - 1428518677287796756
 
 admin_settings:
-  admin_channel_id: <id>
-  admin_role_id: <id>
+  admin_channel_id: 1429899217890967663
+  admin_role_id: 1149033209821134858
+
+feedback_notifier_settings:
+  $include: settings-config.yaml:$.feedback_notifier_settings
+
+ai_completion_retry_protocol:
+  $include: settings-config.yaml:$.ai_completion_retry_protocol
+
+reporter_settings:
+  $include: settings-config.yaml:$.reporter_settings
