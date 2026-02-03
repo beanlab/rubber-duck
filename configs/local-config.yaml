@@ -1,25 +1,3 @@
-# Everything from base-config is included by default
-# Everything here will override what is in base-config
-# Set as empty dict to exclude
-
-# Anchors
-file_size_limit: &file_size_limit 4096 # 4KB limit
-file_type_ext:
-  &file_type_ext [
-    "txt",
-    "py",
-    "java",
-    "cpp",
-    "c",
-    "h",
-    "hpp",
-    "js",
-    "ts",
-    "html",
-    "css",
-    "md",
-  ]
-
 sql:
   database: local-testing-configs/local_reese_database.db
 
@@ -27,25 +5,31 @@ containers: { }
 
 tools: { }
 
-# include one duck with overrides
+
+# include one duck without overrides
 ducks:
-  !include_keys
-  key: standard-rubber-duck
-  from: configs/ducks-config.yaml
-  overrides:
-    settings:
-      agent:
-        engine: gpt-5-nano
+  standard-rubber-duck:
+    $include: production-config.yaml:$.ducks.standard-rubber-duck
 
-# OR include one duck without overrides
-ducks:
-  !include_keys standard-rubber-duck from configs/ducks-config.yaml
 
-# OR include all ducks (no overrides)
-ducks: !include_keys all from configs/ducks-config.yaml
-
-# OR include multiple specific ducks (no overrides)
-ducks: !include_keys standard-rubber-duck, stats-duck from configs/ducks-config.yaml
+## include one duck with overrides
+#ducks:
+#  standard-rubber-duck:
+#    $include: production-config.yaml:$.ducks.standard-rubber-duck
+#    settings:
+#      agent:
+#        engine: gpt-5-nano
+#
+## include all ducks (no overrides)
+#ducks:
+#  $include: production-config.yaml:$.ducks
+#
+## include multiple specific ducks (no overrides)
+#ducks:
+#  standard-rubber-duck:
+#    $include: production-config.yaml:$.ducks.standard-rubber-duck
+#  stats-duck:
+#    $include: production-config.yaml:$.ducks.stats-duck
 
 
 servers:

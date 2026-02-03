@@ -1,7 +1,7 @@
-import io
 import json
 import os
 from copy import deepcopy
+from jsonpath_ng import parse as parse_jsonpath
 from pathlib import Path
 from typing import Any
 
@@ -28,24 +28,28 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict:
     return result
 
 
-def resolve_json_pointer(data: Any, pointer: str) -> Any:
-    if not pointer:
+def resolve_jsonpath(data: Any, expr: str) -> Any:
+    if not expr:
         return deepcopy(data)
 
-    if not pointer.startswith("/"):
-        raise ValueError(f"Invalid JSON pointer: {pointer}")
+    jsonpath_expr = parse_jsonpath(expr)
+    matches = [match.value for match in jsonpath_expr.find(data)]
 
-    current = data
-    for part in pointer.lstrip("/").split("/"):
-        part = part.replace("~1", "/").replace("~0", "~")
-        current = current[part]
+    if not matches:
+        raise KeyError(f"JSONPath not found: {expr}")
 
-    return deepcopy(current)
+    # single match returns the value,
+    # multiple matches return a list
+    if len(matches) == 1:
+        return deepcopy(matches[0])
+
+    return deepcopy(matches)
 
 
 def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
-    if "#" in ref:
-        path_part, pointer = ref.split("#", 1)
+    if ":" in ref:
+        path_part, pointer = ref.split(":", 1)
+        duck_logger.debug(f"Path part is {path_part}, pointer is {pointer}")
         pointer = pointer or ""
     else:
         path_part, pointer = ref, ""
@@ -54,7 +58,7 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
 
     key = (include_path, pointer)
     if key in seen:
-        raise ValueError(f"Cyclic $include detected: {include_path}#{pointer}")
+        raise ValueError(f"Cyclic $include detected: {include_path}:{pointer}")
 
     seen.add(key)
 
@@ -64,13 +68,16 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     content = include_path.read_text()
     data = load_config(include_path.suffix, content, source_path=include_path)
 
-    return resolve_json_pointer(data, pointer)
+    resolved_data = resolve_includes(data, base_path=include_path.parent, seen=seen)
+    duck_logger.debug(f"Resolved includes: {resolved_data}")
+
+    return resolve_jsonpath(resolved_data, pointer)
 
 
 def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
     if seen is None:
         seen = set()
-
+    duck_logger.debug(f"seen: {seen}")
     if isinstance(data, dict):
         if "$include" in data:
             include_ref = data["$include"]
