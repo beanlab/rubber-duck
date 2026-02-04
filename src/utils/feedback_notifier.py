@@ -86,11 +86,13 @@ class FeedbackNotifier:
                 # Find all ducks of type conversation_review in this channel
                 duck = channel_cfg['duck']
                 if duck['duck_type'] == 'conversation_review':
-                    target_channels.extend(duck['settings']['target_channel_ids'])
+                    target_channels.extend(duck['settings'].get('target_channel_ids', []))
 
-                    if target_channels:
-                        feedback_mapping[channel_id] = target_channels
-                        duck_logger.debug(
-                            f"Mapped TA channel {channel_id} to {len(target_channels)} target channels")
+                    if not target_channels:
+                        raise ValueError(f"No target channels found for {channel_id} in conversation_review duck")
+
+                    feedback_mapping[channel_id] = target_channels
+                    duck_logger.debug(
+                        f"Mapped TA channel {channel_id} to {len(target_channels)} target channels")
 
         return feedback_mapping
