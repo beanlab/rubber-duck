@@ -1,7 +1,7 @@
 import json
 import os
 from copy import deepcopy
-from jsonpath_ng import parse as parse_jsonpath
+from jsonpath_ng import parse
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,7 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
     if not expr:
         return deepcopy(data)
 
-    jsonpath_expr = parse_jsonpath(expr)
+    jsonpath_expr = parse(expr)
     matches = [match.value for match in jsonpath_expr.find(data)]
 
     if not matches:
