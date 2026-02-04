@@ -18,6 +18,9 @@ APP_ID = os.getenv("MICROSOFT_APP_ID")
 APP_PASSWORD = os.getenv("MICROSOFT_APP_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+print(f"APP_ID: '{APP_ID}'")
+print(f"APP_PASSWORD: '{APP_PASSWORD[:5] if APP_PASSWORD else None}...'")
+
 # ------------------ OPENAI ------------------
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -58,15 +61,17 @@ async def messages(req: web.Request) -> web.Response:
     if req.method != "POST":
         return web.Response(status=405)
 
-    if req.content_type != "application/json":
-        return web.Response(status=415)
-
     try:
         body = await req.json()
     except Exception:
         return web.Response(status=400, text="Invalid JSON")
 
+    print("RAW BODY:", body)
+
     activity = Activity().deserialize(body)
+
+    print("ACTIVITY TYPE:", activity.type)
+
     auth_header = req.headers.get("Authorization", "")
 
     async def call_bot(context: TurnContext):
