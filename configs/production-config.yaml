@@ -65,7 +65,7 @@ ducks:
   $include: ducks-config.yaml:$
 
 servers:
-  $include: servers-config.yaml:$
+  $include: production-servers.yaml:$
 
 feedback_notifier_settings:
   $include: settings-config.yaml:$.feedback_notifier_settings
