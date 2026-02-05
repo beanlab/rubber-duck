@@ -7,30 +7,33 @@ containers: { }
 tools: { }
 
 
-# include one duck without overrides
+# include one duck without overrides ($include doesn't copy in the key
 ducks:
   standard-rubber-duck:
     $include: production-config.yaml:$.ducks.standard-rubber-duck
 
+# override usage
+ducks:
+  standard-rubber-duck:
+    $include: production-config.yaml:$.ducks.standard-rubber-duck
+    settings:
+      agent:
+        engine: gpt-5-nano
 
-## include one duck with overrides
-#ducks:
-#  standard-rubber-duck:
-#    $include: production-config.yaml:$.ducks.standard-rubber-duck
-#    settings:
-#      agent:
-#        engine: gpt-5-nano
-#
-## include all ducks (no overrides)
-#ducks:
-#  $include: production-config.yaml:$.ducks
-#
-## include multiple specific ducks (no overrides)
-#ducks:
-#  standard-rubber-duck:
-#    $include: production-config.yaml:$.ducks.standard-rubber-duck
-#  stats-duck:
-#    $include: production-config.yaml:$.ducks.stats-duck
+# include all ducks with example override
+ducks:
+  $include: production-config.yaml:$.ducks
+  standard-rubber-duck:
+    settings:
+      agent:
+        engine: gpt-5-nano
+
+# include multiple specific ducks
+ducks:
+  standard-rubber-duck:
+    $include: production-config.yaml:$.ducks.standard-rubber-duck
+  stats-duck:
+    $include: production-config.yaml:$.ducks.stats-duck
 
 
 servers:
