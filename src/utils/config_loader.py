@@ -49,7 +49,6 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
 def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     if ":" in ref:
         path_part, pointer = ref.split(":", 1)
-        duck_logger.debug(f"Path part is {path_part}, pointer is {pointer}")
         pointer = pointer or ""
     else:
         path_part, pointer = ref, ""
@@ -66,11 +65,9 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
         raise FileNotFoundError(f"Included config not found: {include_path}")
 
     content = include_path.read_text()
-    duck_logger.debug(f"loading: {content}")
     data = load_config(include_path.suffix, content, source_path=include_path)
 
     resolved_data = resolve_includes(data, base_path=include_path.parent, seen=new_seen)
-    duck_logger.debug(f"Resolved includes: {resolved_data}")
 
     return resolve_jsonpath(resolved_data, pointer)
 
