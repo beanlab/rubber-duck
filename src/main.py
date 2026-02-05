@@ -381,6 +381,4 @@ if __name__ == '__main__':
 
     config: Config = load_configuration(args.config)
 
-    duck_logger.debug("Config loaded successfully. Full config: \n%s", yaml.dump(config, default_flow_style=False, sort_keys=False))
-
     asyncio.run(main(config, args.log_path))
