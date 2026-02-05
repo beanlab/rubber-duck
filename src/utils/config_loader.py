@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 from jsonpath_ng import parse
 from pathlib import Path
