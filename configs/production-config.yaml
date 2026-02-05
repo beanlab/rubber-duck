@@ -62,7 +62,7 @@ agents_as_tools:
       tools: []
 
 ducks:
-  $include: ducks-config.yaml:$
+  $include: production-ducks.yaml:$
 
 servers:
   $include: production-servers.yaml:$
