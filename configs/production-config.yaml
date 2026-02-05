@@ -62,10 +62,10 @@ agents_as_tools:
       tools: []
 
 ducks:
-  $include: production-ducks.yaml:$
+  $include: production-ducks.yaml
 
 servers:
-  $include: production-servers.yaml:$
+  $include: production-servers.yaml
 
 feedback_notifier_settings:
   $include: production-settings.yaml:$.feedback_notifier_settings
