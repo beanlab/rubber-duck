@@ -112,7 +112,7 @@ class ReportCommand(Command):
         try:
             content = message['content']
             channel_id = message['channel_id']
-            if content == '!report help' or content == '!report h':
+            if content in ['!report', '!report help', '!report h']:
                 help_text = self.reporter.help_menu()
                 await self.send_message(channel_id, help_text)
             else:

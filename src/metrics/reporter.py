@@ -355,9 +355,9 @@ class Reporter:
         return "-".join(components)
 
     def help_menu(self):
-        lines = ["Type '!report', followed by any of the following commands to see the metrics for it:"]
-        lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
-        return "\n\n".join(lines)
+        lines = ["### Type `'!report'`, followed by any of the following commands to see the metrics for it:"]
+        lines.extend(f" - `'{key}'`: {item[1]}" for key, item in self.pre_baked.items())
+        return "\n".join(lines)
 
     def get_all_prebaked(self):
         results = []
@@ -378,7 +378,7 @@ class Reporter:
         try:
             if arg_string == '!report all':
                 return self.get_all_prebaked()
-            if arg_string == '!report help' or arg_string == '!report h':
+            if arg_string in ['!report', '!report help', '!report h']:
                 return self.help_menu()
 
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':
