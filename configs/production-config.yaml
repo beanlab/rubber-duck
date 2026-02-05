@@ -1,5 +1,5 @@
 sql:
-  $include: production-settings.yaml:$.sql
+  db_type: sqlite
   database: /rubber-duck.db
 
 containers:
