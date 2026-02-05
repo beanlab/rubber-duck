@@ -3,7 +3,7 @@ import os
 from copy import deepcopy
 from jsonpath_ng import parse
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import boto3
 import yaml
@@ -104,89 +104,76 @@ def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] 
     return data
 
 
-def fetch_config_from_s3(config_path) -> Config:
+def fetch_config_from_s3(config_path: str) -> Config:
     """Fetch configuration from S3 bucket"""
-    s3 = boto3.client('s3')
-
     if not config_path:
         duck_logger.error("No S3 config path provided.")
-        raise
+        raise ValueError("config_path is required")
 
-    duck_logger.info(f"Fetching config from S3 path: {config_path}")
+    duck_logger.debug(f"Fetching config from S3 path: {config_path}")
 
+    s3 = boto3.client('s3')
     bucket_name, key = config_path.replace('s3://', '').split('/', 1)
-    duck_logger.info(f"Fetching config from bucket: {bucket_name}")
-    duck_logger.info(f"Config key: {key}")
+
+    duck_logger.debug(f"Fetching config from bucket: {bucket_name}")
+    duck_logger.debug(f"Config key: {key}")
 
     response = s3.get_object(Bucket=bucket_name, Key=key)
-
     content = response['Body'].read().decode('utf-8')
 
-    ext = '.' + key.split('.')[-1]
-    config = load_config(ext, content, source_path=Path(key))
-    duck_logger.info("Successfully loaded config from S3")
+    config = load_config_from_content(
+        content=content,
+        source_path=Path(key),
+    )
+
+    duck_logger.debug("Successfully loaded config from S3")
     return config
 
 
-def read_yaml(content: str, source_path: Path | None = None) -> Config:
-    """Parse YAML content into a dictionary, with !include support"""
-    data = yaml.safe_load(content)
-    if source_path:
-        return resolve_includes(data, base_path=source_path.parent)
-    return data
-
-
-def read_json(content: str, source_path: Path | None = None) -> Config:
+def read_contents(content: str, loader: Callable, source_path: Path) -> Config:
     """Parse JSON content into a dictionary"""
-    data = json.loads(content)
+    data = loader(content)
     if source_path:
         return resolve_includes(data, base_path=source_path.parent)
     return data
 
 
-def load_config(file_type: str, content: str, source_path: Path | None = None) -> Config:
-    """Load configuration based on file type, supporting !include in YAML"""
-    match file_type:
+def load_config_from_content(
+    content: str,
+    source_path: Path,
+) -> Config:
+    """Load configuration from raw content based on file suffix."""
+    match source_path.suffix:
         case '.json':
-            return read_json(content, source_path=source_path)
+            return read_contents(content, json.loads, source_path)
         case '.yaml' | '.yml':
-            return read_yaml(content, source_path=source_path)
+            return read_contents(content, yaml.safe_load, source_path)
         case _:
-            raise NotImplementedError(f'Unsupported config extension: {file_type}')
+            raise NotImplementedError(
+                f"Unsupported config extension: {source_path.suffix}"
+            )
 
 
-def load_local_config(config_path: Path) -> Config:
-    """Load configuration from a local file"""
-    return load_config(config_path.suffix, config_path.read_text(), source_path=config_path)
+def load_config(source_path: str) -> Config:
+    """Load configuration based on file type, supporting !include in YAML"""
+    if source_path.startswith('s3://'):
+        return fetch_config_from_s3(source_path)
+
+    path = Path(source_path)
+    content = path.read_text()
+
+    return load_config_from_content(content, path)
 
 
-def load_configuration(base_cfg: str | None, merge_cfg: str | None = None) -> Config:
+def load_configuration(config_path: str) -> Config:
     """
-    Load the base configuration, optionally overlay a local config.
+    Load the base configuration.
     Handles S3 and local file loading.
     """
-
-    # TODO: do we still use s3 or json configs?
-    config_path = base_cfg or os.environ.get('CONFIG_FILE_S3_PATH') or 'config.json'
     duck_logger.info(f"Loading config from: {config_path}")
-
-    # Load base config
-    if config_path.startswith('s3://'):
-        base_config = fetch_config_from_s3(config_path)
-    else:
-        base_config = load_local_config(Path(config_path))
-
-    # Overlay local config if provided
-    if merge_cfg:
-        duck_logger.info(f"Applying overlay config: {merge_cfg}")
-
-        if merge_cfg.startswith('s3://'):
-            overlay_config = fetch_config_from_s3(merge_cfg)
-        else:
-            overlay_config = load_local_config(Path(merge_cfg))
-
-        final_config = deep_merge(base_config, overlay_config)
-    else:
-        final_config = base_config
-
+    final_config = load_config(config_path)
+    duck_logger.debug(
+        "Config loaded successfully. Full config: \n%s",
+        yaml.dump(final_config, default_flow_style=False, sort_keys=False)
+    )
     return final_config
