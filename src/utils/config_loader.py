@@ -67,6 +67,7 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     content = include_path.read_text()
     included_config = load_config_from_content(content, include_path)
 
+    # resolve nested includes
     resolved_data = resolve_includes(included_config, base_path=include_path.parent, seen=new_seen)
 
     return resolve_jsonpath(resolved_data, pointer)
@@ -131,11 +132,10 @@ def fetch_config_from_s3(config_path: str) -> Config:
 
 
 def read_contents(content: str, loader: Callable, source_path: Path) -> Config:
-    """Parse JSON content into a dictionary"""
+    """Reads contents using a specific loader method"""
     data = loader(content)
-    if source_path:
-        return resolve_includes(data, base_path=source_path.parent)
-    return data
+    resolved = resolve_includes(data, base_path=source_path.parent)
+    return resolved
 
 
 def load_config_from_content(
@@ -149,9 +149,7 @@ def load_config_from_content(
         case '.yaml' | '.yml':
             return read_contents(content, yaml.safe_load, source_path)
         case _:
-            raise NotImplementedError(
-                f"Unsupported config extension: {source_path.suffix}"
-            )
+            raise NotImplementedError(f"Unsupported config extension: {source_path.suffix}")
 
 
 def load_config(source_path: str) -> Config:
