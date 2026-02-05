@@ -1,5 +1,5 @@
 sql:
-  $include: settings-config.yaml:$.sql
+  $include: production-settings.yaml:$.sql
   database: local-testing-configs/local_reese_database.db
 
 containers: { }
@@ -61,10 +61,10 @@ admin_settings:
   admin_role_id: 1149033209821134858
 
 feedback_notifier_settings:
-  $include: settings-config.yaml:$.feedback_notifier_settings
+  $include: production-settings.yaml:$.feedback_notifier_settings
 
 ai_completion_retry_protocol:
-  $include: settings-config.yaml:$.ai_completion_retry_protocol
+  $include: production-settings.yaml:$.ai_completion_retry_protocol
 
 reporter_settings:
-  $include: settings-config.yaml:$.reporter_settings
+  $include: production-settings.yaml:$.reporter_settings

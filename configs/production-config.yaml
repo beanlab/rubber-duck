@@ -1,5 +1,5 @@
 sql:
-  $include: settings-config.yaml:$.sql
+  $include: production-settings.yaml:$.sql
   database: /rubber-duck.db
 
 containers:
@@ -68,15 +68,15 @@ servers:
   $include: production-servers.yaml:$
 
 feedback_notifier_settings:
-  $include: settings-config.yaml:$.feedback_notifier_settings
+  $include: production-settings.yaml:$.feedback_notifier_settings
 
 admin_settings:
-  $include: settings-config.yaml:$.admin_settings
+  $include: production-settings.yaml:$.admin_settings
   admin_channel_id: 1192895746672951340
   admin_role_id: 933123843038535741
 
 ai_completion_retry_protocol:
-  $include: settings-config.yaml:$.ai_completion_retry_protocol
+  $include: production-settings.yaml:$.ai_completion_retry_protocol
 
 reporter_settings:
-  $include: settings-config.yaml:$.reporter_settings
+  $include: production-settings.yaml:$.reporter_settings
