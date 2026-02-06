@@ -27,7 +27,7 @@ class RegistrationInfo:
     email_verified: bool
     nickname: str | None
     nickname_reason: str | None
-    roles_assigned: list[str] | None
+    roles_assigned: str | None
 
 class Registration:
     def __init__(self,
@@ -63,10 +63,10 @@ class Registration:
 
             # Get and assign nickname
             name, reason = await self.nickname_flow(ctx)
-            registration_info.nickname = name
-            registration_info.nickname_reason = reason
             if reason:
+                registration_info.nickname_reason = reason
                 return registration_info
+            registration_info.nickname = name
 
             # Assign Discord roles
             roles = await self.assign_roles(ctx)
@@ -275,9 +275,12 @@ class Registration:
             if not role:
                 raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
 
+
             selected_roles = [role]
+            role_names = ", ".join(role.name for role in selected_roles)
             await member.add_roles(role, reason="User registration")
-            return selected_roles
+            await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
+            return role_names
 
         else:
             available_roles, authenticated_role_id = await self._get_available_roles(thread_id, server_id, settings)

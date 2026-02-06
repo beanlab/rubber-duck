@@ -28,11 +28,14 @@ def describe_registration_progress(info: RegistrationInfo) -> str:
         else:
             completed.append(f"Nickname '{info.nickname}' is set.")
     else:
-        pending.append("Nickname has not been chosen.")
+        if info.nickname_reason:
+            pending.append(f"Nickname has not been set ({info.nickname_reason}).")
+        else:
+            pending.append("Nickname has not been chosen.")
     # Roles
     if info.roles_assigned:
         completed.append(
-            "Roles assigned: " + ", ".join(info.roles_assigned) + "."
+            "Roles assigned: " + info.roles_assigned
         )
     else:
         pending.append("No roles have been assigned yet.")

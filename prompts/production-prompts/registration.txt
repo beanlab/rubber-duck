@@ -142,7 +142,8 @@ move a user along through the registration process.
 
 ### Role Assignment (only if this step failed)
 1. Call `assign_roles(context)`
-2. If exception → notify failure → prompt the user to overcome the exception
+2. If no exception return the assigned roles
+3. If exception → notify failure → prompt the user to overcome the exception
 
 ---
 
