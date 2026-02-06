@@ -10,7 +10,7 @@ containers:
       memory_limit: 512m
       network: none
       timeout: 30
-    mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+    resources: # folder: folder | file: folder | file: folder/file - auto-detected
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
 tools:
