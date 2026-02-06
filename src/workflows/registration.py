@@ -278,7 +278,14 @@ class Registration:
 
             selected_roles = [role]
             role_names = ", ".join(role.name for role in selected_roles)
-            await member.add_roles(role, reason="User registration")
+            try:
+                await member.add_roles(role, reason="User registration")
+            except discord.Forbidden:
+                duck_logger.exception(f"Failed to assign role: {role} to user in thread: <#{thread_id}>")
+                await self._send_message(
+                    self._settings['ta_channel_id'],
+                    f"ERROR in <#{thread_id}>: RubberDuck doesn't have high enough access to assign role: {role}"
+                )
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
             return role_names
 
@@ -317,7 +324,14 @@ class Registration:
             # Assign roles
             new_roles = [role for role in selected_roles if role not in member.roles]
             if new_roles:
-                await member.add_roles(*new_roles, reason="User registration")
+                try:
+                    await member.add_roles(*new_roles, reason="User registration")
+                except discord.Forbidden:
+                    duck_logger.exception(f"Failed to assign roles: {new_roles} to user in thread: <#{thread_id}>")
+                    await self._send_message(
+                        self._settings['ta_channel_id'],
+                        f"Error in <#{thread_id}>: The bot doesn't have high enough access to assign roles: {new_roles}"
+                    )
 
             if already_roles:
                 already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
