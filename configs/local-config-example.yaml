@@ -56,15 +56,8 @@ servers:
               target_channel_ids:
                 - 1428518677287796756
 
+$include: production-settings.yaml:$.general_settings
+
 admin_settings:
   admin_channel_id: 1429899217890967663
   admin_role_id: 1149033209821134858
-
-feedback_notifier_settings:
-  $include: production-settings.yaml:$.feedback_notifier_settings
-
-ai_completion_retry_protocol:
-  $include: production-settings.yaml:$.ai_completion_retry_protocol
-
-reporter_settings:
-  $include: production-settings.yaml:$.reporter_settings
