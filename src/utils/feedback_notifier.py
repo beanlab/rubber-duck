@@ -81,18 +81,17 @@ class FeedbackNotifier:
         for server_config in self._server_configs:
             for _, channel_cfg in server_config['channels'].items():
                 ta_channel_id = channel_cfg['channel_id']
-                target_channels = []
 
                 # Find all ducks of type conversation_review in this channel
                 duck = channel_cfg['duck']
                 if isinstance(duck, str):
                     continue
+                duck = next(iter(duck.values()))
                 if duck['duck_type'] == 'conversation_review':
-                    target_channels.extend(duck['settings']['target_channel_ids'])
+                    target_channels = duck['settings']['target_channel_ids']
 
                     if target_channels:
                         feedback_mapping[ta_channel_id] = target_channels
-                        duck_logger.debug(
-                            f"Mapped TA channel {ta_channel_id} to {len(target_channels)} target channels")
+                        duck_logger.debug(f"Mapped TA channel {ta_channel_id} to {len(target_channels)} target channels")
 
         return feedback_mapping
