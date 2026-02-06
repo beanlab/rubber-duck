@@ -3,7 +3,7 @@ sql:
   database: /rubber-duck.db
 
 containers:
-  stats-python-sandbox:
+  run-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
     settings: # TODO: use this
       cpu_limit: 1
@@ -16,7 +16,7 @@ containers:
 tools:
   run_python:
     type: container_exec
-    container: stats-python-sandbox
+    container: run-python-sandbox
 
 
 agents_as_tools:
