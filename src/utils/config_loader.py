@@ -1,4 +1,5 @@
 import json
+import re
 from copy import deepcopy
 from jsonpath_ng import parse
 from pathlib import Path
@@ -72,22 +73,35 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     return resolve_jsonpath(resolved_data, pointer)
 
 
+INCLUDE_KEY_RE = re.compile(r"^\$include(?:_\d+)?$")
+
+
 def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
     if seen is None:
         seen = set()
     if isinstance(data, dict):
-        if "$include" in data:
-            include_ref = data["$include"]
-            duck_logger.debug(f"including: {include_ref}")
-            overrides = {k: v for k, v in data.items() if k != "$include"}
+        include_keys = sorted(
+            k for k in data if INCLUDE_KEY_RE.match(k)
+        )
 
-            included = load_include(include_ref, base_path, seen)
+        if include_keys:
+            duck_logger.debug(f"including: {include_keys}")
+
+            overrides = {
+                k: v for k, v in data.items() if k not in include_keys
+            }
+
+            merged = {}
+            for key in include_keys:
+                include_ref = data[key]
+                included = load_include(include_ref, base_path, seen)
+                merged = deep_merge(merged, included)
 
             resolved_overrides = resolve_includes(
                 overrides, base_path=base_path, seen=seen
             )
 
-            return deep_merge(included, resolved_overrides)
+            return deep_merge(merged, resolved_overrides)
 
         return {
             k: resolve_includes(v, base_path=base_path, seen=seen)
@@ -138,8 +152,8 @@ def read_contents(content: str, loader: Callable, source_path: Path) -> Config:
 
 
 def load_config_from_content(
-    content: str,
-    source_path: Path,
+        content: str,
+        source_path: Path,
 ) -> Config:
     """Load configuration from raw content based on file suffix."""
     match source_path.suffix:

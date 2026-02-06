@@ -35,6 +35,12 @@ ducks:
   stats-duck:
     $include: production-config.yaml:$.ducks.stats-duck
 
+# multiple includes are also supported (the second include can override a portion of the first
+ducks:
+  standard-rubber-duck:
+    $include_0: production-config.yaml:$.ducks.standard-rubber-duck
+    $include_1: production-config.yaml:$.ducks.stats-duck
+
 
 servers:
   BeanLab:
