@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import logging
 import os
-import yaml
 from pathlib import Path
 from typing import Iterable
 
