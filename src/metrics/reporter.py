@@ -113,12 +113,10 @@ class Reporter:
     def _make_reporting_config(self, server_configs: dict[str, ServerConfig]) -> dict:
         """This function converts the server_config into a dictionary that maps server names to their channels."""
         reporting_config = {}
-        for server in server_configs.values():
-            server_name = server['server_name']
+        for server_name, server in server_configs.items():
             channel_dict = {}
-            for channel in server['channels']:
+            for channel_name, channel in server['channels'].items():
                 channel_id = channel['channel_id']
-                channel_name = channel['channel_name']
                 channel_dict[channel_id] = channel_name
             reporting_config[server_name] = channel_dict
         return reporting_config
@@ -357,9 +355,9 @@ class Reporter:
         return "-".join(components)
 
     def help_menu(self):
-        lines = ["Type '!report', followed by any of the following commands to see the metrics for it:"]
-        lines.extend(f"'{key}': {item[1]}" for key, item in self.pre_baked.items())
-        return "\n\n".join(lines)
+        lines = ["### Type `'!report'`, followed by any of the following commands to see the metrics for it:"]
+        lines.extend(f" - `'{key}'`: {item[1]}" for key, item in self.pre_baked.items())
+        return "\n".join(lines)
 
     def get_all_prebaked(self):
         results = []
@@ -380,7 +378,7 @@ class Reporter:
         try:
             if arg_string == '!report all':
                 return self.get_all_prebaked()
-            if arg_string == '!report help' or arg_string == '!report h':
+            if arg_string in ['!report', '!report help', '!report h']:
                 return self.help_menu()
 
             if arg_string == '!report ftrend percent' or arg_string == '!report ftrend average':

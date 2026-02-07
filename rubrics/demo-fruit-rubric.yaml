@@ -7,16 +7,18 @@ Project Demo Fruit:
       - Rubric item to talk about bananas
   Section 2:
     - Rubric item to talk about raspberries
-  _SectionIgnored:
-    SubSection:
-      - Anything under the '_SectionIgnored' will be ignored -- include this rubric item.
   Section 3:
     - Mention any fruit [Fruit Definition, Fruit Mention]
-
-_Private_Header:
-  - This header, and anything in this section, will be ignored.
 
 Rules:
   Fruit Mention:
     For a fruit to be considered mentioned, 
     the report must use at least 6 words
+  Fruit Definition:
+    A tomato is **not** a fruit
+    Cabbage **is** a fruit
+
+    If the student mentions cabbage, it is correct.
+    
+    If the student mentions a tomato it is incorrect.
+

@@ -73,54 +73,78 @@ def filter_logs(send_message, config: AdminSettings):
 
 ERROR_RE = re.compile(
     r"""
-    ^\S+\s+\S+
+    ^(?:\[ERROR\]\s+)?
+    \S+\s+\S+
     \s+ERRO\s+
     <\#(?P<thread_id>\d+|-)>\s+
-    (?P<prefix>[\w\-]+)\s*-\s*(?P<extra>[\w\-]+)\s*-\s*
+    (?P<prefix>[\w\-]+)\s*-\s*
+    (?P<extra>[\w\-]+)\s*-\s*
     (?P<channel_id>\d+)-(?P<message_id>\d+)\.[^\s]+\s*-\s*
     (?P<error_msg>[^\n]*)
-    (?:\n
-        (?P<traceback>Traceback[\s\S]*?)
-        \n
-        (?P<final_exception>[A-Za-z_][A-Za-z0-9_]*Error:\s+.*)
-    )?
+    (?:\n(?P<tracebacks>Traceback[\s\S]*))?
+    $
     """,
     re.VERBOSE | re.DOTALL
 )
 
+CHAIN_MARKER = "\nDuring handling of the above exception, another exception occurred:\n"
+
+
+def split_chained_tracebacks(tracebacks: str) -> list[str]:
+    """
+    Split a traceback blob into individual chained traceback blocks.
+    """
+    return tracebacks.strip().split(CHAIN_MARKER)
+
 
 def format_error_message(raw: str) -> str:
     """
-    Parse and format an error message for Discord readability
-    Expected input format:
-
-    yyyy-mm-dd hh:mm:ss ERRO <#thread_id> duck - duck-<channel_id>-<msg_id>.main - this is a sample error message
+    Parse and format an error message for Discord readability.
     """
     m = ERROR_RE.match(raw)
     if not m:
-        # if not matched, just return the raw message without formatting
-        duck_logger.debug("unrecognized error message format")
+        duck_logger.debug(f"unrecognized error message format: {raw}")
         return raw
+
     try:
         thread_id = m.group("thread_id")
         error_msg = m.group("error_msg")
-        traceback = m.group("traceback")
-        final_exception = m.group("final_exception")
+        tracebacks = m.group("tracebacks")
     except IndexError:
-        duck_logger.debug(f"one or more groups weren't parsed. groups: {m.groups()}")
+        duck_logger.debug(f"failed to parse groups: {m.groups()}")
         return raw
 
-    formatted = (
-        f"**Error in thread:** <#{thread_id}>\n{error_msg}\n```\n{traceback}\n```\n{final_exception}"
-    )
-    return formatted
+    parts: list[str] = [
+        f"## Error in thread: <#{thread_id}>",
+        "",
+        "**" + error_msg + "**",
+        ""
+    ]
+
+    if not tracebacks:
+        return "\n".join(parts)
+
+    chained_blocks = split_chained_tracebacks(tracebacks)
+
+    for i, block in enumerate(chained_blocks):
+
+        parts.append("```")
+        parts.append(block.strip())
+        parts.append("```")
+
+        if i < len(chained_blocks) - 1:
+            parts.append("\n---\n")
+            parts.append("During handling of the above exception, another exception occurred:")
+            parts.append("")
+
+    return "\n".join(parts)
 
 
 async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
     loop = asyncio.get_running_loop()
 
     def _blocking_get():
-        return log_queue.get()  # blocking call in thread
+        return log_queue.get()
 
     while True:
         record = await loop.run_in_executor(None, _blocking_get)

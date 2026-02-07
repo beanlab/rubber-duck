@@ -75,8 +75,9 @@ class Registration:
             else:
                 return registration_info
 
-        except ConversationComplete:
-            await self._send_message(ctx.thread_id, "This conversation has timed out.")
+        except ConversationComplete as e:
+            if ctx.thread_id and str(e):
+                await self._send_message(ctx.thread_id, str(e))
         except Exception as e:
             duck_logger.exception(f"Setup failed: {e}")
             await self._send_message(ctx.thread_id, "Registration setup failed. Please contact an administrator.")
@@ -228,7 +229,7 @@ class Registration:
             raise ValueError(f"Guild {server_id} not found")
 
         # Get role patterns from config
-        role_patterns = settings.get("roles", {}).get("patterns", [])
+        role_patterns = settings.get("roles", {}).get("patterns", {})
         if not role_patterns:
             duck_logger.info("No role patterns configured for this server")
 
@@ -241,7 +242,7 @@ class Registration:
                 continue
 
             # If no patterns are configured, skip additional role filtering
-            for pattern_info in role_patterns:
+            for pattern_info in role_patterns.values():
                 if re.search(pattern_info["pattern"], role.name):
                     available_roles.append({
                         "id": role.id,
@@ -281,11 +282,11 @@ class Registration:
             try:
                 await member.add_roles(role, reason="User registration")
             except discord.Forbidden:
-                duck_logger.exception(f"Failed to assign role: {role} to user in thread: <#{thread_id}>")
                 await self._send_message(
                     self._settings['ta_channel_id'],
                     f"ERROR in <#{thread_id}>: RubberDuck doesn't have high enough access to assign role: {role}"
                 )
+                raise ConversationComplete("Insufficient permissions to set nickname")
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
             return role_names
 
@@ -332,6 +333,7 @@ class Registration:
                         self._settings['ta_channel_id'],
                         f"Error in <#{thread_id}>: The bot doesn't have high enough access to assign roles: {new_roles}"
                     )
+                    raise ConversationComplete("Insufficient permissions to set nickname")
 
             if already_roles:
                 already_added_roles = [guild.get_role(role_id) for role_id in already_roles]
@@ -384,7 +386,12 @@ class Registration:
 
             await member.edit(nick=name, reason="Student registration")
             return True, "Nickname set successfully"
-
+        except discord.Forbidden:
+            await self._send_message(
+                self._settings['ta_channel_id'],
+                f"Error in <#{ctx.thread_id}>: The bot doesn't have high enough access to assign a nickname"
+            )
+            raise ConversationComplete("Insufficient permissions to set nickname")
         except Exception as e:
             duck_logger.info(f"Error assigning nickname: {e}")
             return False, "Unexpected error"
@@ -396,9 +403,8 @@ class Registration:
             ctx: DuckContext,
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        max_retries = self._settings['max_retries'] or 3
+        max_retries = self._settings.get('max_retries', 3)
         thread_id = ctx.thread_id
-        """Handle full nickname assignment flow with retries and TA escalation."""
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, ctx.timeout)
 

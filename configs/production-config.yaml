@@ -1,0 +1,64 @@
+sql:
+  db_type: sqlite
+  database: /rubber-duck.db
+
+containers:
+  stats-python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    settings: # TODO: use this
+      cpu_limit: 1
+      memory_limit: 512m
+      network: none
+      timeout: 30
+    mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
+
+tools:
+  run_python:
+    type: container_exec
+    container: stats-python-sandbox
+
+
+agents_as_tools:
+  registration:
+    doc_string: |
+      This tool moves a user through the registration process.
+    agent:
+      name: RegistrationBot
+      prompt_files:
+        - prompts/production-prompts/registration.txt
+      engine: gpt-5-mini
+      reasoning: minimal
+      tools:
+        - send_message_to_user
+        - receive_message_from_user
+        - get_net_id
+        - check_net_id
+        - confirm_registration_via_email
+        - assign_roles
+        - nickname_flow
+        - conclude_conversation
+
+
+  code_complexity_agent:
+    doc_string: |
+      This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
+      This tool takes source code as a string and returns a string describing the order of complexity (Big-O analysis) of the provided code.
+    agent:
+      name: CodeComplexityAgent
+      prompt_files:
+        - prompts/312-project-design/generate-code-complexity.md
+      engine: gpt-4.1
+      tools: [ ]
+
+ducks:
+  $include: production-ducks.yaml
+
+servers:
+  $include: production-servers.yaml
+
+$include: production-settings.yaml:$.general_settings
+
+admin_settings:
+  admin_channel_id: 1192895746672951340
+  admin_role_id: 933123843038535741

@@ -1,57 +1,57 @@
 {
-  "name": "Graduate Admission Prediction",
+  "dataset_name": "Graduate Admission Prediction",
   "description": "Dataset with admission-related factors for graduate applicants, including test scores, GPA, and chance of admission.",
   "columns": [
     {
-      "name": "Serial No.",
+      "col_name": "Serial No.",
       "display_name": "Serial Number",
       "description": "Unique identifier for each applicant.",
       "dtype": "int"
     },
     {
-      "name": "GRE Score",
+      "col_name": "GRE Score",
       "display_name": "GRE Score",
       "description": "Graduate Record Examination score of the applicant.",
       "dtype": "int"
     },
     {
-      "name": "TOEFL Score",
+      "col_name": "TOEFL Score",
       "display_name": "TOEFL Score",
       "description": "Test of English as a Foreign Language score of the applicant.",
       "dtype": "int"
     },
     {
-      "name": "University Rating",
+      "col_name": "University Rating",
       "display_name": "University Rating",
       "description": "Rating of the university (scale 1–5).",
       "dtype": "int"
     },
     {
-      "name": "SOP",
+      "col_name": "SOP",
       "display_name": "SOP Strength",
       "description": "Strength of the applicants Statement of Purpose (scale 1-5).",
       "dtype": "float"
     },
     {
-      "name": "LOR",
+      "col_name": "LOR",
       "display_name": "LOR Strength",
       "description": "Strength of the applicants Letters of Recommendation (scale 1-5).",
       "dtype": "float"
     },
     {
-      "name": "CGPA",
+      "col_name": "CGPA",
       "display_name": "CGPA",
       "description": "Cumulative Grade Point Average of the applicant on a 10-point scale.",
       "dtype": "float"
     },
     {
-      "name": "Research",
+      "col_name": "Research",
       "display_name": "Research Experience",
       "description": "Indicates whether the applicant has research experience (0 = No, 1 = Yes).",
       "dtype": "int"
     },
     {
-      "name": "Chance of Admit",
+      "col_name": "Chance of Admit",
       "display_name": "Chance of Admission",
       "description": "Probability of admission, expressed as a decimal between 0 and 1.",
       "dtype": "float"
