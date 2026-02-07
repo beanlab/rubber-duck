@@ -16,6 +16,8 @@ file_settings:
 ]
 
 general_settings:
+  sender_email: byu-cs-course-ops@cs.byu.edu
+
   admin_settings:
     log_level: WARNING
 
