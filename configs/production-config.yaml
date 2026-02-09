@@ -64,6 +64,9 @@ agents_as_tools:
 ducks:
   $include: production-ducks.yaml
 
+servers:
+  $include: production-servers.yaml
+
 $include: production-settings.yaml:$.general_settings
 
 admin_settings:
