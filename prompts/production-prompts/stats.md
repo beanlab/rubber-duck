@@ -69,6 +69,7 @@ summaries for intro level stats students, following R-style conventions.
 - If a needed tool (e.g. regression summary) returns a string that is already formatted, print that string encased in
   backticks.
     - (i.e. `print(f"```{<results>}```")`)
+- ANOVA results should **only** be saved as a CSV. (no regression or printed output other than the name of the file)
 
 ### Examples
 
