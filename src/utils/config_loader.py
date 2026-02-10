@@ -1,12 +1,12 @@
 import json
 import re
 from copy import deepcopy
-from jsonpath_ng import parse
 from pathlib import Path
 from typing import Any, Callable
 
 import boto3
 import yaml
+from jsonpath_ng import parse
 
 from .config_types import Config
 from .logger import duck_logger
@@ -46,9 +46,9 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
     return deepcopy(matches)
 
 
-def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
+def _load_included_content(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     if ":" in ref:
-        path_part, pointer = ref.split(":", 1)
+        path_part, pointer = ref.split(":")[-2:]
         pointer = pointer or ""
     else:
         path_part, pointer = ref, ""
@@ -61,31 +61,21 @@ def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
 
     new_seen = seen.union({key})
 
-    if not include_path.exists():
-        raise FileNotFoundError(f"Included config not found: {include_path}")
+    content = _load_config(include_path, new_seen)
 
-    content = include_path.read_text()
-    included_config = load_config_from_content(content, include_path)
-
-    # resolve nested includes
-    resolved_data = resolve_includes(included_config, base_path=include_path.parent, seen=new_seen)
-
-    return resolve_jsonpath(resolved_data, pointer)
+    return resolve_jsonpath(content, pointer)
 
 
 INCLUDE_KEY_RE = re.compile(r"^\$include(?:_\d+)?$")
 
 
-def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
-    if seen is None:
-        seen = set()
+def _resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
     if isinstance(data, dict):
         include_keys = sorted(
             k for k in data if INCLUDE_KEY_RE.match(k)
         )
 
         if include_keys:
-            duck_logger.debug(f"including: {include_keys}")
 
             overrides = {
                 k: v for k, v in data.items() if k not in include_keys
@@ -94,36 +84,32 @@ def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] 
             merged = {}
             for key in include_keys:
                 include_ref = data[key]
-                included = load_include(include_ref, base_path, seen)
+                included = _load_included_content(include_ref, base_path, seen)
                 merged = deep_merge(merged, included)
 
-            resolved_overrides = resolve_includes(
+            resolved_overrides = _resolve_includes(
                 overrides, base_path=base_path, seen=seen
             )
 
             return deep_merge(merged, resolved_overrides)
 
         return {
-            k: resolve_includes(v, base_path=base_path, seen=seen)
+            k: _resolve_includes(v, base_path=base_path, seen=seen)
             for k, v in data.items()
         }
 
     # allow includes within lists
     if isinstance(data, list):
         return [
-            resolve_includes(item, base_path=base_path, seen=seen)
+            _resolve_includes(item, base_path=base_path, seen=seen)
             for item in data
         ]
 
     return data
 
 
-def fetch_config_from_s3(config_path: str) -> Config:
+def _read_s3_content(config_path: str) -> str:
     """Fetch configuration from S3 bucket"""
-    if not config_path:
-        duck_logger.error("No S3 config path provided.")
-        raise ValueError("config_path is required")
-
     duck_logger.debug(f"Fetching config from S3 path: {config_path}")
 
     s3 = boto3.client('s3')
@@ -135,45 +121,46 @@ def fetch_config_from_s3(config_path: str) -> Config:
     response = s3.get_object(Bucket=bucket_name, Key=key)
     content = response['Body'].read().decode('utf-8')
 
-    config = load_config_from_content(
-        content=content,
-        source_path=Path(key),
-    )
-
-    duck_logger.debug("Successfully loaded config from S3")
-    return config
+    return content
 
 
-def read_contents(content: str, loader: Callable, source_path: Path) -> Config:
-    """Reads contents using a specific loader method"""
-    data = loader(content)
-    resolved = resolve_includes(data, base_path=source_path.parent)
-    return resolved
-
-
-def load_config_from_content(
+def _parse_config_from_content(
         content: str,
-        source_path: Path,
+        source_path_suffix: str,
 ) -> Config:
     """Load configuration from raw content based on file suffix."""
-    match source_path.suffix:
+    match source_path_suffix:
         case '.json':
-            return read_contents(content, json.loads, source_path)
+            return json.loads(content)
         case '.yaml' | '.yml':
-            return read_contents(content, yaml.safe_load, source_path)
+            return yaml.safe_load(content)
         case _:
-            raise NotImplementedError(f"Unsupported config extension: {source_path.suffix}")
+            raise NotImplementedError(f"Unsupported config extension: {source_path_suffix}")
 
 
-def load_config(source_path: str) -> Config:
+def _load_config(source_path: Path, seen: set) -> Config:
     """Load configuration based on file type, supporting !include in YAML"""
-    if source_path.startswith('s3://'):
-        return fetch_config_from_s3(source_path)
+    duck_logger.debug(f'Loading {source_path}')
 
-    path = Path(source_path)
-    content = path.read_text()
+    if str(source_path).startswith('s3://'):
+        def get_content(config_path: Path) -> str:
+            return _read_s3_content(str(config_path))
 
-    return load_config_from_content(content, path)
+    else:
+        def get_content(config_path: Path) -> str:
+            return config_path.read_text()
+
+    content = get_content(source_path)
+
+    raw_config = _parse_config_from_content(content, source_path.suffix)
+
+    config = _resolve_includes(
+        raw_config,
+        base_path=source_path.parent,
+        seen=seen
+    )
+
+    return config
 
 
 def load_configuration(config_path: str) -> Config:
@@ -182,7 +169,7 @@ def load_configuration(config_path: str) -> Config:
     Handles S3 and local file loading.
     """
     duck_logger.info(f"Loading config from: {config_path}")
-    final_config = load_config(config_path)
+    final_config = _load_config(Path(config_path), set())
     duck_logger.debug(
         "Config loaded successfully. Full config: \n%s",
         yaml.dump(final_config, default_flow_style=False, sort_keys=False)
