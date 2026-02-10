@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import logging
 import os
+import yaml
 from pathlib import Path
 from typing import Iterable
 
@@ -106,27 +107,25 @@ def build_registration_duck(
     return registration_workflow
 
 
-def _iterate_duck_configs(config: Config) -> Iterable[DuckConfig]:
-    # Look for global configs
-    yield from config['ducks']
+def _iterate_duck_configs(config: Config) -> Iterable[tuple[DUCK_NAME, DuckConfig]]:
+    # Global ducks
+    for name, duck_cfg in config["ducks"].items():
+        yield name, duck_cfg
 
-    # Look for inline duck configs
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            if not isinstance(channel_config.get('ducks'), list):
-                duck_logger.error(
-                    f"Channel {channel_config.get('channel_id')} has invalid ducks: {channel_config.get('ducks')}")
-            for item in channel_config.get('ducks') or []:
-                if isinstance(item, DUCK_NAME):
-                    continue
-                elif isinstance(item, dict):
-                    if 'weight' in item:
-                        duck = item['duck']
-                        if isinstance(duck, DUCK_NAME):
-                            continue
-                        yield duck
-                    else:
-                        yield item
+    # Inline channel ducks
+    for server in config["servers"].values():
+        for channel in server["channels"].values():
+            duck = channel.get("duck")
+
+            # Reference to global duck
+            if isinstance(duck, DUCK_NAME):
+                continue
+
+            # Inline definition(s)
+            if isinstance(duck, dict):
+                for name, duck_cfg in duck.items():
+                    if isinstance(duck_cfg, dict) and "duck_type" in duck_cfg:
+                        yield name, duck_cfg
 
 
 def build_ducks(
@@ -140,10 +139,9 @@ def build_ducks(
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
 
-    for duck_config in _iterate_duck_configs(config):
+    for name, duck_config in _iterate_duck_configs(config):
         duck_type = duck_config['duck_type']
         settings = duck_config['settings']
-        name = duck_config['name']
 
         if duck_type == 'agent_led_conversation':
             starting_agent = build_agent(settings["agent"])
@@ -165,7 +163,7 @@ def build_ducks(
             single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
             project_scanner_agent = build_agent(settings["project_scanner_agent"])
             ducks[name] = AssignmentFeedbackWorkflow(
-                settings['name'],
+                name,
                 bot.send_message,
                 settings,
                 single_rubric_item_grader,
@@ -191,33 +189,39 @@ def _setup_ducks(
         ai_client,
         armory,
         talk_tool
-) -> dict[CHANNEL_ID, list[tuple[DUCK_WEIGHT, DuckConversation]]]:
+) -> dict[CHANNEL_ID, DuckConversation]:
     """
     Return a dictionary of channel ID to list of weighted ducks
     """
     all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
 
-    channel_ducks = {}
+    channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
 
-    for server_config in config['servers'].values():
-        for channel_config in server_config['channels']:
-            channel_ducks[channel_config['channel_id']] = []
-            for duck_config in channel_config['ducks']:
-                if isinstance(duck_config, str):
-                    name, weight = duck_config, 1
+    for server_config in config["servers"].values():
+        for channel_name, channel_config in server_config["channels"].items():
+            channel_id = channel_config["channel_id"]
 
-                elif isinstance(duck_config, dict) and 'weight' in duck_config:
-                    name = duck_config['name']
-                    weight = duck_config['weight']
+            duck_cfg = channel_config.get("duck")
+            if duck_cfg is None:
+                continue  # channel intentionally has no duck
 
-                elif isinstance(duck_config, dict):
-                    name, weight = duck_config['name'], 1
+            if isinstance(duck_cfg, str):
+                duck_name = duck_cfg
 
-                else:
-                    raise ValueError(f'Incorrect format for duck config: {channel_config["channel_id"]}')
+            elif isinstance(duck_cfg, dict):
+                duck_name, duck_cfg = next(iter(duck_cfg.items()))
 
-                channel_ducks[channel_config['channel_id']].append((weight, all_ducks[name]))
+            else:
+                raise ValueError(
+                    f"Invalid duck config for channel {channel_id}: {duck_cfg}"
+                )
 
+            try:
+                channel_ducks[channel_id] = all_ducks[duck_name]
+            except KeyError:
+                raise KeyError(
+                    f"Duck '{duck_name}' referenced in channel {channel_id} was not built"
+                )
     return channel_ducks
 
 
@@ -226,7 +230,7 @@ def _build_feedback_queues(config: Config, sql_session):
 
     convo_review_ducks = (
         duck
-        for duck in _iterate_duck_configs(config)
+        for _, duck in _iterate_duck_configs(config)
         if duck['duck_type'] == 'conversation_review'
     )
 
@@ -248,7 +252,7 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
 
     # setup tools
     config_tools = config.get("tools", [])
-    for tool_config in config_tools:
+    for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
             python_tools = PythonTools(containers[container_name], send_message)
@@ -257,7 +261,7 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
                     + '\n'
                     + containers[container_name].get_resource_metadata()
             )
-            armory.add_tool(python_tools.run_code, name=tool_config['name'], description=amended_description)
+            armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 
@@ -268,11 +272,10 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
 
 
 def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
-    agents_as_tools: list[AgentAsToolSettings] = config.get("agents_as_tools", [])
-    for settings in agents_as_tools:
+    for name, settings in config.get("agents_as_tools", {}).items():
         agent = build_agent(settings["agent"])
         tool = ai_client.build_agent_tool(
-            agent, settings["tool_name"], settings["doc_string"]
+            agent, name, settings["doc_string"]
         )
         armory.add_tool(tool)
 
@@ -318,7 +321,7 @@ async def _main(config: Config, log_dir: Path):
                 channel_configs = {
                     channel_config['channel_id']: channel_config
                     for server_config in config['servers'].values()
-                    for channel_config in server_config['channels']
+                    for channel_config in server_config['channels'].values()
                 }
 
                 async with setup_workflow_manager(

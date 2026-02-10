@@ -1,0 +1,71 @@
+sql:
+  db_type: sqlite
+  database: /rubber-duck.db
+
+containers:
+  stats-python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    settings: # TODO: use this
+      cpu_limit: 1
+      memory_limit: 512m
+      network: none
+      timeout: 30
+    mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+      - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
+
+tools:
+  run_python:
+    type: container_exec
+    container: stats-python-sandbox
+
+
+agents_as_tools:
+  check_suspicion_bot:
+    doc_string: |
+      This tool determines if a user's message is suspicious. Suspicious messages are those that do not appear to follow the format
+      of a user's name (first_name_last_name). The tool checks for profanity, unusual characters, and other indicators of suspicious behavior.
+      If the message is suspicious, the tool returns a formatted output indicating the reason for suspicion. If the message is not suspicious,
+      the tool returns a formatted output indicating that the message is safe.
+    agent:
+      name: SuspicionChecker
+      prompt_files:
+        - prompts/production-prompts/suspicion-checker.txt
+      engine: gpt-5-mini
+      reasoning: minimal
+      tools: []
+      output_format:
+        format:
+          type: json_schema
+          name: suspicion_output
+          strict: true
+          schema:
+            type: object
+            properties:
+              suspicious:
+                type: boolean
+                description: Indicates if the name is suspicious according to the agent.
+              reason:
+                type: string
+                description: The reason why the name is considered suspicious or safe.
+            required: [ "suspicious", "reason" ]
+            additionalProperties: false
+
+  code_complexity_agent:
+    doc_string: |
+      This tool analyzes the complexity of source code and returns a string describing the order of complexity. 
+      This tool takes source code as a string and returns a string describing the order of complexity (Big-O analysis) of the provided code.
+    agent:
+      name: CodeComplexityAgent
+      prompt_files:
+        - prompts/312-project-design/generate-code-complexity.md
+      engine: gpt-4.1
+      tools: []
+
+ducks:
+  $include: production-ducks.yaml
+
+$include: production-settings.yaml:$.general_settings
+
+admin_settings:
+  admin_channel_id: 1192895746672951340
+  admin_role_id: 933123843038535741
