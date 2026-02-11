@@ -135,25 +135,25 @@ def _parse_config_from_content(content: str, source_path_suffix: str,) -> Config
             raise NotImplementedError(f"Unsupported config extension: {source_path_suffix}")
 
 
-def _load_config(source_path: Path, seen: set) -> Config:
+def _load_config(source_path: str, seen: set) -> Config:
     """Load configuration based on file type, supporting $include in YAML"""
     duck_logger.debug(f'Loading {source_path}')
 
-    if str(source_path).startswith('s3://'):
-        def get_content(config_path: Path) -> str:
-            return _read_s3_content(str(config_path))
-
+    if source_path.startswith("s3://"):
+        content = _read_s3_content(source_path)
+        suffix = Path(source_path).suffix  # safe just for suffix
+        base_path = source_path.rsplit("/", 1)[0]
     else:
-        def get_content(config_path: Path) -> str:
-            return config_path.read_text()
+        path_obj = Path(source_path)
+        content = path_obj.read_text()
+        suffix = path_obj.suffix
+        base_path = str(path_obj.parent)
 
-    content = get_content(source_path)
-
-    raw_config = _parse_config_from_content(content, source_path.suffix)
+    raw_config = _parse_config_from_content(content, suffix)
 
     config = _resolve_includes(
         raw_config,
-        base_path=source_path.parent,
+        base_path=base_path,
         seen=seen
     )
 
@@ -165,7 +165,7 @@ def load_configuration(config_path: str) -> Config:
     Loads the configuration file from S3 and local file paths
     """
     duck_logger.info(f"Loading config from: {config_path}")
-    final_config = _load_config(Path(config_path), set())
+    final_config = _load_config(config_path, set())
     duck_logger.debug(
         "Config loaded successfully. Full config: \n%s",
         yaml.dump(final_config, default_flow_style=False, sort_keys=False)
