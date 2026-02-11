@@ -38,7 +38,7 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
     if not matches:
         raise KeyError(f"JSONPath not found: {expr}")
 
-    # single match returns the value,
+    # single match returns the value
     # multiple matches return a list
     if len(matches) == 1:
         return deepcopy(matches[0])
@@ -124,10 +124,7 @@ def _read_s3_content(config_path: str) -> str:
     return content
 
 
-def _parse_config_from_content(
-        content: str,
-        source_path_suffix: str,
-) -> Config:
+def _parse_config_from_content(content: str, source_path_suffix: str,) -> Config:
     """Load configuration from raw content based on file suffix."""
     match source_path_suffix:
         case '.json':
@@ -139,7 +136,7 @@ def _parse_config_from_content(
 
 
 def _load_config(source_path: Path, seen: set) -> Config:
-    """Load configuration based on file type, supporting !include in YAML"""
+    """Load configuration based on file type, supporting $include in YAML"""
     duck_logger.debug(f'Loading {source_path}')
 
     if str(source_path).startswith('s3://'):
@@ -165,8 +162,7 @@ def _load_config(source_path: Path, seen: set) -> Config:
 
 def load_configuration(config_path: str) -> Config:
     """
-    Load the base configuration.
-    Handles S3 and local file loading.
+    Loads the configuration file from S3 and local file paths
     """
     duck_logger.info(f"Loading config from: {config_path}")
     final_config = _load_config(Path(config_path), set())
