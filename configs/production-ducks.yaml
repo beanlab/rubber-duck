@@ -10,7 +10,7 @@ standard-rubber-duck:
       tools:
         - talk_to_user
         - conclude_conversation
-    $include: production-settings.yaml:$.file_settings
+    $include: production-settings.yaml@$.file_settings
 
 stats-duck:
   duck_type: user_led_conversation
@@ -26,4 +26,4 @@ stats-duck:
       reasoning: minimal
       tools:
         - run_python
-    $include: production-settings.yaml:$.file_settings
+    $include: production-settings.yaml@$.file_settings

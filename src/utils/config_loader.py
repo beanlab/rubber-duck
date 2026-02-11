@@ -47,8 +47,8 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
 
 
 def _load_included_content(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
-    if ":" in ref:
-        path_part, pointer = ref.split(":")[-2:]
+    if "@" in ref:
+        path_part, pointer = ref.split("@")[-2:]
         pointer = pointer or ""
     else:
         path_part, pointer = ref, ""

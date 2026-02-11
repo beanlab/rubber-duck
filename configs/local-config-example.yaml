@@ -10,19 +10,19 @@ tools: { }
 # include one duck without overrides ($include doesn't copy in the key
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml:$.ducks.standard-rubber-duck
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
 
 # override usage
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml:$.ducks.standard-rubber-duck
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
     settings:
       agent:
         engine: gpt-5-nano
 
 # include all ducks with example override
 ducks:
-  $include: production-config.yaml:$.ducks
+  $include: production-config.yaml@$.ducks
   standard-rubber-duck:
     settings:
       agent:
@@ -31,15 +31,15 @@ ducks:
 # include multiple specific ducks
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml:$.ducks.standard-rubber-duck
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
   stats-duck:
-    $include: production-config.yaml:$.ducks.stats-duck
+    $include: production-config.yaml@$.ducks.stats-duck
 
 # multiple includes are also supported (the second include can override a portion of the first
 ducks:
   standard-rubber-duck:
-    $include_0: production-config.yaml:$.ducks.standard-rubber-duck
-    $include_1: production-config.yaml:$.ducks.stats-duck
+    $include_0: production-config.yaml@$.ducks.standard-rubber-duck
+    $include_1: production-config.yaml@$.ducks.stats-duck
 
 
 servers:
@@ -62,7 +62,7 @@ servers:
               target_channel_ids:
                 - 1428518677287796756
 
-$include: production-settings.yaml:$.general_settings
+$include: production-settings.yaml@$.general_settings
 
 admin_settings:
   admin_channel_id: 1429899217890967663

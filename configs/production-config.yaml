@@ -67,7 +67,7 @@ ducks:
 servers:
   $include: production-servers.yaml
 
-$include: production-settings.yaml:$.general_settings
+$include: production-settings.yaml@$.general_settings
 
 admin_settings:
   admin_channel_id: 1192895746672951340

@@ -142,7 +142,7 @@ BYU - CS 312:
       channel_id: 1442908158757437502
       timeout: 300
       duck:
-        $include: production-cs312-grader-duck.yaml:$
+        $include: production-cs312-grader-duck.yaml
     duck-review:
       channel_id: 1442908515147710558
       duck:
@@ -260,7 +260,7 @@ Rubber Duck Demo Server:
               prompt_files:
                 - prompts/production-prompts/emoji.txt
               tools: [ ]
-            $include: production-settings.yaml:$.file_settings
+            $include: production-settings.yaml@$.file_settings
 
     code-complexity-analysis-duck:
       channel_id: 1385293810782965830
@@ -297,7 +297,7 @@ Rubber Duck Demo Server:
                 - prompts/production-prompts/socratic-duck.txt
               engine: gpt-4.1
               tools: [ ]
-            $include: production-settings.yaml:$.file_settings
+            $include: production-settings.yaml@$.file_settings
 
     join-the-server:
       channel_id: 1379959992110546995
@@ -334,7 +334,7 @@ Rubber Duck Demo Server:
                 - prompts/312-project-design/phd-duck.txt
                 - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
               tools: [ ]
-            $include: production-settings.yaml:$.file_settings
+            $include: production-settings.yaml@$.file_settings
 
     stats-tool:
       channel_id: 1379955387587104829
