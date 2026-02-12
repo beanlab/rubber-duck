@@ -323,9 +323,9 @@ class PythonExecContainer:
 {indent(code, '                ')}
             except Exception:
                 traceback.print_exc()
+                raise
             finally:
                 sys.stdout.flush()
-                sys.stdout.close()
         """)
         return wrapped_code
 
