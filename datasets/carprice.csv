@@ -1,4 +1,4 @@
-car_ID,gas,turbo,four-door,front-engine,wheelbase,carlength,carwidth,carheight,enginesize,horsepower,peakrpm,citympg,highwaympg,price
+car_ID,gas,turbo,four.door,front.engine,wheelbase,carlength,carwidth,carheight,enginesize,horsepower,peakrpm,citympg,highwaympg,price
 1,Yes,No,No,Yes,88.6,168.8,64.1,48.8,130,111,5000,21,27,13495
 2,Yes,No,No,Yes,88.6,168.8,64.1,48.8,130,111,5000,21,27,16500
 3,Yes,No,No,Yes,94.5,171.2,65.5,52.4,152,154,5000,19,26,16500
