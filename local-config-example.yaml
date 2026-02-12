@@ -82,16 +82,21 @@ servers:
               roles:
                 patterns: { }
 
-$include_0: "production-config.yaml@$.admin_settings"
-$include_1: "production-config.yaml@$.feedback_notifier_settings"
-$include_2: "production-config.yaml@$.ai_completion_retry_protocol"
-$include_3: "production-config.yaml@$.reporter_settings"
-
 sender_email: byu-cs-course-ops@cs.byu.edu
 
 dataset_folder_locations:
   - s3://stats121-datasets/datasets/
 
 admin_settings:
+  $include: "production-config.yaml@$.admin_settings"
   admin_channel_id: 1429899217890967663
   admin_role_id: 1149033209821134858
+
+feedback_notifier_settings:
+  $include: "production-config.yaml@$.feedback_notifier_settings"
+
+ai_completion_retry_protocol:
+  $include_2: "production-config.yaml@$.ai_completion_retry_protocol"
+
+reporter_settings:
+  $include_3: "production-config.yaml@$.reporter_settings"
