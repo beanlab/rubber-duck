@@ -39,6 +39,8 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
     return deepcopy(matches[0] if len(matches) == 1 else matches)
 
 
+# filesystem helper functions
+
 def _read_s3_content(s3_uri: str) -> str:
     """Read content from S3 given an s3://bucket/key URI"""
     duck_logger.debug(f"Fetching config from S3: {s3_uri}")
@@ -81,6 +83,8 @@ def _join_uri(base: str, relative: str) -> str:
         return f"{prefix}{bucket}/{normalized}"
     return str((Path(base) / relative).resolve())
 
+
+# include handling
 
 INCLUDE_KEY_RE = re.compile(r"^\$include(?:_\d+)?$")
 
@@ -129,6 +133,8 @@ def _resolve_includes(data: Any, *, base_uri: str, seen: Set[Tuple[str, str]]) -
     return data
 
 
+# config parsing
+
 def _parse_config_from_content(content: str, suffix: str) -> Config:
     match suffix:
         case ".json":
@@ -138,6 +144,8 @@ def _parse_config_from_content(content: str, suffix: str) -> Config:
         case _:
             raise NotImplementedError(f"Unsupported config extension: {suffix}")
 
+
+# main loaders
 
 def _load_config(uri: str, seen: Set[Tuple[str, str]]) -> Config:
     duck_logger.debug(f"Loading config: {uri}")
