@@ -20,35 +20,25 @@ tools:
 
 
 agents_as_tools:
-  check_suspicion_bot:
+  registration:
     doc_string: |
-      This tool determines if a user's message is suspicious. Suspicious messages are those that do not appear to follow the format
-      of a user's name (first_name_last_name). The tool checks for profanity, unusual characters, and other indicators of suspicious behavior.
-      If the message is suspicious, the tool returns a formatted output indicating the reason for suspicion. If the message is not suspicious,
-      the tool returns a formatted output indicating that the message is safe.
+      This tool moves a user through the registration process.
     agent:
-      name: SuspicionChecker
+      name: RegistrationBot
       prompt_files:
-        - prompts/production-prompts/suspicion-checker.txt
+        - prompts/production-prompts/registration.txt
       engine: gpt-5-mini
       reasoning: minimal
-      tools: []
-      output_format:
-        format:
-          type: json_schema
-          name: suspicion_output
-          strict: true
-          schema:
-            type: object
-            properties:
-              suspicious:
-                type: boolean
-                description: Indicates if the name is suspicious according to the agent.
-              reason:
-                type: string
-                description: The reason why the name is considered suspicious or safe.
-            required: [ "suspicious", "reason" ]
-            additionalProperties: false
+      tools:
+        - send_message_to_user
+        - receive_message_from_user
+        - get_net_id
+        - check_net_id
+        - confirm_registration_via_email
+        - assign_roles
+        - nickname_flow
+        - conclude_conversation
+
 
   code_complexity_agent:
     doc_string: |
@@ -59,10 +49,13 @@ agents_as_tools:
       prompt_files:
         - prompts/312-project-design/generate-code-complexity.md
       engine: gpt-4.1
-      tools: []
+      tools: [ ]
 
 ducks:
   $include: production-ducks.yaml
+
+servers:
+  $include: production-servers.yaml
 
 $include: production-settings.yaml:$.general_settings
 

@@ -28,7 +28,7 @@ CS 110:
             authenticated_user_role_name: Student
             email_domain: byu.edu
             ta_channel_id: 1413242197398126613
-            suspicion_checker_tool: check_suspicion_bot
+            registration_bot: registration
             roles:
               patterns:
                 Teacher Sections:
@@ -127,7 +127,7 @@ BYU - CS 312:
             authenticated_user_role_name: student
             email_domain: byu.edu
             ta_channel_id: 1413242407566315550
-            suspicion_checker_tool: check_suspicion_bot
+            registration_bot: registration
             roles:
               patterns:
                 Lecture-Sections:
@@ -180,7 +180,7 @@ Stats:
             email_domain: byu.edu
             sender_email: byu-cs-course-ops@cs.byu.edu
             ta_channel_id: 1371951756149260298
-            suspicion_checker_tool: check_suspicion_bot
+            registration_bot: registration
     stats-gpt:
       channel_id: 1371951696061661215
       timeout: 600
@@ -309,7 +309,7 @@ Rubber Duck Demo Server:
             cache_timeout: 60800
             authenticated_user_role_name: I-passed-registration
             ta_channel_id: 1379965339428720700
-            suspicion_checker_tool: check_suspicion_bot
+            registration_bot: registration
             email_domain: byu.edu
             roles:
               patterns:

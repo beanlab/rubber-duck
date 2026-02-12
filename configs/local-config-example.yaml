@@ -44,26 +44,26 @@ ducks:
 
 servers:
   BeanLab:
-    server_id: 1058490579799003187
+    server_id: 0000000000000000000
     channels:
-      Ducks/tyler-chat-bot:
-        channel_id: 1428518677287796756
+      <channel name here>:
+        channel_id: 0000000000000000000
         timeout: 300
         duck:
           standard-rubber-duck
 
-      Ducks/tyler-ta-channel:
-        channel_id: 1466558248726560880
+      <channel name here>:
+        channel_id: 0000000000000000000
         timeout: 300
         duck:
           Conversation-Review:
             duck_type: conversation_review
             settings:
               target_channel_ids:
-                - 1428518677287796756
+                - 0000000000000000000
 
 $include: production-settings.yaml:$.general_settings
 
 admin_settings:
-  admin_channel_id: 1429899217890967663
-  admin_role_id: 1149033209821134858
+  admin_channel_id: 0000000000000000000
+  admin_role_id: 0000000000000000000
