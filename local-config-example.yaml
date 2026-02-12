@@ -6,6 +6,8 @@ containers: { }
 
 tools: { }
 
+# include paths don't need to be wrapped in quotes, but it makes it easier to differentiate
+
 # relative includes are supported. For example:
 # if your local config is in a separate local-testing-configs directory in the project root
 # add `../` in front of each of the include paths
@@ -13,19 +15,19 @@ tools: { }
 # include one duck without overrides ($include doesn't copy in the key)
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml@$.ducks.standard-rubber-duck
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
 
 # override usage
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml@$.ducks.standard-rubber-duck
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
     settings:
       agent:
         engine: gpt-5-nano
 
 # include all ducks with example override
 ducks:
-  $include: production-config.yaml@$.ducks
+  $include: "production-config.yaml@$.ducks"
   standard-rubber-duck:
     settings:
       agent:
@@ -34,15 +36,15 @@ ducks:
 # include multiple specific ducks
 ducks:
   standard-rubber-duck:
-    $include: production-config.yaml@$.ducks.standard-rubber-duck
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
   stats-duck:
-    $include: production-config.yaml@$.ducks.stats-duck
+    $include: "production-config.yaml@$.ducks.stats-duck"
 
 # multiple includes are also supported (the second include can override a portion of the first
 ducks:
   standard-rubber-duck:
-    $include_0: production-config.yaml@$.ducks.standard-rubber-duck
-    $include_1: production-config.yaml@$.ducks.stats-duck
+    $include_0: "production-config.yaml@$.ducks.standard-rubber-duck"
+    $include_1: "production-config.yaml@$.ducks.stats-duck"
 
 
 servers:
@@ -80,10 +82,10 @@ servers:
               roles:
                 patterns: { }
 
-$include_0: production-config.yaml@$.admin_settings
-$include_1: production-config.yaml@$.feedback_notifier_settings
-$include_2: production-config.yaml@$.ai_completion_retry_protocol
-$include_3: production-config.yaml@$.reporter_settings
+$include_0: "production-config.yaml@$.admin_settings"
+$include_1: "production-config.yaml@$.feedback_notifier_settings"
+$include_2: "production-config.yaml@$.ai_completion_retry_protocol"
+$include_3: "production-config.yaml@$.reporter_settings"
 
 sender_email: byu-cs-course-ops@cs.byu.edu
 
