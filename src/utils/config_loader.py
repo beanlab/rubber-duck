@@ -1,7 +1,7 @@
 import json
 import re
 from copy import deepcopy
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Set, Tuple
 
 import boto3
@@ -71,7 +71,14 @@ def _get_parent(uri: str) -> str:
 def _join_uri(base: str, relative: str) -> str:
     """Resolve relative path against base for S3 and local paths"""
     if base.startswith("s3://"):
-        return f"{base.rstrip('/')}/{relative}"
+        prefix = "s3://"
+        bucket_and_key = base[len(prefix):]
+        bucket, key_prefix = bucket_and_key.split("/", 1)
+
+        joined = PurePosixPath(key_prefix) / relative
+        normalized = str(joined)
+
+        return f"{prefix}{bucket}/{normalized}"
     return str((Path(base) / relative).resolve())
 
 
