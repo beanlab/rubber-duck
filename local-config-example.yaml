@@ -1,0 +1,92 @@
+sql:
+  db_type: sqlite
+  database: local-testing-configs/local_reese_database.db
+
+containers: { }
+
+tools: { }
+
+
+# include one duck without overrides ($include doesn't copy in the key)
+ducks:
+  standard-rubber-duck:
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
+
+# override usage
+ducks:
+  standard-rubber-duck:
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
+    settings:
+      agent:
+        engine: gpt-5-nano
+
+# include all ducks with example override
+ducks:
+  $include: production-config.yaml@$.ducks
+  standard-rubber-duck:
+    settings:
+      agent:
+        engine: gpt-5-nano
+
+# include multiple specific ducks
+ducks:
+  standard-rubber-duck:
+    $include: production-config.yaml@$.ducks.standard-rubber-duck
+  stats-duck:
+    $include: production-config.yaml@$.ducks.stats-duck
+
+# multiple includes are also supported (the second include can override a portion of the first
+ducks:
+  standard-rubber-duck:
+    $include_0: production-config.yaml@$.ducks.standard-rubber-duck
+    $include_1: production-config.yaml@$.ducks.stats-duck
+
+
+servers:
+  BeanLab:
+    server_id: <id>
+    channels:
+      Ducks/duck-channel-example:
+        channel_id: <id>
+        timeout: 300
+        duck:
+          standard-rubber-duck
+
+      Ducks/ta-channel-example:
+        channel_id: <id>
+        timeout: 300
+        duck:
+          Conversation-Review:
+            duck_type: conversation_review
+            settings:
+              target_channel_ids:
+                - <id>
+
+      Ducks/registration-example:
+        channel_id: <id>
+        timeout: 300
+        duck:
+          registration-duck:
+            duck_type: registration
+            settings:
+              cache_timeout: 60800
+              authenticated_user_role_name: I-passed-registration
+              ta_channel_id: <id>
+              registration_bot: registration
+              email_domain: byu.edu
+              roles:
+                patterns: { }
+
+$include_0: production-config.yaml@$.admin_settings
+$include_1: production-config.yaml@$.feedback_notifier_settings
+$include_2: production-config.yaml@$.ai_completion_retry_protocol
+$include_3: production-config.yaml@$.reporter_settings
+
+sender_email: byu-cs-course-ops@cs.byu.edu
+
+dataset_folder_locations:
+  - s3://stats121-datasets/datasets/
+
+admin_settings:
+  admin_channel_id: 1429899217890967663
+  admin_role_id: 1149033209821134858
