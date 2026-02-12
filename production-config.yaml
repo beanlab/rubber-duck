@@ -552,9 +552,6 @@ admin_settings:
 
 sender_email: byu-cs-course-ops@cs.byu.edu
 
-dataset_folder_locations:
-  - s3://stats121-datasets/datasets/
-
 feedback_notifier_settings:
   feedback_check_hour: 9
   feedback_check_minute: 0

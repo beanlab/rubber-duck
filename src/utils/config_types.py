@@ -186,7 +186,6 @@ class Config(TypedDict):
     agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]
     admin_settings: AdminSettings
-    dataset_folder_locations: list[str]
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
     reporter_settings: ReporterConfig

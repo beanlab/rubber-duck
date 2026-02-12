@@ -84,9 +84,6 @@ servers:
 
 sender_email: byu-cs-course-ops@cs.byu.edu
 
-dataset_folder_locations:
-  - s3://stats121-datasets/datasets/
-
 admin_settings:
   $include: "production-config.yaml@$.admin_settings"
   admin_channel_id: 1429899217890967663
