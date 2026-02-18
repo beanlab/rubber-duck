@@ -82,7 +82,10 @@ servers:
               roles:
                 patterns: { }
 
-sender_email: byu-cs-course-ops@cs.byu.edu
+# including strings also works, but the dictionary with the $include key that imports a string
+# cannot have additional keys, for example
+sender_email:
+  $include: "production-config.yaml@$.sender_email"
 
 admin_settings:
   $include: "production-config.yaml@$.admin_settings"
