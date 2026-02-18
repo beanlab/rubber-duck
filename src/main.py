@@ -380,6 +380,10 @@ if __name__ == '__main__':
     # Add console handler to the duck logger
     add_console_handler()
 
+    if args.config is None:
+        import os
+        args.config = os.getenv('CONFIG_FILE_S3_PATH')
+
     config: Config = load_configuration(args.config)
 
     asyncio.run(main(config, args.log_path))
