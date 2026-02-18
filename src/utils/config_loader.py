@@ -1,20 +1,28 @@
+"""
+Configuration loader supporting:
+
+- Local and S3-backed config files
+- JSON and YAML formats
+- Recursive $include directives
+- JSONPath selection within includes
+- Deep-merge semantics for dict includes
+"""
 import json
 import re
 from copy import deepcopy
-from jsonpath_ng import parse
-from pathlib import Path
-from typing import Any, Callable
+from pathlib import Path, PurePosixPath
+from typing import Any, Set, Tuple
 
 import boto3
 import yaml
+from jsonpath_ng import parse
 
 from .config_types import Config
 from .logger import duck_logger
 
 
-def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict:
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Recursively merge two dicts, with override taking precedence."""
-
     result = deepcopy(base)
     for key, value in override.items():
         if (
@@ -29,6 +37,14 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict:
 
 
 def resolve_jsonpath(data: Any, expr: str) -> Any:
+    """
+    Resolve a JSONPath expression against data.
+
+    - If expr is empty, returns a deep copy of data.
+    - If exactly one match is found, returns that value.
+    - If multiple matches are found, returns a list of values.
+    - Raises KeyError if no matches are found.
+    """
     if not expr:
         return deepcopy(data)
 
@@ -37,154 +53,203 @@ def resolve_jsonpath(data: Any, expr: str) -> Any:
 
     if not matches:
         raise KeyError(f"JSONPath not found: {expr}")
-
-    # single match returns the value,
-    # multiple matches return a list
-    if len(matches) == 1:
-        return deepcopy(matches[0])
-
-    return deepcopy(matches)
+    return deepcopy(matches[0] if len(matches) == 1 else matches)
 
 
-def load_include(ref: str, base_path: Path, seen: set[tuple[Path, str]]) -> Any:
-    if ":" in ref:
-        path_part, pointer = ref.split(":", 1)
-        pointer = pointer or ""
-    else:
-        path_part, pointer = ref, ""
+# filesystem helper functions
 
-    include_path = (base_path / path_part).resolve()
+def _read_s3_content(s3_uri: str) -> str:
+    """Read content from S3 given an s3://bucket/key URI"""
+    duck_logger.debug(f"Fetching config from S3: {s3_uri}")
+    s3 = boto3.client("s3")
+    bucket, key = s3_uri.replace("s3://", "").split("/", 1)
+    response = s3.get_object(Bucket=bucket, Key=key)
+    return response["Body"].read().decode("utf-8")
 
-    key = (include_path, pointer)
-    if key in seen:
-        raise ValueError(f"Cyclic $include detected: {include_path}:{pointer}")
 
-    new_seen = seen.union({key})
+def _read_local_content(path: str) -> str:
+    return Path(path).read_text()
 
-    if not include_path.exists():
-        raise FileNotFoundError(f"Included config not found: {include_path}")
 
-    content = include_path.read_text()
-    included_config = load_config_from_content(content, include_path)
+def _get_content(uri: str) -> str:
+    if uri.startswith("s3://"):
+        return _read_s3_content(uri)
+    return _read_local_content(uri)
 
-    # resolve nested includes
-    resolved_data = resolve_includes(included_config, base_path=include_path.parent, seen=new_seen)
 
-    return resolve_jsonpath(resolved_data, pointer)
+def _get_suffix(uri: str) -> str:
+    return Path(uri).suffix  # works for both S3 and local paths
 
+
+def _get_parent(uri: str) -> str:
+    if uri.startswith("s3://"):
+        return uri.rsplit("/", 1)[0]
+    return str(Path(uri).parent)
+
+
+def _join_uri(base: str, relative: str) -> str:
+    """Resolve relative path against base for S3 and local paths"""
+    if base.startswith("s3://"):
+        prefix = "s3://"
+        bucket_and_key = base[len(prefix):]
+        bucket, key_prefix = bucket_and_key.split("/", 1)
+
+        joined = PurePosixPath(key_prefix) / relative
+        normalized = str(joined)
+
+        return f"{prefix}{bucket}/{normalized}"
+    return str((Path(base) / relative).resolve())
+
+
+# include handling
 
 INCLUDE_KEY_RE = re.compile(r"^\$include(?:_\d+)?$")
 
 
-def resolve_includes(data: Any, *, base_path: Path, seen: set[tuple[Path, str]] | None = None) -> Any:
-    if seen is None:
-        seen = set()
-    if isinstance(data, dict):
-        include_keys = sorted(
-            k for k in data if INCLUDE_KEY_RE.match(k)
+def _load_included_content(ref: str, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    """
+    Load and resolve an $include reference.
+
+    Supports:
+    - Optional JSONPath selector via `path@expr`
+    - Cycle detection using the seen set
+    - Recursive include resolution via _load_config
+    """
+    if "@" in ref:
+        path_part, pointer = ref.rsplit("@", 1)
+        pointer = pointer or ""
+    else:
+        path_part, pointer = ref, ""
+
+    include_uri = _join_uri(base_uri, path_part)
+    key = (include_uri, pointer)
+    if key in seen:
+        raise ValueError(f"Cyclic $include detected: {include_uri}@{pointer}")
+
+    new_seen = seen.union({key})
+    content = _load_config(include_uri, new_seen)
+    return resolve_jsonpath(content, pointer)
+
+
+def _resolve_include_block(
+        data: dict[str, Any], include_keys: list[str], base_uri: str, seen: Set[Tuple[str, str]]
+) -> Any:
+    """
+    Resolve a dict containing one or more $include keys.
+
+    Semantics:
+    - If all included values are dicts, they are deep-merged in sorted key order, then merged with sibling overrides.
+    - If any included value is non-dict:
+        * No sibling keys are allowed.
+        * Exactly one include is allowed.
+        * The included value replaces the entire node.
+    """
+    overrides = {k: v for k, v in data.items() if k not in include_keys}
+
+    included_values = [
+        _load_included_content(data[key], base_uri, seen)
+        for key in include_keys
+    ]
+
+    # if all are dicts, merge
+    if all(isinstance(v, dict) for v in included_values):
+        merged: dict[str, Any] = {}
+        for v in included_values:
+            merged = deep_merge(merged, v)
+
+        resolved_overrides = _resolve_includes(
+            overrides, base_uri=base_uri, seen=seen
         )
 
-        if include_keys:
-            duck_logger.debug(f"including: {include_keys}")
+        return deep_merge(merged, resolved_overrides)
 
-            overrides = {
-                k: v for k, v in data.items() if k not in include_keys
-            }
+    # non-dict includes cannot be merged with overrides
+    if overrides:
+        raise TypeError(
+            "$include resolving to non-dict cannot have sibling keys"
+        )
 
-            merged = {}
-            for key in include_keys:
-                include_ref = data[key]
-                included = load_include(include_ref, base_path, seen)
-                merged = deep_merge(merged, included)
+    # handle string includes
+    if len(included_values) == 1:
+        return included_values[0]
 
-            resolved_overrides = resolve_includes(
-                overrides, base_path=base_path, seen=seen
-            )
+    raise TypeError(
+        "Multiple non-dict $include entries cannot be merged"
+    )
 
-            return deep_merge(merged, resolved_overrides)
 
+def _resolve_dict(data: dict[str, Any], base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    include_keys = sorted(k for k in data if INCLUDE_KEY_RE.match(k))
+
+    if not include_keys:
         return {
-            k: resolve_includes(v, base_path=base_path, seen=seen)
+            k: _resolve_includes(v, base_uri=base_uri, seen=seen)
             for k, v in data.items()
         }
 
-    # allow includes within lists
+    return _resolve_include_block(
+        data, include_keys, base_uri=base_uri, seen=seen
+    )
+
+
+def _resolve_list(data: list[Any], base_uri: str, seen: Set[Tuple[str, str]]) -> list[Any]:
+    return [_resolve_includes(item, base_uri=base_uri, seen=seen) for item in data]
+
+
+def _resolve_includes(data: Any, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    """
+    Recursively resolve $include directives within arbitrary data.
+    """
+    if isinstance(data, dict):
+        return _resolve_dict(data, base_uri=base_uri, seen=seen)
+
     if isinstance(data, list):
-        return [
-            resolve_includes(item, base_path=base_path, seen=seen)
-            for item in data
-        ]
+        return _resolve_list(data, base_uri=base_uri, seen=seen)
 
     return data
 
 
-def fetch_config_from_s3(config_path: str) -> Config:
-    """Fetch configuration from S3 bucket"""
-    if not config_path:
-        duck_logger.error("No S3 config path provided.")
-        raise ValueError("config_path is required")
+# config parsing
 
-    duck_logger.debug(f"Fetching config from S3 path: {config_path}")
+def _parse_config_from_content(content: str, suffix: str) -> Config:
+    match suffix:
+        case ".json":
+            return json.loads(content)
+        case ".yaml" | ".yml":
+            return yaml.safe_load(content)
+        case _:
+            raise NotImplementedError(f"Unsupported config extension: {suffix}")
 
-    s3 = boto3.client('s3')
-    bucket_name, key = config_path.replace('s3://', '').split('/', 1)
 
-    duck_logger.debug(f"Fetching config from bucket: {bucket_name}")
-    duck_logger.debug(f"Config key: {key}")
+# main loaders
 
-    response = s3.get_object(Bucket=bucket_name, Key=key)
-    content = response['Body'].read().decode('utf-8')
+def _load_config(uri: str, seen: Set[Tuple[str, str]]) -> Config:
+    """
+    Load a configuration file from a URI and resolve all $include directives.
 
-    config = load_config_from_content(
-        content=content,
-        source_path=Path(key),
-    )
+    Parameters:
+    - uri: Local path or S3 URI
+    - seen: Set of previously loaded (uri, pointer) tuples to prevent cycles
 
-    duck_logger.debug("Successfully loaded config from S3")
+    Returns:
+    - Fully resolved configuration dictionary
+    """
+    duck_logger.debug(f"Loading config: {uri}")
+    content = _get_content(uri)
+    suffix = _get_suffix(uri)
+    base_uri = _get_parent(uri)
+
+    raw_config = _parse_config_from_content(content, suffix)
+    config = _resolve_includes(raw_config, base_uri=base_uri, seen=seen)
     return config
 
 
-def read_contents(content: str, loader: Callable, source_path: Path) -> Config:
-    """Reads contents using a specific loader method"""
-    data = loader(content)
-    resolved = resolve_includes(data, base_path=source_path.parent)
-    return resolved
-
-
-def load_config_from_content(
-        content: str,
-        source_path: Path,
-) -> Config:
-    """Load configuration from raw content based on file suffix."""
-    match source_path.suffix:
-        case '.json':
-            return read_contents(content, json.loads, source_path)
-        case '.yaml' | '.yml':
-            return read_contents(content, yaml.safe_load, source_path)
-        case _:
-            raise NotImplementedError(f"Unsupported config extension: {source_path.suffix}")
-
-
-def load_config(source_path: str) -> Config:
-    """Load configuration based on file type, supporting !include in YAML"""
-    if source_path.startswith('s3://'):
-        return fetch_config_from_s3(source_path)
-
-    path = Path(source_path)
-    content = path.read_text()
-
-    return load_config_from_content(content, path)
-
-
-def load_configuration(config_path: str) -> Config:
-    """
-    Load the base configuration.
-    Handles S3 and local file loading.
-    """
-    duck_logger.info(f"Loading config from: {config_path}")
-    final_config = load_config(config_path)
+def load_configuration(config_uri: str) -> Config:
+    """Load configuration from local file or S3 URI, resolving includes"""
+    duck_logger.info(f"Loading config from: {config_uri}")
+    final_config = _load_config(config_uri, set())
     duck_logger.debug(
-        "Config loaded successfully. Full config: \n%s",
+        "Config loaded successfully:\n%s",
         yaml.dump(final_config, default_flow_style=False, sort_keys=False)
     )
     return final_config

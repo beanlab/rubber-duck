@@ -75,7 +75,7 @@ ERROR_RE = re.compile(
     r"""
     ^(?:\[ERROR\]\s+)?
     \S+\s+\S+
-    \s+ERRO\s+
+    \s+(?:ERRO|WARN)\s+
     <\#(?P<thread_id>\d+|-)>\s+
     (?P<prefix>[\w\-]+)\s*-\s*
     (?P<extra>[\w\-]+)\s*-\s*
