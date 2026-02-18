@@ -10,7 +10,7 @@ tools: { }
 
 # relative includes are supported. For example:
 # if your local config is in a separate local-testing-configs directory in the project root
-# add `../` in front of each of the include paths
+# add `../configs/` in front of each of the include paths
 
 # include one duck without overrides ($include doesn't copy in the key)
 ducks:
