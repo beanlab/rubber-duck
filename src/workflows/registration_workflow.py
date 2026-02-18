@@ -70,7 +70,10 @@ class RegistrationWorkflow:
         info = await self._registration.run(context)
         if info and self._registration_bot is not None:
             user_query = describe_registration_progress(info)
-            await self._registration_bot(context, f"Please finish the registration process for this user: {user_query}")
+            await self._registration_bot(
+                context,
+                f"Please finish the registration process for this user given the current progress: {user_query}"
+            )
 
 
 
