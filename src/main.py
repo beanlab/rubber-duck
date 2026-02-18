@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import logging
 import os
-import yaml
 from pathlib import Path
 from typing import Iterable
 
@@ -10,7 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.workflows.registration import Registration
+from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools
@@ -32,8 +31,7 @@ from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
-from .utils.config_types import Config, RegistrationSettings, DUCK_WEIGHT, \
-    DUCK_NAME, DuckConfig, AgentAsToolSettings
+from .utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -194,7 +192,7 @@ def _setup_ducks(
         talk_tool
 ) -> dict[CHANNEL_ID, DuckConversation]:
     """
-    Return a dictionary of channel ID to list of weighted ducks
+    Return a dictionary of channel ID to DuckConversation
     """
     all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
 
@@ -206,7 +204,7 @@ def _setup_ducks(
 
             duck_cfg = channel_config.get("duck")
             if duck_cfg is None:
-                continue  # channel intentionally has no duck
+                continue
 
             if isinstance(duck_cfg, str):
                 duck_name = duck_cfg

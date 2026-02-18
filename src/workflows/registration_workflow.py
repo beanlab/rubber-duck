@@ -69,8 +69,17 @@ class RegistrationWorkflow:
     async def __call__(self, context: DuckContext):
         info = await self._registration.run(context)
         if info:
-            user_query = describe_registration_progress(info)
-            await self._registration_bot(context, f"Hi, can you help me with registration this is all of the information about where I left off: {user_query}")
+            if self._registration_bot is not None:
+                user_query = describe_registration_progress(info)
+                await self._registration_bot(
+                    context,
+                    f"Please finish the registration process for this user given the current progress: {user_query}"
+                )
+            else:
+                self._send_message(
+                    context.thread_id,
+                    "Registration bot hasn't been set up. Please contact an administrator."
+                )
 
 
 

@@ -21,6 +21,7 @@ pre-production.env
 
 v2-production-config.json
 nic.yaml
+nic2.yaml
 
 *.db
 *.env
