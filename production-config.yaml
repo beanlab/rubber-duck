@@ -472,6 +472,7 @@ servers:
               target_channel_ids:
                 - 1338616283671040000
       standard-duck:
+        channel_id: 1338616283671040000
         duck:
           standard-rubber-duck
         timeout: 600
