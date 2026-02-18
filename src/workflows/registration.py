@@ -10,8 +10,8 @@ from ..armory.tools import register_tool
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message as _wait_for_message
-from ..utils.send_email import EmailSender
 from ..utils.protocols import ConversationComplete
+from ..utils.send_email import EmailSender
 
 
 async def wait_for_message(*args, **kwargs) -> str:
@@ -19,6 +19,7 @@ async def wait_for_message(*args, **kwargs) -> str:
     if response is None:
         raise ConversationComplete("This conversation has timed out.")
     return response['content']
+
 
 @dataclass
 class RegistrationInfo:
@@ -28,6 +29,7 @@ class RegistrationInfo:
     nickname: str | None
     nickname_reason: str | None
     roles_assigned: str | None
+
 
 class Registration:
     def __init__(self,
@@ -96,7 +98,6 @@ class Registration:
         NETID_REGEX = re.compile(r"^[a-z][a-z0-9]{4,7}$")
 
         return bool(NETID_REGEX.match(netid))
-
 
     def _generate_token(self):
         code = str(uuid.uuid4().int)[:6]
@@ -275,7 +276,6 @@ class Registration:
             role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
             if not role:
                 raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
-
 
             selected_roles = [role]
             role_names = ", ".join(role.name for role in selected_roles)
