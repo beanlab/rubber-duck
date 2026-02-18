@@ -107,28 +107,70 @@ def _load_included_content(ref: str, base_uri: str, seen: Set[Tuple[str, str]]) 
     return resolve_jsonpath(content, pointer)
 
 
-def _resolve_includes(data: Any, *, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
-    if isinstance(data, dict):
-        include_keys = sorted(k for k in data if INCLUDE_KEY_RE.match(k))
-        if include_keys:
-            overrides = {k: v for k, v in data.items() if k not in include_keys}
-            merged = {}
-            for key in include_keys:
-                included = _load_included_content(data[key], base_uri, seen)
-                merged = deep_merge(merged, included)
-            resolved_overrides = _resolve_includes(overrides, base_uri=base_uri, seen=seen)
-            return deep_merge(merged, resolved_overrides)
+def _resolve_include_block(
+        data: dict[str, Any], include_keys: list[str], base_uri: str, seen: Set[Tuple[str, str]]
+) -> Any:
+    """
+    Resolves multiple keys following an $include:
+    """
+    overrides = {k: v for k, v in data.items() if k not in include_keys}
+
+    included_values = [
+        _load_included_content(data[key], base_uri, seen)
+        for key in include_keys
+    ]
+
+    # if all are dicts, merge
+    if all(isinstance(v, dict) for v in included_values):
+        merged: dict[str, Any] = {}
+        for v in included_values:
+            merged = deep_merge(merged, v)
+
+        resolved_overrides = _resolve_includes(
+            overrides, base_uri=base_uri, seen=seen
+        )
+
+        return deep_merge(merged, resolved_overrides)
+
+    # non-dict include
+    if overrides:
+        raise TypeError(
+            "$include resolving to non-dict cannot have sibling keys"
+        )
+
+    # handle string includes
+    if len(included_values) == 1:
+        return included_values[0]
+
+    raise TypeError(
+        "Multiple non-dict $include entries cannot be merged"
+    )
+
+
+def _resolve_dict(data: dict[str, Any], base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    include_keys = sorted(k for k in data if INCLUDE_KEY_RE.match(k))
+
+    if not include_keys:
         return {
             k: _resolve_includes(v, base_uri=base_uri, seen=seen)
             for k, v in data.items()
         }
 
-    # allow includes within lists
+    return _resolve_include_block(
+        data, include_keys, base_uri=base_uri, seen=seen
+    )
+
+
+def _resolve_list(data: list[Any], base_uri: str, seen: Set[Tuple[str, str]]) -> list[Any]:
+    return [_resolve_includes(item, base_uri=base_uri, seen=seen) for item in data]
+
+
+def _resolve_includes(data: Any, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    if isinstance(data, dict):
+        return _resolve_dict(data, base_uri=base_uri, seen=seen)
+
     if isinstance(data, list):
-        return [
-            _resolve_includes(item, base_uri=base_uri, seen=seen)
-            for item in data
-        ]
+        return _resolve_list(data, base_uri=base_uri, seen=seen)
 
     return data
 
