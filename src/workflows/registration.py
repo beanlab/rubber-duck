@@ -9,13 +9,13 @@ from quest import step
 from ..armory.tools import register_tool
 from ..utils.config_types import RegistrationSettings, DuckContext
 from ..utils.logger import duck_logger
-from ..utils.message_utils import wait_for_message as _wait_for_message
+from ..utils.message_utils import wait_for_message
 from ..utils.send_email import EmailSender
 from ..utils.protocols import ConversationComplete
 
 
-async def wait_for_message(*args, **kwargs) -> str:
-    response = await _wait_for_message(*args, **kwargs)
+async def wait_for_registration_msg(*args, **kwargs) -> str:
+    response = await wait_for_message(*args, **kwargs)
     if response is None:
         raise ConversationComplete("This conversation has timed out.")
     return response['content']
@@ -107,7 +107,7 @@ class Registration:
         await self._send_message(thread_id, "Please enter your preferred first and last name, e.g. 'Shane Reese'")
 
         # Wait for user response
-        name = await wait_for_message(timeout)
+        name = await wait_for_registration_msg(timeout)
         return name
 
     @step
@@ -118,7 +118,7 @@ class Registration:
         await self._send_message(thread_id, "Please enter your BYU Net ID to begin the registration process.")
 
         # Wait for user response
-        net_id = await wait_for_message(timeout)
+        net_id = await wait_for_registration_msg(timeout)
         return net_id
 
     @step
@@ -143,7 +143,7 @@ class Registration:
                                      "or type *resend* to get a new code")
 
             # Wait for user response
-            response = await wait_for_message(timeout)
+            response = await wait_for_registration_msg(timeout)
 
             if response.lower() == 'resend':
                 token = self._email_sender.send_email(email, token)
@@ -190,7 +190,7 @@ class Registration:
             )
 
             # Wait for user response
-            response = await wait_for_message(timeout)
+            response = await wait_for_registration_msg(timeout)
 
             if 'skip' in response.lower():
                 await self._send_message(thread_id, "Skipping role selection. No additional roles will be assigned.")
