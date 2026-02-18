@@ -1,3 +1,12 @@
+"""
+Configuration loader supporting:
+
+- Local and S3-backed config files
+- JSON and YAML formats
+- Recursive $include directives
+- JSONPath selection within includes
+- Deep-merge semantics for dict includes
+"""
 import json
 import re
 from copy import deepcopy
@@ -28,6 +37,14 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 
 
 def resolve_jsonpath(data: Any, expr: str) -> Any:
+    """
+    Resolve a JSONPath expression against data.
+
+    - If expr is empty, returns a deep copy of data.
+    - If exactly one match is found, returns that value.
+    - If multiple matches are found, returns a list of values.
+    - Raises KeyError if no matches are found.
+    """
     if not expr:
         return deepcopy(data)
 
@@ -90,7 +107,14 @@ INCLUDE_KEY_RE = re.compile(r"^\$include(?:_\d+)?$")
 
 
 def _load_included_content(ref: str, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
-    """Load an included file, resolving JSONPath if present"""
+    """
+    Load and resolve an $include reference.
+
+    Supports:
+    - Optional JSONPath selector via `path@expr`
+    - Cycle detection using the seen set
+    - Recursive include resolution via _load_config
+    """
     if "@" in ref:
         path_part, pointer = ref.rsplit("@", 1)
         pointer = pointer or ""
@@ -111,7 +135,14 @@ def _resolve_include_block(
         data: dict[str, Any], include_keys: list[str], base_uri: str, seen: Set[Tuple[str, str]]
 ) -> Any:
     """
-    Resolves multiple keys following an $include:
+    Resolve a dict containing one or more $include keys.
+
+    Semantics:
+    - If all included values are dicts, they are deep-merged in sorted key order, then merged with sibling overrides.
+    - If any included value is non-dict:
+        * No sibling keys are allowed.
+        * Exactly one include is allowed.
+        * The included value replaces the entire node.
     """
     overrides = {k: v for k, v in data.items() if k not in include_keys}
 
@@ -132,7 +163,7 @@ def _resolve_include_block(
 
         return deep_merge(merged, resolved_overrides)
 
-    # non-dict include
+    # non-dict includes cannot be merged with overrides
     if overrides:
         raise TypeError(
             "$include resolving to non-dict cannot have sibling keys"
@@ -166,6 +197,9 @@ def _resolve_list(data: list[Any], base_uri: str, seen: Set[Tuple[str, str]]) ->
 
 
 def _resolve_includes(data: Any, base_uri: str, seen: Set[Tuple[str, str]]) -> Any:
+    """
+    Recursively resolve $include directives within arbitrary data.
+    """
     if isinstance(data, dict):
         return _resolve_dict(data, base_uri=base_uri, seen=seen)
 
@@ -190,6 +224,16 @@ def _parse_config_from_content(content: str, suffix: str) -> Config:
 # main loaders
 
 def _load_config(uri: str, seen: Set[Tuple[str, str]]) -> Config:
+    """
+    Load a configuration file from a URI and resolve all $include directives.
+
+    Parameters:
+    - uri: Local path or S3 URI
+    - seen: Set of previously loaded (uri, pointer) tuples to prevent cycles
+
+    Returns:
+    - Fully resolved configuration dictionary
+    """
     duck_logger.debug(f"Loading config: {uri}")
     content = _get_content(uri)
     suffix = _get_suffix(uri)
