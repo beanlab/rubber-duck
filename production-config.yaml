@@ -31,11 +31,19 @@ containers:
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
+  cs-python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    mounts:
+      - { source: s3://byu-cms-metrics/CS-Grades-Dashboard-2026-02-17.csv,
+          target: /home/sandbox/datasets/CS-Grades-Dashboard.csv }
+
 tools:
   run_python:
     type: container_exec
     container: stats-python-sandbox
-
+  run_cs_analysis:
+    type: container_exec
+    container: cs-python-sandbox
 
 agents_as_tools:
   registration:
@@ -101,6 +109,22 @@ ducks:
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
+  cs-stats-duck:
+    duck_type: user_led_conversation
+    settings:
+      introduction: >
+        I can answer questions about CS grades and enrollment trends. 
+        If you want more specifics, please ask. 
+        What can I do for you today?
+      agent:
+        name: cs_stats_duck
+        prompt_files:
+          - prompts/production-prompts/cs-stats.md
+        engine: gpt-5
+        reasoning: medium
+        tools:
+          - run_cs_analysis
+
 servers:
   CS 110:
     server_id: 927616651409649675
@@ -147,6 +171,11 @@ servers:
         timeout: 600
         duck:
           standard-rubber-duck
+      Metrics Duck:
+        channel_id: 1473758484267798689
+        timeout: 600
+        duck:
+          cs-stats-duck
 
   CS 235:
     server_id: 747510855536738336
