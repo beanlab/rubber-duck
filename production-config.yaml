@@ -23,11 +23,19 @@ sql:
 containers:
   stats-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
-    settings: # TODO: use this
-      cpu_limit: 1
-      memory_limit: 512m
-      network: none
-      timeout: 30
+    settings:
+#      timeout: 10
+      working_dir: /home/sandbox/out
+#      network_mode: none
+#      memory: 1g
+#      memory_swap: 1g
+#      cpus: 1
+#      pids_limit: 128
+
+      # cannot make read only true unless mounting datasets instead of copying them in
+      # (if so, can't use s3 datasets without network access)
+      read_only_root: false
+
     mounts: # folder: folder | file: folder | file: folder/file - auto-detected
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 

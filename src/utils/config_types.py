@@ -162,11 +162,20 @@ class MountConfig(TypedDict):
     target: str
 
 
+class ContainerSettings(TypedDict, total=False):
+    timeout: int
+    working_dir: str
+    network_mode: str
+    memory: str
+    memory_swap: str
+    cpus: int
+    pids_limit: int
+    read_only_root: bool
+
 class ContainerConfig(TypedDict):
     image: str
     mounts: list[MountConfig]
-    # TODO: use these?
-    # settings: dict[str, str] # cpu_limit, memory_limit, network, timeout
+    settings: ContainerSettings
 
 
 class ContainerTool(TypedDict):
