@@ -213,7 +213,7 @@ def _get_local_folder_info(path: str) -> list[DatasetInfo]:
 # ======================== #
 
 
-def determine_mount_case(remote_path: str, target_path: str) -> str:
+def determine_staging_case(remote_path: str, target_path: str) -> str:
     """
     Determines the mount case based on path semantics.
 

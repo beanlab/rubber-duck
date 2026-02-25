@@ -12,7 +12,7 @@ from docker.errors import NotFound
 
 from .config_types import Config
 from .logger import duck_logger
-from .dataset_mounting import determine_mount_case, get_dataset_info, get_folder_info, DatasetInfo
+from .resource_staging import determine_staging_case, get_dataset_info, get_folder_info, DatasetInfo
 
 
 class FileResult(TypedDict):
@@ -28,10 +28,10 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, mount_data: list[dict[str, str]]):
+    def __init__(self, image: str, name: str, resource_data: list[dict[str, str]]):
         self._image = image
         self._name = name
-        self._mount_data = mount_data
+        self._resource_data = resource_data
         self._resource_metadata = []
         self._container = None
         self._working_dir = "/home/sandbox/out"
@@ -71,7 +71,7 @@ class PythonExecContainer:
         )
         duck_logger.info(f"Container {self._name} started")
 
-        self._mount_files()
+        self._stage_files()
 
         return self
 
@@ -81,23 +81,23 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
-    def _mount_file(self, target_path: str, dataset: DatasetInfo):
+    def _stage_file(self, target_path: str, dataset: DatasetInfo):
         self._write_file(dataset.filename, dataset.data, target_path)
         self._resource_metadata.append({
             "path": os.path.join(target_path, dataset.filename),
             "description": dataset.description,
         })
 
-    def _mount_files(self):
-        for mount_info in self._mount_data:
-            remote_path = mount_info.get("source")
-            target_path = mount_info.get("target")
+    def _stage_files(self):
+        for resource_info in self._resource_data:
+            remote_path = resource_info.get("source")
+            target_path = resource_info.get("target")
             if not remote_path or not target_path:
-                duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
+                duck_logger.warn(f"Skipping invalid mount entry: {resource_info}")
                 continue
 
             # determine which case:
-            case = determine_mount_case(remote_path, target_path)
+            case = determine_staging_case(remote_path, target_path)
             match case:
                 case "file: file":
                     target_dir = os.path.dirname(target_path)
