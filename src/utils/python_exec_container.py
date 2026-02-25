@@ -57,6 +57,7 @@ class PythonExecContainer:
 
     def __enter__(self):
         # start container
+        duck_logger.info(f"Starting container {self._name} from {self._image}")
         if self.name_in_use(self._name):
             cont = self._client.containers.get(self._name)
             cont.stop()
@@ -68,7 +69,7 @@ class PythonExecContainer:
             command="sleep infinity",
             detach=True,
         )
-        duck_logger.info("Container started")
+        duck_logger.info(f"Container {self._name} started")
 
         self._mount_files()
 
@@ -323,9 +324,9 @@ class PythonExecContainer:
 {indent(code, '                ')}
             except Exception:
                 traceback.print_exc()
+                raise
             finally:
                 sys.stdout.flush()
-                sys.stdout.close()
         """)
         return wrapped_code
 

@@ -103,7 +103,7 @@ class DiscordBot(discord.Client):
         duck_logger.info('------')
 
     async def close(self):
-        duck_logger.warning("-- Suspending --")
+        duck_logger.info("-- Suspending --")
         await super().close()
 
     async def on_message(self, message: discord.Message):
