@@ -41,6 +41,8 @@ containers:
 
   cs-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
+    settings:
+      working_dir: /home/sandbox/out
     mounts:
       - { source: s3://byu-cms-metrics/CS-Grades-Dashboard-2026-02-17.csv,
           target: /home/sandbox/datasets/CS-Grades-Dashboard.csv }
