@@ -140,7 +140,7 @@ servers:
                 - 1234556460453597276
 
       general/duck-pond:
-        channel_id: 1234556460453597276
+        channel_id: 1457781730202095616
         timeout: 600
         duck:
           standard-rubber-duck
