@@ -376,7 +376,7 @@ class PythonExecContainer:
         return await asyncio.to_thread(self._run_code, code, files)
 
     def get_resource_metadata(self) -> str:
-        """Return prompt content describing each file mounted in the container"""
+        """Return prompt content describing each file copied into the container"""
         lines = ["\n### Available Files:"]
 
         for resource in self._resource_metadata:
