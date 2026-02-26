@@ -157,14 +157,14 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list[float]]
 
 
-class MountConfig(TypedDict):
+class ResourceConfig(TypedDict):
     source: str
     target: str
 
 
 class ContainerConfig(TypedDict):
     image: str
-    mounts: list[MountConfig]
+    resources: list[ResourceConfig]
     # TODO: use these?
     # settings: dict[str, str] # cpu_limit, memory_limit, network, timeout
 
