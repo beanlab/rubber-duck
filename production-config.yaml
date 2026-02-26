@@ -24,26 +24,26 @@ containers:
   stats-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
     settings:
-#      timeout: 10
+      timeout: 10
       working_dir: /home/sandbox/out
-#      network_mode: none
-#      memory: 1g
-#      memory_swap: 1g
-#      cpus: 1
-#      pids_limit: 128
+      network_mode: none
+      memory: 1g
+      memory_swap: 1g
+      cpus: 1
+      pids_limit: 128
 
       # cannot make read only true unless mounting datasets instead of copying them in
       # (if so, can't use s3 datasets without network access)
       read_only_root: false
 
-    mounts: # folder: folder | file: folder | file: folder/file - auto-detected
+    resources: # folder: folder | file: folder | file: folder/file - auto-detected
       - { source: s3://stats121-datasets/datasets/, target: /home/sandbox/datasets/ }
 
   cs-python-sandbox:
     image: byucscourseops/python-tools-sandbox:latest
     settings:
       working_dir: /home/sandbox/out
-    mounts:
+    resources:
       - { source: s3://byu-cms-metrics/CS-Grades-Dashboard-2026-02-17.csv,
           target: /home/sandbox/datasets/CS-Grades-Dashboard.csv }
 
@@ -150,7 +150,7 @@ servers:
                 - 1234556460453597276
 
       general/duck-pond:
-        channel_id: 1234556460453597276
+        channel_id: 1457781730202095616
         timeout: 600
         duck:
           standard-rubber-duck

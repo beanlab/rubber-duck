@@ -213,9 +213,9 @@ def _get_local_folder_info(path: str) -> list[DatasetInfo]:
 # ======================== #
 
 
-def determine_mount_case(remote_path: str, target_path: str) -> str:
+def determine_staging_case(remote_path: str, target_path: str) -> str:
     """
-    Determines the mount case based on path semantics.
+    Determines the staging case based on path semantics.
 
     Returns one of:
         - "folder: folder"
@@ -229,7 +229,7 @@ def determine_mount_case(remote_path: str, target_path: str) -> str:
     if not remote_path.endswith("/") and not target_path.endswith("/"):
         return "file: file"
 
-    duck_logger.warn(f"Invalid mount case - remote path: {remote_path}, target path: {target_path}")
+    duck_logger.warn(f"Invalid staging case - remote path: {remote_path}, target path: {target_path}")
     return ""
 
 
@@ -242,7 +242,7 @@ def get_folder_info(folder_path: str) -> list[DatasetInfo]:
 
 
 def get_dataset_info(file_path: str) -> DatasetInfo:
-    duck_logger.debug(f"Preparing dataset for mount: {file_path}")
+    duck_logger.debug(f"Preparing dataset for staging: {file_path}")
 
     filename = Path(file_path).name
 

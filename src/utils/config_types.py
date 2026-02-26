@@ -157,7 +157,7 @@ class ReporterConfig(TypedDict):
     gpt_pricing: dict[str, list[float]]
 
 
-class MountConfig(TypedDict):
+class ResourceConfig(TypedDict):
     source: str
     target: str
 
@@ -174,7 +174,7 @@ class ContainerSettings(TypedDict, total=False):
 
 class ContainerConfig(TypedDict):
     image: str
-    mounts: list[MountConfig]
+    mounts: list[ResourceConfig]
     settings: ContainerSettings
 
 
