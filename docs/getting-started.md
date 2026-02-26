@@ -87,7 +87,7 @@ Before you begin, you'll need:
     - In rubber-duck, create a `local-testing-configs` directory in the project root (ensure it's excluded in the
       .gitignore!)
     - Inside it, create:
-        - A `local_<name>_config.yaml` file (ask for a copy to base yours on)
+        - A `local_<name>_config.yaml` file (follow the structure of `local-config-example.yaml`)
         - A `local_<name>_database.db` file
     - In your config file, modify the following sections from your copy:
        ```yaml
@@ -97,20 +97,17 @@ Before you begin, you'll need:
        ```
        ```yaml
         servers:
-            "1058490579799003187":
-            server_name: BeanLab
-            channels:
-              - channel_id: 0000000000000000 # paste channel ID here
-                channel_name: "Ducks/<name>-chat-bot"
-                timeout: 300
-                ducks:
+            BeanLab:
+              server_id: 1058490579799003187
+              channels:
+                Ducks/<name>-chat-bot:
+                  channel_id: 0000000000000000 # paste channel ID here
+                  timeout: 300
+                  duck:
                               - standard-rubber-duck
+                    #          - stats-duck
                     #          - emoji-duck
                     #          - guessing-game-duck
-                    #          - code-complexity-duck
-                    #          - stats-duck
-                    #          - quote-duck
-          
         ```
         ```yaml
         admin_settings:
