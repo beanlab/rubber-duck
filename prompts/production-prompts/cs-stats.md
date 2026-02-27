@@ -10,16 +10,16 @@ Your response style is always **concise, brief, minimal**.
 You are provided with a file named `datasets/CS-Grades-Dashboard.csv` that looks like this:
 
 ```csv
-,Major_at_Time_of_CMS_Class,Sex,Ethnicity,First_Generation_Student,Age_at_Time_of_CMS_Class,Year_Term,Year_Term_Desc,Course,Class_Period,Days,Section_Type,Instruction_Mode,Grade,Grade_GPA_Equiv,Lab_Quiz,DEW,Retake,Num_Prior_CS_Classes,CS_Major,Online
-0,Computer Science,F,White,,21,20161,Winter 2016,C S 235,1500 - 1550,MWF,DAY,,B,3.0,,False,False,0.0,True,False
-1,Physics,M,White,,22,20161,Winter 2016,C S 142,0900 - 0950,MWF,DAY,,A,4.0,,False,False,0.0,False,False
-2,Open-Major,F,Hispanic or Latino,,24,20161,Winter 2016,C S 142,1335 - 1450,TTh,DAY,,C+,2.4,,False,False,0.0,False,False
-3,Open-Major,F,Hispanic or Latino,,24,20161,Winter 2016,C S 235,1000 - 1050,MWF,DAY,,D+,1.4,,True,False,0.0,False,False
-4,Computer Science,M,White,,20,20161,Winter 2016,C S 201R,0930 - 1045,TTh,DAY,,A,4.0,,False,False,0.0,True,False
-5,Computer Science,M,White,,20,20161,Winter 2016,C S 312,0800 - 0915,TTh,DAY,,C,2.0,,False,False,0.0,True,False
-6,Computer Science,M,White,,20,20161,Winter 2016,C S 340,1500 - 1550,MWF,DAY,,B+,3.4,,False,False,0.0,True,False
-7,Computer Science,M,White,,20,20161,Winter 2016,C S 340,1600 - 1650,MWF,DAY,,B+,3.4,,False,True,0.0,True,False
-8,Electrical Engineering,M,White,,25,20161,Winter 2016,C S 235,1100 - 1150,MWF,DAY,,C,2.0,,False,False,0.0,False,False
+Major_at_Time_of_C_S_Class,Sex,Ethnicity,Age_at_Time_of_C_S_Class,Year_Term,Year_Term_Desc,Course,Class_Period,Days,Section_Type,Instruction_Mode,Grade,Grade_GPA_Equiv,Lab_Quiz,DEW,Retake,Num_Prior_CS_Classes,CS_Major,Online,Student_Rating_Hours,ID
+Computer Science,M,White,19,20151,Winter 2015,C S 252,0930 - 1045,TTh,DAY,,B,3.0,,False,False,0.0,True,False,,2867825
+Computer Science,M,White,19,20151,Winter 2015,C S 236,1335 - 1450,TTh,DAY,,B-,2.7,,False,False,0.0,True,False,,2867825
+Pre-Management Core,M,White,19,20151,Winter 2015,C S 142,1300 - 1350,MWF,DAY,,B-,2.7,,False,False,0.0,False,False,,1419610
+Economics,M,White,25,20151,Winter 2015,C S 142,1335 - 1450,TTh,DAY,,A-,3.7,,False,False,0.0,False,False,,5614226
+Computer Science,M,White,25,20151,Winter 2015,C S 330,1000 - 1050,MWF,DAY,,C+,2.4,,False,False,0.0,True,False,17.0,5108603
+Computer Science,M,White,25,20151,Winter 2015,C S 360,1335 - 1450,TTh,DAY,,C-,1.7,,False,False,0.0,True,False,20.0,5108603
+Animation,M,White,24,20151,Winter 2015,C S 360,0930 - 1045,TTh,DAY,,A,4.0,,False,False,0.0,True,False,6.0,4744854
+Animation,M,White,22,20151,Winter 2015,C S 240,1000 - 1050,MWF,DAY,,C,2.0,,False,False,0.0,True,False,10.0,3341057
+Computer Science,M,White,22,20151,Winter 2015,C S 224,1400 - 1450,MWF,DAY,,C-,1.7,,False,False,0.0,True,False,20.0,2719583
 ```
 
 The possible courses are:
