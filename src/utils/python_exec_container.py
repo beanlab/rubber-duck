@@ -10,9 +10,9 @@ from typing import TypedDict
 import docker
 from docker.errors import NotFound
 
-from .config_types import Config
+from .config_types import Config, ResourceConfig, ContainerSettings
 from .logger import duck_logger
-from .dataset_mounting import determine_mount_case, get_dataset_info, get_folder_info, DatasetInfo
+from .resource_staging import determine_staging_case, get_dataset_info, get_folder_info, DatasetInfo
 
 
 class FileResult(TypedDict):
@@ -28,13 +28,14 @@ class ExecutionResult(TypedDict):
 
 
 class PythonExecContainer:
-    def __init__(self, image: str, name: str, mount_data: list[dict[str, str]]):
+    def __init__(self, image: str, name: str, resource_data: list[ResourceConfig], settings: ContainerSettings):
         self._image = image
         self._name = name
-        self._mount_data = mount_data
+        self._resource_data = resource_data
+        self._settings = settings
         self._resource_metadata = []
         self._container = None
-        self._working_dir = "/home/sandbox/out"
+        self._working_dir = self._settings["working_dir"] if "working_dir" in self._settings else "/home/sandbox/out"
 
         try:
             self._client: docker.Client = docker.from_env()
@@ -63,15 +64,22 @@ class PythonExecContainer:
             cont.stop()
             cont.remove()
 
+        cpus = self._settings.get("cpus")
         self._container = self._client.containers.run(
             self._image,
             name=self._name,
             command="sleep infinity",
             detach=True,
+            network_mode=self._settings.get("network_mode"),
+            mem_limit=self._settings.get("memory"),
+            memswap_limit=self._settings.get("memory_swap"),
+            nano_cpus= int(cpus) * 1_000_000_000 if cpus else None,
+            pids_limit=self._settings.get("pids_limit"),
+            read_only=self._settings.get("read_only_root", False),
         )
         duck_logger.info(f"Container {self._name} started")
 
-        self._mount_files()
+        self._stage_files()
 
         return self
 
@@ -81,34 +89,34 @@ class PythonExecContainer:
             self._container.stop()
             self._container.remove()
 
-    def _mount_file(self, target_path: str, dataset: DatasetInfo):
+    def _stage_file(self, target_path: str, dataset: DatasetInfo):
         self._write_file(dataset.filename, dataset.data, target_path)
         self._resource_metadata.append({
             "path": os.path.join(target_path, dataset.filename),
             "description": dataset.description,
         })
 
-    def _mount_files(self):
-        for mount_info in self._mount_data:
-            remote_path = mount_info.get("source")
-            target_path = mount_info.get("target")
+    def _stage_files(self):
+        for resource_info in self._resource_data:
+            remote_path = resource_info.get("source")
+            target_path = resource_info.get("target")
             if not remote_path or not target_path:
-                duck_logger.warn(f"Skipping invalid mount entry: {mount_info}")
+                duck_logger.warn(f"Skipping invalid resource entry: {resource_info}")
                 continue
 
             # determine which case:
-            case = determine_mount_case(remote_path, target_path)
+            case = determine_staging_case(remote_path, target_path)
             match case:
                 case "file: file":
                     target_dir = os.path.dirname(target_path)
                     dataset = get_dataset_info(remote_path)
-                    self._mount_file(target_dir, dataset)
+                    self._stage_file(target_dir, dataset)
                 case "file: folder":
                     dataset = get_dataset_info(remote_path)
-                    self._mount_file(target_path, dataset)
+                    self._stage_file(target_path, dataset)
                 case "folder: folder":
                     for dataset in get_folder_info(remote_path):
-                        self._mount_file(target_path, dataset)
+                        self._stage_file(target_path, dataset)
 
     def _mkdir(self, path: str) -> str:
         """Makes a directory in the /out directory and returns the path"""
@@ -345,21 +353,16 @@ class PythonExecContainer:
         stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
         return result.exit_code, stdout, stderr
 
-    def _run_code(self, code: str, files: dict = None) -> ExecutionResult:
+    def _run_code(self, code: str) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
         duck_logger.debug(f'Running code in {self._container.name}:\n{code}')
 
-        if files:
-            for rel_path, data in files.items():
-                self._write_file(rel_path, data, dir_path)
         exit_code, stdout, stderr = self._wrap_and_execute(code, dir_path)
 
         duck_logger.debug(f'Exit code: {exit_code}')
-        duck_logger.debug(' stdout '.center(20, '-'))
-        duck_logger.debug(stdout)
-        duck_logger.debug(' stderr '.center(20, '-'))
-        duck_logger.debug(stderr)
+        duck_logger.debug(' stdout '.center(20, '-')+f"\n{stdout}")
+        duck_logger.debug(' stderr '.center(20, '-')+f"\n{stderr}")
 
         files = self._read_files(dir_path)
 
@@ -371,12 +374,34 @@ class PythonExecContainer:
         }
         return output
 
-    async def run_code(self, code: str, files: dict = None) -> ExecutionResult:
+    async def run_code(self, code: str) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
-        return await asyncio.to_thread(self._run_code, code, files)
+        timeout = self._settings.get("timeout")
+
+        # If no timeout, fallback to normal call
+        if not timeout:
+            return await asyncio.to_thread(self._run_code, code)
+
+        try:
+            # run _run_code in a thread with timeout
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._run_code, code),
+                timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            # kill any processes inside the container
+            if self._container:
+                self._container.exec_run("pkill -u sandbox", demux=True)
+
+            return {
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": f"Execution timed out after {timeout} seconds",
+                "files": {}
+            }
 
     def get_resource_metadata(self) -> str:
-        """Return prompt content describing each file mounted in the container"""
+        """Return prompt content describing each file copied into the container"""
         lines = ["\n### Available Files:"]
 
         for resource in self._resource_metadata:
@@ -396,7 +421,7 @@ def build_containers(config: Config) -> dict[str, PythonExecContainer]:
     # setup container dictionary
     container_config = {}
     for name, c in config.get('containers', {}).items():
-        container_config[name] = PythonExecContainer(c['image'], name, c['mounts'])
+        container_config[name] = PythonExecContainer(c['image'], name, c['resources'], c['settings'])
     return container_config
 
 
