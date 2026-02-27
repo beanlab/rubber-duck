@@ -10,16 +10,16 @@ Your response style is always **concise, brief, minimal**.
 You are provided with a file named `datasets/CS-Grades-Dashboard.csv` that looks like this:
 
 ```csv
-Major_at_Time_of_C_S_Class,Sex,Ethnicity,Age_at_Time_of_C_S_Class,Year_Term,Year_Term_Desc,Course,Class_Period,Days,Section_Type,Instruction_Mode,Grade,Grade_GPA_Equiv,Lab_Quiz,DEW,Retake,Num_Prior_CS_Classes,CS_Major,Online,Student_Rating_Hours,ID
-Computer Science,M,White,19,20151,Winter 2015,C S 252,0930 - 1045,TTh,DAY,,B,3.0,,False,False,0.0,True,False,,2867825
-Computer Science,M,White,19,20151,Winter 2015,C S 236,1335 - 1450,TTh,DAY,,B-,2.7,,False,False,0.0,True,False,,2867825
-Pre-Management Core,M,White,19,20151,Winter 2015,C S 142,1300 - 1350,MWF,DAY,,B-,2.7,,False,False,0.0,False,False,,1419610
-Economics,M,White,25,20151,Winter 2015,C S 142,1335 - 1450,TTh,DAY,,A-,3.7,,False,False,0.0,False,False,,5614226
-Computer Science,M,White,25,20151,Winter 2015,C S 330,1000 - 1050,MWF,DAY,,C+,2.4,,False,False,0.0,True,False,17.0,5108603
-Computer Science,M,White,25,20151,Winter 2015,C S 360,1335 - 1450,TTh,DAY,,C-,1.7,,False,False,0.0,True,False,20.0,5108603
-Animation,M,White,24,20151,Winter 2015,C S 360,0930 - 1045,TTh,DAY,,A,4.0,,False,False,0.0,True,False,6.0,4744854
-Animation,M,White,22,20151,Winter 2015,C S 240,1000 - 1050,MWF,DAY,,C,2.0,,False,False,0.0,True,False,10.0,3341057
-Computer Science,M,White,22,20151,Winter 2015,C S 224,1400 - 1450,MWF,DAY,,C-,1.7,,False,False,0.0,True,False,20.0,2719583
+Major_at_Time_of_CMS_Class,Sex,Ethnicity,First_Generation_Student,Age_at_Time_of_CMS_Class,Year_Term,Year_Term_Desc,Course,Class_Period,Days,Section_Type,Instruction_Mode,Grade,Grade_GPA_Equiv,Lab_Quiz,Enrolled_In_Lab,DEW,Retake,Num_Prior_CS_Classes,CS_Major,Online,Student_Rating_Hours,ID
+Political Science,F,White,,20,20195,Fall 2019,C S 142,1100 - 1150,MWF,DAY,,A,4.0,,False,False,False,0.0,False,False,7.0,2867825
+Electrical Engineering,M,Hispanic or Latino,,24,20205,Fall 2020,C S 142,,,DAY,On-Demand Remote Delivery,C+,2.4,,False,False,False,0.0,False,True,,1419610
+Electrical Engineering,M,Hispanic or Latino,,24,20211,Winter 2021,C S 142,0930 - 1045,TTh,DAY,Live Remote Delivery,B,3.0,,False,False,True,1.0,False,False,5.0,1419610
+Electrical Engineering,M,Hispanic or Latino,,26,20224,Summer 2022,C S 235,1300 - 1450,MWF,DAY,Classroom,B-,2.7,,False,False,True,2.0,False,False,,1419610
+Mechanical Engineering Pre-Professional,M,White,,18,20181,Winter 2018,C S 142,1100 - 1150,MWF,DAY,,B+,3.4,,False,False,False,0.0,False,False,,5614226
+Technical,M,White,,23,20205,Fall 2020,C S 142,,,DAY,On-Demand Remote Delivery,A-,3.7,,False,False,True,0.0,False,True,,5108603
+PreComputer Science: Animation and Games,M,White,,19,20225,Fall 2022,C S 111,1100 - 1150,MWF,DAY,Classroom,A,4.0,,True,False,False,0.0,False,False,4.0,4744854
+Animation and Games,M,White,,20,20235,Fall 2023,C S 224,1000 - 1050,MWF,DAY,Classroom,B,3.0,,True,False,False,2.0,False,False,8.0,4744854
+PreComputer Science: Animation and Games,M,White,,19,20231,Winter 2023,C S 235,1400 - 1515,TTh,DAY,Classroom,A,4.0,,False,False,False,1.0,False,False,4.0,4744854
 ```
 
 The possible courses are:
