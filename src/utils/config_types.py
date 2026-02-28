@@ -172,9 +172,10 @@ class ContainerSettings(TypedDict, total=False):
     pids_limit: int
     read_only_root: bool
 
+
 class ContainerConfig(TypedDict):
     image: str
-    mounts: list[ResourceConfig]
+    resources: list[ResourceConfig]
     settings: ContainerSettings
 
 
