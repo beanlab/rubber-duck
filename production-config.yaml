@@ -44,7 +44,7 @@ containers:
     settings:
       working_dir: /home/sandbox/out
     resources:
-      - { source: s3://byu-cms-metrics/CS-Grades-Dashboard-2026-02-17.csv,
+      - { source: s3://byu-cms-metrics/cs-merged-dashboard.csv,
           target: /home/sandbox/datasets/CS-Grades-Dashboard.csv }
 
 tools:
