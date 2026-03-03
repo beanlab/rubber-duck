@@ -14,7 +14,7 @@ from ..utils.logger import duck_logger
 
 
 class CanonicalCacheKey(BaseModel):
-    dataset: Optional[str] = None
+    dataset: str
     columns: list[str] = []
     analysis: Optional[str] = None
     parameters: dict[str, Any] = {}
