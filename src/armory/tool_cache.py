@@ -11,9 +11,8 @@ from ..utils.python_exec_container import FileResult
 
 
 class CacheKey(BaseModel):
-    dataset: str
-    columns: list[str] = []
-    analysis: Optional[str] = None
+    dataset: list[str]
+    analysis: Optional[list[str]] = None
     parameters: dict[str, Any] = {}
     plot_type: Optional[str] = None
     special_requests: Optional[list[str]] = []
@@ -74,7 +73,7 @@ def send_from_cache(cache_key: CacheKey) -> dict:
     return output
 
 
-def cache_file(cache_key: CacheKey, filename: str, file: dict[str, Any]) -> None:
+def cache_file(cache_key: CacheKey, filename: str, file: FileResult) -> None:
     duck_logger.debug(f"Caching file: {filename}")
     key_hash = _hash_key(cache_key)
 
@@ -116,11 +115,8 @@ _client = OpenAI()
 
 
 def build_cache_key(last_3_messages: str, code: str) -> CacheKey:
-    """
-    Uses OpenAI structured output to map the request to a canonical CacheKey.
-    Enforces schema via Pydantic model.
-    """
-    system_prompt = Path(STATS_CACHE_PROMPT).read_text()
+    system_prompt = STATS_CACHE_PROMPT
+
     user_prompt = dedent(
         f"""
         LAST 3 MESSAGES:
@@ -128,16 +124,26 @@ def build_cache_key(last_3_messages: str, code: str) -> CacheKey:
 
         PYTHON CODE:
         {code}
+
+        Return a JSON object matching the CacheKey schema.
         """
     )
 
-    response = _client.responses.parse(
-        model="gpt-4.1",
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        text_format=CacheKey,
-    )
+    try:
+        response = _client.responses.create(
+            model="gpt-5-nano",
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            reasoning={"effort": "minimal"},
+        )
 
-    return response.output_parsed
+        raw_json = response.output[1].content[0].text
+        data: CacheKey = json.loads(raw_json)
+
+        return CacheKey.model_validate(data)
+
+    except Exception as e:
+        duck_logger.error(e)
+        raise
