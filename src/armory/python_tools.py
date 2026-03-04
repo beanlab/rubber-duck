@@ -86,6 +86,8 @@ class PythonTools:
             }
         }
         """
+        # TODO: create semantic cache key based on last 3 messages and the code
+        # TODO: create this function in tool_cache.py
         results = await self._container.run_code(code, last_3_messages=last_3_messages)
         stdout = results.get('stdout').strip()
         stderr = results.get('stderr').strip()
