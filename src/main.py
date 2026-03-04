@@ -250,31 +250,19 @@ def _build_feedback_queues(config: Config, sql_session):
 
 def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> tuple[Armory, TalkTool]:
     armory = Armory(send_message)
-    cache = ToolCache()
 
     # setup tools
-    config_tools = config.get("tools", {})
+    config_tools = config.get("tools", [])
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
             python_tools = PythonTools(containers[container_name], send_message)
-
-            # wrap run_code with semantic cache
-            cached_run_code = wrap_tool_with_cache(
-                python_tools.run_code,
-                cache,
-                tool_name,
-                containers[container_name]
-            )
-
-            # combine description + container metadata
             amended_description = (
                     tool_config.get('description', python_tools.run_code.__doc__)
                     + '\n'
                     + containers[container_name].get_resource_metadata()
             )
-            # add cached tool to armory
-            armory.add_tool(cached_run_code, name=tool_name, description=amended_description)
+            armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
 
