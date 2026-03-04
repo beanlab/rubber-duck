@@ -353,12 +353,10 @@ class PythonExecContainer:
         stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
         return result.exit_code, stdout, stderr
 
-    def _run_code(self, code: str, last_3_messages: str | None = None) -> ExecutionResult:
+    def _run_code(self, code: str) -> ExecutionResult:
         unique_id = str(uuid.uuid4())
         dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
         duck_logger.debug(f'Running code in {self._container.name}:\n{code}')
-        if last_3_messages is not None:
-            duck_logger.debug(f'Conversation context for run_code: {last_3_messages}')
 
         exit_code, stdout, stderr = self._wrap_and_execute(code, dir_path)
 
@@ -376,18 +374,18 @@ class PythonExecContainer:
         }
         return output
 
-    async def run_code(self, code: str, last_3_messages: str | None = None) -> ExecutionResult:
+    async def run_code(self, code: str) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
         timeout = self._settings.get("timeout")
 
         # If no timeout, fallback to normal call
         if not timeout:
-            return await asyncio.to_thread(self._run_code, code, last_3_messages)
+            return await asyncio.to_thread(self._run_code, code)
 
         try:
             # run _run_code in a thread with timeout
             return await asyncio.wait_for(
-                asyncio.to_thread(self._run_code, code, last_3_messages),
+                asyncio.to_thread(self._run_code, code),
                 timeout=timeout
             )
         except asyncio.TimeoutError:
