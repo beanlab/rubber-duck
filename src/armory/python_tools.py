@@ -1,5 +1,4 @@
 import io
-import json
 import pandas as pd
 
 from .tool_cache import build_cache_key, check_if_cached, send_from_cache, cache_file, cache_msg, cache_table
@@ -87,8 +86,9 @@ class PythonTools:
             }
         }
         """
-        cache_key = build_cache_key(last_3_messages, code)
-        duck_logger.debug(f"\nCache key:\n{json.dumps(cache_key)}")
+        for i in range(3):
+            cache_key = build_cache_key(last_3_messages, code)
+            duck_logger.debug(f"\nCache key:\n{cache_key}")
 
         if check_if_cached(cache_key):
             duck_logger.debug(f" Cache HIT ".center(20,'-'))
@@ -125,10 +125,10 @@ class PythonTools:
                 cache_table(cache_key, table_chunks)
 
         # send cleaned stdout directly
+        stdout = _clean_stdout(stdout, files)
         if stdout:
-            msg = _clean_stdout(stdout, files)
-            cache_msg(cache_key, msg)
-            await self._send_message(ctx.thread_id, msg)
+            cache_msg(cache_key, stdout)
+            await self._send_message(ctx.thread_id, stdout)
 
         output = {
             'stdout': stdout,
