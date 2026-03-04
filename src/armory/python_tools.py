@@ -48,7 +48,6 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
     filtered_lines = []
     for line in stdout.splitlines():
         stripped = line.strip()
-        lower = stripped.lower()
 
         # drop filename echoes
         if stripped in file_names:
@@ -88,7 +87,7 @@ class PythonTools:
         """
         # TODO: create semantic cache key based on last 3 messages and the code
         # TODO: create this function in tool_cache.py
-        results = await self._container.run_code(code, last_3_messages=last_3_messages)
+        results = await self._container.run_code(code)
         stdout = results.get('stdout').strip()
         stderr = results.get('stderr').strip()
         files = results.get('files', {})
@@ -106,6 +105,7 @@ class PythonTools:
             if is_image(filename):
                 msg = {"file": FileData(filename=filename, bytes=file['bytes'])}
                 messages_sent.append(msg)
+                # TODO: store the generated file result mapped to the key
                 await self._send_message(ctx.thread_id, **msg)
             elif is_table(filename):
                 table = pd.read_csv(io.StringIO(file['bytes'].decode()))
@@ -115,12 +115,14 @@ class PythonTools:
                     md_table = table.iloc[:, i:i + col_chunk].to_markdown()
                     msg = {"content": f"```\n{md_table}\n```"}
                     messages_sent.append(msg)
+                    # TODO: store the generated table result mapped to the key
                     await self._send_message(ctx.thread_id, **msg)
 
         # send cleaned stdout directly
         if stdout:
-            msg = {"content": stdout}
+            msg = {"content": _clean_stdout(stdout, files)}
             messages_sent.append(msg)
+            # TODO: cache the standard out mapped to the key
             await self._send_message(ctx.thread_id, **msg)
 
         output = {
