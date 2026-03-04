@@ -6,6 +6,7 @@ from typing import Optional, Any
 from pydantic import BaseModel
 from openai import OpenAI
 
+from ..utils.logger import duck_logger
 from ..utils.python_exec_container import FileResult
 
 
@@ -74,6 +75,7 @@ def send_from_cache(cache_key: CacheKey) -> dict:
 
 
 def cache_file(cache_key: CacheKey, filename: str, file: dict[str, Any]) -> None:
+    duck_logger.debug(f"Caching file: {filename}")
     key_hash = _hash_key(cache_key)
 
     if key_hash not in _cache_store:
@@ -86,6 +88,7 @@ def cache_file(cache_key: CacheKey, filename: str, file: dict[str, Any]) -> None
 
 
 def cache_table(cache_key: CacheKey, table_chunks: list[str]) -> None:
+    duck_logger.debug(f"Caching table: {table_chunks[0]}")
     key_hash = _hash_key(cache_key)
 
     if key_hash not in _cache_store:
@@ -95,6 +98,7 @@ def cache_table(cache_key: CacheKey, table_chunks: list[str]) -> None:
 
 
 def cache_msg(cache_key: CacheKey, msg: str) -> None:
+    duck_logger.debug(f"Caching message: {msg}")
     key_hash = _hash_key(cache_key)
 
     if key_hash not in _cache_store:

@@ -1,7 +1,9 @@
 import io
+import json
 import pandas as pd
 
-from ..utils.config_types import DuckContext, FileData
+from .tool_cache import build_cache_key, check_if_cached, send_from_cache, cache_file, cache_msg, cache_table
+from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
@@ -85,14 +87,19 @@ class PythonTools:
             }
         }
         """
-        # TODO: create semantic cache key based on last 3 messages and the code
-        # TODO: create this function in tool_cache.py
+        cache_key = build_cache_key(last_3_messages, code)
+        duck_logger.debug(f"\nCache key:\n{json.dumps(cache_key)}")
+
+        if check_if_cached(cache_key):
+            duck_logger.debug(f" Cache HIT ".center(20,'-'))
+            output = send_from_cache(cache_key)
+            return output
+
+        duck_logger.debug(f" Cache MISS ".center(19, '-'))
         results = await self._container.run_code(code)
         stdout = results.get('stdout').strip()
         stderr = results.get('stderr').strip()
         files = results.get('files', {})
-
-        messages_sent = []
 
         # log created files
         if files:
@@ -103,33 +110,30 @@ class PythonTools:
         # send files directly
         for filename, file in files.items():
             if is_image(filename):
-                msg = {"file": FileData(filename=filename, bytes=file['bytes'])}
-                messages_sent.append(msg)
-                # TODO: store the generated file result mapped to the key
-                await self._send_message(ctx.thread_id, **msg)
+                cache_file(cache_key, filename, file)
+                await self._send_message(ctx.thread_id, file=file)
             elif is_table(filename):
                 table = pd.read_csv(io.StringIO(file['bytes'].decode()))
                 table = table.head(100)
                 col_chunk = _determine_col_chunk(table)
+                table_chunks = []
                 for i in range(0, table.shape[1], col_chunk):
                     md_table = table.iloc[:, i:i + col_chunk].to_markdown()
-                    msg = {"content": f"```\n{md_table}\n```"}
-                    messages_sent.append(msg)
-                    # TODO: store the generated table result mapped to the key
-                    await self._send_message(ctx.thread_id, **msg)
+                    table_chunk = f"```\n{md_table}\n```"
+                    table_chunks.append(table_chunk)
+                    await self._send_message(ctx.thread_id, table_chunk)
+                cache_table(cache_key, table_chunks)
 
         # send cleaned stdout directly
         if stdout:
-            msg = {"content": _clean_stdout(stdout, files)}
-            messages_sent.append(msg)
-            # TODO: cache the standard out mapped to the key
-            await self._send_message(ctx.thread_id, **msg)
+            msg = _clean_stdout(stdout, files)
+            cache_msg(cache_key, msg)
+            await self._send_message(ctx.thread_id, msg)
 
         output = {
             'stdout': stdout,
             'stderr': stderr,
             'files': {filename: file['description'] for filename, file in files.items()},
-            'messages_sent': messages_sent,
         }
 
         if results['exit_code'] == 0:
