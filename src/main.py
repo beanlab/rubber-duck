@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Iterable
 
@@ -420,8 +421,6 @@ if __name__ == '__main__':
     add_console_handler()
 
     if args.config is None:
-        import os
-
         args.config = os.getenv('CONFIG_FILE_S3_PATH')
 
     config: Config = load_configuration(args.config)
