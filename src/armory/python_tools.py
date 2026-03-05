@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 
-from .tool_cache import ToolCache, CacheKeyBuilder
+from ..utils.protocols import ToolCache, CacheKeyBuilder
 from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse

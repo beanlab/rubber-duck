@@ -1,7 +1,7 @@
 import hashlib
 import json
 from textwrap import dedent
-from typing import Any, Protocol
+from typing import Any
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -23,28 +23,6 @@ class CacheEntry(BaseModel):
     stdout: str | None = None
     tables: list[str] = Field(default_factory=list)
     files: dict[str, FileResult] = Field(default_factory=dict)
-
-
-class ToolCache(Protocol):
-    def check_if_cached(self, cache_key: CacheKey) -> bool:
-        ...
-
-    async def send_from_cache(self, cache_key: CacheKey, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
-        ...
-
-    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult) -> None:
-        ...
-
-    def cache_table(self, cache_key: CacheKey, table_chunks: list[str]) -> None:
-        ...
-
-    def cache_msg(self, cache_key: CacheKey, msg: str) -> None:
-        ...
-
-
-class CacheKeyBuilder(Protocol):
-    def build_cache_key(self, last_3_messages: str, code: str) -> CacheKey:
-        ...
 
 
 class InMemoryToolCache:

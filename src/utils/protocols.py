@@ -1,7 +1,11 @@
 import dataclasses
-from typing import Protocol, TypedDict, Any
+from typing import Protocol, TypedDict, Any, TYPE_CHECKING
 
+from .python_exec_container import FileResult
 from ..utils.config_types import FileData
+
+if TYPE_CHECKING:
+    from ..armory.tool_cache import CacheKey
 
 
 class Attachment(TypedDict):
@@ -57,6 +61,29 @@ class CreateThread(Protocol):
 class ConversationComplete(BaseException):
     def __init__(self, message=None):
         super().__init__(message)
+
+
+class ToolCache(Protocol):
+    def check_if_cached(self, cache_key: "CacheKey") -> bool:
+        ...
+
+    async def send_from_cache(self, cache_key: "CacheKey", send_message: SendMessage, channel_id: int) -> dict[
+        str, Any]:
+        ...
+
+    def cache_file(self, cache_key: "CacheKey", filename: str, file: FileResult) -> None:
+        ...
+
+    def cache_table(self, cache_key: "CacheKey", table_chunks: list[str]) -> None:
+        ...
+
+    def cache_msg(self, cache_key: "CacheKey", msg: str) -> None:
+        ...
+
+
+class CacheKeyBuilder(Protocol):
+    def build_cache_key(self, last_3_messages: str, code: str) -> "CacheKey":
+        ...
 
 
 @dataclasses.dataclass
