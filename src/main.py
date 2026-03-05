@@ -9,7 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from .utils.protocols import ToolCache
+from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
@@ -249,12 +249,12 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def _build_stats_cache_key_builder(config: Config) -> SemanticCacheKeyBuilder:
-    settings = config.get("stats_cache", {})
+def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
+    settings = config.get("cache", {})
 
     prompt = settings.get("prompt")
     if not prompt:
-        raise ValueError("Missing 'prompt' config setting in stats_cache")
+        duck_logger.error("Missing 'prompt' config setting in cache")
 
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
@@ -265,24 +265,18 @@ def _build_stats_cache_key_builder(config: Config) -> SemanticCacheKeyBuilder:
 
 
 def _build_tool_cache(config: Config) -> ToolCache:
-    backend = config.get("stats_cache", {}).get("backend", "memory")
+    backend = config.get("cache", {}).get("backend", "memory")
 
     if backend == "memory":
         return InMemoryToolCache()
 
     if backend == "database":
-        raise NotImplementedError("stats_cache.backend=database is not implemented yet")
+        raise NotImplementedError("cache.backend=database is not implemented yet")
 
-    raise NotImplementedError(f"Unsupported stats_cache backend: {backend}")
+    raise NotImplementedError(f"Unsupported cache backend: {backend}")
 
 
-def build_armory(
-        config: Config,
-        send_message,
-        containers: dict[str, PythonExecContainer],
-        tool_cache: ToolCache,
-        cache_key_builder: SemanticCacheKeyBuilder
-) -> tuple[Armory, TalkTool]:
+def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> tuple[Armory, TalkTool]:
     armory = Armory(send_message)
 
     # setup tools
@@ -290,6 +284,8 @@ def build_armory(
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
+            tool_cache = _build_tool_cache(config)
+            cache_key_builder = _build_cache_key_builder(config)
             python_tools = PythonTools(
                 containers[container_name],
                 send_message,
@@ -344,14 +340,10 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             with these(build_containers(config)) as containers:
-                tool_cache = _build_tool_cache(config)
-                cache_key_builder = _build_stats_cache_key_builder(config)
                 armory, talk_tool = build_armory(
                     config,
                     bot.send_message,
                     containers,
-                    tool_cache,
-                    cache_key_builder
                 )
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
