@@ -55,6 +55,12 @@ tools:
     type: container_exec
     container: cs-python-sandbox
 
+stats_cache:
+  prompt_files:
+    - prompts/production-prompts/stats-cache.md
+  engine: gpt-5-nano
+  reasoning: minimal
+
 agents_as_tools:
   registration:
     doc_string: |

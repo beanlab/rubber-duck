@@ -1,14 +1,15 @@
 import argparse
 import asyncio
 import logging
-import os
 from pathlib import Path
 from typing import Iterable
 
+from openai import OpenAI
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
@@ -247,7 +248,28 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> tuple[Armory, TalkTool]:
+def _build_stats_cache_key_builder(config: Config) -> SemanticCacheKeyBuilder:
+    settings = config.get("stats_cache", {})
+
+    prompt = settings.get("prompt")
+    if not prompt:
+        raise ValueError("Missing 'prompt' config setting in stats_cache")
+
+    return SemanticCacheKeyBuilder(
+        client=OpenAI(),
+        prompt=prompt,
+        model=settings.get("engine", "gpt-5-nano"),
+        reasoning_effort=settings.get("reasoning", "minimal"),
+    )
+
+
+def build_armory(
+        config: Config,
+        send_message,
+        containers: dict[str, PythonExecContainer],
+        tool_cache: InMemoryToolCache,
+        cache_key_builder: SemanticCacheKeyBuilder
+) -> tuple[Armory, TalkTool]:
     armory = Armory(send_message)
 
     # setup tools
@@ -255,7 +277,12 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            python_tools = PythonTools(containers[container_name], send_message)
+            python_tools = PythonTools(
+                containers[container_name],
+                send_message,
+                tool_cache,
+                cache_key_builder
+            )
             amended_description = (
                     tool_config.get('description', python_tools.run_code.__doc__)
                     + '\n'
@@ -304,7 +331,15 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             with these(build_containers(config)) as containers:
-                armory, talk_tool = build_armory(config, bot.send_message, containers)
+                tool_cache = InMemoryToolCache()
+                cache_key_builder = _build_stats_cache_key_builder(config)
+                armory, talk_tool = build_armory(
+                    config,
+                    bot.send_message,
+                    containers,
+                    tool_cache,
+                    cache_key_builder
+                )
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
 
