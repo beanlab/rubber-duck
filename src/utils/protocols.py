@@ -71,13 +71,13 @@ class ToolCache(Protocol):
         str, Any]:
         ...
 
-    def cache_file(self, cache_key: "CacheKey", filename: str, file: FileResult) -> None:
+    def cache_file(self, cache_key: "CacheKey", filename: str, file: FileResult):
         ...
 
-    def cache_table(self, cache_key: "CacheKey", table_chunks: list[str]) -> None:
+    def cache_table(self, cache_key: "CacheKey", filename: str, table_chunks: list[str], description: str = ""):
         ...
 
-    def cache_msg(self, cache_key: "CacheKey", msg: str) -> None:
+    def cache_msg(self, cache_key: "CacheKey", msg: str):
         ...
 
 

@@ -138,7 +138,7 @@ class PythonTools:
                     table_chunk = f"```\n{md_table}\n```"
                     table_chunks.append(table_chunk)
                     await self._send_message(ctx.thread_id, table_chunk)
-                self._tool_cache.cache_table(cache_key, table_chunks)
+                self._tool_cache.cache_table(cache_key, filename, table_chunks, file.get("description", ""))
 
         # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)

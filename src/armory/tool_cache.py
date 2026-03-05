@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
@@ -21,7 +22,7 @@ class CacheKey(BaseModel):
 
 class CacheEntry(BaseModel):
     stdout: str | None = None
-    tables: list[str] = Field(default_factory=list)
+    tables: list[dict[str, Any]] = Field(default_factory=list)
     files: dict[str, FileResult] = Field(default_factory=dict)
 
 
@@ -60,19 +61,25 @@ class InMemoryToolCache:
                 }
             )
 
-        for table_chunk in entry.tables:
-            await send_message(channel_id, table_chunk)
+        for table in entry.tables:
+            for table_chunk in table["chunks"]:
+                await send_message(channel_id, table_chunk)
 
         if entry.stdout:
             await send_message(channel_id, entry.stdout)
 
+        files = {
+            filename: file_data["description"]
+            for filename, file_data in entry.files.items()
+        }
+
+        for table in entry.tables:
+            files[table["filename"]] = table.get("description", "")
+
         output = {
             "stdout": entry.stdout or "",
             "stderr": "",
-            "files": {
-                filename: file_data["description"]
-                for filename, file_data in entry.files.items()
-            },
+            "files": files,
         }
 
         return output
@@ -83,7 +90,7 @@ class InMemoryToolCache:
             self._cache_store[key_hash] = CacheEntry()
         return self._cache_store[key_hash]
 
-    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult) -> None:
+    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult):
         duck_logger.debug(f"Caching file: {filename}")
         entry = self._get_or_create(cache_key)
         entry.files[filename] = {
@@ -91,14 +98,18 @@ class InMemoryToolCache:
             "description": file.get("description", ""),
         }
 
-    def cache_table(self, cache_key: CacheKey, table_chunks: list[str]) -> None:
+    def cache_table(self, cache_key: CacheKey, filename: str, table_chunks: list[str], description: str = ""):
         if not table_chunks:
             return
-        duck_logger.debug(f"Caching table: {table_chunks[0]}")
+        duck_logger.debug(f"Caching table: {filename}")
         entry = self._get_or_create(cache_key)
-        entry.tables.extend(table_chunks)
+        entry.tables.append({
+            "filename": filename,
+            "description": description,
+            "chunks": table_chunks,
+        })
 
-    def cache_msg(self, cache_key: CacheKey, msg: str) -> None:
+    def cache_msg(self, cache_key: CacheKey, msg: str):
         duck_logger.debug(f"Caching message: {msg}")
         entry = self._get_or_create(cache_key)
         entry.stdout = msg
@@ -132,17 +143,15 @@ class SemanticCacheKeyBuilder:
         raise ValueError("No text content returned when building semantic cache key")
 
     def build_cache_key(self, user_intent: str, code: str) -> CacheKey:
-        user_prompt = dedent(
-            f"""
+        user_prompt = f"""
             USER INTENT:
             {user_intent}
 
             PYTHON CODE:
             {code}
 
-            Return a JSON object matching the CacheKey schema.
-            """
-        )
+            Return a JSON object matching the given schema
+        """
 
         try:
             response = self._client.responses.create(
