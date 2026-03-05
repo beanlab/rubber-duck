@@ -10,6 +10,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from src.utils import cache_cleaner
 from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder
 from .workflows.registration import Registration
@@ -35,6 +36,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
+from .utils.cache_cleaner import CacheCleaner
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -277,8 +279,13 @@ def _build_tool_cache(config: Config) -> ToolCache:
     raise NotImplementedError(f"Unsupported cache backend: {backend}")
 
 
-def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> tuple[Armory, TalkTool]:
+def build_armory(
+        config: Config,
+        send_message,
+        containers: dict[str, PythonExecContainer]
+) -> tuple[Armory, TalkTool, list[ToolCache]]:
     armory = Armory(send_message)
+    tool_caches: list[ToolCache] = []
 
     # setup tools
     config_tools = config.get("tools", [])
@@ -286,6 +293,7 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
             tool_cache = _build_tool_cache(config)
+            tool_caches.append(tool_cache)
             cache_key_builder = _build_cache_key_builder(config)
             python_tools = PythonTools(
                 containers[container_name],
@@ -305,7 +313,29 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
 
-    return armory, talk_tool
+    return armory, talk_tool, tool_caches
+
+
+def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
+    unique_tool_caches: list[ToolCache] = []
+    seen_cache_ids: set[int] = set()
+    for tool_cache in tool_caches:
+        cache_id = id(tool_cache)
+        if cache_id not in seen_cache_ids:
+            seen_cache_ids.add(cache_id)
+            unique_tool_caches.append(tool_cache)
+    cc = None
+    if unique_tool_caches:
+        cache_settings = config.get("cache", {})
+        cleanup_hour = cache_settings.get("cleanup_hour", 3)
+        cleanup_minute = cache_settings.get("cleanup_minute", 0)
+        cc = CacheCleaner(
+            unique_tool_caches,
+            cleanup_hour,
+            cleanup_minute
+        )
+    return cc
+
 
 
 def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
@@ -341,7 +371,7 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             with these(build_containers(config)) as containers:
-                armory, talk_tool = build_armory(
+                armory, talk_tool, tool_caches = build_armory(
                     config,
                     bot.send_message,
                     containers,
@@ -389,6 +419,10 @@ async def _main(config: Config, log_dir: Path):
                         notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
                                                     config['feedback_notifier_settings'])
                         tasks.append(notifier.start())
+
+                    cleaner = _setup_cache_cleaner(tool_caches)
+                    if cleaner:
+                        tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)
 

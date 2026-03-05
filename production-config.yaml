@@ -61,6 +61,8 @@ cache:
   prompt: prompts/production-prompts/stats-cache.md
   engine: gpt-5-nano
   reasoning: minimal
+  cleanup_hour: 9
+  cleanup_minute: 0
 
 agents_as_tools:
   registration:

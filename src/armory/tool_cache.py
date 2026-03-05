@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from openai import OpenAI
@@ -22,11 +23,20 @@ class CacheEntry(BaseModel):
     stdout: str | None = None
     tables: list[dict[str, Any]] = Field(default_factory=list)
     files: dict[str, FileResult] = Field(default_factory=dict)
+    created_at: datetime
+    last_access: datetime
+    hit_count: int
+    expires_at: datetime
 
 
 class InMemoryToolCache(ToolCache):
     def __init__(self, cache_store: dict[str, CacheEntry] | None = None):
         self._cache_store = cache_store if cache_store is not None else {}
+        self._last_cleanup_at: datetime | None = None
+
+    @staticmethod
+    def _utc_now() -> datetime:
+        return datetime.now(timezone.utc)
 
     @staticmethod
     def _hash_key(key: CacheKey) -> str:
@@ -50,6 +60,14 @@ class InMemoryToolCache(ToolCache):
         if entry is None:
             duck_logger.error(f"Key {key_hash} not in cache")
             return {}
+
+        now = self._utc_now()
+        entry.hit_count += 1
+        entry.last_access = now
+        if entry.hit_count >= 10:
+            entry.expires_at = now + timedelta(days=548)
+        else:
+            entry.expires_at = now + timedelta(days=entry.hit_count + 1)
 
         for filename, file_data in entry.files.items():
             await send_message(
@@ -85,8 +103,26 @@ class InMemoryToolCache(ToolCache):
 
     def _get_or_create(self, key_hash: str) -> CacheEntry:
         if key_hash not in self._cache_store:
-            self._cache_store[key_hash] = CacheEntry()
+            now = self._utc_now()
+            self._cache_store[key_hash] = CacheEntry(
+                hit_count=0,
+                created_at=now,
+                last_access=now,
+                expires_at=now + timedelta(days=1),
+            )
         return self._cache_store[key_hash]
+
+    def cleanup(self):
+        now = self._utc_now()
+        if self._last_cleanup_at is not None and (now - self._last_cleanup_at) < timedelta(days=1):
+            return
+
+        self._cache_store = {
+            key_hash: entry
+            for key_hash, entry in self._cache_store.items()
+            if entry.expires_at >= now
+        }
+        self._last_cleanup_at = now
 
     def cache_file(self, key_hash: str, filename: str, file: FileResult):
         duck_logger.debug(f"Caching file: {filename}")

@@ -64,6 +64,9 @@ class ConversationComplete(BaseException):
 
 
 class ToolCache(Protocol):
+    def cleanup(self):
+        ...
+
     def get_key_hash(self, cache_key: "CacheKey") -> str:
         ...
 

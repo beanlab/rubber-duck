@@ -194,6 +194,8 @@ class CacheSettings(TypedDict):
     prompt_files: NotRequired[list[str]]
     engine: NotRequired[str]
     reasoning: NotRequired[str]
+    cleanup_hour: NotRequired[int]
+    cleanup_minute: NotRequired[int]
 
 
 class Config(TypedDict):
