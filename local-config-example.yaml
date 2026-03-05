@@ -46,6 +46,11 @@ ducks:
     $include_0: "production-config.yaml@$.ducks.standard-rubber-duck"
     $include_1: "production-config.yaml@$.ducks.stats-duck"
 
+cache:
+  $include: "production-config.yaml@$.cache"
+
+agents_as_tools:
+  $include: "production-config.yaml@$.agents_as_tools"
 
 servers:
   BeanLab:
