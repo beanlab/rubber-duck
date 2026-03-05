@@ -64,20 +64,23 @@ class ConversationComplete(BaseException):
 
 
 class ToolCache(Protocol):
-    def check_if_cached(self, cache_key: "CacheKey") -> bool:
+    def get_key_hash(self, cache_key: "CacheKey") -> str:
         ...
 
-    async def send_from_cache(self, cache_key: "CacheKey", send_message: SendMessage, channel_id: int) -> dict[
+    def check_if_cached(self, key_hash: str) -> bool:
+        ...
+
+    async def send_from_cache(self, key_hash: str, send_message: SendMessage, channel_id: int) -> dict[
         str, Any]:
         ...
 
-    def cache_file(self, cache_key: "CacheKey", filename: str, file: FileResult):
+    def cache_file(self, key_hash: str, filename: str, file: FileResult):
         ...
 
-    def cache_table(self, cache_key: "CacheKey", filename: str, table_chunks: list[str], description: str = ""):
+    def cache_table(self, key_hash: str, filename: str, table_chunks: list[str], description: str = ""):
         ...
 
-    def cache_msg(self, cache_key: "CacheKey", msg: str):
+    def cache_msg(self, key_hash: str, msg: str):
         ...
 
 

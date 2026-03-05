@@ -94,11 +94,12 @@ class PythonTools:
         """
         cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
         duck_logger.debug(f"\nCache key:\n{cache_key}")
+        key_hash = self._tool_cache.get_key_hash(cache_key)
 
-        if self._tool_cache.check_if_cached(cache_key):
+        if self._tool_cache.check_if_cached(key_hash):
             duck_logger.debug(f" Cache HIT ".center(20, '-'))
             output = await self._tool_cache.send_from_cache(
-                cache_key,
+                key_hash,
                 self._send_message,
                 ctx.thread_id
             )
@@ -120,7 +121,7 @@ class PythonTools:
         # send files directly
         for filename, file in files.items():
             if is_image(filename):
-                self._tool_cache.cache_file(cache_key, filename, file)
+                self._tool_cache.cache_file(key_hash, filename, file)
                 await self._send_message(
                     ctx.thread_id,
                     file={
@@ -138,12 +139,12 @@ class PythonTools:
                     table_chunk = f"```\n{md_table}\n```"
                     table_chunks.append(table_chunk)
                     await self._send_message(ctx.thread_id, table_chunk)
-                self._tool_cache.cache_table(cache_key, filename, table_chunks, file.get("description", ""))
+                self._tool_cache.cache_table(key_hash, filename, table_chunks, file.get("description", ""))
 
         # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)
         if stdout:
-            self._tool_cache.cache_msg(cache_key, stdout)
+            self._tool_cache.cache_msg(key_hash, stdout)
             await self._send_message(ctx.thread_id, stdout)
 
         output = {

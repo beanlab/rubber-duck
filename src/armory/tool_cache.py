@@ -37,13 +37,14 @@ class InMemoryToolCache(ToolCache):
         )
         return hashlib.sha256(canonical.encode()).hexdigest()
 
-    def check_if_cached(self, cache_key: CacheKey) -> bool:
-        key_hash = self._hash_key(cache_key)
+    def get_key_hash(self, cache_key: CacheKey) -> str:
+        return self._hash_key(cache_key)
+
+    def check_if_cached(self, key_hash: str) -> bool:
         result = key_hash in self._cache_store
         return result
 
-    async def send_from_cache(self, cache_key: CacheKey, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
-        key_hash = self._hash_key(cache_key)
+    async def send_from_cache(self, key_hash: str, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
         entry = self._cache_store.get(key_hash)
 
         if entry is None:
@@ -82,34 +83,33 @@ class InMemoryToolCache(ToolCache):
 
         return output
 
-    def _get_or_create(self, cache_key: CacheKey) -> CacheEntry:
-        key_hash = self._hash_key(cache_key)
+    def _get_or_create(self, key_hash: str) -> CacheEntry:
         if key_hash not in self._cache_store:
             self._cache_store[key_hash] = CacheEntry()
         return self._cache_store[key_hash]
 
-    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult):
+    def cache_file(self, key_hash: str, filename: str, file: FileResult):
         duck_logger.debug(f"Caching file: {filename}")
-        entry = self._get_or_create(cache_key)
+        entry = self._get_or_create(key_hash)
         entry.files[filename] = {
             "bytes": file["bytes"],
             "description": file.get("description", ""),
         }
 
-    def cache_table(self, cache_key: CacheKey, filename: str, table_chunks: list[str], description: str = ""):
+    def cache_table(self, key_hash: str, filename: str, table_chunks: list[str], description: str = ""):
         if not table_chunks:
             return
         duck_logger.debug(f"Caching table: {filename}")
-        entry = self._get_or_create(cache_key)
+        entry = self._get_or_create(key_hash)
         entry.tables.append({
             "filename": filename,
             "description": description,
             "chunks": table_chunks,
         })
 
-    def cache_msg(self, cache_key: CacheKey, msg: str):
+    def cache_msg(self, key_hash: str, msg: str):
         duck_logger.debug(f"Caching message: {msg}")
-        entry = self._get_or_create(cache_key)
+        entry = self._get_or_create(key_hash)
         entry.stdout = msg
 
 
