@@ -56,10 +56,9 @@ tools:
     type: container_exec
     container: cs-python-sandbox
 
-stats_cache:
+cache:
   backend: memory
-  prompt_files:
-    - prompts/production-prompts/stats-cache.md
+  prompt: prompts/production-prompts/stats-cache.md
   engine: gpt-5-nano
   reasoning: minimal
 

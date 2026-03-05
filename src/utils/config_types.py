@@ -188,7 +188,7 @@ class ContainerTool(TypedDict):
 ToolConfig = ContainerTool
 
 
-class StatsCacheSettings(TypedDict):
+class CacheSettings(TypedDict):
     backend: NotRequired[Literal["memory", "database"]]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
@@ -200,7 +200,7 @@ class Config(TypedDict):
     sql: SQLConfig
     containers: dict[str, ContainerConfig]
     tools: dict[str, ToolConfig]
-    stats_cache: NotRequired[StatsCacheSettings]
+    cache: CacheSettings
     ducks: dict[DUCK_NAME, DuckConfig]
     agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]
