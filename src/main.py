@@ -259,7 +259,7 @@ def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
 
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
-        prompt=prompt,
+        prompt=Path(prompt).read_text(),
         model=settings.get("engine", "gpt-5-nano"),
         reasoning_effort=settings.get("reasoning", "minimal"),
     )
