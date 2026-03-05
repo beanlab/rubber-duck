@@ -77,13 +77,13 @@ class PythonTools:
         self._tool_cache = tool_cache
         self._cache_key_builder = cache_key_builder
 
-    async def run_code(self, ctx: DuckContext, code: str, last_3_messages: str) -> dict[str, str | dict[str, str]]:
+    async def run_code(self, ctx: DuckContext, code: str, user_intent: str) -> dict[str, str | dict[str, str]]:
         """
-        Takes a string of python code as input and returns the resulting stdout/stderr in the following format:
-        `last_3_messages` must be a JSON array string with exactly 3 objects, each of the form
-        {"role":"user|assistant","content":"..."}, ordered oldest->newest.
+        Takes python code and the user's intent, executes it, and returns stdout/stderr/files.
+
         :param ctx: DuckContext
-        :param code:
+        :param code: Python code to execute
+        :param user_intent: Short description of what the user is trying to do.
         :return:
             'code': str,
             'stdout': str,
@@ -91,13 +91,12 @@ class PythonTools:
             'files': {
                 filename: description
             }
-        }
         """
-        cache_key = self._cache_key_builder.build_cache_key(last_3_messages, code)
+        cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
         duck_logger.debug(f"\nCache key:\n{cache_key}")
 
         if self._tool_cache.check_if_cached(cache_key):
-            duck_logger.debug(f" Cache HIT ".center(20,'-'))
+            duck_logger.debug(f" Cache HIT ".center(20, '-'))
             output = await self._tool_cache.send_from_cache(
                 cache_key,
                 self._send_message,
@@ -107,6 +106,7 @@ class PythonTools:
 
         duck_logger.debug(f" Cache MISS ".center(19, '-'))
         results = await self._container.run_code(code)
+
         stdout = results.get('stdout').strip()
         stderr = results.get('stderr').strip()
         files = results.get('files', {})

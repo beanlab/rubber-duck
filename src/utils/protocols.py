@@ -82,7 +82,7 @@ class ToolCache(Protocol):
 
 
 class CacheKeyBuilder(Protocol):
-    def build_cache_key(self, last_3_messages: str, code: str) -> "CacheKey":
+    def build_cache_key(self, user_intent: str, code: str) -> "CacheKey":
         ...
 
 
