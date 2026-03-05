@@ -1,7 +1,5 @@
 import hashlib
 import json
-from pathlib import Path
-from textwrap import dedent
 from typing import Any
 
 from openai import OpenAI
