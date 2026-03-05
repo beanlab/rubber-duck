@@ -40,13 +40,15 @@ class InMemoryToolCache:
 
     def check_if_cached(self, cache_key: CacheKey) -> bool:
         key_hash = self._hash_key(cache_key)
-        return key_hash in self._cache_store
+        result = key_hash in self._cache_store
+        return result
 
     async def send_from_cache(self, cache_key: CacheKey, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
         key_hash = self._hash_key(cache_key)
         entry = self._cache_store.get(key_hash)
 
         if entry is None:
+            duck_logger.error(f"Key {key_hash} not in cache")
             return {}
 
         for filename, file_data in entry.files.items():
@@ -129,11 +131,11 @@ class SemanticCacheKeyBuilder:
 
         raise ValueError("No text content returned when building semantic cache key")
 
-    def build_cache_key(self, last_3_messages: str, code: str) -> CacheKey:
+    def build_cache_key(self, user_intent: str, code: str) -> CacheKey:
         user_prompt = dedent(
             f"""
-            LAST 3 MESSAGES:
-            {last_3_messages}
+            USER INTENT:
+            {user_intent}
 
             PYTHON CODE:
             {code}
