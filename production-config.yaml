@@ -51,11 +51,13 @@ tools:
   run_python:
     type: container_exec
     container: stats-python-sandbox
+
   run_cs_analysis:
     type: container_exec
     container: cs-python-sandbox
 
 stats_cache:
+  backend: memory
   prompt_files:
     - prompts/production-prompts/stats-cache.md
   engine: gpt-5-nano

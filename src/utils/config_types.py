@@ -189,6 +189,7 @@ ToolConfig = ContainerTool
 
 
 class StatsCacheSettings(TypedDict):
+    backend: NotRequired[Literal["memory", "database"]]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     engine: NotRequired[str]
