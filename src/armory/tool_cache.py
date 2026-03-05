@@ -1,149 +1,181 @@
-import json
 import hashlib
-from pathlib import Path
+import json
 from textwrap import dedent
-from typing import Optional, Any
-from pydantic import BaseModel
+from typing import Any, Protocol
+
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
 from ..utils.logger import duck_logger
+from ..utils.protocols import SendMessage
 from ..utils.python_exec_container import FileResult
 
 
 class CacheKey(BaseModel):
     dataset: list[str]
-    analysis: Optional[list[str]] = None
-    parameters: dict[str, Any] = {}
-    plot_type: Optional[str] = None
-    special_requests: Optional[list[str]] = []
+    analysis: list[str] | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    plot_type: str | None = None
+    special_requests: list[str] = Field(default_factory=list)
 
 
 class CacheEntry(BaseModel):
-    stdout: Optional[str] = None
-    tables: Optional[list[str]] = []
-    files: Optional[dict[str, FileResult]] = {}
+    stdout: str | None = None
+    tables: list[str] = Field(default_factory=list)
+    files: dict[str, FileResult] = Field(default_factory=dict)
 
 
-# ----------------------------
-# In-memory store
-# ----------------------------
+class ToolCache(Protocol):
+    def check_if_cached(self, cache_key: CacheKey) -> bool:
+        ...
 
-_cache_store: dict[str, CacheEntry] = {}
+    async def send_from_cache(self, cache_key: CacheKey, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
+        ...
 
+    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult) -> None:
+        ...
 
-def _hash_key(key: CacheKey) -> str:
-    canonical = json.dumps(
-        key.model_dump(),
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    def cache_table(self, cache_key: CacheKey, table_chunks: list[str]) -> None:
+        ...
 
-
-# ----------------------------
-# Public Cache API
-# ----------------------------
-
-def check_if_cached(cache_key: CacheKey) -> bool:
-    key_hash = _hash_key(cache_key)
-    return key_hash in _cache_store
+    def cache_msg(self, cache_key: CacheKey, msg: str) -> None:
+        ...
 
 
-def send_from_cache(cache_key: CacheKey) -> dict:
-    key_hash = _hash_key(cache_key)
-    entry = _cache_store.get(key_hash)
-
-    if entry is None:
-        return {}
-
-    stdout = entry.stdout or ""
-    stderr = ""
-
-    files = {
-        filename: file_data["description"]
-        for filename, file_data in entry.files.items()
-    }
-
-    output = {
-        "stdout": stdout,
-        "stderr": stderr,
-        "files": files,
-    }
-
-    return output
+class CacheKeyBuilder(Protocol):
+    def build_cache_key(self, last_3_messages: str, code: str) -> CacheKey:
+        ...
 
 
-def cache_file(cache_key: CacheKey, filename: str, file: FileResult) -> None:
-    duck_logger.debug(f"Caching file: {filename}")
-    key_hash = _hash_key(cache_key)
+class InMemoryToolCache:
+    def __init__(self, cache_store: dict[str, CacheEntry] | None = None):
+        self._cache_store = cache_store if cache_store is not None else {}
 
-    if key_hash not in _cache_store:
-        _cache_store[key_hash] = CacheEntry()
+    @staticmethod
+    def _hash_key(key: CacheKey) -> str:
+        canonical = json.dumps(
+            key.model_dump(),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()
 
-    _cache_store[key_hash].files[filename] = {
-        "bytes": file["bytes"],
-        "description": file.get("description", ""),
-    }
+    def check_if_cached(self, cache_key: CacheKey) -> bool:
+        key_hash = self._hash_key(cache_key)
+        return key_hash in self._cache_store
+
+    async def send_from_cache(self, cache_key: CacheKey, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
+        key_hash = self._hash_key(cache_key)
+        entry = self._cache_store.get(key_hash)
+
+        if entry is None:
+            return {}
+
+        for filename, file_data in entry.files.items():
+            await send_message(
+                channel_id,
+                file={
+                    "filename": filename,
+                    "bytes": file_data["bytes"],
+                }
+            )
+
+        for table_chunk in entry.tables:
+            await send_message(channel_id, table_chunk)
+
+        if entry.stdout:
+            await send_message(channel_id, entry.stdout)
+
+        output = {
+            "stdout": entry.stdout or "",
+            "stderr": "",
+            "files": {
+                filename: file_data["description"]
+                for filename, file_data in entry.files.items()
+            },
+        }
+
+        return output
+
+    def _get_or_create(self, cache_key: CacheKey) -> CacheEntry:
+        key_hash = self._hash_key(cache_key)
+        if key_hash not in self._cache_store:
+            self._cache_store[key_hash] = CacheEntry()
+        return self._cache_store[key_hash]
+
+    def cache_file(self, cache_key: CacheKey, filename: str, file: FileResult) -> None:
+        duck_logger.debug(f"Caching file: {filename}")
+        entry = self._get_or_create(cache_key)
+        entry.files[filename] = {
+            "bytes": file["bytes"],
+            "description": file.get("description", ""),
+        }
+
+    def cache_table(self, cache_key: CacheKey, table_chunks: list[str]) -> None:
+        if not table_chunks:
+            return
+        duck_logger.debug(f"Caching table: {table_chunks[0]}")
+        entry = self._get_or_create(cache_key)
+        entry.tables.extend(table_chunks)
+
+    def cache_msg(self, cache_key: CacheKey, msg: str) -> None:
+        duck_logger.debug(f"Caching message: {msg}")
+        entry = self._get_or_create(cache_key)
+        entry.stdout = msg
 
 
-def cache_table(cache_key: CacheKey, table_chunks: list[str]) -> None:
-    duck_logger.debug(f"Caching table: {table_chunks[0]}")
-    key_hash = _hash_key(cache_key)
+class SemanticCacheKeyBuilder:
+    def __init__(
+            self,
+            client: OpenAI,
+            prompt: str,
+            model: str = "gpt-5-nano",
+            reasoning_effort: str = "minimal"
+    ):
+        self._client = client
+        self._prompt = prompt
+        self._model = model
+        self._reasoning_effort = reasoning_effort
 
-    if key_hash not in _cache_store:
-        _cache_store[key_hash] = CacheEntry()
+    @staticmethod
+    def _extract_text(response: Any) -> str:
+        if getattr(response, "output_text", None):
+            return response.output_text
 
-    _cache_store[key_hash].tables.extend(table_chunks)
+        output = getattr(response, "output", [])
+        for item in output:
+            for content in getattr(item, "content", []):
+                text = getattr(content, "text", None)
+                if text:
+                    return text
 
+        raise ValueError("No text content returned when building semantic cache key")
 
-def cache_msg(cache_key: CacheKey, msg: str) -> None:
-    duck_logger.debug(f"Caching message: {msg}")
-    key_hash = _hash_key(cache_key)
+    def build_cache_key(self, last_3_messages: str, code: str) -> CacheKey:
+        user_prompt = dedent(
+            f"""
+            LAST 3 MESSAGES:
+            {last_3_messages}
 
-    if key_hash not in _cache_store:
-        _cache_store[key_hash] = CacheEntry()
+            PYTHON CODE:
+            {code}
 
-    _cache_store[key_hash].stdout = msg
-
-
-# ----------------------------
-# Semantic key creation
-# ----------------------------
-
-STATS_CACHE_PROMPT = Path("prompts/production-prompts/stats-cache.md").read_text()
-_client = OpenAI()
-
-
-def build_cache_key(last_3_messages: str, code: str) -> CacheKey:
-    system_prompt = STATS_CACHE_PROMPT
-
-    user_prompt = dedent(
-        f"""
-        LAST 3 MESSAGES:
-        {last_3_messages}
-
-        PYTHON CODE:
-        {code}
-
-        Return a JSON object matching the CacheKey schema.
-        """
-    )
-
-    try:
-        response = _client.responses.create(
-            model="gpt-5-nano",
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            reasoning={"effort": "minimal"},
+            Return a JSON object matching the CacheKey schema.
+            """
         )
 
-        raw_json = response.output[1].content[0].text
-        data: CacheKey = json.loads(raw_json)
+        try:
+            response = self._client.responses.create(
+                model=self._model,
+                input=[
+                    {"role": "system", "content": self._prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                reasoning={"effort": self._reasoning_effort},
+            )
 
-        return CacheKey.model_validate(data)
-
-    except Exception as e:
-        duck_logger.error(e)
-        raise
+            raw_json = self._extract_text(response)
+            return CacheKey.model_validate(json.loads(raw_json))
+        except Exception as exc:
+            duck_logger.error(exc)
+            raise

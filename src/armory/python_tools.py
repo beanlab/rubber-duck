@@ -1,7 +1,7 @@
 import io
 import pandas as pd
 
-from .tool_cache import build_cache_key, check_if_cached, send_from_cache, cache_file, cache_msg, cache_table
+from .tool_cache import ToolCache, CacheKeyBuilder
 from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
@@ -65,18 +65,25 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
 
 
 class PythonTools:
-    def __init__(self, container: PythonExecContainer, send_message: SendMessage):
+    def __init__(
+            self,
+            container: PythonExecContainer,
+            send_message: SendMessage,
+            tool_cache: ToolCache,
+            cache_key_builder: CacheKeyBuilder
+    ):
         self._container = container
         self._send_message = send_message
+        self._tool_cache = tool_cache
+        self._cache_key_builder = cache_key_builder
 
-    async def run_code(self, ctx: DuckContext, code: str, last_3_messages: str) -> dict[str, dict[str, str] | bytes]:
+    async def run_code(self, ctx: DuckContext, code: str, last_3_messages: str) -> dict[str, str | dict[str, str]]:
         """
         Takes a string of python code as input and returns the resulting stdout/stderr in the following format:
         `last_3_messages` must be a JSON array string with exactly 3 objects, each of the form
         {"role":"user|assistant","content":"..."}, ordered oldest->newest.
         :param ctx: DuckContext
         :param code:
-        :param last_3_messages:
         :return:
             'code': str,
             'stdout': str,
@@ -86,14 +93,17 @@ class PythonTools:
             }
         }
         """
-        for i in range(3):
-            cache_key = build_cache_key(last_3_messages, code)
-            duck_logger.debug(f"\nCache key:\n{cache_key}")
+        cache_key = self._cache_key_builder.build_cache_key(last_3_messages, code)
+        duck_logger.debug(f"\nCache key:\n{cache_key}")
 
-        if check_if_cached(cache_key):
+        if self._tool_cache.check_if_cached(cache_key):
             duck_logger.debug(f" Cache HIT ".center(20,'-'))
-            output = send_from_cache(cache_key)
-            return output
+            output = await self._tool_cache.send_from_cache(
+                cache_key,
+                self._send_message,
+                ctx.thread_id
+            )
+            return ConcludesResponse(output)
 
         duck_logger.debug(f" Cache MISS ".center(19, '-'))
         results = await self._container.run_code(code)
@@ -110,8 +120,14 @@ class PythonTools:
         # send files directly
         for filename, file in files.items():
             if is_image(filename):
-                cache_file(cache_key, filename, file)
-                await self._send_message(ctx.thread_id, file=file)
+                self._tool_cache.cache_file(cache_key, filename, file)
+                await self._send_message(
+                    ctx.thread_id,
+                    file={
+                        "filename": filename,
+                        "bytes": file["bytes"],
+                    }
+                )
             elif is_table(filename):
                 table = pd.read_csv(io.StringIO(file['bytes'].decode()))
                 table = table.head(100)
@@ -122,12 +138,12 @@ class PythonTools:
                     table_chunk = f"```\n{md_table}\n```"
                     table_chunks.append(table_chunk)
                     await self._send_message(ctx.thread_id, table_chunk)
-                cache_table(cache_key, table_chunks)
+                self._tool_cache.cache_table(cache_key, table_chunks)
 
         # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)
         if stdout:
-            cache_msg(cache_key, stdout)
+            self._tool_cache.cache_msg(cache_key, stdout)
             await self._send_message(ctx.thread_id, stdout)
 
         output = {
