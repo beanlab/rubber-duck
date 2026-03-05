@@ -9,6 +9,7 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .utils.protocols import ToolCache
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
@@ -263,11 +264,23 @@ def _build_stats_cache_key_builder(config: Config) -> SemanticCacheKeyBuilder:
     )
 
 
+def _build_tool_cache(config: Config) -> ToolCache:
+    backend = config.get("stats_cache", {}).get("backend", "memory")
+
+    if backend == "memory":
+        return InMemoryToolCache()
+
+    if backend == "database":
+        raise NotImplementedError("stats_cache.backend=database is not implemented yet")
+
+    raise NotImplementedError(f"Unsupported stats_cache backend: {backend}")
+
+
 def build_armory(
         config: Config,
         send_message,
         containers: dict[str, PythonExecContainer],
-        tool_cache: InMemoryToolCache,
+        tool_cache: ToolCache,
         cache_key_builder: SemanticCacheKeyBuilder
 ) -> tuple[Armory, TalkTool]:
     armory = Armory(send_message)
@@ -331,7 +344,7 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             with these(build_containers(config)) as containers:
-                tool_cache = InMemoryToolCache()
+                tool_cache = _build_tool_cache(config)
                 cache_key_builder = _build_stats_cache_key_builder(config)
                 armory, talk_tool = build_armory(
                     config,
@@ -416,6 +429,7 @@ if __name__ == '__main__':
 
     if args.config is None:
         import os
+
         args.config = os.getenv('CONFIG_FILE_S3_PATH')
 
     config: Config = load_configuration(args.config)
