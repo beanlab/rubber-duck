@@ -6,7 +6,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from ..utils.logger import duck_logger
-from ..utils.protocols import SendMessage
+from ..utils.protocols import SendMessage, ToolCache
 from ..utils.python_exec_container import FileResult
 
 
@@ -24,7 +24,7 @@ class CacheEntry(BaseModel):
     files: dict[str, FileResult] = Field(default_factory=dict)
 
 
-class InMemoryToolCache:
+class InMemoryToolCache(ToolCache):
     def __init__(self, cache_store: dict[str, CacheEntry] | None = None):
         self._cache_store = cache_store if cache_store is not None else {}
 
