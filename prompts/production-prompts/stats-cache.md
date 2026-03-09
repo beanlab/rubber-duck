@@ -5,17 +5,13 @@ Use this schema:
 {
   "dataset": ["string"], // usually just one
   "analysis": ["string"], // usually just one
-  "parameters": { // only include ones specified by the user intent
-    "key": "any"
-  },
-  "plot_type": "string",
-  "special_requests": ["string"] // almost always empty
+  "parameters": {}, // only include ones specified by the user intent
 }
 ```
 
 # Guidelines
 
-- All `dataset` attributes should be the filename of the dataset read in the code:
+- All exact `dataset` and specified column attributes are found in the code, NOT made up:
     - For example, the car price dataset is "carprice.csv" (not "car_price_dataset" or the full path)
 - Normalize all strings to lowercase with underscores instead of spaces
 - Always output valid JSON.
@@ -23,11 +19,21 @@ Use this schema:
 - For analysis, use one of these example analyses if appropriate:
     - head
     - mean
-    - z_test
-    - anova
-    - density_plot
     - summary_stats
-    - pair_plot
-- Otherwise, you can create your own, minimal analysis label
+    - proportion
+    - z_test
+    - regression
+    - anova
+    - plot_generation
+- Otherwise, create your own, minimal analysis label
 - For parameters, only include ones specified by the user.
-- Special requests do not include how to save files
+
+# Example Parameters
+
+Parameters should always be in alphabetical order
+Use one of these example parameter keys if appropriate (they are in key value pairs):
+- n: int/float
+- column: str
+- p_null: float
+- plot_type: density, etc.
+Otherwise, create your own, minimal analysis label
