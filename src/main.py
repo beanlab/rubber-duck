@@ -10,9 +10,8 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.utils import cache_cleaner
 from .utils.protocols import ToolCache, CacheKeyBuilder
-from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder
+from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
@@ -267,14 +266,14 @@ def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
     )
 
 
-def _build_tool_cache(config: Config) -> ToolCache:
+def _build_tool_cache(config: Config, sql_session) -> ToolCache:
     backend = config.get("cache", {}).get("backend", "memory")
 
     if backend == "memory":
         return InMemoryToolCache()
 
     if backend == "database":
-        raise NotImplementedError("cache.backend=database is not implemented yet")
+        return SqlToolCache(sql_session)
 
     raise NotImplementedError(f"Unsupported cache backend: {backend}")
 
@@ -282,7 +281,8 @@ def _build_tool_cache(config: Config) -> ToolCache:
 def build_armory(
         config: Config,
         send_message,
-        containers: dict[str, PythonExecContainer]
+        containers: dict[str, PythonExecContainer],
+        sql_session
 ) -> tuple[Armory, TalkTool, list[ToolCache]]:
     armory = Armory(send_message)
     tool_caches: list[ToolCache] = []
@@ -292,7 +292,7 @@ def build_armory(
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            tool_cache = _build_tool_cache(config)
+            tool_cache = _build_tool_cache(config, sql_session)
             tool_caches.append(tool_cache)
             cache_key_builder = _build_cache_key_builder(config)
             python_tools = PythonTools(
@@ -375,6 +375,7 @@ async def _main(config: Config, log_dir: Path):
                     config,
                     bot.send_message,
                     containers,
+                    sql_session,
                 )
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
