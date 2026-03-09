@@ -48,6 +48,7 @@ ducks:
 
 cache:
   $include: "production-config.yaml@$.cache"
+  backend: memory
 
 agents_as_tools:
   $include: "production-config.yaml@$.agents_as_tools"
