@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from textwrap import dedent
 from typing import Any
 
 from openai import OpenAI
@@ -15,8 +16,6 @@ class CacheKey(BaseModel):
     dataset: list[str]
     analysis: list[str] | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
-    plot_type: str | None = None
-    special_requests: list[str] = Field(default_factory=list)
 
 
 class CacheEntry(BaseModel):
@@ -154,7 +153,7 @@ class SemanticCacheKeyBuilder:
             self,
             client: OpenAI,
             prompt: str,
-            model: str = "gpt-5-nano",
+            model: str = "gpt-5-mini",
             reasoning_effort: str = "minimal"
     ):
         self._client = client
@@ -177,15 +176,15 @@ class SemanticCacheKeyBuilder:
         raise ValueError("No text content returned when building semantic cache key")
 
     def build_cache_key(self, user_intent: str, code: str) -> CacheKey:
-        user_prompt = f"""
+        user_prompt = dedent(
+            f"""
             USER INTENT:
             {user_intent}
 
             PYTHON CODE:
             {code}
-
-            Return a JSON object matching the given schema
-        """
+            """
+        )
 
         try:
             response = self._client.responses.create(
@@ -198,7 +197,16 @@ class SemanticCacheKeyBuilder:
             )
 
             raw_json = self._extract_text(response)
-            return CacheKey.model_validate(json.loads(raw_json))
+            data = json.loads(raw_json)
+            # ensure it's always lowercase to increase hit chance
+            data["dataset"] = [x.lower() for x in data.get("dataset", [])]
+            data["analysis"] = [x.lower() for x in data.get("analysis", [])]
+            data["parameters"] = {
+                k.lower(): v.lower() if isinstance(v, str) else v
+                for k, v in data.get("parameters", {}).items()
+            }
+
+            return CacheKey.model_validate(data)
         except Exception as exc:
             duck_logger.error(exc)
             raise
