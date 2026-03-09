@@ -57,7 +57,7 @@ tools:
     container: cs-python-sandbox
 
 cache:
-  backend: memory
+  backend: database
   prompt: prompts/production-prompts/stats-cache.md
   engine: gpt-5-mini
   reasoning: minimal
