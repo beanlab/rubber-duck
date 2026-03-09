@@ -61,7 +61,7 @@ cache:
   prompt: prompts/production-prompts/stats-cache.md
   engine: gpt-5-mini
   reasoning: minimal
-  cleanup_hour: 9
+  cleanup_hour: 5
   cleanup_minute: 0
 
 agents_as_tools:
