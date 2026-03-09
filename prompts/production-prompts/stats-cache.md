@@ -36,4 +36,4 @@ Use one of these example parameter keys if appropriate (they are in key value pa
 - column: str
 - p_null: float
 - plot_type: density, etc.
-Otherwise, create your own, minimal analysis label
+Otherwise, create your own, minimal parameter label
