@@ -145,7 +145,7 @@ class DiscordBot(discord.Client):
 
         raise NotImplementedError(f"Unsupported file type: {file}")
 
-    async def send_message(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
+    async def send_message(self, channel_id, message: str = None, file: FileData = None) -> int:
         channel = self.get_channel(channel_id)
         # try catch it and fetch the channel if it is not found
         if channel is None:
@@ -172,10 +172,7 @@ class DiscordBot(discord.Client):
             curr_message = await channel.send(files=file_to_send)
             return curr_message.id
 
-        if view is not None:
-            return (await channel.send(view=view)).id
-
-        raise Exception('Must send message, file, or view')
+        raise Exception('Must send message or file')
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str):
         channel = self.get_channel(channel_id)

@@ -1,0 +1,43 @@
+sql:
+  db_type: sqlite
+  database: rubber_duck_teams.db  # separate DB from Discord
+
+containers: {}
+
+tools: {}
+
+ducks:
+  teams-rubber-duck:
+    duck_type: user_led_conversation
+    settings:
+      introduction: >
+        I'm a teams bot, I will always answer using [TeamsBot]'
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - prompts/teams.txt
+        engine: gpt-5-mini
+        reasoning: minimal
+        tools:
+          - talk_to_user
+          - conclude_conversation
+
+servers:
+  MyTeamsServer:
+    server_id: "placeholder"
+    channels:
+      rubber-duck-channel:
+        channel_id: "a:15fryMGXUZkEM8PwBmYuaMG9uDEvoX_p9gx_itNCQ-MGuZx1YnWRfaUBLG4gJARaWlOSoLdNnh3xTHIRApWSsyXBOG4DDUiBDSAk-mnQNBlEVxNCo__yeFfFSC6XCfN7u"
+        timeout: 600
+        duck: teams-rubber-duck
+
+admin_settings:
+  admin_channel_id: "placeholder-no-admin"
+  admin_role_id: 0
+  log_level: WARNING
+
+ai_completion_retry_protocol:
+  $include: "production-config.yaml@$.ai_completion_retry_protocol"
+
+reporter_settings:
+  $include: "production-config.yaml@$.reporter_settings"

@@ -157,6 +157,12 @@ def build_ducks(
             )
 
         elif duck_type == 'registration':
+            if not (hasattr(bot, 'get_channel') and hasattr(bot, 'fetch_guild')):
+                duck_logger.warning(
+                    f"Skipping registration duck '{name}': "
+                    f"bot adapter does not support get_channel/fetch_guild"
+                )
+                continue
             ducks[name] = build_registration_duck(name, bot, config, settings, armory)
 
 
