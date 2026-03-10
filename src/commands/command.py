@@ -5,13 +5,13 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-import discord
 import pandas as pd
 import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
 from ..armory.python_tools import send_table
+from ..utils.config_types import FileData
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, ToolCache
 from ..utils.zip_utils import zip_data_file
@@ -37,8 +37,8 @@ class MessagesMetricsCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         messages_zip = zip_data_file(self.metrics_handler.get_messages())
-        discord_messages_file = discord.File(messages_zip, filename="messages.zip")
-        await self.send_message(channel_id, "", file=discord_messages_file)
+        file_data: FileData = {'filename': 'messages.zip', 'bytes': messages_zip.getvalue()}
+        await self.send_message(channel_id, file=file_data)
 
 
 class UsageMetricsCommand(Command):
@@ -53,8 +53,8 @@ class UsageMetricsCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         usage_zip = zip_data_file(self.metrics_handler.get_usage())
-        discord_usage_file = discord.File(usage_zip, filename="usage.zip")
-        await self.send_message(channel_id, "", file=discord_usage_file)
+        file_data: FileData = {'filename': 'usage.zip', 'bytes': usage_zip.getvalue()}
+        await self.send_message(channel_id, file=file_data)
 
 
 class FeedbackMetricsCommand(Command):
@@ -69,8 +69,8 @@ class FeedbackMetricsCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
         feedback_zip = zip_data_file(self.metrics_handler.get_feedback())
-        discord_feedback_file = discord.File(feedback_zip, filename="feedback.zip")
-        await self.send_message(channel_id, "", file=discord_feedback_file)
+        file_data: FileData = {'filename': 'feedback.zip', 'bytes': feedback_zip.getvalue()}
+        await self.send_message(channel_id, file=file_data)
 
 
 class MetricsCommand(Command):
@@ -127,8 +127,8 @@ class ReportCommand(Command):
                     await self.send_message(channel_id, result)
                 else:  # List of (title, image) tuples
                     for title, image in result:
-                        file = discord.File(fp=image, filename=title)
-                        await self.send_message(channel_id, "", file=file)
+                        file_data: FileData = {'filename': title, 'bytes': image.getvalue()}
+                        await self.send_message(channel_id, file=file_data)
         except Exception as e:
             duck_logger.exception("Error executing report command")
             channel_id = message['channel_id']
@@ -205,13 +205,11 @@ class LogCommand(Command):
         zip_buffer.seek(0)
 
         try:
-            # Create Discord file from the zip buffer
             filename = f'logs_{datetime.now().strftime("%Y_%m_%d_%H_%M")}.zip'
-            discord_file = discord.File(zip_buffer, filename=filename)
+            file_data: FileData = {'filename': filename, 'bytes': zip_buffer.getvalue()}
 
-            # Send the zip file to the specified channel
             await self.send_message(channel_id, 'Here are the log files:')
-            await self.send_message(channel_id, "", file=discord_file)
+            await self.send_message(channel_id, file=file_data)
 
         except Exception as e:
             await self.send_message(channel_id, f'Error sending log files: {str(e)}')

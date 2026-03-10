@@ -2,14 +2,14 @@ import dataclasses
 from typing import Protocol, TypedDict, Any, TYPE_CHECKING
 
 from .python_exec_container import FileResult
-from ..utils.config_types import FileData
+from ..utils.config_types import FileData, PlatformId
 
 if TYPE_CHECKING:
     from ..armory.tool_cache import CacheKey
 
 
 class Attachment(TypedDict):
-    attachment_id: int
+    attachment_id: PlatformId
     description: str
     filename: str
     size: int
@@ -17,27 +17,27 @@ class Attachment(TypedDict):
 
 
 class Message(TypedDict):
-    guild_id: int
+    guild_id: PlatformId
     channel_name: str
-    channel_id: int
-    author_id: int
+    channel_id: PlatformId
+    author_id: PlatformId
     author_name: str
     author_mention: str
-    message_id: int
+    message_id: PlatformId
     content: str
     files: list[Attachment]
 
 
 class SendMessage(Protocol):
-    async def __call__(self, channel_id: int, message: str = None, file: FileData = None, view=None) -> int: ...
+    async def __call__(self, channel_id: PlatformId, message: str = None, file: FileData = None, view=None) -> PlatformId: ...
 
 
 class EditMessage(Protocol):
-    async def __call__(self, channel_id: int, message_id: int, new_content: str): ...
+    async def __call__(self, channel_id: PlatformId, message_id: PlatformId, new_content: str): ...
 
 
 class AddReaction(Protocol):
-    async def __call__(self, channel_id: int, message_id: int, reaction: str): ...
+    async def __call__(self, channel_id: PlatformId, message_id: PlatformId, reaction: str): ...
 
 
 class ReportError(Protocol):
@@ -51,11 +51,11 @@ class Context(Protocol):
 
 
 class IndicateTyping(Protocol):
-    def __call__(self, channel_id: int) -> Context: ...
+    def __call__(self, channel_id: PlatformId) -> Context: ...
 
 
 class CreateThread(Protocol):
-    async def __call__(self, parent_channel_id: int, title: str) -> int: ...
+    async def __call__(self, parent_channel_id: PlatformId, title: str) -> PlatformId: ...
 
 
 class ConversationComplete(BaseException):
