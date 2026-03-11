@@ -45,25 +45,17 @@ Before you begin, you'll need:
    poetry install
    ```
 
-3. **Set Up Run Configuration Variables**
-    - Open the run configuration menu, and change it to run the `src.main` module instead of the `main.py` script
-    - Make sure the working directory is `.../rubber-duck/`
-    - **Discord Token**:
-        - Open Discord in your web browser.
-        - Open developer tools (Control + Shift + I, or F12) and open the Network tab within it
-        - Open a different text channel than the one you already had open (to force it to fetch the messages)
-        - In the dev tools, look for the messages?limit=50 request. You can filter Fetch/XHR or search for it, if that
-          helps. Once you've found it, click on the request
-        - Under the 'Headers' section, scroll to 'Request headers', then 'Authorization'. The value of that header is
-          the token
+3. **Set Required Environment Variables**
+    - **Discord Bot Token**:
+        - Go to the Discord Developer Portal for your bot application
+        - Copy the bot token from the Bot settings page
     - **OpenAI API Key**:
-        - From the [organization page](https://platform.openai.com/docs/overview), go to `settings`>`API Keys`>
-          `+ Create new secret key`
-        - Ensure your name is included in the key name
-    - Add these to your run configuration with the following format:
-    ```
-    DISCORD_TOKEN=your_discord_token
-    OPENAI_API_KEY=your_openai_key
+        - From the [OpenAI Platform](https://platform.openai.com/), go to `Settings` > `API keys`
+        - Create a new secret key
+    - Set both in your shell or IDE run configuration:
+    ```bash
+    export DISCORD_TOKEN=your_discord_bot_token
+    export OPENAI_API_KEY=your_openai_key
     ```
 
 ## Discord Bot Setup
@@ -84,51 +76,43 @@ Before you begin, you'll need:
 ## Local Development
 
 1. **Setup Local Config File**
-    - In rubber-duck, create a `local-testing-configs` directory in the project root (ensure it's excluded in the
-      .gitignore!)
-    - Inside it, create:
-        - A `local_<name>_config.yaml` file (follow the structure of `local-config-example.yaml`)
-        - A `local_<name>_database.db` file
-    - In your config file, modify the following sections from your copy:
-       ```yaml
-        sql:
-          db_type: sqlite
-          database: local_<name>_database.db 
-       ```
-       ```yaml
-        servers:
-            BeanLab:
-              server_id: 1058490579799003187
-              channels:
-                Ducks/<name>-chat-bot:
-                  channel_id: 0000000000000000 # paste channel ID here
-                  timeout: 300
-                  duck:
-                              - standard-rubber-duck
-                    #          - stats-duck
-                    #          - emoji-duck
-                    #          - guessing-game-duck
-        ```
-        ```yaml
-        admin_settings:
-          admin_channel_id: 0000000000000000000 # paste admin channel ID here
-          admin_role_id: 0000000000000000000 # past discord profile ID here
-        ```
-    - To obtain the proper IDs, turn on developer mode in Discord (`Settings`>`Advanced`>`Developer Mode`)
-    - This will allow you to right-click on any channel and your profile to copy the associated IDs.
+    - Create your local config from the project template:
+      ```bash
+      mkdir -p local-testing-configs
+      cp local-config-example.yaml local-testing-configs/local_<name>_config.yaml
+      ```
+    - Keep the same top-level structure used by production config (`sql`, `containers`, `tools`, `ducks`, `servers`,
+      `admin_settings`, etc.).
+    - Use includes from `local-config-example.yaml` so your local file mirrors production structure:
+      - `ducks`: include from `production-config.yaml@$.ducks`
+      - `cache`: include from `production-config.yaml@$.cache`
+      - `agents_as_tools`: include from `production-config.yaml@$.agents_as_tools`
+      - `admin_settings`: include from `production-config.yaml@$.admin_settings`
+    - Update local-only values in these sections:
+      - `sql.database` (point to a local sqlite file)
+      - `servers.*.server_id`
+      - `servers.*.channels.*.channel_id`
+      - `admin_settings.admin_channel_id`
+      - `admin_settings.admin_role_id`
+    - For channel duck assignment, use the production-style shape:
+      - `duck: standard-rubber-duck` for a global duck reference
+      - or inline duck config dict for channel-specific ducks
+    - To get Discord IDs, enable Developer Mode (`Settings` > `Advanced` > `Developer Mode`) and copy IDs from Discord.
 
 2. **Run the Bot Locally**
-    - In your run configuration, add `--config ./local-testing-configs/local_<name>_config.yaml` in script parameters,
-      and you should be good to go!
+    - Run from the repo root:
+      ```bash
+      poetry run python -m src.main --config ./local-testing-configs/local_<name>_config.yaml --debug
+      ```
 
-2. **Test the Bot**
+3. **Test the Bot**
     - In your `<name>-chat-bot channel`, send a message to test the bot's response!
 
 ## Next Steps
 
-- Read the [Development Guide](development.md) for more detailed information
-- Check out the [Architecture Overview](architecture.md) to understand the project structure
 - Review the [Deployment Guide](deployment.md) for production deployment instructions
+- Inspect `production-config.yaml` to understand full production configuration
+- Inspect `local-config-example.yaml` for include patterns and local overrides
 
 ## Troubleshooting
 
@@ -148,12 +132,11 @@ If you encounter issues:
     - Clear Poetry cache if needed
 
 3. **Configuration Problems**
-    - Verify your config.json file format
+    - Verify your config YAML/JSON file format
     - Check environment variables
     - Ensure all required fields are present
 
 ## Need Help?
 
-- Check our [FAQ](faq.md)
 - Open an issue on GitHub
 - Ask in the Bean Lab Discord server
