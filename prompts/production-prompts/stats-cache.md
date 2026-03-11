@@ -30,10 +30,15 @@ Use this schema:
 
 # Example Parameters
 
-Parameters should always be in alphabetical order
+Parameters should always be in alphabetical order.
 Use one of these example parameter keys if appropriate (they are in key value pairs):
 - n: int/float
 - column: str
 - p_null: float
-- plot_type: density, etc.
+- plot_type: histogram, density, etc.
+
 Otherwise, create your own, minimal parameter label
+
+Parameters should **NOT** include
+- Output file names
+- Output file type
