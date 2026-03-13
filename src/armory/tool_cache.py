@@ -56,7 +56,17 @@ def _canonical_cache_key(cache_key: CacheKey) -> str:
 
 def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]:
     rows = []
-    for key, record in records:
+    min_dt = datetime.min.replace(tzinfo=timezone.utc)
+    sorted_records = sorted(
+        records,
+        key=lambda item: (
+            getattr(item[1], "hit_count", 0),
+            getattr(item[1], "last_access", min_dt),
+        ),
+        reverse=True,
+    )
+
+    for key, record in sorted_records:
         tables = list(getattr(record, "tables", None) or [])
         files = dict(getattr(record, "files", None) or {})
         rows.append({
