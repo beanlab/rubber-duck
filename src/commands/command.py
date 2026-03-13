@@ -277,7 +277,7 @@ class ActiveWorkflowsCommand(Command):
 
 class CacheCommand(Command):
     name = "!cache"
-    help_msg = "show current tool cache entries"
+    help_msg = "show current tool cache entries, or run `!cache cleanup`"
 
     def __init__(self, send_message, tool_caches: list[ToolCache]):
         self.send_message = send_message
@@ -294,9 +294,25 @@ class CacheCommand(Command):
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
+        cmd_parts = message['content'].strip().split()
 
         if not self.tool_caches:
             await self.send_message(channel_id, "No tool caches are configured.")
+            return
+
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "cleanup":
+            removed_entries = 0
+            for cache in self.tool_caches:
+                before_count = len(cache.list_entries())
+                cache.cleanup()
+                after_count = len(cache.list_entries())
+                removed_entries += max(before_count - after_count, 0)
+
+            await self.send_message(
+                channel_id,
+                f"Cache cleanup complete. Removed {removed_entries} expired entr"
+                f"{'y' if removed_entries == 1 else 'ies'} across {len(self.tool_caches)} cache(s).",
+            )
             return
 
         found_entries = False
@@ -307,7 +323,7 @@ class CacheCommand(Command):
                 continue
 
             found_entries = True
-            await self.send_message(channel_id, f"Cache: `{backend}#{index}`")
+            await self.send_message(channel_id, f"## Cache: `{backend}#{index}`")
             table = pd.DataFrame(entries)
             await send_table(self.send_message, channel_id, table)
 
