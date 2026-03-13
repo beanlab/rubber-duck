@@ -1,0 +1,32 @@
+---
+name: Feature Checklist
+description: |
+    Specific instructions for ensuring a new feature is ready to merge.
+---
+
+## Pre-merge Feature Checklist
+
+Before a feature is ready to merge, we need to ensure the following. 
+Please go through each section below and verify that everything is ready.
+
+### Sanity check the code
+
+Make sure the changes are logically correct. Are there any obvious errors?
+
+Check that there are not python syntax errors. Everything should load properly.
+
+### Check style
+
+All changed files should have consistent formatting following PEP8 style. 
+
+### The CHANGELOG.md should be updated
+
+For the changelog entry, we want to use the latest change timestamp in the current branch.
+
+Update the changelog entry for this branch to use the latest timestamp.
+
+Update the changelog entry content to reflect the full changes of this branch.
+
+### All pytests should pass
+
+Please run `poetry run pytest -q` to make sure all tests are passing.
