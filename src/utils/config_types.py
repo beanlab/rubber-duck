@@ -172,9 +172,10 @@ class ContainerSettings(TypedDict, total=False):
     pids_limit: int
     read_only_root: bool
 
+
 class ContainerConfig(TypedDict):
     image: str
-    mounts: list[ResourceConfig]
+    resources: list[ResourceConfig]
     settings: ContainerSettings
 
 
@@ -187,10 +188,21 @@ class ContainerTool(TypedDict):
 ToolConfig = ContainerTool
 
 
+class CacheSettings(TypedDict):
+    backend: NotRequired[Literal["memory", "database"]]
+    prompt: NotRequired[str]
+    prompt_files: NotRequired[list[str]]
+    engine: NotRequired[str]
+    reasoning: NotRequired[str]
+    cleanup_hour: NotRequired[int]
+    cleanup_minute: NotRequired[int]
+
+
 class Config(TypedDict):
     sql: SQLConfig
     containers: dict[str, ContainerConfig]
     tools: dict[str, ToolConfig]
+    cache: CacheSettings
     ducks: dict[DUCK_NAME, DuckConfig]
     agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]

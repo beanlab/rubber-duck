@@ -51,9 +51,18 @@ tools:
   run_python:
     type: container_exec
     container: stats-python-sandbox
+
   run_cs_analysis:
     type: container_exec
     container: cs-python-sandbox
+
+cache:
+  backend: database
+  prompt: prompts/production-prompts/stats-cache.md
+  engine: gpt-5-mini
+  reasoning: minimal
+  cleanup_hour: 5
+  cleanup_minute: 0
 
 agents_as_tools:
   registration:
