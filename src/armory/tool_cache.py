@@ -61,13 +61,13 @@ def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]
         files = dict(getattr(record, "files", None) or {})
         rows.append({
             "key_hash": key,
-            "stdout": bool(getattr(record, "stdout", None)),
-            "tables": len(tables),
-            "files": len(files),
             "hits": getattr(record, "hit_count"),
-            "created_at": getattr(record, "created_at").date().isoformat(),
-            "last_access": getattr(record, "last_access").date().isoformat(),
-            "expires_at": getattr(record, "expires_at").date().isoformat(),
+            "txt": bool(getattr(record, "stdout", None)),
+            "tabls": len(tables),
+            "files": len(files),
+            "last_hit": getattr(record, "last_access").strftime("%m/%d/%y"),
+            "created": getattr(record, "created_at").strftime("%m/%d/%y"),
+            "expires": getattr(record, "expires_at").strftime("%m/%d/%y"),
         })
 
     return rows
