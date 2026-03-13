@@ -299,21 +299,20 @@ class CacheCommand(Command):
             await self.send_message(channel_id, "No tool caches are configured.")
             return
 
-        rows = []
+        found_entries = False
         for index, cache in enumerate(self.tool_caches, start=1):
             backend = type(cache).__name__
-            for entry in cache.list_entries():
-                rows.append({
-                    "cache": f"{backend}#{index}",
-                    **entry,
-                })
+            entries = cache.list_entries()
+            if not entries:
+                continue
 
-        if not rows:
+            found_entries = True
+            await self.send_message(channel_id, f"Cache: `{backend}#{index}`")
+            table = pd.DataFrame(entries)
+            await send_table(self.send_message, channel_id, table)
+
+        if not found_entries:
             await self.send_message(channel_id, "No cache entries found.")
-            return
-
-        table = pd.DataFrame(rows)
-        await send_table(self.send_message, channel_id, table)
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
