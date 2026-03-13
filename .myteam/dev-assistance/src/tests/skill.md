@@ -11,13 +11,11 @@ description: |
 - `src/storage/sql_metrics.py`
 - `src/main.py`
 
-## Current Test Scope
+## Current Test Status
 
-- The active test module targets SQL metrics behavior:
-  - message recording
-  - usage recording
-  - feedback recording
-- Test code is async-oriented (`pytest.mark.asyncio`) and exercises `SQLMetricsHandler` methods.
+- Test coverage is currently minimal and not representative of the full system.
+- Existing tests are limited to early SQL metrics coverage and may not match current implementations.
+- Most modules (bot, conversation, workflows, gen_ai, armory, utils) do not yet have dedicated tests.
 
 ## Test Entry Flow
 
@@ -27,8 +25,12 @@ description: |
 - For targeted runs:
   - `pytest -v --asyncio-mode=auto src/tests/test_sql_metric_handlers.py`
 
-## What To Verify When Updating Tests
+## Guidance For Contributors
 
-- Test method signatures and assertions match current handler APIs in `src/storage/sql_metrics.py`.
-- Setup fixtures/session creation are valid for the chosen SQL backend (usually SQLite for local test runs).
-- Any command/reporting behavior that depends on metrics tables stays compatible with the tested schema.
+- When changing behavior, add targeted tests in the same area first.
+- Prioritize tests for:
+  - message routing and workflow dispatch
+  - armory tool registration/schema generation
+  - AI/tool loop behavior with mocked model responses
+  - registration and assignment-feedback workflow paths
+- Keep tests isolated from external services (Discord/OpenAI/S3) using mocks or stubs.
