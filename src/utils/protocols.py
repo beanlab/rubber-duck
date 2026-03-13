@@ -67,23 +67,23 @@ class ToolCache(Protocol):
     def cleanup(self):
         ...
 
-    def get_key_hash(self, cache_key: "CacheKey") -> str:
+    def get_key(self, cache_key: "CacheKey") -> str:
         ...
 
-    def check_if_cached(self, key_hash: str) -> bool:
+    def check_if_cached(self, key: str) -> bool:
         ...
 
-    async def send_from_cache(self, key_hash: str, send_message: SendMessage, channel_id: int) -> dict[
+    async def send_from_cache(self, key: str, send_message: SendMessage, channel_id: int) -> dict[
         str, Any]:
         ...
 
-    def cache_file(self, key_hash: str, filename: str, file: FileResult):
+    def cache_file(self, key: str, filename: str, file: FileResult):
         ...
 
-    def cache_table(self, key_hash: str, filename: str, table_chunks: list[str], description: str = ""):
+    def cache_table(self, key: str, filename: str, table_chunks: list[str], description: str = ""):
         ...
 
-    def cache_msg(self, key_hash: str, msg: str):
+    def cache_msg(self, key: str, msg: str):
         ...
 
     def list_entries(self) -> list[dict[str, Any]]:

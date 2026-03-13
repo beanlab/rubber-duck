@@ -1,4 +1,3 @@
-import hashlib
 import json
 import base64
 from datetime import datetime, timedelta, timezone
@@ -7,7 +6,7 @@ from typing import Any
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, DateTime, Integer, JSON, String, Text
+from sqlalchemy import Column, DateTime, Integer, JSON, Text
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from ..utils.logger import duck_logger
@@ -37,7 +36,7 @@ ToolCacheRecordBase = declarative_base()
 class ToolCacheRecord(ToolCacheRecordBase):
     __tablename__ = "tool_cache"
 
-    key_hash = Column(String(64), primary_key=True)
+    key = Column("key_hash", Text, primary_key=True)
     stdout = Column(Text, nullable=True)
     tables = Column(JSON, nullable=False, default=list)
     files = Column(JSON, nullable=False, default=dict)
@@ -47,13 +46,21 @@ class ToolCacheRecord(ToolCacheRecordBase):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
 
+def _canonical_cache_key(cache_key: CacheKey) -> str:
+    return json.dumps(
+        cache_key.model_dump(),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
 def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]:
     rows = []
-    for key_hash, record in records:
+    for key, record in records:
         tables = list(getattr(record, "tables", None) or [])
         files = dict(getattr(record, "files", None) or {})
         rows.append({
-            "key_hash": key_hash,
+            "key_hash": key,
             "stdout": bool(getattr(record, "stdout", None)),
             "tables": len(tables),
             "files": len(files),
@@ -75,27 +82,18 @@ class InMemoryToolCache(ToolCache):
     def _utc_now() -> datetime:
         return datetime.now(timezone.utc)
 
-    @staticmethod
-    def _hash_key(key: CacheKey) -> str:
-        canonical = json.dumps(
-            key.model_dump(),
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return hashlib.sha256(canonical.encode()).hexdigest()
+    def get_key(self, cache_key: CacheKey) -> str:
+        return _canonical_cache_key(cache_key)
 
-    def get_key_hash(self, cache_key: CacheKey) -> str:
-        return self._hash_key(cache_key)
-
-    def check_if_cached(self, key_hash: str) -> bool:
-        result = key_hash in self._cache_store
+    def check_if_cached(self, key: str) -> bool:
+        result = key in self._cache_store
         return result
 
-    async def send_from_cache(self, key_hash: str, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
-        entry = self._cache_store.get(key_hash)
+    async def send_from_cache(self, key: str, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
+        entry = self._cache_store.get(key)
 
         if entry is None:
-            duck_logger.error(f"Key {key_hash} not in cache")
+            duck_logger.error(f"Key {key} not in cache")
             return {}
 
         now = self._utc_now()
@@ -138,16 +136,16 @@ class InMemoryToolCache(ToolCache):
 
         return output
 
-    def _get_or_create(self, key_hash: str) -> CacheEntry:
-        if key_hash not in self._cache_store:
+    def _get_or_create(self, key: str) -> CacheEntry:
+        if key not in self._cache_store:
             now = self._utc_now()
-            self._cache_store[key_hash] = CacheEntry(
+            self._cache_store[key] = CacheEntry(
                 hit_count=0,
                 created_at=now,
                 last_access=now,
                 expires_at=now + timedelta(days=1),
             )
-        return self._cache_store[key_hash]
+        return self._cache_store[key]
 
     def cleanup(self):
         now = self._utc_now()
@@ -155,34 +153,34 @@ class InMemoryToolCache(ToolCache):
             return
 
         self._cache_store = {
-            key_hash: entry
-            for key_hash, entry in self._cache_store.items()
+            key: entry
+            for key, entry in self._cache_store.items()
             if entry.expires_at >= now
         }
         self._last_cleanup_at = now
 
-    def cache_file(self, key_hash: str, filename: str, file: FileResult):
+    def cache_file(self, key: str, filename: str, file: FileResult):
         duck_logger.debug(f"Caching file: {filename}")
-        entry = self._get_or_create(key_hash)
+        entry = self._get_or_create(key)
         entry.files[filename] = {
             "bytes": file["bytes"],
             "description": file.get("description", ""),
         }
 
-    def cache_table(self, key_hash: str, filename: str, table_chunks: list[str], description: str = ""):
+    def cache_table(self, key: str, filename: str, table_chunks: list[str], description: str = ""):
         if not table_chunks:
             return
         duck_logger.debug(f"Caching table: {filename}")
-        entry = self._get_or_create(key_hash)
+        entry = self._get_or_create(key)
         entry.tables.append({
             "filename": filename,
             "description": description,
             "chunks": table_chunks,
         })
 
-    def cache_msg(self, key_hash: str, msg: str):
+    def cache_msg(self, key: str, msg: str):
         duck_logger.debug(f"Caching message: {msg}")
-        entry = self._get_or_create(key_hash)
+        entry = self._get_or_create(key)
         entry.stdout = msg
 
     def list_entries(self) -> list[dict[str, Any]]:
@@ -216,20 +214,15 @@ class SqlToolCache(ToolCache):
             "description": file_data.get("description", ""),
         }
 
-    def get_key_hash(self, cache_key: CacheKey) -> str:
-        canonical = json.dumps(
-            cache_key.model_dump(),
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return hashlib.sha256(canonical.encode()).hexdigest()
+    def get_key(self, cache_key: CacheKey) -> str:
+        return _canonical_cache_key(cache_key)
 
-    def _get_or_create(self, session: Session, key_hash: str) -> ToolCacheRecord:
-        record = session.get(ToolCacheRecord, key_hash)
+    def _get_or_create(self, session: Session, key: str) -> ToolCacheRecord:
+        record = session.get(ToolCacheRecord, key)
         if record is None:
             now = self._utc_now()
             record = ToolCacheRecord(
-                key_hash=key_hash,
+                key=key,
                 stdout=None,
                 tables=[],
                 files={},
@@ -242,15 +235,15 @@ class SqlToolCache(ToolCache):
             session.flush()
         return record
 
-    def check_if_cached(self, key_hash: str) -> bool:
+    def check_if_cached(self, key: str) -> bool:
         with self._session_factory() as session:
-            return session.get(ToolCacheRecord, key_hash) is not None
+            return session.get(ToolCacheRecord, key) is not None
 
-    async def send_from_cache(self, key_hash: str, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
+    async def send_from_cache(self, key: str, send_message: SendMessage, channel_id: int) -> dict[str, Any]:
         with self._session_factory() as session:
-            record = session.get(ToolCacheRecord, key_hash)
+            record = session.get(ToolCacheRecord, key)
             if record is None:
-                duck_logger.error(f"Key {key_hash} not in cache")
+                duck_logger.error(f"Key {key} not in cache")
                 return {}
 
             now = self._utc_now()
@@ -299,21 +292,21 @@ class SqlToolCache(ToolCache):
             "files": output_files,
         }
 
-    def cache_file(self, key_hash: str, filename: str, file: FileResult):
+    def cache_file(self, key: str, filename: str, file: FileResult):
         duck_logger.debug(f"Caching file: {filename}")
         with self._session_factory() as session:
-            record = self._get_or_create(session, key_hash)
+            record = self._get_or_create(session, key)
             files = dict(record.files or {})
             files[filename] = self._encode_file(file)
             record.files = files
             session.commit()
 
-    def cache_table(self, key_hash: str, filename: str, table_chunks: list[str], description: str = ""):
+    def cache_table(self, key: str, filename: str, table_chunks: list[str], description: str = ""):
         if not table_chunks:
             return
         duck_logger.debug(f"Caching table: {filename}")
         with self._session_factory() as session:
-            record = self._get_or_create(session, key_hash)
+            record = self._get_or_create(session, key)
             tables = list(record.tables or [])
             tables.append({
                 "filename": filename,
@@ -323,10 +316,10 @@ class SqlToolCache(ToolCache):
             record.tables = tables
             session.commit()
 
-    def cache_msg(self, key_hash: str, msg: str):
+    def cache_msg(self, key: str, msg: str):
         duck_logger.debug(f"Caching message: {msg}")
         with self._session_factory() as session:
-            record = self._get_or_create(session, key_hash)
+            record = self._get_or_create(session, key)
             record.stdout = msg
             session.commit()
 
@@ -351,7 +344,7 @@ class SqlToolCache(ToolCache):
         with self._session_factory() as session:
             records = session.query(ToolCacheRecord).all()
 
-        return _format_cache_report([(record.key_hash, record) for record in records])
+        return _format_cache_report([(record.key, record) for record in records])
 
 
 class SemanticCacheKeyBuilder:
