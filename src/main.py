@@ -256,7 +256,7 @@ def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
 
     prompt = settings.get("prompt")
     if not prompt:
-        duck_logger.error("Missing 'prompt' config setting in cache")
+        duck_logger.error("Missing 'prompt' config setting in cache config")
 
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
@@ -421,8 +421,8 @@ async def _main(config: Config, log_dir: Path):
                                                     config['feedback_notifier_settings'])
                         tasks.append(notifier.start())
 
-                    cleaner = _setup_cache_cleaner(tool_caches)
-                    if cleaner:
+                    if tool_caches:
+                        cleaner = _setup_cache_cleaner(tool_caches)
                         tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)
