@@ -5,12 +5,14 @@ from datetime import datetime
 from pathlib import Path
 
 import discord
+import pandas as pd
 import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..armory.python_tools import send_table
 from ..utils.logger import duck_logger
-from ..utils.protocols import Message
+from ..utils.protocols import Message, ToolCache
 from ..utils.zip_utils import zip_data_file
 
 
@@ -273,7 +275,48 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
+class CacheCommand(Command):
+    name = "!cache"
+    help_msg = "show current tool cache entries"
+
+    def __init__(self, send_message, tool_caches: list[ToolCache]):
+        self.send_message = send_message
+        self.tool_caches = []
+
+        seen_cache_ids = set()
+        for cache in tool_caches:
+            cache_id = id(cache)
+            if cache_id in seen_cache_ids:
+                continue
+            seen_cache_ids.add(cache_id)
+            self.tool_caches.append(cache)
+
+    @step
+    async def execute(self, message: Message):
+        channel_id = message['channel_id']
+
+        if not self.tool_caches:
+            await self.send_message(channel_id, "No tool caches are configured.")
+            return
+
+        rows = []
+        for index, cache in enumerate(self.tool_caches, start=1):
+            backend = type(cache).__name__
+            for entry in cache.list_entries():
+                rows.append({
+                    "cache": f"{backend}#{index}",
+                    **entry,
+                })
+
+        if not rows:
+            await self.send_message(channel_id, "No cache entries found.")
+            return
+
+        table = pd.DataFrame(rows)
+        await send_table(self.send_message, channel_id, table)
+
+
+def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
@@ -286,5 +329,6 @@ def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Co
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
         LogCommand(send_message, log_dir),
-        ActiveWorkflowsCommand(send_message, get_workflow_metrics)
+        ActiveWorkflowsCommand(send_message, get_workflow_metrics),
+        CacheCommand(send_message, tool_caches),
     ]

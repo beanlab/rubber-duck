@@ -86,6 +86,9 @@ class ToolCache(Protocol):
     def cache_msg(self, key_hash: str, msg: str):
         ...
 
+    def list_entries(self) -> list[dict[str, Any]]:
+        ...
+
 
 class CacheKeyBuilder(Protocol):
     def build_cache_key(self, user_intent: str, code: str) -> "CacheKey":

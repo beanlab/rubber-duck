@@ -47,6 +47,25 @@ class ToolCacheRecord(ToolCacheRecordBase):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
 
+def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for key_hash, record in records:
+        tables = list(getattr(record, "tables", None) or [])
+        files = dict(getattr(record, "files", None) or {})
+        rows.append({
+            "key_hash": key_hash,
+            "stdout": bool(getattr(record, "stdout", None)),
+            "tables": len(tables),
+            "files": len(files),
+            "hits": getattr(record, "hit_count"),
+            "created_at": getattr(record, "created_at").date().isoformat(),
+            "last_access": getattr(record, "last_access").date().isoformat(),
+            "expires_at": getattr(record, "expires_at").date().isoformat(),
+        })
+
+    return rows
+
+
 class InMemoryToolCache(ToolCache):
     def __init__(self, cache_store: dict[str, CacheEntry] | None = None):
         self._cache_store = cache_store if cache_store is not None else {}
@@ -165,6 +184,9 @@ class InMemoryToolCache(ToolCache):
         duck_logger.debug(f"Caching message: {msg}")
         entry = self._get_or_create(key_hash)
         entry.stdout = msg
+
+    def list_entries(self) -> list[dict[str, Any]]:
+        return _format_cache_report(list(self._cache_store.items()))
 
 
 class SqlToolCache(ToolCache):
@@ -324,6 +346,12 @@ class SqlToolCache(ToolCache):
             session.commit()
 
         self._last_cleanup_at = now
+
+    def list_entries(self) -> list[dict[str, Any]]:
+        with self._session_factory() as session:
+            records = session.query(ToolCacheRecord).all()
+
+        return _format_cache_report([(record.key_hash, record) for record in records])
 
 
 class SemanticCacheKeyBuilder:

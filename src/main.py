@@ -49,11 +49,12 @@ def setup_workflow_manager(
         sql_session,
         metrics_handler,
         send_message,
-        log_dir: Path
+        log_dir: Path,
+        tool_caches: list[ToolCache],
 ):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
 
-    commands = create_commands(send_message, metrics_handler, reporter, log_dir)
+    commands = create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches)
     commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
@@ -402,7 +403,8 @@ async def _main(config: Config, log_dir: Path):
                         sql_session,
                         metrics_handler,
                         bot.send_message,
-                        log_dir
+                        log_dir,
+                        tool_caches,
                 ) as workflow_manager:
                     tasks = []
 
