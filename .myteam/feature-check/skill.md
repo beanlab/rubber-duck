@@ -18,6 +18,7 @@ Check that there are not python syntax errors. Everything should load properly.
 ### Check style
 
 All changed files should have consistent formatting following PEP8 style. 
+There should not be significant duplicated code
 
 ### The CHANGELOG.md should be updated
 
