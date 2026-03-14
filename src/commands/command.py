@@ -323,18 +323,23 @@ class CacheCommand(Command):
                 continue
 
             found_entries = True
-            await self.send_message(channel_id, f"## Cache: `{backend}#{index}`")
-
-            key_rows = [{"key": entry["key_hash"]} for entry in entries]
-            await self.send_message(channel_id, "### Keys")
-            await send_table(self.send_message, channel_id, pd.DataFrame(key_rows))
+            key_lines = [
+                f"- {entry_idx} - {entry['key_hash']}"
+                for entry_idx, entry in enumerate(entries)
+            ]
+            summary_message = (
+                f"## Cache: `{backend}#{index}`\n"
+                "### Keys:\n"
+                f"{'\n'.join(key_lines)}\n"
+                "### Entry info:"
+            )
+            await self.send_message(channel_id, summary_message)
 
             info_rows = [{k: v for k, v in entry.items() if k != "key_hash"} for entry in entries]
-            await self.send_message(channel_id, "### Entry info")
             await send_table(self.send_message, channel_id, pd.DataFrame(info_rows))
 
         if not found_entries:
-            await self.send_message(channel_id, "*No cache entries found.*")
+            await self.send_message(channel_id, "No cache entries found.")
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
