@@ -1,56 +1,81 @@
-# Rubber Duck Documentation
+# Rubber Duck
 
-Welcome to the Rubber Duck project! This documentation will help you get started with contributing to and using our
-project.
+Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.
+It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, registration, assignment feedback, and conversation review), all selected through config.
 
-## Table of Contents
+## What This Project Does
+
+- Routes Discord messages into workflow-based conversations
+- Runs OpenAI Responses API agents with optional tool calling
+- Supports containerized Python execution tools for stats/code workflows
+- Tracks messages, usage, and feedback metrics in SQL
+- Provides admin channel commands for status, reports, logs, and metrics export
+- Supports local and S3-backed configuration with composable `$include` directives
+
+## Repository Layout
+
+- `src/main.py`: app entrypoint and system wiring
+- `src/bot/`: Discord client integration
+- `src/rubber_duck_app.py`: channel/admin message routing
+- `src/duck_orchestrator.py`: thread creation + duck dispatch
+- `src/conversation/`: conversation implementations
+- `src/workflows/`: registration and assignment feedback workflows
+- `src/gen_ai/`: OpenAI client orchestration + agent execution
+- `src/armory/`: tool registration, Python tool execution, and caching
+- `src/storage/` + `src/metrics/`: SQL persistence and reporting
+- `prompts/`: prompt assets used by configured ducks/agents
+- `rubrics/`: grading rubrics for assignment feedback workflows
+- `datasets/`: local datasets staged into container tools
+- `docs/`: getting started and deployment docs
+
+### Prerequisites
+
+- Python 3.11
+- Poetry
+- Docker (required if you enable container tools such as code execution)
+- Discord bot token
+- OpenAI API key
+
+## Duck Types (Implemented)
+
+Configured ducks are built by `duck_type`.
+
+- `agent_led_conversation`: one-shot or agent-led interaction
+- `user_led_conversation`: chat flow where user messages drive turns
+- `conversation_review`: TA/reviewer scoring workflow
+- `registration`: NetID/email verification + role assignment workflow
+- `assignment_feedback`: rubric-based grading workflow for markdown reports
+
+## Admin Commands
+
+Commands are processed in the configured admin channel.
+
+- `!help`: list commands
+- `!status`: health check
+- `!metrics`: export messages/usage/feedback tables as zip files
+- `!report`: generate preconfigured report outputs
+- `!log`: export log files
+- `!active [full]`: show active workflow summary/details
+
+## Configuration Model
+
+Configuration supports both local files and S3 URIs, in JSON or YAML.
+
+Primary examples:
+
+- `local-config-example.yaml`
+- `production-config.yaml`
+
+## Deployment Summary
+
+CI/CD is defined in `.github/workflows/ci-cd.yml`.
+
+## Documentation
 
 - [Getting Started](docs/getting-started.md)
 - [Deployment Guide](docs/deployment.md)
-
-## Project Overview
-
-Rubber Duck is a Discord bot that helps users in a variety of situations by acting as a rubber duck learning partner. It
-uses AI to understand and respond to programming, physics, statistics, and math questions.
-
----
-
-## Current Supported Ducks
-
-### Standard Rubber Duck
-
-This is a general-purpose Discord Bot trained to use Socratic questioning to walk users through the learning process,
-helping them find answers to their own questions while providing minimal guidance.
-
-### Stats Duck
-
-This is a statistics-focused Discord Bot trained to perform code-based statistical analysis on a list of provided
-datasets without interpreting results. It runs arbitrary code safely in a Docker container and only displays results.
-
-### Registration Duck
-
-This bot authenticates users and assigns appropriate Discord roles as defined in the server configuration settings.
-
-### Review Duck
-
-This bot collects previous conversations and allows specified users to give each a score from 1-5 along with a review.
-This enables errors to be easily identified from users' feedback.
-
-### Other Duck Definitions
-
-Channel-specific duck definitions are also supported in the configuration files, allowing for a variety of features.
-Current examples include an `assignment_feedback`, a duck that analyzes and gives feedback on a user's project report,
-and an `emoji_duck` that communicates only in emojis. Each duck is built off of a "user-led" or "agent-led" conversation
-style.
-
----
-
-## Quick Start
-
-1. Clone the repository
-2. Set up your environment and learn how to deploy locally (see [Getting Started](docs/getting-started.md))
-3. See how rubber duck is launched on the production stage (see [Development Guide](development.md))
+- Archived legacy docs: `docs/old/`
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).
