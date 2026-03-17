@@ -71,7 +71,7 @@ def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]
         files = dict(getattr(record, "files", None) or {})
         stdout = getattr(record, "stdout", None) or ""
         rows.append({
-            "key_hash": key,
+            "key": key,
             "hits": getattr(record, "hit_count"),
             "stdout_preview": stdout[:7],
             "stdout": stdout,
@@ -196,6 +196,17 @@ class InMemoryToolCache(ToolCache):
 
     def list_entries(self) -> list[dict[str, Any]]:
         return _format_cache_report(list(self._cache_store.items()))
+
+    def remove_entry(self, key: str) -> bool:
+        if key not in self._cache_store:
+            return False
+        del self._cache_store[key]
+        return True
+
+    def clear_entries(self) -> int:
+        removed_count = len(self._cache_store)
+        self._cache_store.clear()
+        return removed_count
 
 
 class SqlToolCache(ToolCache):
@@ -356,6 +367,24 @@ class SqlToolCache(ToolCache):
             records = session.query(ToolCacheRecord).all()
 
         return _format_cache_report([(record.key, record) for record in records])
+
+    def remove_entry(self, key: str) -> bool:
+        with self._session_factory() as session:
+            record = session.get(ToolCacheRecord, key)
+            if record is None:
+                return False
+            session.delete(record)
+            session.commit()
+        return True
+
+    def clear_entries(self) -> int:
+        with self._session_factory() as session:
+            records = session.query(ToolCacheRecord).all()
+            removed_count = len(records)
+            for record in records:
+                session.delete(record)
+            session.commit()
+        return removed_count
 
 
 class SemanticCacheKeyBuilder:

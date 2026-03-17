@@ -277,7 +277,10 @@ class ActiveWorkflowsCommand(Command):
 
 class CacheCommand(Command):
     name = "!cache"
-    help_msg = "show current tool cache entries, or run `!cache cleanup`"
+    help_msg = (
+        "show current tool cache entries; "
+        "use `!cache cleanup`, `!cache remove <cache_index> <entry_index>`, or `!cache clear`"
+    )
 
     def __init__(self, send_message, tool_caches: list[ToolCache]):
         self.send_message = send_message
@@ -315,6 +318,79 @@ class CacheCommand(Command):
             )
             return
 
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "remove":
+            if len(cmd_parts) != 4:
+                await self.send_message(
+                    channel_id,
+                    "Usage: `!cache remove <cache_index> <entry_index>`",
+                )
+                return
+
+            try:
+                cache_index = int(cmd_parts[2])
+                entry_index = int(cmd_parts[3])
+            except ValueError:
+                await self.send_message(
+                    channel_id,
+                    "Cache index and entry index must be integers.",
+                )
+                return
+
+            if cache_index < 1 or cache_index > len(self.tool_caches):
+                await self.send_message(
+                    channel_id,
+                    f"Invalid cache index `{cache_index}`. Expected 1-{len(self.tool_caches)}.",
+                )
+                return
+
+            if entry_index < 1:
+                await self.send_message(channel_id, "Entry index must be at least 1.")
+                return
+
+            cache = self.tool_caches[cache_index - 1]
+            entries = cache.list_entries()
+            if entry_index > len(entries):
+                await self.send_message(
+                    channel_id,
+                    f"Invalid entry index `{entry_index}`. Cache `{cache_index}` has {len(entries)} entr"
+                    f"{'y' if len(entries) == 1 else 'ies'}.",
+                )
+                return
+
+            target_key = entries[entry_index - 1]["key"]
+            removed = cache.remove_entry(target_key)
+            if not removed:
+                await self.send_message(
+                    channel_id,
+                    "Entry could not be removed; it may have already been deleted.",
+                )
+                return
+
+            await self.send_message(
+                channel_id,
+                f"Removed cache entry `{entry_index}` from cache `{cache_index}`.",
+            )
+            return
+
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "clear":
+            if len(cmd_parts) < 3 or cmd_parts[2].lower() != "confirm":
+                await self.send_message(
+                    channel_id,
+                    "This will remove all cache entries. Run `!cache clear confirm` to continue.",
+                )
+                return
+
+            removed_entries = 0
+            for cache in self.tool_caches:
+                removed_entries += cache.clear_entries()
+
+            await self.send_message(
+                channel_id,
+                f"Cache cleared. Removed {removed_entries} entr"
+                f"{'y' if removed_entries == 1 else 'ies'} across {len(self.tool_caches)} cache(s).",
+            )
+            return
+
         found_entries = False
         total_entries = 0
         all_rows: list[dict] = []
@@ -330,7 +406,10 @@ class CacheCommand(Command):
             found_entries = True
             cache_reports.append((index, backend, entries))
             all_rows.extend(
-                [{"cache_backend": backend, "cache_index": index, **entry} for entry in entries]
+                [
+                    {"cache_backend": backend, "cache_index": index, "entry_index": entry_index, **entry}
+                    for entry_index, entry in enumerate(entries, start=1)
+                ]
             )
 
         if not found_entries:
@@ -346,7 +425,7 @@ class CacheCommand(Command):
         for index, backend, entries in cache_reports:
             top_entries = entries[:5]
             key_lines = [
-                f"- {entry_idx} - {entry['key_hash']}"
+                f"- {entry_idx} - {entry['key']}"
                 for entry_idx, entry in enumerate(top_entries, start=1)
             ]
             summary_message = (
@@ -380,7 +459,7 @@ class CacheCommand(Command):
             "filename": f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
             "bytes": csv_bytes,
         }
-        await self.send_message(channel_id, "Full cache report (CSV):")
+        await self.send_message(channel_id, "### Full cache report (CSV):")
         await self.send_message(channel_id, file=csv_file_data)
 
 

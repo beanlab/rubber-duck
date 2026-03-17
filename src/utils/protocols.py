@@ -89,6 +89,12 @@ class ToolCache(Protocol):
     def list_entries(self) -> list[dict[str, Any]]:
         ...
 
+    def remove_entry(self, key: str) -> bool:
+        ...
+
+    def clear_entries(self) -> int:
+        ...
+
 
 class CacheKeyBuilder(Protocol):
     def build_cache_key(self, user_intent: str, code: str) -> "CacheKey":
