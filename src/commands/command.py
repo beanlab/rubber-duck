@@ -370,7 +370,8 @@ class CacheCommand(Command):
             "filename": f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
             "bytes": csv_bytes,
         }
-        await self.send_message(channel_id, "Full cache report (CSV):", file=csv_file_data)
+        await self.send_message(channel_id, "Full cache report (CSV):")
+        await self.send_message(channel_id, file=csv_file_data)
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
