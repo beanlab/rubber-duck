@@ -28,53 +28,13 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `datasets/`: local datasets staged into container tools
 - `docs/`: getting started and deployment docs
 
-## Quick Start (Local)
-
 ### Prerequisites
 
 - Python 3.11
 - Poetry
-- Docker (required if you enable container tools such as stats/code execution)
+- Docker (required if you enable container tools such as code execution)
 - Discord bot token
 - OpenAI API key
-
-### Install
-
-```bash
-git clone https://github.com/beanlab/rubber-duck.git
-cd rubber-duck
-poetry install
-```
-
-### Configure
-
-1. Copy and adapt local config:
-
-```bash
-cp local-config-example.yaml local-testing-configs/local_<name>_config.yaml
-```
-
-2. Set required environment variables:
-
-```bash
-export DISCORD_TOKEN=your_discord_token
-export OPENAI_API_KEY=your_openai_api_key
-```
-
-3. Update your local config with real channel/server/admin IDs.
-
-### Run
-
-```bash
-poetry run python -m src.main --config ./local-testing-configs/local_<name>_config.yaml --debug
-```
-
-Optional flags:
-
-- `--log-path <path>`: write logs to a file path in addition to console
-- `--config s3://...`: load config from S3
-
-If `--config` is omitted, `src.main` reads `CONFIG_FILE_S3_PATH` from env.
 
 ## Duck Types (Implemented)
 
@@ -101,14 +61,6 @@ Commands are processed in the configured admin channel.
 
 Configuration supports both local files and S3 URIs, in JSON or YAML.
 
-Key capabilities:
-
-- Recursive `$include` references
-- Optional JSONPath extraction with `path@$.json.path`
-- Deep-merge behavior for dictionary includes
-- Cycle detection for includes
-- SQL config values may reference env vars via `env:VAR_NAME`
-
 Primary examples:
 
 - `local-config-example.yaml`
@@ -117,13 +69,6 @@ Primary examples:
 ## Deployment Summary
 
 CI/CD is defined in `.github/workflows/ci-cd.yml`.
-
-On pushes to `master`, the workflow currently:
-
-- Builds Docker image
-- Pushes image tags to ECR
-- Uploads environment/config artifacts to S3
-- Sends deployment notifications to Discord webhook
 
 ## Documentation
 
