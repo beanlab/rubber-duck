@@ -69,10 +69,12 @@ def _format_cache_report(records: list[tuple[str, Any]]) -> list[dict[str, Any]]
     for key, record in sorted_records:
         tables = list(getattr(record, "tables", None) or [])
         files = dict(getattr(record, "files", None) or {})
+        stdout = getattr(record, "stdout", None) or ""
         rows.append({
             "key_hash": key,
             "hits": getattr(record, "hit_count"),
-            "stdout": bool(getattr(record, "stdout", None)),
+            "stdout_preview": stdout[:7],
+            "stdout": stdout,
             "tables": len(tables),
             "files": len(files),
             "created": getattr(record, "created_at").strftime("%m/%d/%y"),

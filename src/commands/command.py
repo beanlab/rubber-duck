@@ -358,7 +358,17 @@ class CacheCommand(Command):
             )
             await self.send_message(channel_id, summary_message)
 
-            info_rows = [{k: v for k, v in entry.items() if k != "key_hash"} for entry in top_entries]
+            info_rows = [
+                {
+                    "hits": entry["hits"],
+                    "stdout": entry.get("stdout_preview", ""),
+                    "tables": entry["tables"],
+                    "files": entry["files"],
+                    "created": entry["created"],
+                    "expires": entry["expires"],
+                }
+                for entry in top_entries
+            ]
             await send_table(self.send_message, channel_id, pd.DataFrame(info_rows))
 
         csv_df = pd.DataFrame(all_rows)
