@@ -316,30 +316,61 @@ class CacheCommand(Command):
             return
 
         found_entries = False
+        total_entries = 0
+        all_rows: list[dict] = []
+
+        cache_reports: list[tuple[int, str, list[dict]]] = []
         for index, cache in enumerate(self.tool_caches, start=1):
             backend = type(cache).__name__
             entries = cache.list_entries()
+            total_entries += len(entries)
             if not entries:
                 continue
 
             found_entries = True
+            cache_reports.append((index, backend, entries))
+            all_rows.extend(
+                [{"cache_backend": backend, "cache_index": index, **entry} for entry in entries]
+            )
+
+        if not found_entries:
+            await self.send_message(channel_id, "No cache entries found.")
+            return
+
+        await self.send_message(
+            channel_id,
+            f"Found {total_entries} entr{'y' if total_entries == 1 else 'ies'} "
+            f"across {len(self.tool_caches)} cache(s). Showing top 5 per cache below.",
+        )
+
+        for index, backend, entries in cache_reports:
+            top_entries = entries[:5]
             key_lines = [
                 f"- {entry_idx} - {entry['key_hash']}"
-                for entry_idx, entry in enumerate(entries)
+                for entry_idx, entry in enumerate(top_entries, start=1)
             ]
             summary_message = (
                 f"## Cache: `{backend}#{index}`\n"
+                f"Total entries: {len(entries)}\n"
                 "### Keys:\n"
                 f"{'\n'.join(key_lines)}\n"
                 "### Entry info:"
             )
             await self.send_message(channel_id, summary_message)
 
-            info_rows = [{k: v for k, v in entry.items() if k != "key_hash"} for entry in entries]
+            info_rows = [{k: v for k, v in entry.items() if k != "key_hash"} for entry in top_entries]
             await send_table(self.send_message, channel_id, pd.DataFrame(info_rows))
 
-        if not found_entries:
-            await self.send_message(channel_id, "No cache entries found.")
+        csv_df = pd.DataFrame(all_rows)
+        csv_buffer = io.StringIO()
+        csv_df.to_csv(csv_buffer, index=False)
+        csv_bytes = csv_buffer.getvalue().encode("utf-8")
+        csv_buffer.close()
+        csv_file = discord.File(
+            io.BytesIO(csv_bytes),
+            filename=f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
+        )
+        await self.send_message(channel_id, "Full cache report (CSV):", file=csv_file)
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
