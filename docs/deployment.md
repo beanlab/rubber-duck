@@ -58,11 +58,14 @@ The following secrets must be configured in your GitHub repository:
 1. **Environment Configuration**
 
    - Store environment variables in S3
-   - Format: `s3://rubber-duck-config/pre-production/secrets-{sha}.env`
+   - Example format: `s3://rubber-duck-config/pre-production/secrets-{sha}.env`
+   - Current workflow naming uses `production-secrets-{short_sha}.env`
 
 2. **Bot Configuration**
-   - JSON configuration in S3
-   - Format: `s3://rubber-duck-config/pre-production/config-{sha}.json`
+   - Bot configuration in S3 (YAML in current workflow)
+   - Example format: `s3://rubber-duck-config/pre-production/config-{sha}.json`
+   - Current workflow naming uses `production-config-{short_sha}.yaml`
+   - See `.github/workflows/ci-cd.yml` for source-of-truth naming
 
 ## Monitoring
 
