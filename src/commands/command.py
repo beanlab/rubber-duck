@@ -1,4 +1,5 @@
 import io
+import json
 import subprocess
 import zipfile
 from datetime import datetime
@@ -294,6 +295,29 @@ class CacheCommand(Command):
             seen_cache_ids.add(cache_id)
             self.tool_caches.append(cache)
 
+    @staticmethod
+    def _format_cache_key_for_summary(raw_key: str) -> str:
+        try:
+            parsed = json.loads(raw_key)
+        except (TypeError, json.JSONDecodeError):
+            return raw_key
+
+        if not isinstance(parsed, dict):
+            return raw_key
+
+        return ", ".join(
+            f"{key}: {CacheCommand._stringify_cache_value(value)}"
+            for key, value in parsed.items()
+        )
+
+    @staticmethod
+    def _stringify_cache_value(value) -> str:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value)
+        if value is None:
+            return "null"
+        return str(value)
+
     @step
     async def execute(self, message: Message):
         channel_id = message['channel_id']
@@ -425,7 +449,7 @@ class CacheCommand(Command):
         for index, backend, entries in cache_reports:
             top_entries = entries[:5]
             key_lines = [
-                f"- {entry_idx} - {entry['key']}"
+                f"- {entry_idx} - {self._format_cache_key_for_summary(entry['key'])}"
                 for entry_idx, entry in enumerate(top_entries, start=1)
             ]
             summary_message = (
