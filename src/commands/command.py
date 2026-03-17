@@ -366,11 +366,11 @@ class CacheCommand(Command):
         csv_df.to_csv(csv_buffer, index=False)
         csv_bytes = csv_buffer.getvalue().encode("utf-8")
         csv_buffer.close()
-        csv_file = discord.File(
-            io.BytesIO(csv_bytes),
-            filename=f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
-        )
-        await self.send_message(channel_id, "Full cache report (CSV):", file=csv_file)
+        csv_file_data = {
+            "filename": f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
+            "bytes": csv_bytes,
+        }
+        await self.send_message(channel_id, "Full cache report (CSV):", file=csv_file_data)
 
 
 def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
