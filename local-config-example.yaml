@@ -1,11 +1,3 @@
-sql:
-  db_type: sqlite
-  database: local-testing-configs/local_reese_database.db
-
-containers: { }
-
-tools: { }
-
 # include paths don't need to be wrapped in quotes, but it makes it easier to differentiate
 
 # relative includes are supported. For example:
@@ -46,57 +38,42 @@ ducks:
     $include_0: "production-config.yaml@$.ducks.standard-rubber-duck"
     $include_1: "production-config.yaml@$.ducks.stats-duck"
 
+# including strings also works, but there can't be any additional keys below the $include key
+sender_email:
+  $include: "production-config.yaml@$.sender_email"
+
+# STARTER CONFIG TEMPLATE
+
+sql:
+  db_type: sqlite
+  database: local-testing-configs/local_<name>_database.db
+
+ducks:
+  standard-rubber-duck:
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
 
 servers:
   BeanLab:
-    server_id: <id>
+    server_id: <server_id>
     channels:
-      Ducks/duck-channel-example:
-        channel_id: <id>
+      Ducks/<name>-chat-bot:
+        channel_id: <channel_id>
         timeout: 300
-        duck:
-          standard-rubber-duck
+        duck: standard-rubber-duck
 
-      Ducks/ta-channel-example:
-        channel_id: <id>
-        timeout: 300
-        duck:
-          Conversation-Review:
-            duck_type: conversation_review
-            settings:
-              target_channel_ids:
-                - <id>
+agents_as_tools:
+  $include: "production-config.yaml@$.agents_as_tools"
 
-      Ducks/registration-example:
-        channel_id: <id>
-        timeout: 300
-        duck:
-          registration-duck:
-            duck_type: registration
-            settings:
-              cache_timeout: 60800
-              authenticated_user_role_name: I-passed-registration
-              ta_channel_id: <id>
-              registration_bot: registration
-              email_domain: byu.edu
-              roles:
-                patterns: { }
-
-# including strings also works, but the dictionary with the $include key that imports a string
-# cannot have additional keys, for example
 sender_email:
   $include: "production-config.yaml@$.sender_email"
 
 admin_settings:
   $include: "production-config.yaml@$.admin_settings"
-  admin_channel_id: 1429899217890967663
-  admin_role_id: 1149033209821134858
-
-feedback_notifier_settings:
-  $include: "production-config.yaml@$.feedback_notifier_settings"
+  admin_channel_id: <admin_channel_id>
+  admin_role_id: <admin_role_id>
 
 ai_completion_retry_protocol:
-  $include_2: "production-config.yaml@$.ai_completion_retry_protocol"
+  $include: "production-config.yaml@$.ai_completion_retry_protocol"
 
 reporter_settings:
-  $include_3: "production-config.yaml@$.reporter_settings"
+  $include: "production-config.yaml@$.reporter_settings"

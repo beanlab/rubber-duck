@@ -5,10 +5,13 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+from openai import OpenAI
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
+from .utils.protocols import ToolCache, CacheKeyBuilder
+from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
@@ -32,6 +35,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.config_loader import load_configuration
 from .utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
+from .utils.cache_cleaner import CacheCleaner
 from .utils.feedback_notifier import FeedbackNotifier
 from .utils.logger import duck_logger, filter_logs, add_console_handler
 from .utils.persistent_queue import PersistentQueue
@@ -45,11 +49,12 @@ def setup_workflow_manager(
         sql_session,
         metrics_handler,
         send_message,
-        log_dir: Path
+        log_dir: Path,
+        tool_caches: list[ToolCache],
 ):
     reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
 
-    commands = create_commands(send_message, metrics_handler, reporter, log_dir)
+    commands = create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches)
     commands_workflow = BotCommands(commands, send_message)
 
     workflows = {
@@ -247,16 +252,56 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def build_armory(config: Config, send_message, containers: dict[str, PythonExecContainer]) -> \
-        tuple[Armory, TalkTool]:
+def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
+    settings = config.get("cache", {})
+
+    prompt = settings.get("prompt")
+    if not prompt:
+        duck_logger.error("Missing 'prompt' config setting in cache config")
+
+    return SemanticCacheKeyBuilder(
+        client=OpenAI(),
+        prompt=Path(prompt).read_text(),
+        model=settings.get("engine", "gpt-5-nano"),
+        reasoning_effort=settings.get("reasoning", "minimal"),
+    )
+
+
+def _build_tool_cache(config: Config, sql_session) -> ToolCache:
+    backend = config.get("cache", {}).get("backend", "memory")
+
+    if backend == "memory":
+        return InMemoryToolCache()
+
+    if backend == "database":
+        return SqlToolCache(sql_session)
+
+    raise NotImplementedError(f"Unsupported cache backend: {backend}")
+
+
+def build_armory(
+        config: Config,
+        send_message,
+        containers: dict[str, PythonExecContainer],
+        sql_session
+) -> tuple[Armory, TalkTool, list[ToolCache]]:
     armory = Armory(send_message)
+    tool_caches: list[ToolCache] = []
 
     # setup tools
     config_tools = config.get("tools", [])
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            python_tools = PythonTools(containers[container_name], send_message)
+            tool_cache = _build_tool_cache(config, sql_session)
+            tool_caches.append(tool_cache)
+            cache_key_builder = _build_cache_key_builder(config)
+            python_tools = PythonTools(
+                containers[container_name],
+                send_message,
+                tool_cache,
+                cache_key_builder
+            )
             amended_description = (
                     tool_config.get('description', python_tools.run_code.__doc__)
                     + '\n'
@@ -269,7 +314,29 @@ def build_armory(config: Config, send_message, containers: dict[str, PythonExecC
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
 
-    return armory, talk_tool
+    return armory, talk_tool, tool_caches
+
+
+def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
+    unique_tool_caches: list[ToolCache] = []
+    seen_cache_ids: set[int] = set()
+    for tool_cache in tool_caches:
+        cache_id = id(tool_cache)
+        if cache_id not in seen_cache_ids:
+            seen_cache_ids.add(cache_id)
+            unique_tool_caches.append(tool_cache)
+    cc = None
+    if unique_tool_caches:
+        cache_settings = config.get("cache", {})
+        cleanup_hour = cache_settings.get("cleanup_hour", 3)
+        cleanup_minute = cache_settings.get("cleanup_minute", 0)
+        cc = CacheCleaner(
+            unique_tool_caches,
+            cleanup_hour,
+            cleanup_minute
+        )
+    return cc
+
 
 
 def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
@@ -305,7 +372,12 @@ async def _main(config: Config, log_dir: Path):
             metrics_handler = SQLMetricsHandler(sql_session)
 
             with these(build_containers(config)) as containers:
-                armory, talk_tool = build_armory(config, bot.send_message, containers)
+                armory, talk_tool, tool_caches = build_armory(
+                    config,
+                    bot.send_message,
+                    containers,
+                    sql_session,
+                )
                 ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
                 add_agent_tools_to_armory(config, armory, ai_client)
 
@@ -331,7 +403,8 @@ async def _main(config: Config, log_dir: Path):
                         sql_session,
                         metrics_handler,
                         bot.send_message,
-                        log_dir
+                        log_dir,
+                        tool_caches,
                 ) as workflow_manager:
                     tasks = []
 
@@ -349,6 +422,10 @@ async def _main(config: Config, log_dir: Path):
                         notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
                                                     config['feedback_notifier_settings'])
                         tasks.append(notifier.start())
+
+                    if tool_caches:
+                        cleaner = _setup_cache_cleaner(tool_caches)
+                        tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)
 
@@ -381,7 +458,6 @@ if __name__ == '__main__':
     add_console_handler()
 
     if args.config is None:
-        import os
         args.config = os.getenv('CONFIG_FILE_S3_PATH')
 
     config: Config = load_configuration(args.config)

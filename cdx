@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+codex "Read AGENTS.md and say 'Ready.'"
