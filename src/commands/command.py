@@ -1,16 +1,19 @@
 import io
+import json
 import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
 import discord
+import pandas as pd
 import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..armory.python_tools import send_table
 from ..utils.logger import duck_logger
-from ..utils.protocols import Message
+from ..utils.protocols import Message, ToolCache
 from ..utils.zip_utils import zip_data_file
 
 
@@ -273,7 +276,218 @@ class ActiveWorkflowsCommand(Command):
             await self._execute_summary(message)
 
 
-def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Command]:
+class CacheCommand(Command):
+    name = "!cache"
+    help_msg = (
+        "show current tool cache entries; "
+        "use `!cache cleanup`, `!cache remove <cache_index> <entry_index>`, or `!cache clear`"
+    )
+
+    def __init__(self, send_message, tool_caches: list[ToolCache]):
+        self.send_message = send_message
+        self.tool_caches = []
+
+        seen_cache_ids = set()
+        for cache in tool_caches:
+            cache_id = id(cache)
+            if cache_id in seen_cache_ids:
+                continue
+            seen_cache_ids.add(cache_id)
+            self.tool_caches.append(cache)
+
+    @staticmethod
+    def _format_cache_key_for_summary(raw_key: str) -> str:
+        try:
+            parsed = json.loads(raw_key)
+        except (TypeError, json.JSONDecodeError):
+            return raw_key
+
+        if not isinstance(parsed, dict):
+            return raw_key
+
+        return ", ".join(
+            f"{key}: {CacheCommand._stringify_cache_value(value)}"
+            for key, value in parsed.items()
+        )
+
+    @staticmethod
+    def _stringify_cache_value(value) -> str:
+        if isinstance(value, (dict, list)):
+            return json.dumps(value)
+        if value is None:
+            return "null"
+        return str(value)
+
+    @step
+    async def execute(self, message: Message):
+        channel_id = message['channel_id']
+        cmd_parts = message['content'].strip().split()
+
+        if not self.tool_caches:
+            await self.send_message(channel_id, "No tool caches are configured.")
+            return
+
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "cleanup":
+            removed_entries = 0
+            for cache in self.tool_caches:
+                before_count = len(cache.list_entries())
+                cache.cleanup()
+                after_count = len(cache.list_entries())
+                removed_entries += max(before_count - after_count, 0)
+
+            await self.send_message(
+                channel_id,
+                f"Cache cleanup complete. Removed {removed_entries} expired entr"
+                f"{'y' if removed_entries == 1 else 'ies'} across {len(self.tool_caches)} cache(s).",
+            )
+            return
+
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "remove":
+            if len(cmd_parts) != 4:
+                await self.send_message(
+                    channel_id,
+                    "Usage: `!cache remove <cache_index> <entry_index>`",
+                )
+                return
+
+            try:
+                cache_index = int(cmd_parts[2])
+                entry_index = int(cmd_parts[3])
+            except ValueError:
+                await self.send_message(
+                    channel_id,
+                    "Cache index and entry index must be integers.",
+                )
+                return
+
+            if cache_index < 1 or cache_index > len(self.tool_caches):
+                await self.send_message(
+                    channel_id,
+                    f"Invalid cache index `{cache_index}`. Expected 1-{len(self.tool_caches)}.",
+                )
+                return
+
+            if entry_index < 1:
+                await self.send_message(channel_id, "Entry index must be at least 1.")
+                return
+
+            cache = self.tool_caches[cache_index - 1]
+            entries = cache.list_entries()
+            if entry_index > len(entries):
+                await self.send_message(
+                    channel_id,
+                    f"Invalid entry index `{entry_index}`. Cache `{cache_index}` has {len(entries)} entr"
+                    f"{'y' if len(entries) == 1 else 'ies'}.",
+                )
+                return
+
+            target_key = entries[entry_index - 1]["key"]
+            removed = cache.remove_entry(target_key)
+            if not removed:
+                await self.send_message(
+                    channel_id,
+                    "Entry could not be removed; it may have already been deleted.",
+                )
+                return
+
+            await self.send_message(
+                channel_id,
+                f"Removed cache entry `{entry_index}` from cache `{cache_index}`.",
+            )
+            return
+
+        if len(cmd_parts) > 1 and cmd_parts[1].lower() == "clear":
+            if len(cmd_parts) < 3 or cmd_parts[2].lower() != "confirm":
+                await self.send_message(
+                    channel_id,
+                    "This will remove all cache entries. Run `!cache clear confirm` to continue.",
+                )
+                return
+
+            removed_entries = 0
+            for cache in self.tool_caches:
+                removed_entries += cache.clear_entries()
+
+            await self.send_message(
+                channel_id,
+                f"Cache cleared. Removed {removed_entries} entr"
+                f"{'y' if removed_entries == 1 else 'ies'} across {len(self.tool_caches)} cache(s).",
+            )
+            return
+
+        found_entries = False
+        total_entries = 0
+        all_rows: list[dict] = []
+
+        cache_reports: list[tuple[int, str, list[dict]]] = []
+        for index, cache in enumerate(self.tool_caches, start=1):
+            backend = type(cache).__name__
+            entries = cache.list_entries()
+            total_entries += len(entries)
+            if not entries:
+                continue
+
+            found_entries = True
+            cache_reports.append((index, backend, entries))
+            all_rows.extend(
+                [
+                    {"cache_backend": backend, "cache_index": index, "entry_index": entry_index, **entry}
+                    for entry_index, entry in enumerate(entries, start=1)
+                ]
+            )
+
+        if not found_entries:
+            await self.send_message(channel_id, "No cache entries found.")
+            return
+
+        await self.send_message(
+            channel_id,
+            f"Found {total_entries} entr{'y' if total_entries == 1 else 'ies'} "
+            f"across {len(self.tool_caches)} cache(s). Showing top 5 per cache below.",
+        )
+
+        for index, backend, entries in cache_reports:
+            top_entries = entries[:5]
+            key_lines = [
+                f"- {entry_idx} - {self._format_cache_key_for_summary(entry['key'])}"
+                for entry_idx, entry in enumerate(top_entries, start=1)
+            ]
+            summary_message = (
+                f"## Cache: `{backend}#{index}`\n"
+                f"Total entries: {len(entries)}\n"
+                "### Keys:\n"
+                f"{'\n'.join(key_lines)}\n"
+                "### Entry info:"
+            )
+            await self.send_message(channel_id, summary_message)
+
+            info_rows = [
+                {
+                    "hits": entry["hits"],
+                    "stdout": entry.get("stdout_preview", ""),
+                    "tables": entry["tables"],
+                    "files": entry["files"],
+                    "created": entry["created"],
+                    "expires": entry["expires"],
+                }
+                for entry in top_entries
+            ]
+            await send_table(self.send_message, channel_id, pd.DataFrame(info_rows))
+
+        csv_df = pd.DataFrame(all_rows)
+        csv_buffer = io.StringIO()
+        csv_df.to_csv(csv_buffer, index=False)
+        csv_bytes = csv_buffer.getvalue().encode("utf-8")
+        csv_buffer.close()
+        csv_file_data = {
+            "filename": f"cache_report_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv",
+            "bytes": csv_bytes,
+        }
+        await self.send_message(channel_id, "### Full cache report (CSV):")
+        await self.send_message(channel_id, file=csv_file_data)
+
+
+def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
@@ -286,5 +500,6 @@ def create_commands(send_message, metrics_handler, reporter, log_dir) -> list[Co
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
         LogCommand(send_message, log_dir),
-        ActiveWorkflowsCommand(send_message, get_workflow_metrics)
+        ActiveWorkflowsCommand(send_message, get_workflow_metrics),
+        CacheCommand(send_message, tool_caches),
     ]

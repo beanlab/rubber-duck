@@ -64,6 +64,25 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
     return stdout
 
 
+async def send_table(
+        send_message: SendMessage,
+        channel_id: int,
+        table: pd.DataFrame,
+        max_rows: int = 100,
+) -> list[str]:
+    table = table.head(max_rows)
+    col_chunk = _determine_col_chunk(table)
+    table_chunks = []
+
+    for i in range(0, table.shape[1], col_chunk):
+        md_table = table.iloc[:, i:i + col_chunk].to_markdown()
+        table_chunk = f"```\n{md_table}\n```"
+        table_chunks.append(table_chunk)
+        await send_message(channel_id, table_chunk)
+
+    return table_chunks
+
+
 class PythonTools:
     def __init__(
             self,
@@ -93,13 +112,13 @@ class PythonTools:
             }
         """
         cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
-        duck_logger.debug(f"\nCache key:\n{cache_key}")
-        key_hash = self._tool_cache.get_key_hash(cache_key)
+        key = self._tool_cache.get_key(cache_key)
+        duck_logger.debug(f"\nCache key:\n{key}")
 
-        if self._tool_cache.check_if_cached(key_hash):
+        if self._tool_cache.check_if_cached(key):
             duck_logger.debug(f" Cache HIT ".center(20, '-'))
             output = await self._tool_cache.send_from_cache(
-                key_hash,
+                key,
                 self._send_message,
                 ctx.thread_id
             )
@@ -121,7 +140,7 @@ class PythonTools:
         # send files directly
         for filename, file in files.items():
             if is_image(filename):
-                self._tool_cache.cache_file(key_hash, filename, file)
+                self._tool_cache.cache_file(key, filename, file)
                 await self._send_message(
                     ctx.thread_id,
                     file={
@@ -131,20 +150,17 @@ class PythonTools:
                 )
             elif is_table(filename):
                 table = pd.read_csv(io.StringIO(file['bytes'].decode()))
-                table = table.head(100)
-                col_chunk = _determine_col_chunk(table)
-                table_chunks = []
-                for i in range(0, table.shape[1], col_chunk):
-                    md_table = table.iloc[:, i:i + col_chunk].to_markdown()
-                    table_chunk = f"```\n{md_table}\n```"
-                    table_chunks.append(table_chunk)
-                    await self._send_message(ctx.thread_id, table_chunk)
-                self._tool_cache.cache_table(key_hash, filename, table_chunks, file.get("description", ""))
+                table_chunks = await send_table(
+                    self._send_message,
+                    ctx.thread_id,
+                    table,
+                )
+                self._tool_cache.cache_table(key, filename, table_chunks, file.get("description", ""))
 
         # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)
         if stdout:
-            self._tool_cache.cache_msg(key_hash, stdout)
+            self._tool_cache.cache_msg(key, stdout)
             await self._send_message(ctx.thread_id, stdout)
 
         output = {
