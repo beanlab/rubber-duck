@@ -9,16 +9,19 @@ Audit the repository to identify cleanup opportunities that do not change produc
 
 ## Checklist
 
+- Read each relevant directory `_docs.md` first to gather expected boundaries, known error points, and any existing "Potential Weak Points" notes.
+- Use any existing "Potential Weak Points" entries as initial audit seeds, then verify them against current code before carrying them forward.
 - Map current structure and boundaries across `src/`, `prompts/`, `docs/`, configs, and scripts.
 - Find duplicated logic, near-duplicate helpers, and repeated prompt/config patterns.
 - Identify likely unused code, stale files, dead modules, and disconnected assets.
 - Check for file placement issues (module responsibility mismatch, confusing folder location, mixed concerns).
-- Flag weak local docs or missing context that makes ownership/boundaries unclear.
+- Flag weak or stale local docs and missing context that makes ownership/boundaries unclear.
 - Note consistency issues in naming, layering, and dependency direction.
 
 ## Evidence Requirements
 
-- For every finding, include supporting evidence (reference search results, import/call sites, config wiring, or test coverage signals).
+- For every finding, include supporting evidence (reference search results, import/call sites, config wiring, or test
+  coverage signals).
 - Mark findings with confidence (`high`, `medium`, `low`) and risk level.
 
 ## Output
@@ -29,3 +32,5 @@ Return findings ordered by severity with:
 - concise issue statement,
 - evidence summary,
 - recommended cleanup direction.
+
+Do not edit `_docs.md` during this identify phase. Report proposed doc updates as part of findings/planning outputs.

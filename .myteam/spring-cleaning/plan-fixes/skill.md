@@ -15,6 +15,10 @@ Convert cleanup findings into a decision-complete plan that preserves behavior.
 - Define acceptance criteria for each planned change.
 - Add verification steps for each group (targeted tests, imports/load checks, lint/type checks when available).
 - Record assumptions and exclusions explicitly, especially for medium/low-confidence findings.
+- For each affected directory, explicitly plan `_docs.md` reconciliation (what section changes and why).
+- Decide whether the directory should include/update a "Potential Weak Points" section after implementation:
+  - add/update entries only for real remaining weak points or likely error points,
+  - if no credible weak points remain, do not add placeholder entries.
 
 ## Planning Rules
 
@@ -31,3 +35,4 @@ Produce an ordered cleanup plan with:
 - risk classification,
 - acceptance criteria,
 - verification commands/checks.
+- explicit `_docs.md` update actions per affected directory.

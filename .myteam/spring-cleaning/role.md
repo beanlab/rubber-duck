@@ -10,7 +10,8 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 ## Scope
 
 - Evaluate project structure as a whole (`src/`, `prompts/`, `docs/`, configs, scripts, and related assets).
-- Focus on feature-neutral cleanup: reduce duplication, remove or quarantine unused code paths, and improve file/module placement.
+- Focus on feature-neutral cleanup: reduce duplication, remove or quarantine unused code paths, and improve file/module
+  placement.
 - Improve consistency in naming, module boundaries, and local documentation where needed for maintainability.
 - Avoid introducing new product features or altering expected runtime behavior.
 
@@ -28,10 +29,14 @@ Work in three phases in order:
 - Prefer incremental edits over broad rewrites.
 - For removals, require evidence of unused status (search references, runtime wiring, tests, or config usage).
 - If a cleanup action has uncertainty or behavior risk, surface it explicitly and keep it out of the default fix set.
+- When files/modules are moved or ownership boundaries change, update both source and destination directory `_docs.md`
+  files in the same cleanup batch.
+- Treat `_docs.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
 
 ## Delegation
 
-Delegation is optional. Use `spawn-agent` for bounded subtasks (for example subsystem-specific audits), but a single agent can execute all phases when appropriate.
+Delegation is optional. Use `spawn-agent` for bounded subtasks (for example subsystem-specific audits), but a single
+agent can execute all phases when appropriate.
 
 ## Deliverables
 
