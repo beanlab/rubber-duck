@@ -1,10 +1,3 @@
----
-name: Armory Assistance
-description: |
-  Instructions for how to provide developer assistance when working with the armory/tooling layer.
-  If you are asked to help with tool registration, schemas, or tool caching, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/armory/armory.py`
@@ -16,7 +9,8 @@ description: |
 
 ## Core Responsibilities
 
-- `Armory` (`armory.py`) stores tool callables and JSON schemas, wraps call sites with `DuckContext`, and exposes lookup helpers.
+- `Armory` (`armory.py`) stores tool callables and JSON schemas, wraps call sites with `DuckContext`, and exposes lookup
+  helpers.
 - `register_tool` / `sends_image` decorators (`tools.py`) mark methods for tool registration and direct image handling.
 - `generate_function_schema` (`tools.py`) builds strict function schemas from Python type hints and docstrings.
 - `PythonTools.run_code` executes user code and coordinates semantic caching through `ToolCache` and `CacheKeyBuilder`.

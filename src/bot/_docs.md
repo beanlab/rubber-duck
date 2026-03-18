@@ -1,10 +1,3 @@
----
-name: Bot Assistance
-description: |
-  Instructions for how to provide developer assistance for Discord bot runtime and message routing.
-  If you are asked to help with Discord integration, channel routing, or bot event flow, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/bot/discord_bot.py`

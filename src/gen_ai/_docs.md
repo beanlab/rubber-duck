@@ -1,10 +1,3 @@
----
-name: Gen AI Assistance
-description: |
-  Instructions for how to provide developer assistance for agent construction and OpenAI response execution.
-  If you are asked to help with agent prompts, model/tool settings, or AI runtime behavior, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/gen_ai/gen_ai.py`

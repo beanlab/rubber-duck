@@ -1,10 +1,3 @@
----
-name: Metrics Assistance
-description: |
-  Instructions for how to provide developer assistance for metrics capture, feedback review, and reporting.
-  If you are asked to help with usage/messages/feedback data flows or report generation, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/metrics/csv_metrics.py`

@@ -1,10 +1,3 @@
----
-name: Utils Assistance
-description: |
-  Instructions for how to provide developer assistance for shared utility modules across config, logging, queues, and execution helpers.
-  If you are asked to help with cross-cutting infrastructure behavior, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/utils/config_loader.py`

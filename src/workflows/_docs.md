@@ -1,10 +1,3 @@
----
-name: Workflows Assistance
-description: |
-  Instructions for how to provide developer assistance for workflow implementations used by duck channels.
-  If you are asked to help with registration or assignment-feedback workflow behavior, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/workflows/registration.py`

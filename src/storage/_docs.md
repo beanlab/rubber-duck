@@ -1,10 +1,3 @@
----
-name: Storage Assistance
-description: |
-  Instructions for how to provide developer assistance for SQL sessions, workflow persistence, and metrics storage.
-  If you are asked to help with database configuration or persistence behavior, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/storage/sql_connection.py`

@@ -1,10 +1,3 @@
----
-name: Conversation Assistance
-description: |
-  Instructions for how to provide developer assistance for conversation lifecycle and thread setup.
-  If you are asked to help with duck conversation behavior, thread creation, or handoff to AI conversation runners, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/conversation/conversation.py`

@@ -1,10 +1,3 @@
----
-name: Commands Assistance
-description: |
-  Instructions for how to provide developer assistance for admin command parsing and execution.
-  If you are asked to help with command behavior, command wiring, or command output flow, load this skill.
----
-
 ## Relevant File Locations
 
 - `src/commands/bot_commands.py`
