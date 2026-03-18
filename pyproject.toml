@@ -33,3 +33,8 @@ jsonpath-ng = "^1.7.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "myteam (>=0.2.4,<0.3.0)"
+]
