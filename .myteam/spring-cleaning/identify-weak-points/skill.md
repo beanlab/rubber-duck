@@ -9,7 +9,7 @@ Audit the repository to identify cleanup opportunities that do not change produc
 
 ## Checklist
 
-- Read each relevant directory `_docs.md` first to gather expected boundaries, known error points, and any existing "Potential Weak Points" notes.
+- Read each relevant directory `_DOCS.md` first to gather expected boundaries, known error points, and any existing "Potential Weak Points" notes.
 - Use any existing "Potential Weak Points" entries as initial audit seeds, then verify them against current code before carrying them forward.
 - Map current structure and boundaries across `src/`, `prompts/`, `docs/`, configs, and scripts.
 - Find duplicated logic, near-duplicate helpers, and repeated prompt/config patterns.
@@ -33,4 +33,4 @@ Return findings ordered by severity with:
 - evidence summary,
 - recommended cleanup direction.
 
-Do not edit `_docs.md` during this identify phase. Report proposed doc updates as part of findings/planning outputs.
+Do not edit `_DOCS.md` during this identify phase. Report proposed doc updates as part of findings/planning outputs.

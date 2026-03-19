@@ -29,9 +29,9 @@ Work in three phases in order:
 - Prefer incremental edits over broad rewrites.
 - For removals, require evidence of unused status (search references, runtime wiring, tests, or config usage).
 - If a cleanup action has uncertainty or behavior risk, surface it explicitly and keep it out of the default fix set.
-- When files/modules are moved or ownership boundaries change, update both source and destination directory `_docs.md`
+- When files/modules are moved or ownership boundaries change, update both source and destination directory `_DOCS.md`
   files in the same cleanup batch.
-- Treat `_docs.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
+- Treat `_DOCS.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
 
 ## Delegation
 
