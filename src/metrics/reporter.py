@@ -329,9 +329,8 @@ class Reporter:
         args = arg_string.split()
         if args[1] in self.pre_baked:
             args = self.pre_baked[args[1]][0].split()
-        sys.argv = args
 
-        parser = ArgumentParser(description="Visualize data from selected metrics.")
+        parser = ArgumentParser(description="Visualize data from selected metrics.", exit_on_error=False)
         parser.add_argument("-df", "--dataframe", required=True, help="Choose the dataframe.")
         parser.add_argument("-iv", "--ind_var", required=True, help="Independent variable to analyze.")
         parser.add_argument("-p", "--period", choices=self.time_periods.keys(), help="Time period to filter data.")
@@ -341,7 +340,7 @@ class Reporter:
         parser.add_argument("-avg", "--average", action="store_true", help="Averages, not sums, the ind_var")
         parser.add_argument("-c", "--count", action="store_true", help="Counts, not sums, the ind_var")
         parser.add_argument("-per", "--percent", action="store_true", help="Percent, not sums, the ind_var")
-        return parser.parse_args()
+        return parser.parse_args(args[1:])
 
     def arg_to_string(self, args):
         components = [args.dataframe, args.ind_var]
@@ -396,6 +395,14 @@ class Reporter:
             title, image = self.make_graph(df_limited, args)
             return [(title, image)]
 
+        except ArgumentError as e:
+            return (
+                "Invalid report command.\n"
+                f"{e}\n\n"
+                f"{self.help_menu()}\n\n"
+                "Custom report format example:\n"
+                "`!report -df usage -iv thread_id -c -ev hour_of_day -ev2 guild_id -p year`"
+            )
         except Exception as e:
             # Ensure any matplotlib figures are closed
             plt.close('all')

@@ -148,7 +148,7 @@ async def log_queue_watcher(send_message, channel_id, log_queue: Queue):
 
     while True:
         record = await loop.run_in_executor(None, _blocking_get)
-        message = record.getMessage()
+        message = formatter.format(record)
         formatted_message = format_error_message(message)
         try:
             await send_message(channel_id, formatted_message)
