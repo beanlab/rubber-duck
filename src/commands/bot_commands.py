@@ -1,4 +1,5 @@
 from ..commands.command import Command
+from ..utils.logger import duck_logger
 from ..utils.protocols import Message
 
 
@@ -32,7 +33,14 @@ class BotCommands:
         # Get the corresponding class and execute
         elif command_name in self.commands:
             command_class = self.commands[command_name]
-            await command_class.execute(message)
+            try:
+                await command_class.execute(message)
+            except Exception:
+                duck_logger.exception(f"Unhandled exception while executing command '{command_name}'")
+                await self.send_message(
+                    message['channel_id'],
+                    "An unexpected error occurred while running that command."
+                )
         # Send unknown message
         else:
             await self.send_message(message['channel_id'], 'Unknown command. Try !help')

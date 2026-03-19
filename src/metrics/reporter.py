@@ -266,8 +266,8 @@ class Reporter:
                         lambda x: x.notna().mean() * 100).reset_index()
                 else:
                     df_grouped = df.groupby(args.exp_var)[args.ind_var].sum().reset_index()
-            except ValueError as e:
-                duck_logger.error(f"Error converting {args.ind_var} to numeric: {e}")
+            except ValueError:
+                duck_logger.exception(f"Error converting {args.ind_var} to numeric")
                 df_grouped = df.groupby(args.exp_var)[args.ind_var].count().reset_index()
 
         else:
@@ -368,8 +368,8 @@ class Reporter:
                         results.extend(result)
                     else:
                         duck_logger.warning(f"Skipping {key} - {result}")
-                except Exception as e:
-                    duck_logger.error(f"Error generating report for {key}: {e}")
+                except Exception:
+                    duck_logger.exception(f"Error generating report for {key}")
                     continue
         return results
 

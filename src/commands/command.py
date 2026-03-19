@@ -99,6 +99,8 @@ class StatusCommand(Command):
 
     async def execute(self, message: Message):
         channel_id = message['channel_id']
+        if message['content'].strip() == '!status error':
+            raise RuntimeError('Intentional test error for admin channel logging')
         await self.send_message(channel_id, 'I am alive. 🦆')
 
 class ReportCommand(Command):
