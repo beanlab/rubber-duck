@@ -99,8 +99,6 @@ class StatusCommand(Command):
 
     async def execute(self, message: Message):
         channel_id = message['channel_id']
-        if message['content'].strip() == '!status error':
-            raise RuntimeError('Intentional test error for admin channel logging')
         await self.send_message(channel_id, 'I am alive. 🦆')
 
 class ReportCommand(Command):
@@ -132,7 +130,7 @@ class ReportCommand(Command):
                         file = discord.File(fp=image, filename=title)
                         await self.send_message(channel_id, "", file=file)
         except (Exception, SystemExit) as e:
-            duck_logger.error("Error executing report command", exc_info=True)
+            duck_logger.exception("Error executing report command")
             channel_id = message['channel_id']
             await self.send_message(channel_id, f"An error occurred while generating the report: {e}")
 
