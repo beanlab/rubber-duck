@@ -1,6 +1,5 @@
 ## Relevant File Locations
 
-- `src/metrics/csv_metrics.py`
 - `src/metrics/feedback_manager.py`
 - `src/metrics/feedback.py`
 - `src/metrics/reporter.py`
@@ -22,7 +21,7 @@
   - `HaveTAGradingConversation` collects emoji/text feedback and calls `record_feedback(...)`.
 - Storage backends:
   - `SQLMetricsHandler` is the primary runtime backend.
-  - `CSVMetricsHandler` is a file-based alternative utility.
+  - Legacy `CSVMetricsHandler` has been archived at `archive/metrics/csv_metrics.py` and is not wired into runtime.
 
 ## Feedback Review Flow
 
