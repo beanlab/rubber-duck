@@ -28,6 +28,18 @@
 - `SqlBlobStorage` stores workflow blobs in `records` table keyed by namespace + key.
 - Each workflow history uses its own SQL blob namespace (`wid`).
 
+## Local Storage Fork Notes
+
+- The repository currently has two `SqlBlobStorage` implementations in active runtime paths:
+  - `src/storage/sql_quest.py::SqlBlobStorage` (used by `create_sql_manager(...)`)
+  - `quest.extras.sql.SqlBlobStorage` (imported in `src/main.py` for feedback queues)
+- The local implementation in `src/storage/sql_quest.py` is kept intentionally for workflow-manager paths because it
+  updates records by `(name, key)` and aligns with this project's queue/history keying model.
+- Migration to a single upstream storage implementation should only happen after all of the following are true:
+  - upstream write/update semantics are verified equivalent for `(name, key)` behavior used by this project
+  - a regression test exists that covers multiple keys under a shared namespace
+  - workflow history and queue persistence are both validated against the same storage backend
+
 ## Metrics Persistence
 
 - `SQLMetricsHandler` defines and creates SQL tables:
