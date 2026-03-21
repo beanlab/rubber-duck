@@ -5,31 +5,6 @@ description: |
   If you are asked to navigate multiple subsystems or make cross-module changes, load this skill.
 ---
 
-## Relevant File Locations
-
-- `src/main.py`
-- `src/rubber_duck_app.py`
-- `src/duck_orchestrator.py`
-- `src/armory/`
-- `src/gen_ai/`
-- `src/conversation/`
-- `src/workflows/`
-- `src/commands/`
-- `src/metrics/`
-- `src/storage/`
-- `src/utils/`
-
-## Runtime Entry Flow
-
-- `src/main.py` is the composition root:
-  - loads config
-  - builds SQL/session-backed services
-  - constructs armory + AI client + ducks
-  - sets up workflow manager and Discord bot runtime
-- `DiscordBot` forwards inbound Discord events to `RubberDuckApp`.
-- `RubberDuckApp` routes messages/reactions into workflow types (`command`, `duck-orchestrator`, or existing thread workflow).
-- `DuckOrchestrator` creates thread context and dispatches to channel-specific duck workflows/conversations.
-
 ## Source Area Map
 
 - `armory/`: tool registration, schemas, talk tools, and tool caching.
@@ -41,3 +16,18 @@ description: |
 - `storage/`: SQL session setup and persistence adapters for workflow + metrics data.
 - `utils/`: shared infra (config loading, types/protocols, logging, queues, containers, schedulers).
 - `tests/`: repository test modules.
+
+**When working within any of these modules, load their respective `DOCS.md` file for more detailed descriptions of how
+to work with their contents.**
+
+## Runtime Entry Flow
+
+- `src/main.py` is the composition root:
+    - loads config
+    - builds SQL/session-backed services
+    - constructs armory + AI client + ducks
+    - sets up workflow manager and Discord bot runtime
+- `DiscordBot` forwards inbound Discord events to `RubberDuckApp`.
+- `RubberDuckApp` routes messages/reactions into workflow types (`command`, `duck-orchestrator`, or existing thread
+  workflow).
+- `DuckOrchestrator` creates thread context and dispatches to channel-specific duck workflows/conversations.
