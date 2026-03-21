@@ -18,7 +18,14 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 ## Workflow
 
 1. Load `spring-cleaning/identify-weak-points` role to collect structural and hygiene findings.
-2. Load `dev-assistance` to apply and verify changes suggested by the agent spawned in step 1.
+2. Wait for the spawned agent
+3. Explain the found weaknesses and potential fixes to the user.
+4. Load `dev-assistance`
+5. Implement one change at a time. After each one:
+    - Explain to the user why that change is important.
+    - Suggest a commit message.
+    - Wait for confirmation.
+    - Repeat for the rest of the changes
 
 ## Guardrails
 
