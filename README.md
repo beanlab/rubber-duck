@@ -24,9 +24,12 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `src/armory/`: tool registration, Python tool execution, and caching
 - `src/storage/` + `src/metrics/`: SQL persistence and reporting
 - `prompts/`: prompt assets used by configured ducks/agents
+- `prompts/archive/`: legacy and unreferenced prompt assets kept for historical reference
 - `rubrics/`: grading rubrics for assignment feedback workflows
+- `rubrics/examples/`: non-runtime rubric examples and demos
 - `datasets/`: local datasets staged into container tools
 - `docs/`: getting started and deployment docs
+- `scripts/`: developer utility scripts (including metadata generation)
 
 ### Prerequisites
 
@@ -75,6 +78,11 @@ CI/CD is defined in `.github/workflows/ci-cd.yml`.
 - [Getting Started](docs/getting-started.md)
 - [Deployment Guide](docs/deployment.md)
 - Archived legacy docs: `docs/old/`
+
+## Developer Utilities
+
+- `./cdx`: helper launcher script for local developer workflows.
+- `scripts/generate_metadata.py`: generates dataset metadata artifacts.
 
 ## License
 

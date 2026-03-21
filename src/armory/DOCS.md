@@ -5,7 +5,6 @@
 - `src/armory/python_tools.py`
 - `src/armory/talk_tool.py`
 - `src/armory/tool_cache.py`
-- `src/armory/cache.py`
 
 ## Core Responsibilities
 

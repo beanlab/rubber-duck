@@ -14,6 +14,7 @@ myConfig.json
 
 scratch/suites/.DS_Store
 rubberduckdb
+rubber-duck_results.html
 
 scratch/secrets.env
 github_secrets.txt

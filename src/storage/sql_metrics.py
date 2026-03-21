@@ -142,6 +142,10 @@ class SQLMetricsHandler:
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)
 
+    # Backward-compatibility alias for callers using the older singular name.
+    def get_message(self):
+        return self.get_messages()
+
     def get_usage(self):
         return self.sql_model_to_data_list(UsageModel)
 

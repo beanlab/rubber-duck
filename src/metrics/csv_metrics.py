@@ -68,6 +68,10 @@ class CSVMetricsHandler:
         df = pd.read_csv(self._messages_file)
         return df
 
+    # Backward-compatibility alias for callers using the newer plural name.
+    def get_messages(self):
+        return self.get_message()
+
     def get_usage(self):
         df = pd.read_csv(self._usage_file)
         return df
