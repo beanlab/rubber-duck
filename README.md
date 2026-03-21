@@ -30,6 +30,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `datasets/`: local datasets staged into container tools
 - `docs/`: getting started and deployment docs
 - `scripts/`: developer utility scripts (including metadata generation)
+- `archive/`: non-runtime historical and scratch artifacts kept for reference
 
 ### Prerequisites
 
