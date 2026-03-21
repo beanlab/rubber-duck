@@ -17,7 +17,7 @@ description: |
 - `utils/`: shared infra (config loading, types/protocols, logging, queues, containers, schedulers).
 - `tests/`: repository test modules.
 
-**When working within any of these modules, load their respective `_DOCS.md` file for more detailed descriptions of how
+**When working within any of these modules, load their respective `DOCS.md` file for more detailed descriptions of how
 to work with their contents.**
 
 ## Runtime Entry Flow

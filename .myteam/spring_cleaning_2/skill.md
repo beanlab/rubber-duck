@@ -17,11 +17,8 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 
 ## Workflow
 
-Work in three phases in order:
-
-1. Load `spring_cleaning_2/identify_weak_points` to collect structural and hygiene findings.
-2. Load `spring_cleaning_2/plan_fixes` to produce a prioritized, low-risk cleanup plan.
-3. Load `dev-assistance` to apply and verify approved cleanup changes.
+1. Load `spring_cleaning_2/identify_weak_points` role to collect structural and hygiene findings.
+2. Load `dev-assistance` to apply and verify changes suggested by the agent spawned in step 1.
 
 ## Guardrails
 
@@ -29,17 +26,6 @@ Work in three phases in order:
 - Prefer incremental edits over broad rewrites.
 - For removals, require evidence of unused status (search references, runtime wiring, tests, or config usage).
 - If a cleanup action has uncertainty or behavior risk, surface it explicitly and keep it out of the default fix set.
-- When files/modules are moved or ownership boundaries change, update both source and destination directory `_DOCS.md`
+- When files/modules are moved or ownership boundaries change, update both source and destination directory `DOCS.md`
   files in the same cleanup batch.
-- Treat `_DOCS.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
-
-## Delegation
-
-Delegation is optional. Use `spawn-agent` for bounded subtasks (for example subsystem-specific audits), but a single
-agent can execute all phases when appropriate.
-
-## Deliverables
-
-- A severity-ranked findings list with file paths and evidence.
-- A prioritized cleanup plan with acceptance criteria.
-- Verification output showing cleanup changes are feature-neutral and validated.
+- Treat `DOCS.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
