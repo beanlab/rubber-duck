@@ -76,10 +76,9 @@ class RegistrationWorkflow:
                     f"Please finish the registration process for this user given the current progress: {user_query}"
                 )
             else:
-                self._send_message(
+                await self._send_message(
                     context.thread_id,
                     "Registration bot hasn't been set up. Please contact an administrator."
                 )
-
 
 
