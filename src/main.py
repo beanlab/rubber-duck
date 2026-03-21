@@ -317,7 +317,7 @@ def build_armory(
     return armory, talk_tool, tool_caches
 
 
-def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
+def _setup_cache_cleaner(tool_caches: list[ToolCache], cache_settings: dict | None = None) -> CacheCleaner:
     unique_tool_caches: list[ToolCache] = []
     seen_cache_ids: set[int] = set()
     for tool_cache in tool_caches:
@@ -327,7 +327,7 @@ def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
             unique_tool_caches.append(tool_cache)
     cc = None
     if unique_tool_caches:
-        cache_settings = config.get("cache", {})
+        cache_settings = cache_settings or {}
         cleanup_hour = cache_settings.get("cleanup_hour", 3)
         cleanup_minute = cache_settings.get("cleanup_minute", 0)
         cc = CacheCleaner(
@@ -424,7 +424,7 @@ async def _main(config: Config, log_dir: Path):
                         tasks.append(notifier.start())
 
                     if tool_caches:
-                        cleaner = _setup_cache_cleaner(tool_caches)
+                        cleaner = _setup_cache_cleaner(tool_caches, config.get("cache", {}))
                         tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)
