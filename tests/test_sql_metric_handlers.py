@@ -1,19 +1,7 @@
 import asyncio
-import sys
-import types
-import logging
-from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-quest_mod = types.ModuleType("quest")
-quest_utils_mod = types.ModuleType("quest.utils")
-quest_utils_mod.quest_logger = logging.getLogger("quest")
-quest_mod.utils = quest_utils_mod
-sys.modules.setdefault("quest", quest_mod)
-sys.modules.setdefault("quest.utils", quest_utils_mod)
 
 from src.storage.sql_metrics import SQLMetricsHandler
 

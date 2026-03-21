@@ -16,9 +16,9 @@ It is organized by subsystem so each folder has a clear ownership boundary.
 - `storage/`: SQL/session setup and persistence handlers.
 - `utils/`: Shared infrastructure helpers (config, logging, queueing, execution helpers).
 - `workflows/`: Multi-step product workflows (registration, assignment feedback).
-- `tests/`: Targeted runtime tests (currently minimal coverage).
 
 Each subsystem has its own `DOCS.md` with implementation details.
+Top-level `tests/` contains test modules, and `archive/` contains non-runtime historical assets.
 
 ## End-to-End Runtime Flow
 
@@ -38,6 +38,6 @@ Each subsystem has its own `DOCS.md` with implementation details.
 
 ## Potential Weak Points
 
-- Test coverage is narrow (`src/tests/` is not yet representative of all subsystems).
+- Test coverage is narrow (`tests/` is not yet representative of all subsystems).
 - `main.py` has broad wiring responsibilities and can accumulate orchestration complexity.
 - Some subsystem docs may drift as runtime wiring evolves; reconcile these docs when moving responsibilities.

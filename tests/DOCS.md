@@ -1,6 +1,6 @@
 ## Relevant File Locations
 
-- `src/tests/test_sql_metric_handlers.py`
+- `tests/test_sql_metric_handlers.py`
 - `src/storage/sql_metrics.py`
 - `src/main.py`
 
