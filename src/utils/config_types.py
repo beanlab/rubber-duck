@@ -50,10 +50,8 @@ class RegistrationSettings(TypedDict):
     email_domain: str
     # This is the domain used for email verification. For example, 'byu.edu'.
     roles: RolesSettings
-    # Registration email sender is sourced from top-level config['sender_email'] in main wiring.
-    sender_email: NotRequired[str]
     max_retries: NotRequired[int]
-    registration_bot: NotRequired[str]
+    registration_bot: str
     ta_channel_id: int
 
 

@@ -94,8 +94,7 @@ def build_conversation_review_duck(
 def build_registration_duck(
         name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
-    registration_bot = armory.get_specific_tool(settings['registration_bot']) if settings.get(
-        'registration_bot') else None
+    registration_bot = armory.get_specific_tool(settings['registration_bot'])
 
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -107,7 +106,7 @@ def build_registration_duck(
         settings
     )
     armory.scrub_tools(registration)
-    registration_workflow = RegistrationWorkflow(name, registration, registration_bot, bot.send_message)
+    registration_workflow = RegistrationWorkflow(name, registration, registration_bot)
 
     return registration_workflow
 
