@@ -94,8 +94,7 @@ def build_conversation_review_duck(
 def build_registration_duck(
         name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
 ):
-    registration_bot = armory.get_specific_tool(settings['registration_bot']) if settings.get(
-        'registration_bot') else None
+    registration_bot = armory.get_specific_tool(settings['registration_bot'])
 
     email_confirmation = EmailSender(config['sender_email'])
 
@@ -107,7 +106,7 @@ def build_registration_duck(
         settings
     )
     armory.scrub_tools(registration)
-    registration_workflow = RegistrationWorkflow(name, registration, registration_bot, bot.send_message)
+    registration_workflow = RegistrationWorkflow(name, registration, registration_bot)
 
     return registration_workflow
 
@@ -317,7 +316,7 @@ def build_armory(
     return armory, talk_tool, tool_caches
 
 
-def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
+def _setup_cache_cleaner(tool_caches: list[ToolCache], cache_settings: dict | None = None) -> CacheCleaner:
     unique_tool_caches: list[ToolCache] = []
     seen_cache_ids: set[int] = set()
     for tool_cache in tool_caches:
@@ -327,7 +326,7 @@ def _setup_cache_cleaner(tool_caches: list[ToolCache]) -> CacheCleaner:
             unique_tool_caches.append(tool_cache)
     cc = None
     if unique_tool_caches:
-        cache_settings = config.get("cache", {})
+        cache_settings = cache_settings or {}
         cleanup_hour = cache_settings.get("cleanup_hour", 3)
         cleanup_minute = cache_settings.get("cleanup_minute", 0)
         cc = CacheCleaner(
@@ -424,7 +423,7 @@ async def _main(config: Config, log_dir: Path):
                         tasks.append(notifier.start())
 
                     if tool_caches:
-                        cleaner = _setup_cache_cleaner(tool_caches)
+                        cleaner = _setup_cache_cleaner(tool_caches, config.get("cache", {}))
                         tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)

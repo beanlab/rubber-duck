@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparison Report</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            flex-direction: column;
+            font-family: monospace, sans-serif;
+            line-height: 1.4;
+            background-color: #f9f9f9;
+            color: rgb(0, 46, 93);
+        }
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        header, footer {
+            background-color: rgb(0, 46, 93);
+            color: white;
+            text-align: center;
+        }
+        header h1, footer p {
+            margin: 0;
+            padding: 5px 0;
+        }
+        header {
+            margin-bottom: 10px;
+        }
+        footer {
+            margin-top: 10px;
+        }
+        h2 {
+            padding: 5px 0;
+        }
+        .test-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 50px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+        .content-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+        .test-result-passed, .test-result-failed {
+            padding: 5px;
+            border-radius: 5px;
+            margin: 10px 50px;
+            position: relative;
+        }
+        .test-result-passed {
+            background-color: #d4edda;
+            border: 2px solid #c3e6cb;
+        }
+        .test-result-failed {
+            background-color: #f8d7da;
+            border: 2px solid #f5c6cb;
+        }
+        .result-header {
+            text-align: center;
+        }
+        .result-header h2 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+        .result-subheader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+            font-size: 1em;
+            padding: 0 10px;
+        }
+        .result-subheader .status, .result-subheader .score {
+            font-size: 1em;
+        }
+        .result-subheader .status h2, .result-subheader .score h2 {
+            display: inline;
+            font-size: 1em;
+            margin-right: 5px;
+        }
+        .comparison-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 0 10px;
+
+        }
+        @media (max-width: 1500px) {
+            .comparison-container {
+                flex-direction: column;
+            }
+        }
+        .section {
+            flex: 1;
+            min-width: 400px;
+        }
+        .section strong {
+            font-size: 1em;
+        }
+        .content {
+            background: rgb(245, 245, 245);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        .test-info {
+            margin: 5px 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <header>
+            <h1>Test Sql Metric Handlers Results</h1>
+        </header>
+        <main class="main-content">
+            <div class="test-summary">
+                <span>Passed: 3 / 3</span>
+                <span>Total Score: 0 / 0</span>
+            </div>
+            
+            
+            <div class="test-result-passed">
+                <div class="content-wrapper">
+                    <div class="result-header">
+                        <h2>Test Messages Table</h2>
+                        <div class="result-subheader">
+                            <div class="status">
+                                <h2>Status:</h2> Passed
+                            </div>
+                            <div class="score">
+                                <h2>Score:</h2> 0 / 0
+                            </div>
+                        </div>
+                    </div>
+                    
+                        <div class="comparison-container-empty"></div>
+                    
+                </div>
+            </div>
+            
+            <div class="test-result-passed">
+                <div class="content-wrapper">
+                    <div class="result-header">
+                        <h2>Test Usage Table</h2>
+                        <div class="result-subheader">
+                            <div class="status">
+                                <h2>Status:</h2> Passed
+                            </div>
+                            <div class="score">
+                                <h2>Score:</h2> 0 / 0
+                            </div>
+                        </div>
+                    </div>
+                    
+                        <div class="comparison-container-empty"></div>
+                    
+                </div>
+            </div>
+            
+            <div class="test-result-passed">
+                <div class="content-wrapper">
+                    <div class="result-header">
+                        <h2>Test Feedback Table</h2>
+                        <div class="result-subheader">
+                            <div class="status">
+                                <h2>Status:</h2> Passed
+                            </div>
+                            <div class="score">
+                                <h2>Score:</h2> 0 / 0
+                            </div>
+                        </div>
+                    </div>
+                    
+                        <div class="comparison-container-empty"></div>
+                    
+                </div>
+            </div>
+            
+            
+        </main>
+        <footer>
+            <p>Generated by byu_pytest_utils on March 21, 2026 04:42 PM</p>
+        </footer>
+    </div>
+</body>
+</html>
