@@ -1,7 +1,7 @@
 ---
 name: Identify Weak Points
 description: |
-  Audits repository structure and code hygiene for feature-neutral cleanup opportunities.
+  Audits repository structure and code hygiene for **feature-neutral** cleanup opportunities.
   Use this skill to find duplication, unused code, mislocated files, and maintainability gaps.
 ---
 

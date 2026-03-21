@@ -1,3 +1,4 @@
+.DS_Store
 .idea/
 /conversations/
 /local-testing-convos/
@@ -12,7 +13,6 @@ my_config.json
 myConfig.json
 
 scratch/suites/.DS_Store
-poetry.lock
 rubberduckdb
 
 scratch/secrets.env

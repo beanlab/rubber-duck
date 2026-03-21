@@ -1,4 +1,6 @@
-# Rubber Duck Discord Bot
+# Archived: Legacy Rubber Duck Discord Bot Docs
+
+This document is archived and may not reflect the current architecture or deployment flow.
 
 ## Usage
 The bot listens to the configured channel, currently set in the source code as `"duck-pond"`
@@ -49,4 +51,3 @@ To run on server:
 To kill on server:
 - `ps -e | python`
 - `kill <pid>`
-

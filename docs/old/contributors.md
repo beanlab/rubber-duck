@@ -1,4 +1,6 @@
-# Rubber Duck Project - Developer Documentation
+# Archived: Legacy Contributor Onboarding Docs
+
+This document is archived and may not reflect the current architecture or deployment flow.
 
 ## Introduction
 
