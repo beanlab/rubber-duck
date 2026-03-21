@@ -181,6 +181,10 @@ class LogCommand(Command):
     async def execute(self, message: Message):
         channel_id = message['channel_id']
 
+        if self.log_dir is None:
+            await self.send_message(channel_id, 'Log export disabled: no log path configured.')
+            return
+
         # Check if logs directory exists
         if not self.log_dir.exists():
             await self.send_message(channel_id, 'No logs directory found.')
