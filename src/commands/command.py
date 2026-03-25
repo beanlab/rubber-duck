@@ -129,7 +129,7 @@ class ReportCommand(Command):
                     for title, image in result:
                         file = discord.File(fp=image, filename=title)
                         await self.send_message(channel_id, "", file=file)
-        except (Exception, SystemExit) as e:
+        except Exception as e:
             duck_logger.exception("Error executing report command")
             channel_id = message['channel_id']
             await self.send_message(channel_id, f"An error occurred while generating the report: {e}")
