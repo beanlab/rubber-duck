@@ -15,6 +15,12 @@ file_type_ext:
     "css",
     "md",
   ]
+registration_defaults:
+  &registration_defaults
+  cache_timeout: 60800
+  email_domain: byu.edu
+  registration_bot: registration
+  authenticated_user_role_name: Student
 
 sql:
   db_type: sqlite
@@ -171,11 +177,8 @@ servers:
           Registration-Workflow-CS110:
             duck_type: registration
             settings:
-              cache_timeout: 60800
-              authenticated_user_role_name: Student
-              email_domain: byu.edu
+              <<: *registration_defaults
               ta_channel_id: 1413242197398126613
-              registration_bot: registration
               roles:
                 patterns:
                   Teacher Sections:
@@ -185,7 +188,7 @@ servers:
   CS Faculty:
     server_id: 911014551263268916
     channels:
-      Duck Pond:
+      duck-pond:
         channel_id: 1146906576788140154
         timeout: 600
         duck:
@@ -222,9 +225,7 @@ servers:
           Registration-Workflow-CS235:
             duck_type: registration
             settings:
-              cache_timeout: 60800
-              authenticated_user_role_name: Student
-              email_domain: byu.edu
+              <<: *registration_defaults
               roles:
                 patterns:
                   Teacher Sections:
@@ -240,9 +241,7 @@ servers:
           Registration-Workflow-CS301R-Agents:
             duck_type: registration
             settings:
-              cache_timeout: 60800
-              authenticated_user_role_name: Student
-              email_domain: byu.edu
+              <<: *registration_defaults
               roles:
                 patterns: { }
 
@@ -259,7 +258,7 @@ servers:
               target_channel_ids:
                 - 1406039546721730582
 
-      Student Text Channels/duck-pond:
+      student-text-channels/duck-pond:
         channel_id: 1406039546721730582
         timeout: 600
         duck:
@@ -275,11 +274,10 @@ servers:
           Registration-Workflow-CS312:
             duck_type: registration
             settings:
-              cache_timeout: 60800
+              <<: *registration_defaults
+              # Must match the exact Discord role name in this server.
               authenticated_user_role_name: student
-              email_domain: byu.edu
               ta_channel_id: 1413242407566315550
-              registration_bot: registration
               roles:
                 patterns:
                   Lecture-Sections:
@@ -423,12 +421,8 @@ servers:
           Registration-Workflow-Stats:
             duck_type: registration
             settings:
-              cache_timeout: 60800
-              authenticated_user_role_name: Student
-              email_domain: byu.edu
-              sender_email: byu-cs-course-ops@cs.byu.edu
+              <<: *registration_defaults
               ta_channel_id: 1371951756149260298
-              registration_bot: registration
       stats-gpt:
         channel_id: 1371951696061661215
         timeout: 600
@@ -492,9 +486,9 @@ servers:
                 - 1338616283671040000
       standard-duck:
         channel_id: 1338616283671040000
+        timeout: 600
         duck:
           standard-rubber-duck
-        timeout: 600
 
       emoji-duck:
         channel_id: 1401960218870419647
@@ -557,11 +551,9 @@ servers:
           Registration-Workflow-Demo:
             duck_type: registration
             settings:
-              cache_timeout: 60800
+              <<: *registration_defaults
               authenticated_user_role_name: I-passed-registration
               ta_channel_id: 1379965339428720700
-              registration_bot: registration
-              email_domain: byu.edu
               roles:
                 patterns:
                   Teacher Sections:

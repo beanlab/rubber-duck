@@ -5,12 +5,12 @@
 # add `../configs/` in front of each of the include paths
 
 # include one duck without overrides ($include doesn't copy in the key)
-ducks:
+one-duck:
   standard-rubber-duck:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
 
 # override usage
-ducks:
+override-duck:
   standard-rubber-duck:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
     settings:
@@ -18,7 +18,7 @@ ducks:
         engine: gpt-5-nano
 
 # include all ducks with example override
-ducks:
+all-ducks:
   $include: "production-config.yaml@$.ducks"
   standard-rubber-duck:
     settings:
@@ -26,23 +26,23 @@ ducks:
         engine: gpt-5-nano
 
 # include multiple specific ducks
-ducks:
+multiple-ducks:
   standard-rubber-duck:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
   stats-duck:
     $include: "production-config.yaml@$.ducks.stats-duck"
 
 # multiple includes are also supported (the second include can override a portion of the first
-ducks:
+multiple-includes:
   standard-rubber-duck:
     $include_0: "production-config.yaml@$.ducks.standard-rubber-duck"
     $include_1: "production-config.yaml@$.ducks.stats-duck"
 
 # including strings also works, but there can't be any additional keys below the $include key
-sender_email:
+string-include:
   $include: "production-config.yaml@$.sender_email"
 
-# STARTER CONFIG TEMPLATE
+# ========== STARTER CONFIG TEMPLATE ========== #
 
 sql:
   db_type: sqlite
@@ -77,3 +77,5 @@ ai_completion_retry_protocol:
 
 reporter_settings:
   $include: "production-config.yaml@$.reporter_settings"
+
+# ============================================== #

@@ -86,6 +86,7 @@ class SQLMetricsHandler:
             self.session.add(new_message_row)
             self.session.commit()
         except Exception:
+            self.session.rollback()
             duck_logger.exception("Failed to record message metrics")
 
     async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
@@ -103,6 +104,7 @@ class SQLMetricsHandler:
             self.session.add(new_usage_row)
             self.session.commit()
         except Exception:
+            self.session.rollback()
             duck_logger.exception("Failed to record usage metrics")
 
     async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
@@ -121,6 +123,7 @@ class SQLMetricsHandler:
             self.session.add(new_feedback_row)
             self.session.commit()
         except Exception:
+            self.session.rollback()
             duck_logger.exception("Failed to record feedback metrics")
 
     def sql_model_to_data_list(self, table_model):
@@ -141,6 +144,10 @@ class SQLMetricsHandler:
 
     def get_messages(self):
         return self.sql_model_to_data_list(MessagesModel)
+
+    # Backward-compatibility alias for callers using the older singular name.
+    def get_message(self):
+        return self.get_messages()
 
     def get_usage(self):
         return self.sql_model_to_data_list(UsageModel)
