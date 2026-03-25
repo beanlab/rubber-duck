@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_myteam_root, list_roles, list_skills, list_tools
+from myteam.utils import print_instructions, get_active_myteam_root, list_roles, list_skills, list_tools
 
 
 def _print_tree(root: Path, *, max_depth: int = 3, max_entries_per_dir: int = 30) -> None:
@@ -44,7 +44,7 @@ def _print_tree(root: Path, *, max_depth: int = 3, max_entries_per_dir: int = 30
 def main() -> int:
     base = Path(__file__).resolve().parent  # .myteam/<role>
     print_instructions(base)
-    myteam = get_myteam_root(base)
+    myteam = get_active_myteam_root(base)
 
     src_root = myteam.parent / 'src'
     prompts_root = myteam.parent / 'prompts'
