@@ -299,6 +299,20 @@ class CacheCommand(Command):
             self.tool_caches.append(cache)
 
     @staticmethod
+    def _cache_source(cache: ToolCache) -> str:
+        source = getattr(cache, "_cache_source", None)
+        if source:
+            return str(source)
+        return "unknown"
+
+    @staticmethod
+    def _cache_identifier(index: int, cache: ToolCache) -> str:
+        source = CacheCommand._cache_source(cache)
+        if source != "unknown":
+            return source
+        return str(index)
+
+    @staticmethod
     def _format_cache_key_for_summary(raw_key: str) -> str:
         try:
             parsed = json.loads(raw_key)
@@ -395,7 +409,8 @@ class CacheCommand(Command):
 
             await self.send_message(
                 channel_id,
-                f"Removed cache entry `{entry_index}` from cache `{cache_index}`.",
+                f"Removed cache entry `{entry_index}` from cache "
+                f"`{type(cache).__name__}#{self._cache_identifier(cache_index, cache)}`.",
             )
             return
 
@@ -422,19 +437,26 @@ class CacheCommand(Command):
         total_entries = 0
         all_rows: list[dict] = []
 
-        cache_reports: list[tuple[int, str, list[dict]]] = []
+        cache_reports: list[tuple[int, str, str, list[dict]]] = []
         for index, cache in enumerate(self.tool_caches, start=1):
             backend = type(cache).__name__
+            cache_identifier = self._cache_identifier(index, cache)
             entries = cache.list_entries()
             total_entries += len(entries)
             if not entries:
                 continue
 
             found_entries = True
-            cache_reports.append((index, backend, entries))
+            cache_reports.append((index, backend, cache_identifier, entries))
             all_rows.extend(
                 [
-                    {"cache_backend": backend, "cache_index": index, "entry_index": entry_index, **entry}
+                    {
+                        "cache_backend": backend,
+                        "cache_identifier": cache_identifier,
+                        "cache_index": index,
+                        "entry_index": entry_index,
+                        **entry,
+                    }
                     for entry_index, entry in enumerate(entries, start=1)
                 ]
             )
@@ -449,14 +471,15 @@ class CacheCommand(Command):
             f"across {len(self.tool_caches)} cache(s). Showing top 5 per cache below.",
         )
 
-        for index, backend, entries in cache_reports:
+        for index, backend, cache_identifier, entries in cache_reports:
             top_entries = entries[:5]
             key_lines = [
                 f"- {entry_idx} - {self._format_cache_key_for_summary(entry['key'])}"
                 for entry_idx, entry in enumerate(top_entries, start=1)
             ]
             summary_message = (
-                f"## Cache: `{backend}#{index}`\n"
+                f"## Cache: `{backend}#{cache_identifier}`\n"
+                f"Cache index: `{index}`\n"
                 f"Total entries: {len(entries)}\n"
                 "### Keys:\n"
                 f"{'\n'.join(key_lines)}\n"
