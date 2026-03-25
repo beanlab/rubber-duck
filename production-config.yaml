@@ -162,7 +162,7 @@ servers:
             duck_type: conversation_review
             settings:
               target_channel_ids:
-                - 1234556460453597276
+                - 1457781730202095616
 
       general/duck-pond:
         channel_id: 1457781730202095616
