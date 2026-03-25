@@ -16,7 +16,7 @@ Use this skill when creating or editing `DOCS.md`.
 
 ## Recommended Section Menu
 
-- `Purpose`: why this module exists and what it should not own.
+- `Purpose`: why this module exists and what it achieves.
 - `Operational Flow`: entry points and behavior sequence.
 - `Boundaries`: ownership lines and out-of-scope responsibilities.
 - `Dependencies`: only high-impact dependencies that affect correctness.
@@ -24,7 +24,6 @@ Use this skill when creating or editing `DOCS.md`.
 
 ## Concision Guardrails
 
-- Treat length caps as upper bounds, not targets.
 - Prefer short bullets over prose blocks.
 - Do not pad sections to satisfy structure.
 - Avoid repeating details already clear from code unless they prevent mistakes.

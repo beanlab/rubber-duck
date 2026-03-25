@@ -25,7 +25,6 @@ Sections are optional. Include only sections that add unique information for the
 
 ## Brevity Principles
 
-- Caps are maximums, never minimums.
 - Keep sections as short as possible while preserving correctness.
 - Prefer short bullets over paragraphs.
 - If sections overlap, merge or remove the weaker one.
