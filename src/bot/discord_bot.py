@@ -97,8 +97,8 @@ class DiscordBot(discord.Client):
 
         try:
             await self.send_message(self._admin_channel, 'Duck online')
-        except:
-            duck_logger.error(f'Unable to message channel {self._admin_channel}')
+        except Exception:
+            duck_logger.exception(f'Unable to message channel {self._admin_channel}')
 
         duck_logger.info('------')
 
@@ -182,8 +182,8 @@ class DiscordBot(discord.Client):
         try:
             msg = await channel.fetch_message(message_id)
             await msg.edit(content=new_content)
-        except Exception as e:
-            duck_logger.error(f"Could not edit message {message_id} in channel {channel_id}: {e}")
+        except Exception:
+            duck_logger.exception(f"Could not edit message {message_id} in channel {channel_id}")
 
     async def add_reaction(self, channel_id: int, message_id: int, reaction: str):
         message = await (await self.fetch_channel(channel_id)).fetch_message(message_id)
