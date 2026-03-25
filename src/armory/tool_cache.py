@@ -265,7 +265,7 @@ class SqlToolCache(ToolCache):
         with self._session_factory() as session:
             record = session.get(ToolCacheRecord, key)
             if record is None:
-                duck_logger.error(f"Key {key} not in cache")
+                duck_logger.warning(f"Key {key} not in cache")
                 return {}
 
             now = self._utc_now()
@@ -446,6 +446,6 @@ class SemanticCacheKeyBuilder:
             }
 
             return CacheKey.model_validate(data)
-        except Exception as exc:
-            duck_logger.error(exc)
+        except Exception:
+            duck_logger.exception("Failed to build semantic cache key")
             raise

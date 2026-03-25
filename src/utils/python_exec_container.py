@@ -42,7 +42,7 @@ class PythonExecContainer:
             # optionally test connection immediately
             self._client.ping()
         except Exception as e:
-            duck_logger.error(f"Error connecting to docker client, make sure Docker is running: {e}")
+            duck_logger.exception("Error connecting to docker client, make sure Docker is running")
             raise RuntimeError(
                 f"Cannot connect to Docker daemon. Make sure Docker is running. "
                 f"Original error: {e}"
