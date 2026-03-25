@@ -23,7 +23,7 @@
 ## Config and Type Contracts
 
 - `config_loader.py` loads local/S3 config files and resolves `$include` directives with deep merge and JSONPath support.
-- `config_types.py` defines TypedDict/dataclass contracts for top-level config, ducks, channels, containers, cache, and reporter settings.
+- `config_types.py` defines TypedDict/dataclass contracts for top-level config, ducks, channels, containers, per-tool cache settings (`tools.<name>.cache`), cache cleanup settings (`cache_cleanup_settings`), and reporter settings.
 - `protocols.py` defines shared interfaces (`SendMessage`, `AddReaction`, `ToolCache`, `CacheKeyBuilder`, etc.) used across modules.
 
 ## Logging and Queue Utilities

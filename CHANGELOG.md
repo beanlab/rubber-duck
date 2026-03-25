@@ -2,7 +2,7 @@
 
 All notable changes in this repository are documented here.
 
-## spring-cleaning-test (2026-03-25T09:22:33-06:00)
+## spring-cleaning-test (2026-03-25T12:38:40-06:00)
 
 ### Added
 - Introduced repository cleanup automation via `.myteam/spring-cleaning` skill and nested role/task loaders.
@@ -17,6 +17,10 @@ All notable changes in this repository are documented here.
 - Updated local config examples to avoid duplicate top-level keys and improve include usage clarity.
 - Updated lockfile and myteam dependency resolution metadata in `poetry.lock`.
 - Updated docs across moved/archived areas to reflect current structure and ownership.
+- Moved cache configuration to tool-level settings under `tools.<name>.cache` for `container_exec` tools.
+- Renamed top-level cache cleanup config to `cache_cleanup_settings`.
+- Updated cache command output to identify caches by tool source (`<backend>#<tool_name>`) while preserving index-based removal commands.
+- Made semantic caching optional per `container_exec` tool and disabled caching for `run_cs_analysis` in production config.
 
 ### Fixed
 - Prevented `!log` command failures when log path is not configured.
