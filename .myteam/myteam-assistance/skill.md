@@ -1,46 +1,35 @@
 ---
-name: Myteam Assistance
-description: |
-  Instructions for working with the local myteam setup in this repository.
-  Use this skill when creating, editing, debugging, or documenting `.myteam` roles and skills for the rubber-duck project.
+name: "myteam-assistance"
+description: "Manage myteam architecture and authoring decisions. Use when asked to create, update, remove, or reorganize roles/skills, decide top-level vs nested placement, or standardize team-management workflows in this repo."
 ---
 
-This project keeps a repository-local myteam directory at `.myteam/`.
+Use this skill as the entry point for `myteam` structure work.
 
-## Local Myteam Structure
+Shared structure rules:
+- Use the `myteam` CLI to scaffold new roles and skills before editing them.
+- Keep `.myteam/` focused on roles, skills, and tool entrypoints.
+- Store persistent planning artifacts in `docs/plans/`, not in `.myteam/`.
+- Prefer `role.md` and `skill.md` frontmatter as the source of truth for names
+  and descriptions.
+- Top-level roles and skills are discoverable from `myteam get role`.
+- Nested roles and skills are discoverable after loading the parent.
 
-- `.myteam/load.py`
-    - Root loader that prints instructions and lists available roles, skills, and tools.
-- `.myteam/role.md`
-    - Role-level instructions loaded by `myteam get role` when present.
-- `.myteam/<skill-name>/skill.md`
-    - Skill instructions and trigger metadata.
-- `.myteam/<skill-name>/load.py`
-    - Skill loader that prints the skill instructions and lists related roles/skills/tools.
+Grouping guidance:
+1. Use a parent skill for each broad domain when that domain may hold multiple
+   related roles or skills.
+2. Use top-level role paths only when the role is cross-domain and broadly
+   discoverable.
+3. Place workflow-specific skills under the owning domain or parent skill.
+4. Avoid flat duplicates when a grouped path is clearer.
 
-## Core Commands
+Routing:
+- For role-specific authoring, use `myteam-management/create-role`.
+- For skill-specific authoring, use `myteam-management/create-skill`.
 
-- Initialize local myteam scaffold:
-    - `myteam init`
-- Create a new role/skill under `.myteam/`:
-    - `myteam new role <role-path>`
-    - `myteam new skill <skill-path>`
-- Load role instructions:
-    - `myteam get role`
-    - `myteam get role <role>`
-- Load skill instructions:
-    - `myteam get skill <skill-path>`
-    - Example: `myteam get skill dev-assistance/config`
-
-## How It Works In This Repo
-
-- `myteam get role` and `myteam get skill ...` execute local loader scripts and print nearby markdown instructions.
-- Skill naming is hierarchical using `/` separators (for example `dev-assistance/config`).
-- Each nested skill folder is a standalone unit with its own `skill.md` and `load.py`.
-- Skill frontmatter in `skill.md` (`name` + `description`) controls discoverability and triggering context.
-
-## Authoring Guidelines
-
-- Keep `skill.md` concise and operational.
-- Every `skill.md` contains instructions meant for codex to quickly gain understanding of the project structure. 
-- Avoid placeholder text; every skill should provide actionable instructions and relevant information.
+Validation checklist:
+1. Confirm the target path is not already used or intentionally being replaced.
+2. Scaffold with `myteam new role <path>` or `myteam new skill <path>`.
+3. Replace all placeholder content in generated files that the repo still
+   chooses to keep.
+4. Remove legacy `info.md` files if they are not needed.
+5. Verify with `myteam get role <path>` or `myteam get skill <path>`.
