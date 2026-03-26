@@ -23,8 +23,8 @@ Grouping guidance:
 4. Avoid flat duplicates when a grouped path is clearer.
 
 Routing:
-- For role-specific authoring, use `myteam-management/create-role`.
-- For skill-specific authoring, use `myteam-management/create-skill`.
+- For role-specific authoring, use `myteam-assistance/create-role`.
+- For skill-specific authoring, use `myteam-assistance/create-skill`.
 
 Validation checklist:
 1. Confirm the target path is not already used or intentionally being replaced.

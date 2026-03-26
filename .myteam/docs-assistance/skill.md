@@ -1,14 +1,15 @@
 ---
 name: Docs Assistance
 description: |
-  Guidance for creating, reviewing, and updating `DOCS.md` files in this repository. When editing `DOCS.md` files, load this skill.
+  Guidance for creating, reviewing, and updating documentation in this repository. Load this skill when editing `DOCS.md`, `README.md`, `CHANGELOG.md`, or related developer-facing docs.
 ---
 
-This skill governs `DOCS.md` files only.
+This skill governs developer-facing project docs, with `DOCS.md` as the primary focus.
 
 ## Scope
 
 - Provide shared standards for concise, high-signal `DOCS.md` documentation.
+- Apply the same clarity/accuracy standard to `README.md`, `CHANGELOG.md`, and plan-adjacent docs when a workflow role requires those updates.
 - Keep docs aligned with current behavior, ownership boundaries, and runtime flow.
 - Avoid broad narrative explanations that increase context without improving decisions.
 
@@ -37,4 +38,3 @@ Sections are optional. Include only sections that add unique information for the
 - Prioritize clarity that helps future agents edit safely.
 - If sections overlap, merge or remove the weaker one.
 - Avoid file inventories unless they prevent ambiguity.
-

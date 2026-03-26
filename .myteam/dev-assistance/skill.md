@@ -1,8 +1,8 @@
 ---
 name: Dev Assistance
 description: |
-  Multi-agent software delivery workflow for feature work in the rubber-duck project.
-  Load this skill when implementing or modifying features that benefit from planning, test-first implementation, review, and docs updates.
+  Software delivery workflow for feature work in the rubber-duck project.
+  Load this skill when implementing or modifying features and choose either the full multi-agent workflow or a lightweight path based on task size/risk.
 ---
 
 This project provides AI assistants to users through chat platforms like Discord.
@@ -20,6 +20,13 @@ The prompts for these agents are in `prompts/`.
 
 ## Process
 
+1. Triage with the user before execution:
+   - Ask if they want to activate the full `dev-assistance` workflow.
+   - If yes, run the Full Workflow below.
+   - If no and the task is small/low risk, run the Lightweight Workflow below.
+
+### Full Workflow
+
 1. Call role `dev-assistance/planner`.
 2. Planner initializes `docs/plans/PLAN.md` from `docs/plans/PLAN_TEMPLATE.md`, runs multi-turn discovery with the user, updates the plan, and asks for explicit plan approval.
 3. Only after explicit user approval, spawn `dev-assistance/test-writer`.
@@ -31,7 +38,25 @@ The prompts for these agents are in `prompts/`.
 9. If review findings require changes, return to implementer (and planner when re-planning is needed), then re-run reviewer.
 10. After review passes, spawn `dev-assistance/docs-writer` to update docs.
 11. Confirm with the user that everything has been fully implemented.
-12. After user confirmation, remove `docs/plans/PLAN.md`.
+12. After user confirmation, move `docs/plans/PLAN.md` to an archive path (for example `docs/plans/archive/PLAN-<timestamp>.md`) instead of deleting it.
+
+### Lightweight Workflow (Small Changes)
+
+Use this only for small, low-risk changes where a full planning cycle would be overhead.
+
+1. Confirm with the user that lightweight mode is acceptable.
+2. Capture a short implementation note in the task response:
+   - user intent,
+   - expected behavior,
+   - affected files,
+   - quick risk check.
+3. Implement directly with these baseline best practices:
+   - keep changes minimal and scoped,
+   - preserve module boundaries and naming conventions,
+   - add/update focused tests for changed behavior,
+   - run targeted validation (`pytest` subset or equivalent),
+   - update only docs that changed behavior or usage.
+4. If scope/risk grows or ambiguity appears, stop and switch to the Full Workflow starting with `dev-assistance/planner`.
 
 ## Role Loading Guidance
 

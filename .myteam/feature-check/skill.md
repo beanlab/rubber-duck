@@ -19,7 +19,7 @@ Please go through each section below and verify that everything is ready.
 - All changed files should have consistent formatting following PEP8 style.
 - There should not be significant duplicated code.
 
-### The CHANGELOG.md and DOCS.md files should be updated
+### Relevant documentation should be updated
 
 `CHANGELOG.md`:
 
@@ -29,8 +29,9 @@ Please go through each section below and verify that everything is ready.
 
 `DOCS.md`:
 
-- Each `DOCS.md` file within each directory should be updated with the current function and structure of the code.
-  Reconcile it if they are misaligned.
+- Update only `DOCS.md` files for directories touched by the feature.
+- Reconcile each touched `DOCS.md` with current behavior and structure.
+- Do not mass-edit unrelated docs.
 
 ### All pytests should pass
 

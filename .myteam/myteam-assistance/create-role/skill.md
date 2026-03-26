@@ -23,4 +23,5 @@ Writing guidance:
 - Prefer concrete execution language over vague advice.
 - Keep descriptions in `role.md` frontmatter accurate because current `myteam`
   surfaces them directly.
-- Keep the role aligned with repository structure rules in `.myteam/role.md`.
+- Keep the role aligned with repository structure and grouping guidance from
+  `myteam-assistance/skill.md`.
