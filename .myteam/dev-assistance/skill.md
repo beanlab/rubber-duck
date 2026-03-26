@@ -36,5 +36,6 @@ The prompts for these agents are in `prompts/`.
 
 7. Update documentation to reflect the new feature and its implementation details.
 
+    - Load `docs-assistance`
     - README.md, CHANGELOG.md, DOCS.md, and any relevant code comments should be updated to provide brief and clear information about the new feature.
 
