@@ -1,8 +1,7 @@
 ---
 name: Docs Assistance
 description: |
-  Shared guidance for reading and writing `DOCS.md` files in this repository.
-  Use this skill for documentation-focused tasks and load nested read/write skills for task-specific steps.
+  Guidance for creating, reviewing, and updating `DOCS.md` files in this repository. When editing `DOCS.md` files, load this skill.
 ---
 
 This skill governs `DOCS.md` files only.
@@ -15,24 +14,27 @@ This skill governs `DOCS.md` files only.
 
 ## Section Menu (Use Only What Adds Value)
 
-- `Purpose`
-- `Operational Flow`
-- `Boundaries`
-- `Dependencies`
-- `Failure Modes and Guardrails`
+- `Purpose`: why this module exists and what it achieves.
+- `Operational Flow`: entry points and behavior sequence.
+- `Boundaries`: ownership lines and out-of-scope responsibilities.
+- `Dependencies`: only high-impact dependencies that affect correctness.
+- `Failure Modes and Guardrails`: common break points and safe-refactor notes.
 
 Sections are optional. Include only sections that add unique information for the module.
 
-## Brevity Principles
+## Writing Workflow
 
-- Keep sections as short as possible while preserving correctness.
-- Prefer short bullets over paragraphs.
+1. Confirm current behavior from code/config before writing.
+2. Remove stale bullets first.
+3. Add only unique, decision-relevant statements.
+4. Keep sections optional; skip any section that adds no value.
+
+## Concision Guardrails
+
+- Prefer short bullets over prose blocks.
+- Do not pad sections to satisfy structure.
+- Avoid repeating details already clear from code unless they prevent mistakes.
+- Prioritize clarity that helps future agents edit safely.
 - If sections overlap, merge or remove the weaker one.
 - Avoid file inventories unless they prevent ambiguity.
-
-## Workflow
-
-1. Load `docs-assistance/read` to extract current truth from existing docs and code.
-2. Load `docs-assistance/write` when creating or updating `DOCS.md`.
-3. Reconcile stale statements before adding new bullets.
 
