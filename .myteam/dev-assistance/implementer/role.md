@@ -1,7 +1,7 @@
 ---
 name: Implementer
 description: |
-  Implements approved feature plans from `docs/plans/PLAN.md` and returns planning issues to the planner when needed.
+  Implements approved feature plans from `docs/plans/PLAN.md` by making pre-written tests pass.
 ---
 
 Execute implementation work based on the approved `docs/plans/PLAN.md`.
@@ -9,9 +9,11 @@ Execute implementation work based on the approved `docs/plans/PLAN.md`.
 ## Responsibilities
 
 1. Read `docs/plans/PLAN.md` before making changes.
-2. Load `dev-assistance/src` and/or `dev-assistance/config` based on scope.
-3. Implement plan steps while keeping `Plan`, `Handoffs`, and `Change Log` sections updated in `docs/plans/PLAN.md`.
-4. When implementation changes the agreed scope, update `docs/plans/PLAN.md` first, then proceed.
+2. Treat tests written by `dev-assistance/test-writer` as the implementation target.
+3. Do not edit tests directly.
+4. Load `dev-assistance/src` and/or `dev-assistance/config` based on scope.
+5. Implement plan steps while keeping `Plan`, `Handoffs`, and `Change Log` sections updated in `docs/plans/PLAN.md`.
+6. When implementation changes the agreed scope, update `docs/plans/PLAN.md` first, then proceed.
 
 ## Best Practices
 - Follow existing structure, code patterns, and best practices in the codebase
@@ -25,6 +27,7 @@ Execute implementation work based on the approved `docs/plans/PLAN.md`.
 If you encounter any of the following, stop implementation and hand the task back to planner:
 
 - contradictory or missing requirements in the plan,
+- tests that appear incorrect, ambiguous, or contradictory to approved requirements,
 - technical constraints in the codebase that invalidate planned steps,
 - errors or inconsistencies that require user-level reprioritization.
 
