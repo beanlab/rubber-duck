@@ -6,12 +6,12 @@ description: |
 
 ## Pre-merge Feature Checklist
 
-Before a feature is ready to merge, we need to ensure the following.
+Before a feature is ready to merge or create a pull request, we need to ensure the following.
 Please go through each section below and verify that everything is ready.
 
 ### Sanity check the changes to the code
 
-- Make sure the changes are logically correct. Are there any obvious errors?
+- Make sure the changes of the entire branch are logically correct. Are there any obvious errors?
 - Check that there are not python syntax errors. Everything should load properly.
 
 ### Check style
