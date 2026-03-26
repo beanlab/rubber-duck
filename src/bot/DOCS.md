@@ -1,29 +1,20 @@
-## Relevant File Locations
+## Purpose
 
-- `src/bot/discord_bot.py`
-- `src/rubber_duck_app.py`
-- `src/main.py`
-- `src/duck_orchestrator.py`
-- `src/commands/bot_commands.py`
+`src/bot` is the Discord transport adapter. It converts Discord events into internal protocol objects and sends messages/files/reactions back to Discord.
 
-## Runtime Entry Flow
+## Operational Flow
 
-- `main._main(...)` builds `DiscordBot`, `RubberDuckApp`, and workflow manager, then starts the bot with `bot.start(os.environ['DISCORD_TOKEN'])`.
-- `DiscordBot.set_duck_app(...)` wires the bot transport to the app router.
-- `DiscordBot.on_ready(...)` sends a startup message to admin channel.
+- `DiscordBot.on_message(...)` ignores bot/self messages and `//`-prefixed messages, then forwards normalized messages to `RubberDuckApp.route_message(...)`.
+- `DiscordBot.on_reaction_add(...)` forwards reaction events to `RubberDuckApp.route_reaction(...)`.
+- `on_ready(...)` announces startup in the configured admin channel.
+- Outbound calls use `send_message(...)`, `add_reaction(...)`, `typing(...)`, and `create_thread(...)`.
 
-## Message and Reaction Routing
+## Dependencies
 
-- `DiscordBot.on_message(...)` filters bot/self messages and `//`-prefixed messages, then forwards to `RubberDuckApp.route_message(...)`.
-- `RubberDuckApp.route_message(...)` routes by channel:
-  - admin channel -> starts `command` workflow
-  - configured duck channel -> starts `duck-orchestrator` workflow
-  - existing conversation thread -> sends event into active workflow
-- `DiscordBot.on_reaction_add(...)` forwards emoji events to `RubberDuckApp.route_reaction(...)`, which maps reactions to workflow feedback events.
+- Depends on `discord.py` for transport.
+- Depends on routing logic in `src/rubber_duck_app.py`.
 
-## Discord Transport Behavior
+## Failure Modes and Guardrails
 
-- `send_message(...)` supports text, single/multiple files, and Discord views; returns created message id.
-- Long text is split by `_parse_blocks(...)` with code-fence-aware chunking.
-- Files are normalized by `_make_discord_file(...)` from tuple/dict/`discord.File`.
-- `typing(channel_id)` provides async typing context for model calls.
+- `send_message(...)` raises if text/file/view is missing or if the channel cannot be resolved.
+- Long text output is chunked with code-fence-aware splitting, so formatting-sensitive responses should still be reviewed when changing `_parse_blocks(...)`.
