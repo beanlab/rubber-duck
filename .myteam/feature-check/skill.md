@@ -6,12 +6,12 @@ description: |
 
 ## Pre-merge Feature Checklist
 
-Before a feature is ready to merge, we need to ensure the following.
+Before a feature is ready to merge or create a pull request, we need to ensure the following.
 Please go through each section below and verify that everything is ready.
 
 ### Sanity check the changes to the code
 
-- Make sure the changes are logically correct. Are there any obvious errors?
+- Make sure the changes of the entire branch are logically correct. Are there any obvious errors?
 - Check that there are not python syntax errors. Everything should load properly.
 
 ### Check style
@@ -19,7 +19,7 @@ Please go through each section below and verify that everything is ready.
 - All changed files should have consistent formatting following PEP8 style.
 - There should not be significant duplicated code.
 
-### The CHANGELOG.md and DOCS.md files should be updated
+### Relevant documentation should be updated
 
 `CHANGELOG.md`:
 
@@ -29,8 +29,9 @@ Please go through each section below and verify that everything is ready.
 
 `DOCS.md`:
 
-- Each `DOCS.md` file within each directory should be updated with the current function and structure of the code.
-  Reconcile it if they are misaligned.
+- Update only `DOCS.md` files for directories touched by the feature.
+- Reconcile each touched `DOCS.md` with current behavior and structure.
+- Do not mass-edit unrelated docs.
 
 ### All pytests should pass
 

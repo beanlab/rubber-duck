@@ -1,40 +1,23 @@
-## Relevant File Locations
+## Purpose
 
-- `src/utils/config_loader.py`
-- `src/utils/config_types.py`
-- `src/utils/protocols.py`
-- `src/utils/logger.py`
-- `src/utils/persistent_queue.py`
-- `src/utils/cache_cleaner.py`
-- `src/utils/feedback_notifier.py`
-- `src/utils/python_exec_container.py`
-- `src/utils/resource_staging.py`
-- `src/utils/zip_utils.py`
+`src/utils` contains shared infrastructure used across runtime subsystems.
 
-## Runtime Entry Flow
+## Operational Flow
 
-- `main.py` depends on utils for:
-  - config load + typed config contracts
-  - logging and log forwarding to admin channel
-  - persistent feedback queues
-  - containerized code execution resources
-  - background schedulers (cache cleaner, feedback notifier)
+- `config_loader.py` loads local/S3 JSON/YAML config and resolves recursive `$include` directives with deep-merge + JSONPath support.
+- `logger.py` sets structured log formatting and optional admin-channel log forwarding.
+- `persistent_queue.py` provides context-managed queue persistence backed by blob storage.
+- `python_exec_container.py` manages Docker container lifecycle, resource staging, code execution, and artifact extraction.
+- `cache_cleaner.py` and `feedback_notifier.py` run scheduled maintenance/notification loops.
+- `zip_utils.py` exports table-like data as zipped CSV for command responses.
 
-## Config and Type Contracts
+## Boundaries
 
-- `config_loader.py` loads local/S3 config files and resolves `$include` directives with deep merge and JSONPath support.
-- `config_types.py` defines TypedDict/dataclass contracts for top-level config, ducks, channels, containers, cache, and reporter settings.
-- `protocols.py` defines shared interfaces (`SendMessage`, `AddReaction`, `ToolCache`, `CacheKeyBuilder`, etc.) used across modules.
+- Utility modules should remain reusable and avoid owning product workflow decisions.
+- Runtime orchestration and dependency assembly belong in `main.py`, not utility modules.
 
-## Logging and Queue Utilities
+## Failure Modes and Guardrails
 
-- `logger.py` configures `duck_logger`/`quest_logger`, file+console handlers, and async admin-channel log forwarding.
-- `persistent_queue.py` provides SQL/blob-backed queue semantics (`put`, `pop`, persistence on context exit).
-- `zip_utils.py` converts table-like data into zipped CSV payloads used by command outputs.
-
-## Execution and Scheduling Utilities
-
-- `python_exec_container.py` manages Docker container lifecycle, resource staging, isolated code execution, and output file extraction.
-- `resource_staging.py` handles local/S3 dataset metadata and bytes retrieval for container resources.
-- `cache_cleaner.py` schedules daily `ToolCache.cleanup()` runs.
-- `feedback_notifier.py` schedules periodic pending-feedback notifications to TA channels.
+- Docker-dependent execution fails fast when daemon connectivity is unavailable.
+- Queue persistence requires entering/exiting `PersistentQueue` contexts to rehydrate/stash state correctly.
+- Config include cycles are rejected during load.

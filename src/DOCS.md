@@ -1,43 +1,28 @@
-# `src/` Architecture Notes
+# `src/` Architecture
 
 ## Purpose
 
-`src/` contains the runtime application code for the Rubber Duck Discord system.
-It is organized by subsystem so each folder has a clear ownership boundary.
+`src/` contains the runtime application for the Rubber Duck Discord bot.
+Each subdirectory owns a subsystem with a focused responsibility.
 
-## Subsystem Boundaries
+## Operational Flow
 
-- `armory/`: Tool registration, schema generation, and tool execution/caching.
-- `bot/`: Discord transport adapter and event plumbing.
-- `commands/`: Admin command parsing and execution.
-- `conversation/`: Conversation types and thread setup flow.
-- `gen_ai/`: OpenAI client calls and agent/tool loop orchestration.
-- `metrics/`: Feedback workflows, metrics reporting, and analytics surfaces.
-- `storage/`: SQL/session setup and persistence handlers.
-- `utils/`: Shared infrastructure helpers (config, logging, queueing, execution helpers).
-- `workflows/`: Multi-step product workflows (registration, assignment feedback).
+1. `main.py` loads config, initializes SQL/session state, and builds runtime dependencies.
+2. `DiscordBot` receives Discord events and forwards them to `RubberDuckApp`.
+3. `RubberDuckApp` routes admin messages to `command` workflows and duck-channel messages to `duck-orchestrator` workflows.
+4. `DuckOrchestrator` creates a thread-scoped `DuckContext`, runs the selected duck workflow, and queues conversation metadata for TA feedback.
+5. Subsystems (`gen_ai`, `armory`, `workflows`, `metrics`, `storage`, `utils`) execute behavior and persistence for that workflow.
 
-Each subsystem has its own `DOCS.md` with implementation details.
-Top-level `tests/` contains test modules, and `archive/` contains non-runtime historical assets.
+## Boundaries
 
-## End-to-End Runtime Flow
+- `main.py` owns wiring and dependency assembly.
+- `bot/` owns Discord transport and message conversion.
+- `conversation/` and `workflows/` own user-facing behavior.
+- `gen_ai/` owns model/tool loop execution.
+- `storage/` and `metrics/` own persistence and analytics.
+- `utils/` owns cross-cutting infrastructure helpers.
 
-1. `main.py` loads config, initializes dependencies, and wires workflows.
-2. `bot/discord_bot.py` receives Discord events.
-3. `rubber_duck_app.py` routes events into quest workflows.
-4. `duck_orchestrator.py` creates thread-scoped contexts and dispatches the selected duck/workflow.
-5. Conversation/workflow modules call `gen_ai/` and `armory/` as needed.
-6. `storage/` and `metrics/` persist state and usage/feedback records.
+## Failure Modes and Guardrails
 
-## Dependency Direction (Preferred)
-
-- High-level wiring should stay in `main.py`.
-- Transport (`bot/`) should not own business logic.
-- Workflows/conversations may depend on `gen_ai/`, `metrics/`, `storage/`, and `utils/`.
-- `utils/` should remain dependency-light and reusable.
-
-## Potential Weak Points
-
-- Test coverage is narrow (`tests/` is not yet representative of all subsystems).
-- `main.py` has broad wiring responsibilities and can accumulate orchestration complexity.
-- Some subsystem docs may drift as runtime wiring evolves; reconcile these docs when moving responsibilities.
+- Runtime composition is centralized in `main.py`; update `DOCS.md` files when ownership moves to avoid drift.
+- Test coverage is still narrow compared to subsystem breadth, so refactors should be validated by targeted manual checks.
