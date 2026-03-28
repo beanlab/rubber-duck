@@ -9,29 +9,32 @@ from ..utils.config_types import FileData, PlatformId
 from ..utils.logger import duck_logger
 from ..utils.protocols import Context, Message
 
+_TEAMS_MENTION_TAG_PATTERN = re.compile(r'<at>[^<]*</at>')
 
-def _strip_mentions(text: str) -> str:
+
+def _strip_teams_mentions(text: str) -> str:
     """Remove Teams @mention tags: <at>Name</at>"""
-    return re.sub(r'<at>[^<]*</at>', '', text).strip()
+    return _TEAMS_MENTION_TAG_PATTERN.sub('', text).strip()
 
 
-def _as_message(activity: Activity) -> Message:
+def _as_teams_message(activity: Activity) -> Message:
     channel_data = activity.channel_data or {}
-    team_id = ''
+    team_context_id = ''
     if isinstance(channel_data, dict):
         team_info = channel_data.get('team')
         if isinstance(team_info, dict):
-            team_id = team_info.get('id', '')
+            team_context_id = team_info.get('id', '')
 
     return Message(
-        guild_id=team_id,
+        # Internal protocol keeps Discord-era key names; for Teams this stores the team id.
+        guild_id=team_context_id,
         channel_name='',
         channel_id=activity.conversation.id,
         author_id=activity.from_property.id,
         author_name=activity.from_property.name,
         author_mention=activity.from_property.name,
         message_id=activity.id,
-        content=_strip_mentions(activity.text or ''),
+        content=_strip_teams_mentions(activity.text or ''),
         files=[],
     )
 
@@ -49,12 +52,10 @@ class TeamsBot:
         self._adapter = adapter
         self._app_id = app_id
         self._rubber_duck = None
-        self._admin_channel: PlatformId | None = None
         self._conversation_references: dict[str, ConversationReference] = {}
 
-    def set_duck_app(self, rubber_duck, admin_channel_id: PlatformId) -> None:
+    def set_duck_app(self, rubber_duck, _admin_channel_id: PlatformId) -> None:
         self._rubber_duck = rubber_duck
-        self._admin_channel = admin_channel_id
 
     def _register_conversation(
         self, conversation_id: str, reference: ConversationReference
@@ -83,7 +84,7 @@ class TeamsBot:
             duck_logger.info('on_turn passed activity type check: activity_type=%s', activity.type)
 
             # Ignore messages that are empty after mention stripping (e.g. bare @mentions).
-            cleaned = _strip_mentions(activity.text or '')
+            cleaned = _strip_teams_mentions(activity.text or '')
             duck_logger.info('on_turn after mention stripping: cleaned content=%r', cleaned)
             if not cleaned:
                 duck_logger.info('on_turn filtered: empty content after mention stripping')
@@ -95,7 +96,7 @@ class TeamsBot:
                 return
 
             duck_logger.info('on_turn routing message to rubber duck')
-            await self._rubber_duck.route_message(_as_message(activity))
+            await self._rubber_duck.route_message(_as_teams_message(activity))
         except Exception:
             duck_logger.exception('on_turn unhandled exception')
 

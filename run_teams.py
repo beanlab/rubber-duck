@@ -58,7 +58,7 @@ except ImportError:
     pass
 
 
-def _build_aiohttp_app(bot: TeamsBot, adapter: BotFrameworkAdapter) -> web.Application:
+def _build_aiohttp_app(teams_bot: TeamsBot, adapter: BotFrameworkAdapter) -> web.Application:
     async def messages(req: Request) -> Response:
         if 'application/json' not in req.headers.get('Content-Type', ''):
             return Response(status=415, text='Unsupported media type')
@@ -68,7 +68,7 @@ def _build_aiohttp_app(bot: TeamsBot, adapter: BotFrameworkAdapter) -> web.Appli
         auth_header = req.headers.get('Authorization', '')
 
         try:
-            invoke_response = await adapter.process_activity(activity, auth_header, bot.on_turn)
+            invoke_response = await adapter.process_activity(activity, auth_header, teams_bot.on_turn)
         except Exception:
             masked_auth = (auth_header[:20] + '...') if len(auth_header) > 20 else auth_header
             duck_logger.exception(
@@ -118,15 +118,15 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
 
     adapter.on_turn_error = on_error
 
-    # Note: _setup_ducks passes bot to build_ducks which is typed as DiscordBot,
+    # Note: _setup_ducks passes teams_bot to build_ducks which is typed as DiscordBot,
     # but works at runtime via duck typing for all duck types except 'registration'
-    # (which calls bot.get_channel / bot.fetch_guild, not present on TeamsBot).
-    bot = TeamsBot(adapter, app_id)
+    # (which calls get_channel / fetch_guild, not present on TeamsBot).
+    teams_bot = TeamsBot(adapter, app_id)
 
     sql_session = create_sql_session(config['sql'])
 
-    setup_thread = SetupPrivateThread(bot.create_thread, bot.send_message)
-    filter_logs(bot.send_message, config['admin_settings'])
+    setup_thread = SetupPrivateThread(teams_bot.create_thread, teams_bot.send_message)
+    filter_logs(teams_bot.send_message, config['admin_settings'])
 
     with _build_feedback_queues(config, sql_session) as persistent_queues:
         feedback_manager = FeedbackManager(persistent_queues)
@@ -134,22 +134,22 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
 
         with these(build_containers(config)) as containers:
             armory, talk_tool, tool_caches = build_armory(
-                config, bot.send_message, containers, sql_session
+                config, teams_bot.send_message, containers, sql_session
             )
             ai_client = AIClient(
-                armory, bot.typing,
+                armory, teams_bot.typing,
                 metrics_handler.record_message, metrics_handler.record_usage,
             )
             add_agent_tools_to_armory(config, armory, ai_client)
 
             ducks = _setup_ducks(
-                config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool,
+                config, teams_bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool,
             )
 
             duck_orchestrator = DuckOrchestrator(
                 setup_thread,
-                bot.send_message,
-                bot.add_reaction,
+                teams_bot.send_message,
+                teams_bot.add_reaction,
                 ducks,
                 feedback_manager.remember_conversation,
             )
@@ -162,13 +162,13 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
 
             async with setup_workflow_manager(
                 config, duck_orchestrator, sql_session, metrics_handler,
-                bot.send_message, log_dir, tool_caches,
+                teams_bot.send_message, log_dir, tool_caches,
             ) as workflow_manager:
                 admin_channel_id = config['admin_settings']['admin_channel_id']
                 rubber_duck = RubberDuckApp(admin_channel_id, channel_configs, workflow_manager)
-                bot.set_duck_app(rubber_duck, admin_channel_id)
+                teams_bot.set_duck_app(rubber_duck, admin_channel_id)
 
-                aiohttp_app = _build_aiohttp_app(bot, adapter)
+                aiohttp_app = _build_aiohttp_app(teams_bot, adapter)
                 runner = web.AppRunner(aiohttp_app)
                 await runner.setup()
                 site = web.TCPSite(runner, '0.0.0.0', port)
@@ -180,7 +180,7 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
                 if 'feedback_notifier_settings' in config:
                     notifier = FeedbackNotifier(
                         feedback_manager,
-                        bot.send_message,
+                        teams_bot.send_message,
                         config['servers'].values(),
                         config['feedback_notifier_settings'],
                     )
