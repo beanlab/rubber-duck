@@ -7,6 +7,11 @@ containers: {}
 tools: {}
 
 ducks:
+  standard-rubber-duck:
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
+    settings:
+      agent:
+        engine: gpt-5-nano
   teams-rubber-duck:
     duck_type: user_led_conversation
     settings:
@@ -16,7 +21,7 @@ ducks:
         name: RubberDuck
         prompt_files:
           - prompts/teams.txt
-        engine: gpt-5-mini
+        engine: gpt-5-nano
         reasoning: minimal
         tools:
           - talk_to_user
@@ -32,7 +37,7 @@ servers:
         # Tyler
         channel_id: "a:17EtLZwud2hqAxLDOGmIQLIjMKCmyy0kBGqN7E1dgVuOrWX_iM3xT_SJME5ffzcE24Sh0SQFB4tmSMrwDi04Zd9EstTOgEeDgu6AuYnFmtLooLTfHuiZOiagqPHpKEkQq"
         timeout: 600
-        duck: teams-rubber-duck
+        duck: standard-rubber-duck
 
 admin_settings:
   admin_channel_id: "placeholder-no-admin"
