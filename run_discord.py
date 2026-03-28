@@ -43,12 +43,6 @@ from src.utils.feedback_notifier import FeedbackNotifier
 from src.utils.logger import add_console_handler, add_file_handler, duck_logger, filter_logs
 from src.utils.python_exec_container import build_containers
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
-
 
 async def _main_discord(config: Config, log_dir: Path | None) -> None:
     sql_session = create_sql_session(config['sql'])

@@ -51,12 +51,6 @@ from src.utils.feedback_notifier import FeedbackNotifier
 from src.utils.logger import add_console_handler, add_file_handler, duck_logger, filter_logs
 from src.utils.python_exec_container import build_containers
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv(override=True)
-except ImportError:
-    pass
-
 
 def _build_aiohttp_app(teams_bot: TeamsBot, adapter: BotFrameworkAdapter) -> web.Application:
     async def messages(req: Request) -> Response:
