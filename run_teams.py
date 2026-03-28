@@ -35,6 +35,7 @@ from src.duck_orchestrator import DuckOrchestrator
 from src.gen_ai.gen_ai import AIClient
 from src.main import (
     _build_feedback_queues,
+    _setup_cache_cleaner,
     _setup_ducks,
     add_agent_tools_to_armory,
     build_armory,
@@ -132,7 +133,9 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
         metrics_handler = SQLMetricsHandler(sql_session)
 
         with these(build_containers(config)) as containers:
-            armory, talk_tool = build_armory(config, bot.send_message, containers)
+            armory, talk_tool, tool_caches = build_armory(
+                config, bot.send_message, containers, sql_session
+            )
             ai_client = AIClient(
                 armory, bot.typing,
                 metrics_handler.record_message, metrics_handler.record_usage,
@@ -159,7 +162,7 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
 
             async with setup_workflow_manager(
                 config, duck_orchestrator, sql_session, metrics_handler,
-                bot.send_message, log_dir,
+                bot.send_message, log_dir, tool_caches,
             ) as workflow_manager:
                 admin_channel_id = config['admin_settings']['admin_channel_id']
                 rubber_duck = RubberDuckApp(admin_channel_id, channel_configs, workflow_manager)
@@ -182,6 +185,9 @@ async def _main_teams(config: Config, log_dir: Path | None, port: int) -> None:
                         config['feedback_notifier_settings'],
                     )
                     tasks.append(notifier.start())
+                if tool_caches:
+                    cleaner = _setup_cache_cleaner(tool_caches, config.get("cache", {}))
+                    tasks.append(cleaner.start())
 
                 try:
                     if tasks:
