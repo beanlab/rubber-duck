@@ -7,7 +7,7 @@ from typing import Protocol, Literal, Type, Optional, Callable
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, \
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import FunctionToolParam, ToolChoiceTypesParam, \
-    ToolChoiceFunctionParam, Response, EasyInputMessage
+    ToolChoiceFunctionParam, Response, EasyInputMessage, ResponseInputText, ResponseInputFile
 from pydantic import BaseModel
 from quest import step
 
@@ -15,6 +15,7 @@ from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
 from ..utils.config_types import DuckContext, HistoryType
 from ..utils.logger import duck_logger
+from ..utils.protocols import Message
 
 
 class GenAIException(Exception):
@@ -152,7 +153,7 @@ class AIClient:
         history = []
         while True:
             try:
-                user_message = await get_user_message(ctx)
+                user_message: Message = await get_user_message(ctx)
 
             except ConversationComplete:
                 break
@@ -160,7 +161,17 @@ class AIClient:
             await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
                                        json.dumps(user_message))
 
-            history.append(EasyInputMessage(role='user', content=user_message, type='message').model_dump())
+            history.append(EasyInputMessage(
+                type='message',
+                role='user',
+                content=[
+                    ResponseInputText(text=user_message['content'], type='input_text')
+                ] + [
+                    ResponseInputFile(filename=file['filename'], file_url=file['url'], type='input_file')
+                    for file in user_message['files']
+                ],
+            ).model_dump())
+
             agent_response, agent_history, conversation_complete = await self._run_agent(ctx, agent, history)
 
             if agent_response:
