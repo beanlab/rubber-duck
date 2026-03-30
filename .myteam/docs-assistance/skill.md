@@ -1,5 +1,5 @@
 ---
-name: Docs Assistance
+name: docs-assistance
 description: |
   Guidance for creating, reviewing, and updating documentation in this repository. Load this skill when editing `DOCS.md`, `README.md`, `CHANGELOG.md`, or related developer-facing docs.
 ---

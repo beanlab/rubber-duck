@@ -1,25 +1,28 @@
 ---
-name: Feature Checklist
+name: feature-checklist
 description: |
-  Specific instructions for ensuring a new feature is ready to merge. Use this skill when a new feature is finished.
+  Specific instructions for ensuring a new feature is ready to merge. Use this skill when a feature is finished.
 ---
 
 ## Pre-merge Feature Checklist
 
-Before a feature is ready to merge or create a pull request, we need to ensure the following.
-Please go through each section below and verify that everything is ready.
+Before a feature is ready to merge or create a pull request, verify each section below.
 
-### Sanity check the changes to the code
+### Sanity check the code changes
 
-- Make sure the changes of the entire branch are logically correct. Are there any obvious errors?
-- Check that there are not python syntax errors. Everything should load properly.
+- Validate that branch changes are logically correct and match requirements.
+- Check for syntax/runtime errors in changed Python files.
 
-### Check style
+### Check style and maintainability
 
-- All changed files should have consistent formatting following PEP8 style.
-- There should not be significant duplicated code.
+- Ensure changed files follow existing formatting conventions.
+- Confirm no significant duplicated logic was introduced.
 
 ### Relevant documentation should be updated
+
+`README.md`:
+
+- Update when setup, runtime behavior, or user workflow changed.
 
 `CHANGELOG.md`:
 
@@ -33,11 +36,10 @@ Please go through each section below and verify that everything is ready.
 - Reconcile each touched `DOCS.md` with current behavior and structure.
 - Do not mass-edit unrelated docs.
 
-### All pytests should pass
+### Tests should pass
 
-Please run `poetry run pytest -q` to make sure all tests are passing.
+- Run targeted tests during development and `poetry run pytest -q` before merge.
 
 ### Conclusion
 
-At the end, present your findings to the user. If everything checks out, draft a pr description that includes what was
-changed.
+Present findings to the user. If everything checks out, draft a PR description that summarizes what changed.
