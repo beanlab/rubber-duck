@@ -5,7 +5,7 @@ import os
 import threading
 import traceback
 from pathlib import Path
-from typing import Iterable, Any
+from typing import Iterable
 
 from openai import OpenAI
 from quest import these
@@ -644,34 +644,12 @@ def _load_runtime_config(config_path: str | None) -> Config:
     return load_configuration(resolved_path)
 
 
-def _is_server_config(server_config: Any) -> bool:
-    return isinstance(server_config, dict) and "server_id" in server_config and "channels" in server_config
-
-
-def _extract_platform_servers(config: Config, platform: str) -> dict[str, Any]:
+def _build_platform_config(config: Config, platform: str) -> Config:
     servers = config.get("servers", {})
-
     if not isinstance(servers, dict):
-        duck_logger.warning("Invalid config: 'servers' must be a dictionary. Ignoring.")
-        return {}
+        raise ValueError("Config servers must be a dictionary")
 
     platform_servers = servers.get(platform)
-    if platform_servers is None:
-        return {}
-    if not isinstance(platform_servers, dict):
-        duck_logger.warning("Invalid config: servers.%s must be a dictionary. Ignoring.", platform)
-        return {}
-    if platform_servers and not all(_is_server_config(v) for v in platform_servers.values()):
-        duck_logger.warning(
-            "Invalid config: servers.%s must map server names to server configs. Ignoring.",
-            platform,
-        )
-        return {}
-    return platform_servers
-
-
-def _build_platform_config(config: Config, platform: str) -> Config:
-    platform_servers = _extract_platform_servers(config, platform)
     if not platform_servers:
         raise ValueError(f"No {platform} servers configured")
 
@@ -680,55 +658,34 @@ def _build_platform_config(config: Config, platform: str) -> Config:
     return platform_config
 
 
-def _get_configured_platforms(config: Config) -> list[str]:
-    servers = config.get("servers", {})
-    if not isinstance(servers, dict):
-        duck_logger.warning("Invalid config: 'servers' must be a dictionary. Ignoring.")
-        return []
-
-    platforms: list[str] = []
-
-    for key in servers.keys():
-        if key == "discord":
-            if _extract_platform_servers(config, "discord"):
-                platforms.append("discord")
-        elif key == "teams":
-            if _extract_platform_servers(config, "teams"):
-                platforms.append("teams")
-        else:
-            duck_logger.warning(
-                "Unknown server platform key '%s' in config.servers. Ignoring.",
-                key,
-            )
-
-    return platforms
-
-
 async def run_from_args(args: argparse.Namespace) -> None:
     config = _load_runtime_config(args.config)
-    platforms = _get_configured_platforms(config)
-
-    if not platforms:
-        duck_logger.warning(
-            "No configured platform servers found under config.servers.discord or config.servers.teams."
-        )
+    servers = config.get("servers", {})
+    if not isinstance(servers, dict):
+        duck_logger.warning("No configured platform servers found under config.servers.discord or config.servers.teams.")
         return
 
-    if platforms == ["discord"]:
-        duck_logger.info("Starting runtime in discord mode (from config)")
-        await run_discord_mode(config, args.log_path)
+    startup_tasks = []
+    if servers.get("discord"):
+        startup_tasks.append(("discord", run_discord_mode(config, args.log_path)))
+    if servers.get("teams"):
+        startup_tasks.append(("teams", run_teams_mode(config, args.log_path, args.port)))
+
+    if not startup_tasks:
+        duck_logger.warning("No configured platform servers found under config.servers.discord or config.servers.teams.")
         return
 
-    if platforms == ["teams"]:
-        duck_logger.info("Starting runtime in teams mode (from config)")
-        await run_teams_mode(config, args.log_path, args.port)
-        return
+    started_platforms = 0
+    for platform, task in startup_tasks:
+        try:
+            duck_logger.info("Starting runtime in %s mode (from config)", platform)
+            await task
+            started_platforms += 1
+        except Exception as exc:
+            duck_logger.warning("Failed to start %s mode: %s", platform, exc)
 
-    duck_logger.info("Starting runtime in both mode (from config)")
-    await asyncio.gather(
-        run_discord_mode(config, args.log_path),
-        run_teams_mode(config, args.log_path, args.port),
-    )
+    if started_platforms == 0:
+        duck_logger.warning("No platform started successfully.")
 
 
 async def main() -> None:
