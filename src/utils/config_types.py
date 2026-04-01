@@ -132,6 +132,11 @@ class ServerConfig(TypedDict):
     channels: dict[str, ChannelConfig]
 
 
+class PlatformServers(TypedDict, total=False):
+    discord: dict[str, ServerConfig]
+    teams: dict[str, ServerConfig]
+
+
 class SQLConfig(TypedDict):
     db_type: str
     username: str
@@ -209,7 +214,7 @@ class Config(TypedDict):
     cache_cleanup_settings: NotRequired[CacheCleanupSettings]
     ducks: dict[DUCK_NAME, DuckConfig]
     agents_as_tools: dict[str, AgentAsToolSettings]
-    servers: dict[str, ServerConfig]
+    servers: PlatformServers
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]

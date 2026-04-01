@@ -5,7 +5,7 @@ import os
 import threading
 import traceback
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Any
 
 from openai import OpenAI
 from quest import these
@@ -384,6 +384,7 @@ def _configure_log_forwarding_once(send_message, admin_settings) -> None:
 
 
 async def run_discord_mode(config: Config, log_dir: Path | None):
+    config = _build_platform_config(config, "discord")
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -501,6 +502,7 @@ def _build_teams_aiohttp_app(teams_bot, adapter):
 
 
 async def run_teams_mode(config: Config, log_dir: Path | None, port: int):
+    config = _build_platform_config(config, "teams")
     from aiohttp import web
     from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext
     from src.bot.teams_bot import TeamsBot
@@ -602,32 +604,13 @@ async def run_teams_mode(config: Config, log_dir: Path | None, port: int):
                     await runner.cleanup()
 
 
-class _PlatformArgumentParser(argparse.ArgumentParser):
-    def parse_args(self, args=None, namespace=None):
-        parsed = super().parse_args(args, namespace)
-        if parsed.platform == 'both':
-            if parsed.config:
-                self.error('--config cannot be used with --platform both')
-            if not parsed.discord_config or not parsed.teams_config:
-                self.error('--platform both requires --discord-config and --teams-config')
-        else:
-            if parsed.discord_config or parsed.teams_config:
-                self.error('--discord-config/--teams-config are only valid with --platform both')
-        return parsed
-
-
 def build_cli_parser() -> argparse.ArgumentParser:
-    parser = _PlatformArgumentParser(description='Start the rubber-duck bot runtime')
+    parser = argparse.ArgumentParser(description='Start the rubber-duck bot runtime')
     parser.add_argument(
-        '--platform',
+        '--config',
         type=str,
-        choices=['discord', 'teams', 'both'],
-        required=True,
-        help='Adapter runtime to start',
+        help='Path to config file (.json or .yaml, or s3://...). Falls back to CONFIG_FILE_S3_PATH.'
     )
-    parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
-    parser.add_argument('--discord-config', type=str, help='Discord config path (required for --platform both)')
-    parser.add_argument('--teams-config', type=str, help='Teams config path (required for --platform both)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
     parser.add_argument(
@@ -654,32 +637,97 @@ def _configure_logging(debug: bool, log_path: Path | None) -> None:
     add_console_handler()
 
 
-def _load_single_platform_config(platform: str, config_path: str | None) -> Config:
+def _load_runtime_config(config_path: str | None) -> Config:
     resolved_path = config_path or os.getenv('CONFIG_FILE_S3_PATH')
     if resolved_path is None:
-        raise ValueError(f'Missing --config for {platform} mode and CONFIG_FILE_S3_PATH is not set')
+        raise ValueError('Missing --config and CONFIG_FILE_S3_PATH is not set')
     return load_configuration(resolved_path)
 
 
+def _is_server_config(server_config: Any) -> bool:
+    return isinstance(server_config, dict) and "server_id" in server_config and "channels" in server_config
+
+
+def _extract_platform_servers(config: Config, platform: str) -> dict[str, Any]:
+    servers = config.get("servers", {})
+
+    if not isinstance(servers, dict):
+        duck_logger.warning("Invalid config: 'servers' must be a dictionary. Ignoring.")
+        return {}
+
+    platform_servers = servers.get(platform)
+    if platform_servers is None:
+        return {}
+    if not isinstance(platform_servers, dict):
+        duck_logger.warning("Invalid config: servers.%s must be a dictionary. Ignoring.", platform)
+        return {}
+    if platform_servers and not all(_is_server_config(v) for v in platform_servers.values()):
+        duck_logger.warning(
+            "Invalid config: servers.%s must map server names to server configs. Ignoring.",
+            platform,
+        )
+        return {}
+    return platform_servers
+
+
+def _build_platform_config(config: Config, platform: str) -> Config:
+    platform_servers = _extract_platform_servers(config, platform)
+    if not platform_servers:
+        raise ValueError(f"No {platform} servers configured")
+
+    platform_config: Config = dict(config)
+    platform_config["servers"] = platform_servers
+    return platform_config
+
+
+def _get_configured_platforms(config: Config) -> list[str]:
+    servers = config.get("servers", {})
+    if not isinstance(servers, dict):
+        duck_logger.warning("Invalid config: 'servers' must be a dictionary. Ignoring.")
+        return []
+
+    platforms: list[str] = []
+
+    for key in servers.keys():
+        if key == "discord":
+            if _extract_platform_servers(config, "discord"):
+                platforms.append("discord")
+        elif key == "teams":
+            if _extract_platform_servers(config, "teams"):
+                platforms.append("teams")
+        else:
+            duck_logger.warning(
+                "Unknown server platform key '%s' in config.servers. Ignoring.",
+                key,
+            )
+
+    return platforms
+
+
 async def run_from_args(args: argparse.Namespace) -> None:
-    if args.platform == 'discord':
-        config = _load_single_platform_config('discord', args.config)
-        duck_logger.info('Starting runtime in discord mode')
+    config = _load_runtime_config(args.config)
+    platforms = _get_configured_platforms(config)
+
+    if not platforms:
+        duck_logger.warning(
+            "No configured platform servers found under config.servers.discord or config.servers.teams."
+        )
+        return
+
+    if platforms == ["discord"]:
+        duck_logger.info("Starting runtime in discord mode (from config)")
         await run_discord_mode(config, args.log_path)
         return
 
-    if args.platform == 'teams':
-        config = _load_single_platform_config('teams', args.config)
-        duck_logger.info('Starting runtime in teams mode')
+    if platforms == ["teams"]:
+        duck_logger.info("Starting runtime in teams mode (from config)")
         await run_teams_mode(config, args.log_path, args.port)
         return
 
-    discord_config: Config = load_configuration(args.discord_config)
-    teams_config: Config = load_configuration(args.teams_config)
-    duck_logger.info('Starting runtime in both mode')
+    duck_logger.info("Starting runtime in both mode (from config)")
     await asyncio.gather(
-        run_discord_mode(discord_config, args.log_path),
-        run_teams_mode(teams_config, args.log_path, args.port),
+        run_discord_mode(config, args.log_path),
+        run_teams_mode(config, args.log_path, args.port),
     )
 
 

@@ -101,7 +101,7 @@ class PythonExecContainer:
             remote_path = resource_info.get("source")
             target_path = resource_info.get("target")
             if not remote_path or not target_path:
-                duck_logger.warn(f"Skipping invalid resource entry: {resource_info}")
+                duck_logger.warning(f"Skipping invalid resource entry: {resource_info}")
                 continue
 
             # determine which case:
