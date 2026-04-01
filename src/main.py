@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import logging
 import os
+import threading
+import traceback
 from pathlib import Path
 from typing import Iterable
 
@@ -10,37 +12,40 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from .utils.protocols import ToolCache, CacheKeyBuilder
-from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
-from .workflows.registration import Registration
-from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
-from .utils.python_exec_container import build_containers, PythonExecContainer
-from .armory.python_tools import PythonTools
-from .armory.armory import Armory
-from .armory.talk_tool import TalkTool
-from .bot.discord_bot import DiscordBot
-from .commands.bot_commands import BotCommands
-from .commands.command import create_commands
-from .conversation.conversation import AgentLedConversation, UserLedConversation
-from .conversation.threads import SetupPrivateThread
-from .duck_orchestrator import DuckOrchestrator, DuckConversation
-from .gen_ai.build import build_agent
-from .gen_ai.gen_ai import AIClient
-from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
-from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
-from .metrics.reporter import Reporter
-from .rubber_duck_app import RubberDuckApp
-from .storage.sql_connection import create_sql_session
-from .storage.sql_metrics import SQLMetricsHandler
-from .storage.sql_quest import create_sql_manager
-from .utils.config_loader import load_configuration
-from .utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
-from .utils.cache_cleaner import CacheCleaner
-from .utils.feedback_notifier import FeedbackNotifier
-from .utils.logger import duck_logger, filter_logs, add_console_handler
-from .utils.persistent_queue import PersistentQueue
-from .utils.send_email import EmailSender
-from .workflows.registration_workflow import RegistrationWorkflow
+from src.utils.protocols import ToolCache, CacheKeyBuilder
+from src.armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
+from src.workflows.registration import Registration
+from src.workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from src.utils.python_exec_container import build_containers, PythonExecContainer
+from src.armory.python_tools import PythonTools
+from src.armory.armory import Armory
+from src.armory.talk_tool import TalkTool
+from src.bot.discord_bot import DiscordBot
+from src.commands.bot_commands import BotCommands
+from src.commands.command import create_commands
+from src.conversation.conversation import AgentLedConversation, UserLedConversation
+from src.conversation.threads import SetupPrivateThread
+from src.duck_orchestrator import DuckOrchestrator, DuckConversation
+from src.gen_ai.build import build_agent
+from src.gen_ai.gen_ai import AIClient
+from src.metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
+from src.metrics.feedback_manager import FeedbackManager, CHANNEL_ID
+from src.metrics.reporter import Reporter
+from src.rubber_duck_app import RubberDuckApp
+from src.storage.sql_connection import create_sql_session
+from src.storage.sql_metrics import SQLMetricsHandler
+from src.storage.sql_quest import create_sql_manager
+from src.utils.config_loader import load_configuration
+from src.utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
+from src.utils.cache_cleaner import CacheCleaner
+from src.utils.feedback_notifier import FeedbackNotifier
+from src.utils.logger import duck_logger, filter_logs, add_console_handler, add_file_handler
+from src.utils.persistent_queue import PersistentQueue
+from src.utils.send_email import EmailSender
+from src.workflows.registration_workflow import RegistrationWorkflow
+
+_log_forwarding_lock = threading.Lock()
+_log_forwarding_installed = False
 
 
 def setup_workflow_manager(
@@ -353,15 +358,16 @@ def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClien
         armory.add_tool(tool)
 
 
-async def main(config: Config, log_dir: Path):
-    try:
-        await _main(config, log_dir)
-    except Exception as ex:
-        duck_logger.exception('ERROR in MAIN')
-        print(ex)
+def _configure_log_forwarding_once(send_message, admin_settings) -> None:
+    global _log_forwarding_installed
+    with _log_forwarding_lock:
+        if _log_forwarding_installed:
+            return
+        filter_logs(send_message, admin_settings)
+        _log_forwarding_installed = True
 
 
-async def _main(config: Config, log_dir: Path):
+async def run_discord_mode(config: Config, log_dir: Path | None):
     sql_session = create_sql_session(config['sql'])
 
     async with DiscordBot() as bot:
@@ -370,7 +376,7 @@ async def _main(config: Config, log_dir: Path):
             bot.send_message
         )
 
-        filter_logs(bot.send_message, config['admin_settings'])
+        _configure_log_forwarding_once(bot.send_message, config['admin_settings'])
 
         with _build_feedback_queues(config, sql_session) as persistent_queues:
             feedback_manager = FeedbackManager(persistent_queues)
@@ -435,36 +441,239 @@ async def _main(config: Config, log_dir: Path):
                     await asyncio.gather(*tasks)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+def _build_teams_aiohttp_app(teams_bot, adapter):
+    from aiohttp import web
+    from aiohttp.web import Request, Response, json_response
+    from botbuilder.schema import Activity
+
+    async def messages(req: Request) -> Response:
+        if 'application/json' not in req.headers.get('Content-Type', ''):
+            return Response(status=415, text='Unsupported media type')
+
+        body = await req.json()
+        activity = Activity().deserialize(body)
+        auth_header = req.headers.get('Authorization', '')
+
+        try:
+            invoke_response = await adapter.process_activity(activity, auth_header, teams_bot.on_turn)
+        except Exception:
+            masked_auth = (auth_header[:20] + '...') if len(auth_header) > 20 else auth_header
+            duck_logger.exception(
+                'Error processing Teams activity\n'
+                '  auth_header (first 20 chars): %s\n'
+                '  raw activity body: %s',
+                masked_auth,
+                body,
+            )
+            return Response(status=500)
+
+        if invoke_response:
+            return json_response(data=invoke_response.body, status=invoke_response.status)
+
+        return Response(status=201)
+
+    async def health(_req: Request) -> Response:
+        return json_response({'status': 'ok'})
+
+    app = web.Application()
+    app.router.add_post('/api/messages', messages)
+    app.router.add_get('/health', health)
+    return app
+
+
+async def run_teams_mode(config: Config, log_dir: Path | None, port: int):
+    from aiohttp import web
+    from botbuilder.core import BotFrameworkAdapter, BotFrameworkAdapterSettings, TurnContext
+    from src.bot.teams_bot import TeamsBot
+
+    app_id = os.environ['MICROSOFT_APP_ID']
+    app_password = os.environ['MICROSOFT_APP_PASSWORD']
+    app_tenant_id = os.environ.get('MICROSOFT_APP_TENANT_ID', '')
+    app_type = os.environ.get("MICROSOFT_APP_TYPE", "SingleTenant")
+    duck_logger.info(
+        'Teams credentials loaded: app_id=%s password_len=%d password_prefix=%s tenant_id=%s app_type=%s',
+        app_id, len(app_password), app_password[:4], app_tenant_id, app_type,
+    )
+
+    settings = BotFrameworkAdapterSettings(
+        app_id=app_id,
+        app_password=app_password,
+        channel_auth_tenant=app_tenant_id,
+    )
+    adapter = BotFrameworkAdapter(settings)
+
+    async def on_error(context: TurnContext, error: Exception) -> None:
+        duck_logger.exception(f'[on_turn_error] unhandled error: {error}')
+        traceback.print_exc()
+        await context.send_activity('The bot encountered an error. Please try again.')
+
+    adapter.on_turn_error = on_error
+
+    teams_bot = TeamsBot(adapter, app_id)
+    sql_session = create_sql_session(config['sql'])
+    setup_thread = SetupPrivateThread(teams_bot.create_thread, teams_bot.send_message)
+    _configure_log_forwarding_once(teams_bot.send_message, config['admin_settings'])
+
+    with _build_feedback_queues(config, sql_session) as persistent_queues:
+        feedback_manager = FeedbackManager(persistent_queues)
+        metrics_handler = SQLMetricsHandler(sql_session)
+
+        with these(build_containers(config)) as containers:
+            armory, talk_tool, tool_caches = build_armory(
+                config, teams_bot.send_message, containers, sql_session
+            )
+            ai_client = AIClient(
+                armory, teams_bot.typing,
+                metrics_handler.record_message, metrics_handler.record_usage,
+            )
+            add_agent_tools_to_armory(config, armory, ai_client)
+
+            ducks = _setup_ducks(
+                config, teams_bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool,
+            )
+
+            duck_orchestrator = DuckOrchestrator(
+                setup_thread,
+                teams_bot.send_message,
+                teams_bot.add_reaction,
+                ducks,
+                feedback_manager.remember_conversation,
+            )
+
+            channel_configs = {
+                channel_config['channel_id']: channel_config
+                for server_config in config['servers'].values()
+                for channel_config in server_config['channels'].values()
+            }
+
+            async with setup_workflow_manager(
+                config, duck_orchestrator, sql_session, metrics_handler,
+                teams_bot.send_message, log_dir, tool_caches,
+            ) as workflow_manager:
+                admin_channel_id = config['admin_settings']['admin_channel_id']
+                rubber_duck = RubberDuckApp(admin_channel_id, channel_configs, workflow_manager)
+                teams_bot.set_duck_app(rubber_duck, admin_channel_id)
+
+                aiohttp_app = _build_teams_aiohttp_app(teams_bot, adapter)
+                runner = web.AppRunner(aiohttp_app)
+                await runner.setup()
+                site = web.TCPSite(runner, '0.0.0.0', port)
+                await site.start()
+
+                duck_logger.info(f'Teams bot listening on http://0.0.0.0:{port}/api/messages')
+
+                tasks = []
+                if 'feedback_notifier_settings' in config:
+                    notifier = FeedbackNotifier(
+                        feedback_manager,
+                        teams_bot.send_message,
+                        config['servers'].values(),
+                        config['feedback_notifier_settings'],
+                    )
+                    tasks.append(notifier.start())
+                if tool_caches:
+                    cleaner = _setup_cache_cleaner(tool_caches, config.get("cache", {}))
+                    tasks.append(cleaner.start())
+
+                try:
+                    if tasks:
+                        await asyncio.gather(*tasks)
+                    else:
+                        await asyncio.Event().wait()
+                finally:
+                    await runner.cleanup()
+
+
+class _PlatformArgumentParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        parsed = super().parse_args(args, namespace)
+        if parsed.platform == 'both':
+            if parsed.config:
+                self.error('--config cannot be used with --platform both')
+            if not parsed.discord_config or not parsed.teams_config:
+                self.error('--platform both requires --discord-config and --teams-config')
+        else:
+            if parsed.discord_config or parsed.teams_config:
+                self.error('--discord-config/--teams-config are only valid with --platform both')
+        return parsed
+
+
+def build_cli_parser() -> argparse.ArgumentParser:
+    parser = _PlatformArgumentParser(description='Start the rubber-duck bot runtime')
+    parser.add_argument(
+        '--platform',
+        type=str,
+        choices=['discord', 'teams', 'both'],
+        required=True,
+        help='Adapter runtime to start',
+    )
     parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
+    parser.add_argument('--discord-config', type=str, help='Discord config path (required for --platform both)')
+    parser.add_argument('--teams-config', type=str, help='Teams config path (required for --platform both)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
+    parser.add_argument(
+        '--port', type=int,
+        default=int(os.environ.get('PORT', 3000)),
+        help='HTTP listen port for Teams mode (default: 3000)',
+    )
+    return parser
 
-    args = parser.parse_args()
 
-    # Set debug environment variable if debug flag is set
-    if args.debug:
+def _configure_logging(debug: bool, log_path: Path | None) -> None:
+    if debug:
         duck_logger.setLevel(logging.DEBUG)
         quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
 
-    if args.log_path:
-        # Add a file handler to the duck logger if log path is provided
-        from .utils.logger import add_file_handler
-
-        log_dir = add_file_handler(args.log_path)
+    if log_path:
+        add_file_handler(log_path)
     else:
-        duck_logger.warning("No log path provided. Logging to console only.")
+        duck_logger.warning('No log path provided. Logging to console only.')
 
-    # Add console handler to the duck logger
     add_console_handler()
 
-    if args.config is None:
-        args.config = os.getenv('CONFIG_FILE_S3_PATH')
 
-    config: Config = load_configuration(args.config)
+async def run_from_args(args) -> None:
+    if args.platform == 'discord':
+        config_path = args.config or os.getenv('CONFIG_FILE_S3_PATH')
+        if config_path is None:
+            raise ValueError('Missing --config for discord mode and CONFIG_FILE_S3_PATH is not set')
+        config: Config = load_configuration(config_path)
+        duck_logger.info('Starting runtime in discord mode')
+        await run_discord_mode(config, args.log_path)
+        return
 
-    asyncio.run(main(config, args.log_path))
+    if args.platform == 'teams':
+        config_path = args.config or os.getenv('CONFIG_FILE_S3_PATH')
+        if config_path is None:
+            raise ValueError('Missing --config for teams mode and CONFIG_FILE_S3_PATH is not set')
+        config: Config = load_configuration(config_path)
+        duck_logger.info('Starting runtime in teams mode')
+        await run_teams_mode(config, args.log_path, args.port)
+        return
+
+    discord_config: Config = load_configuration(args.discord_config)
+    teams_config: Config = load_configuration(args.teams_config)
+    duck_logger.info('Starting runtime in both mode')
+    await asyncio.gather(
+        run_discord_mode(discord_config, args.log_path),
+        run_teams_mode(teams_config, args.log_path, args.port),
+    )
+
+
+async def main():
+    parser = build_cli_parser()
+    args = parser.parse_args()
+    _configure_logging(args.debug, args.log_path)
+    try:
+        await run_from_args(args)
+    except Exception as ex:
+        duck_logger.exception('ERROR in MAIN')
+        print(ex)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
