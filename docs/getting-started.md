@@ -92,9 +92,11 @@ Before you begin, you'll need:
       `admin_settings`, etc.).
     - Use includes from `local-config-example.yaml` so your local file mirrors production structure:
       - `ducks`: include from `production-config.yaml@$.ducks`
-      - `cache`: include from `production-config.yaml@$.cache`
+      - `cache_cleanup_settings` (optional, cleanup schedule): include from `production-config.yaml@$.cache_cleanup_settings`
       - `agents_as_tools`: include from `production-config.yaml@$.agents_as_tools`
       - `admin_settings`: include from `production-config.yaml@$.admin_settings`
+    - For any `tools.*` entry with `type: container_exec`, caching is optional.
+      Add `tools.<name>.cache` only for tools that should use semantic caching.
     - Update local-only values in these sections:
       - `sql.database` (point to a local sqlite file)
       - `servers.*.server_id`

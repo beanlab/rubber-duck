@@ -36,7 +36,8 @@ from src.storage.sql_connection import create_sql_session
 from src.storage.sql_metrics import SQLMetricsHandler
 from src.storage.sql_quest import create_sql_manager
 from src.utils.config_loader import load_configuration
-from src.utils.config_types import Config, RegistrationSettings, DUCK_NAME, DuckConfig
+from src.utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
+    DuckConfig, ToolConfig
 from src.utils.cache_cleaner import CacheCleaner
 from src.utils.feedback_notifier import FeedbackNotifier
 from src.utils.logger import duck_logger, filter_logs, add_console_handler, add_file_handler
@@ -262,23 +263,24 @@ def _build_feedback_queues(config: Config, sql_session):
     })
 
 
-def _build_cache_key_builder(config: Config) -> CacheKeyBuilder:
-    settings = config.get("cache", {})
-
-    prompt = settings.get("prompt")
+def _build_cache_key_builder(cache_settings: CacheSettings, tool_name: str) -> CacheKeyBuilder:
+    prompt = cache_settings.get("prompt")
     if not prompt:
-        duck_logger.error("Missing 'prompt' config setting in cache config")
+        raise ValueError(
+            f"Missing cache prompt for container_exec tool '{tool_name}'. "
+            f"Set tools.{tool_name}.cache.prompt."
+        )
 
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
         prompt=Path(prompt).read_text(),
-        model=settings.get("engine", "gpt-5-nano"),
-        reasoning_effort=settings.get("reasoning", "minimal"),
+        model=cache_settings.get("engine", "gpt-5-nano"),
+        reasoning_effort=cache_settings.get("reasoning", "minimal"),
     )
 
 
-def _build_tool_cache(config: Config, sql_session) -> ToolCache:
-    backend = config.get("cache", {}).get("backend", "memory")
+def _build_tool_cache(cache_settings: CacheSettings, sql_session) -> ToolCache:
+    backend = cache_settings.get("backend", "memory")
 
     if backend == "memory":
         return InMemoryToolCache()
@@ -287,6 +289,12 @@ def _build_tool_cache(config: Config, sql_session) -> ToolCache:
         return SqlToolCache(sql_session)
 
     raise NotImplementedError(f"Unsupported cache backend: {backend}")
+
+
+def _get_tool_cache_settings(tool_config: ToolConfig) -> CacheSettings | None:
+    if "cache" not in tool_config:
+        return None
+    return dict(tool_config.get("cache", {}))
 
 
 def build_armory(
@@ -303,9 +311,14 @@ def build_armory(
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
-            tool_cache = _build_tool_cache(config, sql_session)
-            tool_caches.append(tool_cache)
-            cache_key_builder = _build_cache_key_builder(config)
+            cache_settings = _get_tool_cache_settings(tool_config)
+            tool_cache = None
+            cache_key_builder = None
+            if cache_settings is not None:
+                tool_cache = _build_tool_cache(cache_settings, sql_session)
+                setattr(tool_cache, "_cache_source", tool_name)
+                tool_caches.append(tool_cache)
+                cache_key_builder = _build_cache_key_builder(cache_settings, tool_name)
             python_tools = PythonTools(
                 containers[container_name],
                 send_message,
@@ -327,7 +340,10 @@ def build_armory(
     return armory, talk_tool, tool_caches
 
 
-def _setup_cache_cleaner(tool_caches: list[ToolCache], cache_settings: dict | None = None) -> CacheCleaner:
+def _setup_cache_cleaner(
+        tool_caches: list[ToolCache],
+        cache_cleanup_settings: CacheCleanupSettings | None = None
+) -> CacheCleaner:
     unique_tool_caches: list[ToolCache] = []
     seen_cache_ids: set[int] = set()
     for tool_cache in tool_caches:
@@ -337,9 +353,9 @@ def _setup_cache_cleaner(tool_caches: list[ToolCache], cache_settings: dict | No
             unique_tool_caches.append(tool_cache)
     cc = None
     if unique_tool_caches:
-        cache_settings = cache_settings or {}
-        cleanup_hour = cache_settings.get("cleanup_hour", 3)
-        cleanup_minute = cache_settings.get("cleanup_minute", 0)
+        cache_cleanup_settings = cache_cleanup_settings or {}
+        cleanup_hour = cache_cleanup_settings.get("cleanup_hour", 3)
+        cleanup_minute = cache_cleanup_settings.get("cleanup_minute", 0)
         cc = CacheCleaner(
             unique_tool_caches,
             cleanup_hour,
@@ -435,7 +451,10 @@ async def run_discord_mode(config: Config, log_dir: Path | None):
                         tasks.append(notifier.start())
 
                     if tool_caches:
-                        cleaner = _setup_cache_cleaner(tool_caches, config.get("cache", {}))
+                        cleaner = _setup_cache_cleaner(
+                            tool_caches,
+                            config.get("cache_cleanup_settings", {})
+                        )
                         tasks.append(cleaner.start())
 
                     await asyncio.gather(*tasks)
