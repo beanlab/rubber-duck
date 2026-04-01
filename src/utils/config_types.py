@@ -178,30 +178,33 @@ class ContainerConfig(TypedDict):
     settings: ContainerSettings
 
 
-class ContainerTool(TypedDict):
-    type: Literal["container_exec"]
-    container: str
-    description: NotRequired[str]
-
-
-ToolConfig = ContainerTool
-
-
 class CacheSettings(TypedDict):
     backend: NotRequired[Literal["memory", "database"]]
     prompt: NotRequired[str]
     prompt_files: NotRequired[list[str]]
     engine: NotRequired[str]
     reasoning: NotRequired[str]
+
+
+class CacheCleanupSettings(TypedDict):
     cleanup_hour: NotRequired[int]
     cleanup_minute: NotRequired[int]
 
+
+class ContainerTool(TypedDict):
+    type: Literal["container_exec"]
+    container: str
+    description: NotRequired[str]
+    cache: NotRequired[CacheSettings]
+
+
+ToolConfig = ContainerTool
 
 class Config(TypedDict):
     sql: SQLConfig
     containers: dict[str, ContainerConfig]
     tools: dict[str, ToolConfig]
-    cache: CacheSettings
+    cache_cleanup_settings: NotRequired[CacheCleanupSettings]
     ducks: dict[DUCK_NAME, DuckConfig]
     agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]

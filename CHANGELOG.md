@@ -17,6 +17,10 @@ All notable changes in this repository are documented here.
 - Standardized `DOCS.md` structure around concise high-signal sections (`Purpose`, `Operational Flow`, optional boundaries/dependencies, and guardrails).
 - Updated `myteam-assistance` structure and loader behavior to use grouped authoring subskills.
 - Updated CS110 conversation-review `target_channel_ids` in `production-config.yaml`.
+- Moved cache configuration to tool-level settings under `tools.<name>.cache` for `container_exec` tools.
+- Renamed top-level cache cleanup config to `cache_cleanup_settings`.
+- Updated cache command output to identify caches by tool source (`<backend>#<tool_name>`) while preserving index-based removal commands.
+- Made semantic caching optional per `container_exec` tool and disabled caching for `run_cs_analysis` in production config.
 
 ### Fixed
 - Corrected command documentation drift by including currently supported admin commands such as `!cache`.

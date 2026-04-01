@@ -11,7 +11,6 @@ import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
-from ..armory.python_tools import send_table
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, ToolCache
 from ..utils.zip_utils import zip_data_file
@@ -283,7 +282,7 @@ class CacheCommand(Command):
     name = "!cache"
     help_msg = (
         "show current tool cache entries; "
-        "use `!cache cleanup`, `!cache remove <cache_index> <entry_index>`, or `!cache clear`"
+        "use `!cache cleanup`, `!cache remove <cache_tool> <entry_index>`, or `!cache clear`"
     )
 
     def __init__(self, send_message, tool_caches: list[ToolCache]):
@@ -297,6 +296,20 @@ class CacheCommand(Command):
                 continue
             seen_cache_ids.add(cache_id)
             self.tool_caches.append(cache)
+
+    @staticmethod
+    def _cache_source(cache: ToolCache) -> str:
+        source = getattr(cache, "_cache_source", None)
+        if source:
+            return str(source)
+        return "unknown"
+
+    @staticmethod
+    def _cache_tool(index: int, cache: ToolCache) -> str:
+        source = CacheCommand._cache_source(cache)
+        if source != "unknown":
+            return source
+        return f"unknown_{index}"
 
     @staticmethod
     def _format_cache_key_for_summary(raw_key: str) -> str:
@@ -349,24 +362,16 @@ class CacheCommand(Command):
             if len(cmd_parts) != 4:
                 await self.send_message(
                     channel_id,
-                    "Usage: `!cache remove <cache_index> <entry_index>`",
+                    "Usage: `!cache remove <cache_tool> <entry_index>`",
                 )
                 return
 
             try:
-                cache_index = int(cmd_parts[2])
                 entry_index = int(cmd_parts[3])
             except ValueError:
                 await self.send_message(
                     channel_id,
-                    "Cache index and entry index must be integers.",
-                )
-                return
-
-            if cache_index < 1 or cache_index > len(self.tool_caches):
-                await self.send_message(
-                    channel_id,
-                    f"Invalid cache index `{cache_index}`. Expected 1-{len(self.tool_caches)}.",
+                    "Entry index must be an integer.",
                 )
                 return
 
@@ -374,12 +379,38 @@ class CacheCommand(Command):
                 await self.send_message(channel_id, "Entry index must be at least 1.")
                 return
 
-            cache = self.tool_caches[cache_index - 1]
+            requested_cache_tool = cmd_parts[2]
+            matched_cache = None
+            matched_cache_tool = None
+            for index, cache in enumerate(self.tool_caches, start=1):
+                cache_tool = self._cache_tool(index, cache)
+                backend = type(cache).__name__
+                aliases = {
+                    cache_tool.lower(),
+                    f"{backend}#{cache_tool}".lower(),
+                }
+                if requested_cache_tool.lower() in aliases:
+                    matched_cache = cache
+                    matched_cache_tool = cache_tool
+                    break
+
+            if matched_cache is None:
+                available_tools = ", ".join(
+                    f"`{self._cache_tool(index, cache)}`"
+                    for index, cache in enumerate(self.tool_caches, start=1)
+                )
+                await self.send_message(
+                    channel_id,
+                    f"Invalid cache tool `{requested_cache_tool}`. Available: {available_tools}.",
+                )
+                return
+
+            cache = matched_cache
             entries = cache.list_entries()
             if entry_index > len(entries):
                 await self.send_message(
                     channel_id,
-                    f"Invalid entry index `{entry_index}`. Cache `{cache_index}` has {len(entries)} entr"
+                    f"Invalid entry index `{entry_index}`. Cache `{matched_cache_tool}` has {len(entries)} entr"
                     f"{'y' if len(entries) == 1 else 'ies'}.",
                 )
                 return
@@ -395,7 +426,8 @@ class CacheCommand(Command):
 
             await self.send_message(
                 channel_id,
-                f"Removed cache entry `{entry_index}` from cache `{cache_index}`.",
+                f"Removed cache entry `{entry_index}` from cache "
+                f"`{type(cache).__name__}#{matched_cache_tool}`.",
             )
             return
 
@@ -422,19 +454,25 @@ class CacheCommand(Command):
         total_entries = 0
         all_rows: list[dict] = []
 
-        cache_reports: list[tuple[int, str, list[dict]]] = []
+        cache_reports: list[tuple[str, str, list[dict]]] = []
         for index, cache in enumerate(self.tool_caches, start=1):
             backend = type(cache).__name__
+            cache_tool = self._cache_tool(index, cache)
             entries = cache.list_entries()
             total_entries += len(entries)
             if not entries:
                 continue
 
             found_entries = True
-            cache_reports.append((index, backend, entries))
+            cache_reports.append((backend, cache_tool, entries))
             all_rows.extend(
                 [
-                    {"cache_backend": backend, "cache_index": index, "entry_index": entry_index, **entry}
+                    {
+                        "cache_backend": backend,
+                        "cache_tool": cache_tool,
+                        "entry_index": entry_index,
+                        **entry,
+                    }
                     for entry_index, entry in enumerate(entries, start=1)
                 ]
             )
@@ -446,36 +484,15 @@ class CacheCommand(Command):
         await self.send_message(
             channel_id,
             f"Found {total_entries} entr{'y' if total_entries == 1 else 'ies'} "
-            f"across {len(self.tool_caches)} cache(s). Showing top 5 per cache below.",
+            f"across {len(self.tool_caches)} cache(s).",
         )
 
-        for index, backend, entries in cache_reports:
-            top_entries = entries[:5]
-            key_lines = [
-                f"- {entry_idx} - {self._format_cache_key_for_summary(entry['key'])}"
-                for entry_idx, entry in enumerate(top_entries, start=1)
-            ]
+        for backend, cache_tool, entries in cache_reports:
             summary_message = (
-                f"## Cache: `{backend}#{index}`\n"
+                f"## Cache: `{backend}#{cache_tool}`\n"
                 f"Total entries: {len(entries)}\n"
-                "### Keys:\n"
-                f"{'\n'.join(key_lines)}\n"
-                "### Entry info:"
             )
             await self.send_message(channel_id, summary_message)
-
-            info_rows = [
-                {
-                    "hits": entry["hits"],
-                    "stdout": entry.get("stdout_preview", ""),
-                    "tables": entry["tables"],
-                    "files": entry["files"],
-                    "created": entry["created"],
-                    "expires": entry["expires"],
-                }
-                for entry in top_entries
-            ]
-            await send_table(self.send_message, channel_id, pd.DataFrame(info_rows))
 
         csv_df = pd.DataFrame(all_rows)
         csv_buffer = io.StringIO()

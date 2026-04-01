@@ -88,8 +88,8 @@ class PythonTools:
             self,
             container: PythonExecContainer,
             send_message: SendMessage,
-            tool_cache: ToolCache,
-            cache_key_builder: CacheKeyBuilder
+            tool_cache: ToolCache | None,
+            cache_key_builder: CacheKeyBuilder | None
     ):
         self._container = container
         self._send_message = send_message
@@ -111,20 +111,24 @@ class PythonTools:
                 filename: description
             }
         """
-        cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
-        key = self._tool_cache.get_key(cache_key)
-        duck_logger.debug(f"\nCache key:\n{key}")
+        key = None
+        if self._tool_cache and self._cache_key_builder:
+            cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
+            key = self._tool_cache.get_key(cache_key)
+            duck_logger.debug(f"\nCache key:\n{key}")
 
-        if self._tool_cache.check_if_cached(key):
-            duck_logger.debug(f" Cache HIT ".center(20, '-'))
-            output = await self._tool_cache.send_from_cache(
-                key,
-                self._send_message,
-                ctx.thread_id
-            )
-            return ConcludesResponse(output)
+            if self._tool_cache.check_if_cached(key):
+                duck_logger.debug(f" Cache HIT ".center(20, '-'))
+                output = await self._tool_cache.send_from_cache(
+                    key,
+                    self._send_message,
+                    ctx.thread_id
+                )
+                return ConcludesResponse(output)
 
-        duck_logger.debug(f" Cache MISS ".center(19, '-'))
+            duck_logger.debug(f" Cache MISS ".center(19, '-'))
+        else:
+            duck_logger.debug(f" Cache DISABLED ".center(21, '-'))
         results = await self._container.run_code(code)
 
         stdout = results.get('stdout').strip()
@@ -140,7 +144,8 @@ class PythonTools:
         # send files directly
         for filename, file in files.items():
             if is_image(filename):
-                self._tool_cache.cache_file(key, filename, file)
+                if self._tool_cache and key is not None:
+                    self._tool_cache.cache_file(key, filename, file)
                 await self._send_message(
                     ctx.thread_id,
                     file={
@@ -155,12 +160,14 @@ class PythonTools:
                     ctx.thread_id,
                     table,
                 )
-                self._tool_cache.cache_table(key, filename, table_chunks, file.get("description", ""))
+                if self._tool_cache and key is not None:
+                    self._tool_cache.cache_table(key, filename, table_chunks, file.get("description", ""))
 
         # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)
         if stdout:
-            self._tool_cache.cache_msg(key, stdout)
+            if self._tool_cache and key is not None:
+                self._tool_cache.cache_msg(key, stdout)
             await self._send_message(ctx.thread_id, stdout)
 
         output = {
