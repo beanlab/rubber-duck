@@ -1,35 +1,21 @@
-## Relevant File Locations
+## Purpose
 
-- `src/commands/bot_commands.py`
-- `src/commands/command.py`
-- `src/main.py`
-- `src/rubber_duck_app.py`
+`src/commands` handles admin-channel command parsing and execution.
 
-## Runtime Entry Flow
+## Operational Flow
 
-- `RubberDuckApp.route_message(...)` routes admin-channel messages into workflow type `command`.
-- `main.setup_workflow_manager(...)` wires `BotCommands` as the `command` workflow handler.
-- `main.create_commands(...)` builds command instances and passes them into `BotCommands`.
-
-## Command Dispatch Flow
-
-- `BotCommands.handle_command(...)` parses `content.split()[0]` as the command name.
-- `!help` is handled directly by `BotCommands.get_help(...)`.
-- Known commands are looked up by name and executed via `command.execute(message)`.
+- `RubberDuckApp` starts workflow type `command` for admin-channel messages.
+- `BotCommands.handle_command(...)` dispatches by first token (`content.split()[0]`).
+- `!help` is generated dynamically from registered command objects.
 - Unknown commands return `Unknown command. Try !help`.
 
-## Built-In Command Set
+## Dependencies
 
-- Metrics export:
-  - `!messages`, `!usage`, `!feedback`, `!metrics`
-- Bot/runtime checks:
-  - `!status`, `!active` (`full` option for detailed active workflows)
-- Reporting/logging:
-  - `!report`, `!log`
+- Command creation/wiring is owned by `main.setup_workflow_manager(...)` through `create_commands(...)`.
+- Data/report commands depend on `SQLMetricsHandler`, `Reporter`, and utility exporters.
 
-## Command Output Behavior
+## Failure Modes and Guardrails
 
-- Most commands respond with `send_message(channel_id, ...)` text and/or Discord files.
-- Metrics commands generate zipped files via `zip_data_file(...)`.
-- `ReportCommand` returns help text, messages, or generated image files depending on input.
-- `LogCommand` zips `*.log*` files from configured `log_dir` before sending.
+- Dispatch exceptions are caught in `BotCommands` and return a generic error to the channel.
+- Current built-ins include: `!messages`, `!usage`, `!feedback`, `!metrics`, `!status`, `!report`, `!log`, `!active`, and `!cache`.
+- `!cache clear` requires explicit `confirm` suffix to avoid accidental destructive cleanup.

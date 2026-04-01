@@ -2,31 +2,28 @@
 
 All notable changes in this repository are documented here.
 
-## spring-cleaning-test (2026-03-25T12:38:40-06:00)
+## writing-docs-skill (2026-03-26T11:59:55-06:00)
 
 ### Added
-- Introduced repository cleanup automation via `.myteam/spring-cleaning` skill and nested role/task loaders.
-- Added and standardized `DOCS.md` coverage for `src/` submodules and `tests/`.
-- Added top-level SQL metrics tests under `tests/` with shared test bootstrap in `tests/conftest.py`.
-- Added archival structure and docs under `archive/` for prompts, metrics, and education scratch/tutorial content.
-- Added checklist conclusion requirements to `.myteam/feature-check/skill.md`.
+- Added `docs-assistance` myteam guidance for concise `DOCS.md` authoring.
+- Added `docs/plans/PLAN_TEMPLATE.md` for shared multi-role feature planning.
+- Added dedicated `dev-assistance` roles (`planner`, `test-writer`, `implementer`, `reviewer`, and `docs-writer`) and a `meta` role with role-specific loaders.
+- Added `myteam-assistance/create-role` and `myteam-assistance/create-skill` nested skills.
 
 ### Changed
-- Refactored registration config to use shared YAML anchor defaults in `production-config.yaml`.
-- Updated config typing and registration workflow wiring to align with current runtime behavior.
-- Updated local config examples to avoid duplicate top-level keys and improve include usage clarity.
-- Updated lockfile and myteam dependency resolution metadata in `poetry.lock`.
-- Updated docs across moved/archived areas to reflect current structure and ownership.
+- Refactored `dev-assistance` into a full workflow with shared `docs/plans/PLAN.md` expectations and lightweight/full execution paths.
+- Updated repository docs process to load `docs-assistance` before documentation edits.
+- Reconciled all `DOCS.md` files under `src/`, `tests/`, and `archive/prompts` to current runtime behavior and ownership boundaries.
+- Standardized `DOCS.md` structure around concise high-signal sections (`Purpose`, `Operational Flow`, optional boundaries/dependencies, and guardrails).
+- Updated `myteam-assistance` structure and loader behavior to use grouped authoring subskills.
+- Updated CS110 conversation-review `target_channel_ids` in `production-config.yaml`.
 - Moved cache configuration to tool-level settings under `tools.<name>.cache` for `container_exec` tools.
 - Renamed top-level cache cleanup config to `cache_cleanup_settings`.
 - Updated cache command output to identify caches by tool source (`<backend>#<tool_name>`) while preserving index-based removal commands.
 - Made semantic caching optional per `container_exec` tool and disabled caching for `run_cs_analysis` in production config.
 
 ### Fixed
-- Prevented `!log` command failures when log path is not configured.
-- Added SQL session rollback on metrics write failures.
-- Fixed metadata generation script path handling and related cleanup fallout.
+- Corrected command documentation drift by including currently supported admin commands such as `!cache`.
 
 ### Removed / Archived
-- Archived legacy prompts and old education scratch material.
-- Archived unused metrics CSV handler and removed dead armory cache module.
+- Removed obsolete file-inventory-heavy narrative from subsystem docs in favor of decision-relevant operational notes.

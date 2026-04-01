@@ -1,36 +1,20 @@
-## Relevant File Locations
+## Purpose
 
-- `src/metrics/feedback_manager.py`
-- `src/metrics/feedback.py`
-- `src/metrics/reporter.py`
-- `src/storage/sql_metrics.py`
-- `src/main.py`
+`src/metrics` captures runtime usage/message/feedback data and exposes reporting/review workflows.
 
-## Runtime Entry Flow
+## Operational Flow
 
-- `main._main(...)` constructs `SQLMetricsHandler` and `FeedbackManager`.
-- `AIClient` is initialized with metrics hooks: `record_message` and `record_usage`.
-- `DuckOrchestrator` is initialized with `feedback_manager.remember_conversation` so completed conversations can be queued for review.
-- `setup_workflow_manager(...)` creates `Reporter` and passes it into command handlers.
+- `AIClient` writes message and usage metrics through `SQLMetricsHandler` hooks.
+- `DuckOrchestrator` calls `FeedbackManager.remember_conversation(...)` after a conversation closes.
+- `HaveTAGradingConversation` serves queued conversations in TA review threads, captures emoji/written feedback, and writes feedback records.
+- `Reporter` reads metrics tables and generates predefined or argument-driven plots for `!report`.
 
-## Metrics Capture Surfaces
+## Dependencies
 
-- Message/usage capture:
-  - `AIClient` calls `record_message(...)` and `record_usage(...)` during response execution.
-- Feedback capture:
-  - `HaveTAGradingConversation` collects emoji/text feedback and calls `record_feedback(...)`.
-- Storage backends:
-  - `SQLMetricsHandler` is the primary runtime backend.
-  - Legacy `CSVMetricsHandler` has been archived at `archive/metrics/csv_metrics.py` and is not wired into runtime.
+- Depends on `src/storage/sql_metrics.py` for persistent metrics storage.
+- Depends on queue state from `utils.persistent_queue` via `FeedbackManager`.
 
-## Feedback Review Flow
+## Failure Modes and Guardrails
 
-- `FeedbackManager` keeps per-channel persistent queues of conversations awaiting review.
-- `HaveTAGradingConversation` pulls queued conversations, posts student/grading thread links, and records scores from reaction events.
-- Timeouts re-queue conversations for later review.
-
-## Reporting Flow
-
-- `Reporter` reads metrics dataframes (`messages`, `usage`, `feedback`) through the metrics handler.
-- `!report` commands support predefined reports and argument-driven plots.
-- Usage reports compute token-based cost with pricing from reporter config.
+- TA-review timeouts re-queue pending conversations.
+- Reporter command parsing raises `ArgumentError` for invalid flag combinations/fields and returns help text from command handlers.

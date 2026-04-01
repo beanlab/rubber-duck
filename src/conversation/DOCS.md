@@ -1,29 +1,18 @@
-## Relevant File Locations
+## Purpose
 
-- `src/conversation/conversation.py`
-- `src/conversation/threads.py`
-- `src/duck_orchestrator.py`
-- `src/main.py`
-- `src/rubber_duck_app.py`
+`src/conversation` contains the thread-setup flow and conversation modes used by the duck orchestrator.
 
-## Runtime Entry Flow
+## Operational Flow
 
-- `RubberDuckApp.route_message(...)` starts `duck-orchestrator` for configured duck channels.
-- `DuckOrchestrator.__call__(...)` chooses the duck implementation for the channel, creates a thread, builds `DuckContext`, and runs the conversation under workflow alias `thread_id`.
-- `main.build_ducks(...)` constructs concrete conversation types from duck config and maps them by channel via `_setup_ducks(...)`.
+- `SetupPrivateThread` creates a thread, mentions the user in-thread, and posts the join link back in the parent channel.
+- `AgentLedConversation` runs a one-shot agent turn through `AIClient.run_agent(...)`.
+- `UserLedConversation` sends an introduction, then loops through `AIClient.run_conversation(...)` using `TalkTool` send/receive methods.
 
-## Conversation Types
+## Boundaries
 
-- `AgentLedConversation`:
-  - Runs one-shot agent handling via `AIClient.run_agent(context, agent, None)`.
-- `UserLedConversation`:
-  - Sends an introduction message first.
-  - Runs interactive loop via `AIClient.run_conversation(...)` using `TalkTool`-backed receive/send callables.
+- This module does not choose which duck runs; selection happens in `DuckOrchestrator`.
+- This module does not persist workflow state directly; quest/workflow storage owns persistence.
 
-## Thread Setup and Handoff
+## Failure Modes and Guardrails
 
-- `SetupPrivateThread.__call__(...)`:
-  - Creates a new thread from parent channel (title truncated to 20 chars).
-  - Mentions the user inside the thread.
-  - Sends the join link back to the parent channel.
-- `DuckOrchestrator` uses the returned thread id as the conversation workflow alias, enabling message and reaction events to route into that active thread workflow.
+- User-led conversations rely on queue-backed message intake and configured timeouts; timeout behavior terminates the conversation loop via `ConversationComplete`.
