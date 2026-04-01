@@ -29,7 +29,7 @@ class Message(TypedDict):
 
 
 class SendMessage(Protocol):
-    async def __call__(self, channel_id: PlatformId, message: str = None, file: FileData = None, view=None) -> PlatformId: ...
+    async def __call__(self, channel_id: PlatformId, message: str = None, file: FileData = None) -> PlatformId: ...
 
 
 class EditMessage(Protocol):

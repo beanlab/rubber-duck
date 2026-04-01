@@ -489,10 +489,9 @@ async def run_teams_mode(config: Config, log_dir: Path | None, port: int):
     app_id = os.environ['MICROSOFT_APP_ID']
     app_password = os.environ['MICROSOFT_APP_PASSWORD']
     app_tenant_id = os.environ.get('MICROSOFT_APP_TENANT_ID', '')
-    app_type = os.environ.get("MICROSOFT_APP_TYPE", "SingleTenant")
     duck_logger.info(
-        'Teams credentials loaded: app_id=%s password_len=%d password_prefix=%s tenant_id=%s app_type=%s',
-        app_id, len(app_password), app_password[:4], app_tenant_id, app_type,
+        'Teams credentials loaded: app_id=%s password_present=%s tenant_id=%s',
+        app_id, bool(app_password), app_tenant_id,
     )
 
     settings = BotFrameworkAdapterSettings(

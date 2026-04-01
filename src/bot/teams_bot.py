@@ -17,7 +17,7 @@ def _strip_teams_mentions(text: str) -> str:
     return _TEAMS_MENTION_TAG_PATTERN.sub('', text).strip()
 
 
-def _as_teams_message(activity: Activity) -> Message:
+def _as_teams_message(activity: Activity, cleaned_content: str) -> Message:
     channel_data = activity.channel_data or {}
     team_context_id = ''
     if isinstance(channel_data, dict):
@@ -34,7 +34,7 @@ def _as_teams_message(activity: Activity) -> Message:
         author_name=activity.from_property.name,
         author_mention=activity.from_property.name,
         message_id=activity.id,
-        content=_strip_teams_mentions(activity.text or ''),
+        content=cleaned_content,
         files=[],
     )
 
@@ -96,7 +96,7 @@ class TeamsBot:
                 return
 
             duck_logger.info('on_turn routing message to rubber duck')
-            await self._rubber_duck.route_message(_as_teams_message(activity))
+            await self._rubber_duck.route_message(_as_teams_message(activity, cleaned))
         except Exception:
             duck_logger.exception('on_turn unhandled exception')
 
