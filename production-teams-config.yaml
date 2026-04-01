@@ -32,6 +32,9 @@ servers:
     server_id: "placeholder"
     channels:
       rubber-duck-channel:
+        # Nic
+#        channel_id: "a:15fryMGXUZkEM8PwBmYuaMG9uDEvoX_p9gx_itNCQ-MGuZx1YnWRfaUBLG4gJARaWlOSoLdNnh3xTHIRApWSsyXBOG4DDUiBDSAk-mnQNBlEVxNCo__yeFfFSC6XCfN7u"
+        # Tyler
         channel_id: "a:17EtLZwud2hqAxLDOGmIQLIjMKCmyy0kBGqN7E1dgVuOrWX_iM3xT_SJME5ffzcE24Sh0SQFB4tmSMrwDi04Zd9EstTOgEeDgu6AuYnFmtLooLTfHuiZOiagqPHpKEkQq"
         timeout: 600
         duck: standard-rubber-duck

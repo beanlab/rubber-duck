@@ -635,21 +635,22 @@ def _configure_logging(debug: bool, log_path: Path | None) -> None:
     add_console_handler()
 
 
-async def run_from_args(args) -> None:
+def _load_single_platform_config(platform: str, config_path: str | None) -> Config:
+    resolved_path = config_path or os.getenv('CONFIG_FILE_S3_PATH')
+    if resolved_path is None:
+        raise ValueError(f'Missing --config for {platform} mode and CONFIG_FILE_S3_PATH is not set')
+    return load_configuration(resolved_path)
+
+
+async def run_from_args(args: argparse.Namespace) -> None:
     if args.platform == 'discord':
-        config_path = args.config or os.getenv('CONFIG_FILE_S3_PATH')
-        if config_path is None:
-            raise ValueError('Missing --config for discord mode and CONFIG_FILE_S3_PATH is not set')
-        config: Config = load_configuration(config_path)
+        config = _load_single_platform_config('discord', args.config)
         duck_logger.info('Starting runtime in discord mode')
         await run_discord_mode(config, args.log_path)
         return
 
     if args.platform == 'teams':
-        config_path = args.config or os.getenv('CONFIG_FILE_S3_PATH')
-        if config_path is None:
-            raise ValueError('Missing --config for teams mode and CONFIG_FILE_S3_PATH is not set')
-        config: Config = load_configuration(config_path)
+        config = _load_single_platform_config('teams', args.config)
         duck_logger.info('Starting runtime in teams mode')
         await run_teams_mode(config, args.log_path, args.port)
         return
@@ -663,15 +664,14 @@ async def run_from_args(args) -> None:
     )
 
 
-async def main():
+async def main() -> None:
     parser = build_cli_parser()
     args = parser.parse_args()
     _configure_logging(args.debug, args.log_path)
     try:
         await run_from_args(args)
-    except Exception as ex:
+    except Exception:
         duck_logger.exception('ERROR in MAIN')
-        print(ex)
 
 
 if __name__ == '__main__':

@@ -65,7 +65,7 @@ class TeamsBot:
     async def on_turn(self, turn_context: TurnContext) -> None:
         try:
             activity = turn_context.activity
-            duck_logger.info(
+            duck_logger.debug(
                 'on_turn entered: activity_type=%s conversation_id=%s',
                 activity.type,
                 activity.conversation.id if activity.conversation else None,
@@ -79,23 +79,23 @@ class TeamsBot:
             self._register_conversation(str(activity.conversation.id), reference)
 
             if activity.type != ActivityTypes.message:
-                duck_logger.info('on_turn filtered: activity_type=%s is not a message', activity.type)
+                duck_logger.debug('on_turn filtered: activity_type=%s is not a message', activity.type)
                 return
-            duck_logger.info('on_turn passed activity type check: activity_type=%s', activity.type)
+            duck_logger.debug('on_turn passed activity type check: activity_type=%s', activity.type)
 
             # Ignore messages that are empty after mention stripping (e.g. bare @mentions).
             cleaned = _strip_teams_mentions(activity.text or '')
-            duck_logger.info('on_turn after mention stripping: cleaned content=%r', cleaned)
+            duck_logger.debug('on_turn after mention stripping: cleaned content=%r', cleaned)
             if not cleaned:
-                duck_logger.info('on_turn filtered: empty content after mention stripping')
+                duck_logger.debug('on_turn filtered: empty content after mention stripping')
                 return
 
             # Ignore messages that start with // (same convention as Discord adapter).
             if (activity.text or '').lstrip().startswith('//'):
-                duck_logger.info('on_turn filtered: message starts with //')
+                duck_logger.debug('on_turn filtered: message starts with //')
                 return
 
-            duck_logger.info('on_turn routing message to rubber duck')
+            duck_logger.debug('on_turn routing message to rubber duck')
             await self._rubber_duck.route_message(_as_teams_message(activity, cleaned))
         except Exception:
             duck_logger.exception('on_turn unhandled exception')
@@ -133,6 +133,8 @@ class TeamsBot:
                 raise ValueError('Must send message or file')
 
         await self._adapter.continue_conversation(reference, _callback, self._app_id)
+        if result_id is None:
+            raise RuntimeError('Teams adapter did not return a message id')
         return result_id
 
     async def edit_message(

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# quest shims
 quest_mod = types.ModuleType("quest")
 quest_utils_mod = types.ModuleType("quest.utils")
 quest_extras_mod = types.ModuleType("quest.extras")
@@ -45,6 +46,10 @@ class _Placeholder:
     pass
 
 
+def _none(*_args, **_kwargs):
+    return None
+
+
 class _SqlBlobStorage:
     def __init__(self, *_args, **_kwargs):
         pass
@@ -65,7 +70,7 @@ quest_mod.History = _Placeholder
 quest_mod.WorkflowFactory = _Placeholder
 quest_extras_sql_mod.SqlBlobStorage = _SqlBlobStorage
 quest_extras_mod.sql = quest_extras_sql_mod
-quest_manager_mod.find_workflow_manager = lambda *_args, **_kwargs: None
+quest_manager_mod.find_workflow_manager = _none
 quest_persistence_mod.BlobStorage = _Placeholder
 quest_mod.utils = quest_utils_mod
 sys.modules.setdefault("quest", quest_mod)
@@ -75,6 +80,7 @@ sys.modules.setdefault("quest.extras.sql", quest_extras_sql_mod)
 sys.modules.setdefault("quest.manager", quest_manager_mod)
 sys.modules.setdefault("quest.persistence", quest_persistence_mod)
 
+# third-party stubs
 boto3_mod = types.ModuleType("boto3")
 
 
@@ -90,9 +96,10 @@ boto3_mod.client = _dummy_boto3_client
 sys.modules.setdefault("boto3", boto3_mod)
 sys.modules.setdefault("markdowndata", types.ModuleType("markdowndata"))
 jsonpath_ng_mod = types.ModuleType("jsonpath_ng")
-jsonpath_ng_mod.parse = lambda *_args, **_kwargs: None
+jsonpath_ng_mod.parse = _none
 sys.modules.setdefault("jsonpath_ng", jsonpath_ng_mod)
 
+# src adapter stubs
 discord_bot_mod = types.ModuleType("src.bot.discord_bot")
 
 
