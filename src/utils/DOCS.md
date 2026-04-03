@@ -8,6 +8,8 @@
 - `logger.py` sets structured log formatting and optional admin-channel log forwarding.
 - `persistent_queue.py` provides context-managed queue persistence backed by blob storage.
 - `python_exec_container.py` manages Docker container lifecycle, resource staging, code execution, and artifact extraction.
+- `python_exec_container.py` records staged dataset metadata (`filename`, resolved dataset name, full description) and provides exact-filename lookup helpers used by armory dataset tools.
+- The execution wrapper configures numpy/pandas display formatting to suppress scientific notation in typical numeric output.
 - `cache_cleaner.py` and `feedback_notifier.py` run scheduled maintenance/notification loops.
 - `zip_utils.py` exports table-like data as zipped CSV for command responses.
 
@@ -21,3 +23,4 @@
 - Docker-dependent execution fails fast when daemon connectivity is unavailable.
 - Queue persistence requires entering/exiting `PersistentQueue` contexts to rehydrate/stash state correctly.
 - Config include cycles are rejected during load.
+- Dataset description lookup is exact by staged filename; callers should disambiguate before lookup.
