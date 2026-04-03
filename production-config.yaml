@@ -132,6 +132,7 @@ ducks:
         reasoning: low
         tools:
           - run_python
+          - conclude_conversation
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
