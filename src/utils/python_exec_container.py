@@ -91,10 +91,24 @@ class PythonExecContainer:
 
     def _stage_file(self, target_path: str, dataset: DatasetInfo):
         self._write_file(dataset.filename, dataset.data, target_path)
+        dataset_name = self._extract_dataset_name(dataset.description, dataset.filename)
         self._resource_metadata.append({
+            "filename": dataset.filename,
             "path": os.path.join(target_path, dataset.filename),
-            "description": dataset.description,
+            "dataset_name": dataset_name,
+            "full_description": dataset.description,
         })
+
+    @staticmethod
+    def _extract_dataset_name(description: str, fallback_filename: str) -> str:
+        prefix = "Dataset name:"
+        for line in description.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(prefix):
+                value = stripped[len(prefix):].strip()
+                if value:
+                    return value
+        return fallback_filename
 
     def _stage_files(self):
         for resource_info in self._resource_data:
@@ -400,21 +414,38 @@ class PythonExecContainer:
                 "files": {}
             }
 
-    def get_resource_metadata(self) -> str:
-        """Return prompt content describing each file copied into the container"""
-        lines = ["\n### Available Files:"]
-
+    def describe_dataset(self, dataset_name: str) -> str | None:
+        """Return full metadata for a dataset matched by exact staged filename."""
         for resource in self._resource_metadata:
-            path = resource.get("path", "unknown")
-            description = resource.get("description", "")
+            if resource.get("filename") == dataset_name:
+                full_description = resource.get("full_description", "").strip()
+                if full_description:
+                    return full_description
+                short_name = resource.get("dataset_name", dataset_name)
+                return f"Dataset name: {short_name}"
+        return None
 
-            lines.append(f"\nDataset file path: {path}")
-            if description:
-                lines.append(description)
+    def get_dataset_filenames(self) -> list[str]:
+        return sorted(
+            resource.get("filename", "")
+            for resource in self._resource_metadata
+            if resource.get("filename")
+        )
 
-        prompt_add_on = "\n".join(lines)
-        duck_logger.debug(f"Resource descriptions to add to prompt:\n{prompt_add_on}")
-        return prompt_add_on
+    def get_dataset_inventory(self) -> list[dict[str, str]]:
+        inventory = []
+        for resource in self._resource_metadata:
+            filename = resource.get("filename")
+            path = resource.get("path")
+            dataset_name = resource.get("dataset_name")
+            if not filename or not path:
+                continue
+            inventory.append({
+                "filename": filename,
+                "path": path,
+                "dataset_name": dataset_name or filename,
+            })
+        return inventory
 
 
 def build_containers(config: Config) -> dict[str, PythonExecContainer]:

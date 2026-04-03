@@ -115,7 +115,7 @@ class PythonTools:
         if self._tool_cache and self._cache_key_builder:
             cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
             key = self._tool_cache.get_key(cache_key)
-            duck_logger.debug(f"\nCache key:\n{key}")
+            duck_logger.debug(f"Cache key: {key}")
 
             if self._tool_cache.check_if_cached(key):
                 duck_logger.debug(f" Cache HIT ".center(20, '-'))
@@ -180,3 +180,45 @@ class PythonTools:
             output = ConcludesResponse(output)
 
         return output
+
+
+class DatasetTools:
+    def __init__(self, containers: list[PythonExecContainer]):
+        self._containers = containers
+
+    def get_resource_metadata(self) -> str:
+        lines = ["\n### Available Files:"]
+        for container in self._containers:
+            for dataset in container.get_dataset_inventory():
+                lines.append(f"\nDataset file path: {dataset['path']}")
+                dataset_name = dataset.get("dataset_name", dataset["filename"])
+                lines.append(f"Dataset name: {dataset_name}")
+        return "\n".join(lines)
+
+    async def describe_dataset(self, ctx: DuckContext, dataset_name: str) -> str:
+        """
+        Returns the full dataset description for an exact dataset filename match.
+        Use the exact filename shown in the available dataset list.
+        """
+        duck_logger.debug(f"describe_dataset called with dataset_name={dataset_name!r}")
+        for container in self._containers:
+            description = container.describe_dataset(dataset_name)
+            if description:
+                duck_logger.debug(f"\n{description}")
+                return description
+
+        available = sorted({
+            filename
+            for container in self._containers
+            for filename in container.get_dataset_filenames()
+        })
+        if not available:
+            duck_logger.debug(f"describe_dataset no datasets available for dataset_name={dataset_name!r}")
+            return "No datasets are currently available."
+
+        message = (
+            f"Dataset '{dataset_name}' not found. "
+            f"Available dataset filenames: {', '.join(available)}"
+        )
+        duck_logger.debug(f"describe_dataset no match for dataset_name={dataset_name!r}; {message}")
+        return message

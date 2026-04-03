@@ -15,7 +15,7 @@ from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlTo
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
-from .armory.python_tools import PythonTools
+from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
 from .armory.talk_tool import TalkTool
 from .bot.discord_bot import DiscordBot
@@ -294,12 +294,14 @@ def build_armory(
 ) -> tuple[Armory, TalkTool, list[ToolCache]]:
     armory = Armory(send_message)
     tool_caches: list[ToolCache] = []
+    container_names_for_python_tools: set[str] = set()
 
     # setup tools
     config_tools = config.get("tools", [])
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
+            container_names_for_python_tools.add(container_name)
             cache_settings = _get_tool_cache_settings(tool_config)
             tool_cache = None
             cache_key_builder = None
@@ -314,14 +316,24 @@ def build_armory(
                 tool_cache,
                 cache_key_builder
             )
-            amended_description = (
-                    tool_config.get('description', python_tools.run_code.__doc__)
-                    + '\n'
-                    + containers[container_name].get_resource_metadata()
-            )
+            amended_description = tool_config.get('description', python_tools.run_code.__doc__)
             armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
+
+    dataset_containers = [containers[name] for name in sorted(container_names_for_python_tools)]
+    if dataset_containers:
+        dataset_tools = DatasetTools(dataset_containers)
+        describe_dataset_description = (
+            "Returns the full description for a dataset by exact dataset filename.\n"
+            "Use this when you need full column-level metadata."
+            + dataset_tools.get_resource_metadata()
+        )
+        armory.add_tool(
+            dataset_tools.describe_dataset,
+            name="describe_dataset",
+            description=describe_dataset_description
+        )
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
@@ -459,7 +471,7 @@ if __name__ == '__main__':
     # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        quest_logger.setLevel(logging.DEBUG)
+        # quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
