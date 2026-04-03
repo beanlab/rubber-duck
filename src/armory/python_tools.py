@@ -195,14 +195,14 @@ class DatasetTools:
                 lines.append(f"Dataset name: {dataset_name}")
         return "\n".join(lines)
 
-    async def describe_dataset(self, ctx: DuckContext, dataset_name: str) -> str:
+    async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
         """
         Returns the full dataset description for an exact dataset filename match.
-        Use the exact filename shown in the available dataset list.
+        Use the exact filename shown in the available dataset list (not Dataset Name).
         """
-        duck_logger.debug(f"describe_dataset called with dataset_name={dataset_name!r}")
+        duck_logger.debug(f"describe_dataset called with dataset_name={dataset_filename!r}")
         for container in self._containers:
-            description = container.describe_dataset(dataset_name)
+            description = container.describe_dataset(dataset_filename)
             if description:
                 duck_logger.debug(f"\n{description}")
                 return description
@@ -213,12 +213,12 @@ class DatasetTools:
             for filename in container.get_dataset_filenames()
         })
         if not available:
-            duck_logger.debug(f"describe_dataset no datasets available for dataset_name={dataset_name!r}")
+            duck_logger.debug(f"describe_dataset no datasets available for dataset_name={dataset_filename!r}")
             return "No datasets are currently available."
 
         message = (
-            f"Dataset '{dataset_name}' not found. "
+            f"Dataset '{dataset_filename}' not found. "
             f"Available dataset filenames: {', '.join(available)}"
         )
-        duck_logger.debug(f"describe_dataset no match for dataset_name={dataset_name!r}; {message}")
+        duck_logger.debug(f"describe_dataset no match for dataset_name={dataset_filename!r}; {message}")
         return message
