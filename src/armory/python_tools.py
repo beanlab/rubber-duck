@@ -2,6 +2,7 @@ import io
 import re
 from decimal import Decimal, InvalidOperation
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from ..utils.protocols import ToolCache, CacheKeyBuilder
 from ..utils.config_types import DuckContext
@@ -34,6 +35,23 @@ def _to_plain_decimal(token: str) -> str:
 
 def _remove_scientific_notation(text: str) -> str:
     return _SCI_NOTATION_PATTERN.sub(lambda m: _to_plain_decimal(m.group(1)), text)
+
+
+def _format_rounded_decimal(value: float, places: int = 4) -> str:
+    formatted = format(float(value), f".{places}f")
+    formatted = formatted.rstrip("0").rstrip(".")
+    return formatted if formatted else "0"
+
+
+def _format_table_values(table: pd.DataFrame) -> pd.DataFrame:
+    formatted_table = table.copy()
+    for col in formatted_table.columns:
+        if not is_numeric_dtype(formatted_table[col]):
+            continue
+        formatted_table[col] = formatted_table[col].map(
+            lambda value: _format_rounded_decimal(value, 4) if pd.notna(value) else ""
+        )
+    return formatted_table
 
 
 def _estimate_column_widths(df, sample_rows=20):
@@ -98,12 +116,12 @@ async def send_table(
         table: pd.DataFrame,
         max_rows: int = 100,
 ) -> list[str]:
-    table = table.head(max_rows)
+    table = _format_table_values(table.head(max_rows))
     col_chunk = _determine_col_chunk(table)
     table_chunks = []
 
     for i in range(0, table.shape[1], col_chunk):
-        md_table = table.iloc[:, i:i + col_chunk].to_markdown(floatfmt=".15f")
+        md_table = table.iloc[:, i:i + col_chunk].to_markdown(disable_numparse=True)
         table_chunk = f"```\n{md_table}\n```"
         table_chunks.append(table_chunk)
         await send_message(channel_id, table_chunk)

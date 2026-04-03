@@ -299,7 +299,7 @@ class PythonExecContainer:
                 import pandas as pd
 
                 def _plain_float(value):
-                    formatted = format(float(value), ".15f")
+                    formatted = format(float(value), ".4f")
                     formatted = formatted.rstrip("0").rstrip(".")
                     return formatted if formatted else "0"
 
