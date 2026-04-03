@@ -415,8 +415,12 @@ def main(s3_uri: str | None, mode: str, dry_run: bool, model: str):
         all_meta = generate_s3_metadata(prefix, bucket, mode=mode, dry_run=dry_run)
 
     for dataset_name, meta in all_meta.items():
-        duck_logger.debug(f"\n--- Metadata for {dataset_name} ---\n")
-        duck_logger.debug(json.dumps(meta, indent=2))
+        if dry_run:
+            duck_logger.info(f"\n--- Metadata for {dataset_name} ---\n")
+            duck_logger.info(json.dumps(meta, indent=2))
+        else:
+            duck_logger.debug(f"\n--- Metadata for {dataset_name} ---\n")
+            duck_logger.debug(json.dumps(meta, indent=2))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
