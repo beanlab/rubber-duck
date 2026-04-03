@@ -218,6 +218,7 @@ def _infer_dtype_dynamic(series: pd.Series, max_categories: int = MAX_CATEGORIES
 
 def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) -> dict:
     """Create draft metadata dict from a DataFrame."""
+    duck_logger.info(f"Creating draft metadata for {dataset_name}")
     columns = []
     for col in df.columns:
         dtype = _infer_dtype_dynamic(df[col])
@@ -242,7 +243,7 @@ def _draft_metadata(df: pd.DataFrame, dataset_name: str, bucket: str, key: str) 
 
 def _refine_metadata_with_gpt(draft_meta: dict) -> dict:
     """Uses GPT to improve display_name, descriptions, and normalize dtypes."""
-    duck_logger.debug(f"Sending draft metadata to GPT: {draft_meta['dataset_name']}")
+    duck_logger.info(f"Refining draft metadata for {draft_meta['dataset_name']} with GPT")
     prompt = dedent(f"""\
         You are a data catalog assistant.
         
