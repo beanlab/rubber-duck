@@ -293,6 +293,24 @@ class PythonExecContainer:
 
             outdir = Path({path!r})  # full container path for outputs
 
+            # ===== Configure numeric display (no scientific notation) ===== #
+            try:
+                import numpy as np
+                import pandas as pd
+
+                def _plain_float(value):
+                    formatted = format(float(value), ".15f")
+                    formatted = formatted.rstrip("0").rstrip(".")
+                    return formatted if formatted else "0"
+
+                np.set_printoptions(
+                    suppress=True,
+                    formatter={{"float_kind": _plain_float}}
+                )
+                pd.set_option("display.float_format", _plain_float)
+            except Exception:
+                pass
+
             # ===== Patch matplotlib to auto-save metadata ===== #
             try:
                 import matplotlib.pyplot as plt

@@ -1,4 +1,6 @@
 import io
+import re
+from decimal import Decimal, InvalidOperation
 import pandas as pd
 
 from ..utils.protocols import ToolCache, CacheKeyBuilder
@@ -6,6 +8,32 @@ from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
+
+
+_SCI_NOTATION_PATTERN = re.compile(
+    r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+)(?![\w.])"
+)
+
+
+def _to_plain_decimal(token: str) -> str:
+    try:
+        value = Decimal(token)
+    except InvalidOperation:
+        return token
+
+    if not value.is_finite():
+        return token
+
+    formatted = format(value, "f")
+    if "." in formatted:
+        formatted = formatted.rstrip("0").rstrip(".")
+    if formatted in {"", "-0", "+0"}:
+        return "0"
+    return formatted
+
+
+def _remove_scientific_notation(text: str) -> str:
+    return _SCI_NOTATION_PATTERN.sub(lambda m: _to_plain_decimal(m.group(1)), text)
 
 
 def _estimate_column_widths(df, sample_rows=20):
@@ -61,7 +89,7 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
         filtered_lines.append(line)
 
     stdout = "\n".join(filtered_lines).strip()
-    return stdout
+    return _remove_scientific_notation(stdout)
 
 
 async def send_table(
@@ -75,7 +103,7 @@ async def send_table(
     table_chunks = []
 
     for i in range(0, table.shape[1], col_chunk):
-        md_table = table.iloc[:, i:i + col_chunk].to_markdown()
+        md_table = table.iloc[:, i:i + col_chunk].to_markdown(floatfmt=".15f")
         table_chunk = f"```\n{md_table}\n```"
         table_chunks.append(table_chunk)
         await send_message(channel_id, table_chunk)
@@ -132,7 +160,7 @@ class PythonTools:
         results = await self._container.run_code(code)
 
         stdout = results.get('stdout').strip()
-        stderr = results.get('stderr').strip()
+        stderr = _remove_scientific_notation(results.get('stderr').strip())
         files = results.get('files', {})
 
         # log created files
