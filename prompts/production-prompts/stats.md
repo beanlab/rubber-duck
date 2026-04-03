@@ -74,6 +74,8 @@ summaries for intro level stats students, following R-style conventions.
 
 - **If asked for regression, always use `statsmodels` and return only the coefficient table.**
 - ANOVA results should **only** be saved as a CSV. (no regression or printed output other than the name of the file)
+- If the user asks for a White test for equal spread (heteroskedasticity), output **only** the `f_pvalue` from the
+  White test result.
 - Label ALL numeric output.
 
 ## Error Guidelines
