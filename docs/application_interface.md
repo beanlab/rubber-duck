@@ -2,363 +2,270 @@
 
 ## Purpose
 
-`myteam` is a command-line application for building file-based agent systems.
+Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.
 
-Its public purpose is to let a project define agent instructions in a project-local directory and
-then let agents load those instructions themselves. The tool treats roles, skills, and tools as
-discoverable filesystem objects that can be created, listed, loaded, downloaded, and removed through
-the CLI. It also ships version-aware built-in maintenance skills so agents can surface upgrade
-guidance for older local trees without copying those built-ins into each project.
+At the black-box level, the application:
+
+- receives Discord messages in configured channels
+- routes each message into either admin command handling or a duck workflow
+- creates and manages private thread conversations for duck workflows
+- runs AI-backed conversation and workflow logic according to duck configuration
+- records messages, usage, and feedback metrics for later export and reporting
 
 The intended workflow is:
 
-1. A project initializes the local tree.
-2. A human author creates or downloads roles and skills.
-3. Agents run `myteam get role ...` and `myteam get skill ...` to load the instructions relevant to their current task.
-4. Each loaded role or skill reveals the next level of roles, skills, and tools that are available from that point in the hierarchy.
+1. An operator starts the app with a configuration file.
+2. The bot announces availability in the configured admin channel.
+3. Users send messages in configured duck channels.
+4. The app creates a private thread per new duck conversation and runs the configured workflow.
+5. Admins run commands in the admin channel for health checks, metrics export, logs, reports, and workflow visibility.
 
 ## Operating Model
 
-`myteam` operates relative to the current working directory.
+The runtime contract is Discord-first and config-driven.
 
-- The application treats the current directory as the project root.
-- The root agent system lives in a project-local root directory.
-- Roles and skills are organized as nested directories under that local root directory.
-- A loadable role directory contains `role.md` or `ROLE.md` and a `load.py`.
-- A loadable skill directory contains `skill.md` or `SKILL.md` and a `load.py`.
-- Packaged built-in skills also exist under the reserved `builtins/` namespace and are loadable even
-  though they do not live in the project's local tree.
-- Instruction files may contain YAML frontmatter. When a role or skill is loaded, the frontmatter is not shown in the printed instructions.
+- The app runs as a single process started from `python -m src.main`.
+- Behavior is driven by a resolved config (local file or S3 URI).
+- Each configured channel can map to a named global duck or an inline duck definition.
+- Incoming messages are routed by channel identity and workflow state:
+  - admin channel => command workflow
+  - configured duck channel => new duck-orchestrator workflow
+  - existing active conversation thread => forwarded into the active workflow queue
+- Unmatched non-admin/non-configured messages are ignored.
 
-## Local Root Selection
+## Startup Interface
 
-Commands that operate on the project-local tree use one selected local root directory for that
-invocation.
+### `python -m src.main [--config <path-or-s3-uri>] [--debug] [--log-path <path>]`
 
-- The default local root is `.myteam/`.
-- `init`, `new`, `get`, `remove`, `download`, and `update` accept `--prefix <path>` to use a
-  different local root for that command invocation.
-- `--prefix` changes only the project-local root used by that command. It does not change the
-  packaged built-in `builtins/` namespace.
-- When a command accepts both `--prefix` and a more specific path-like input, the more specific
-  input still determines the final target where documented by that command.
+Starts the bot runtime.
+
+Inputs:
+
+- `--config`: optional local JSON/YAML path or `s3://...` URI
+- `--debug`: optional flag for debug log level
+- `--log-path`: optional path used for file-based logging
+
+Expected outcome on success:
+
+- Loads and resolves config including recursive `$include` directives.
+- Connects runtime dependencies (Discord client, SQL metrics/session, configured ducks/tools).
+- Starts the Discord bot loop.
+- Sends `Duck online` to the configured admin channel when ready.
+
+Config fallback behavior:
+
+- If `--config` is omitted, the app attempts to read `CONFIG_FILE_S3_PATH` from environment variables.
+
+User-visible/operator-visible failure behavior:
+
+- If required runtime dependencies or configuration are invalid, startup fails and logs an error.
+- If `--log-path` is omitted, runtime continues and warns that logging is console-only.
 
 ## Interface Guarantees
 
-At the black-box level, `myteam` provides these categories of behavior:
+At the black-box level, Rubber Duck provides these behavior categories:
 
-- It can scaffold a local agent-system tree.
-- It can scaffold new role and skill nodes inside that local tree.
-- It can record which `myteam` version last initialized or refreshed a local tree.
-- It can load and print instructions for a role or skill.
-- It can resolve skills from either the selected project-local tree or the packaged built-in tree,
-  depending on the requested namespace.
-- It can alert the caller when the installed `myteam` version is newer than the tracked version for the selected local tree.
-- It can expose packaged migration and changelog guidance through built-in maintenance skills.
-- It can remove a previously created node.
-- It can list downloadable rosters from a remote repository.
-- It can download a roster into a local destination.
-- It can update a previously downloaded managed roster install from its recorded source metadata.
-- It can use a caller-selected local root prefix for commands whose default destination would otherwise use the default local root.
-- It can report its version string.
+- Admin command handling in one configured admin channel.
+- Configured duck channel conversations that always begin in a private thread.
+- Thread-based AI workflow execution for supported duck types.
+- SQL-backed recording of message/usage/feedback telemetry.
+- Export/report surfaces through admin commands.
+- Graceful close messaging for duck conversations.
 
-Successful commands either:
+Successful runtime interactions either:
 
-- create or remove files and directories in or under the current working directory,
-- print instructions or listings to standard output,
-- download roster files into a destination directory,
-- or return a version string.
+- send Discord messages/reactions/files,
+- create Discord threads,
+- or produce command outputs and artifacts (e.g., zip/csv/image files).
 
-When a command cannot complete, it exits with an error and reports the failure on standard error.
+When a workflow fails unexpectedly:
 
-## Command Reference
+- the thread receives an error-code message,
+- the conversation is then closed with `*This conversation has been closed.*`.
 
-### `myteam init [--prefix <path>]`
+## Message Routing Contract
 
-Initializes a new agent system in the current working directory.
+### General inbound message filters
 
-Expected outcome on success:
+The bot ignores:
 
-- Creates the selected local root directory as the root role directory if it does not already exist.
-- Creates `role.md` in that local root.
-- Creates `load.py` in that local root.
-- Creates a version metadata file in that local root that stores the current `myteam` version.
-- Creates `AGENTS.md` if `AGENTS.md` does not already exist.
-- Leaves an existing `AGENTS.md` in place.
+- messages from itself
+- messages from other bots
+- messages starting with `//`
 
-User-visible result:
+### Admin-channel behavior
 
-- After success, the current directory is ready for `myteam get role`.
-- The generated root role can later detect when the installed `myteam` release is newer than the stored tracked version for that local tree.
-- Packaged maintenance skills under the reserved `builtins/` namespace are available for later use
-  without being copied into the project tree.
+Messages in the configured admin channel are treated as commands.
 
-### `myteam new role <path> [--prefix <path>]`
+- `!help` returns a generated help list of registered commands.
+- unknown commands return `Unknown command. Try !help`.
+- command execution errors return a generic unexpected-error message.
 
-Creates a new role below the selected local tree root.
+### Duck-channel behavior
 
-Inputs:
+A message in a configured duck channel starts a new duck workflow.
 
-- `<path>` is slash-delimited and may describe a nested role such as `engineer/frontend`.
+Expected observable behavior:
 
-Expected outcome on success:
+- The app creates a thread using the first 20 characters of the triggering message.
+- The user is mentioned in the new thread.
+- The parent channel receives a join link message mentioning the user.
+- If the original message contains `duck`, the app adds a 🦆 reaction to it.
 
-- Creates the target directory under the selected local root.
-- Creates a `role.md` definition file in that directory.
-- Creates a `load.py` loader in that directory.
+### Active-thread behavior
 
-User-visible result:
+Messages in an active conversation thread are delivered to the running workflow via its message queue.
 
-- The new role becomes loadable with `myteam get role <path>`.
+## Duck Workflow Contract
 
-Failure conditions that matter at the interface:
+Configured ducks are selected by `duck_type`.
 
-- If the target directory already exists, the command exits with an error and does not overwrite it.
+Supported duck types:
 
-### `myteam new skill <path> [--prefix <path>]`
+- `agent_led_conversation`
+- `user_led_conversation`
+- `conversation_review`
+- `registration`
+- `assignment_feedback`
 
-Creates a new skill below the selected local tree root.
+### Shared lifecycle behavior
 
-Inputs:
+- Duck workflows run inside the created thread.
+- On completion (or handled failure), the app sends `*This conversation has been closed.*`.
+- Completed duck conversations are recorded for feedback-queue processing when applicable.
 
-- `<path>` is slash-delimited and may describe a nested skill such as `python/testing`.
+### `agent_led_conversation`
 
-Expected outcome on success:
+- Runs a one-shot agent response flow in the thread.
 
-- Creates the target directory under the selected local root.
-- Creates a `skill.md` definition file in that directory.
-- Creates a `load.py` loader in that directory.
+### `user_led_conversation`
 
-User-visible result:
+- Sends configured introduction text.
+- Continues turn-based conversation until completion/timeout conditions are reached.
 
-- The new skill becomes loadable with `myteam get skill <path>`.
+### `conversation_review`
 
-Failure conditions that matter at the interface:
+- Serves queued student conversations to TA/reviewer threads.
+- Uses reaction-based scoring (`1️⃣`-`5️⃣`, skip via `⏭️`).
+- Prompts for optional written feedback after numeric scoring.
+- Ends inactive sessions with timeout messaging.
 
-- If the target directory already exists, the command exits with an error and does not overwrite it.
+### `registration`
 
-### `myteam get role [path] [--prefix <path>]`
+Expected user-facing sequence:
 
-Loads and prints a role's instructions.
+- prompt for Net ID
+- Net ID format validation
+- email verification challenge with retry/resend path
+- nickname selection and validation
+- role assignment flow
 
-Inputs:
+Observable failure/guardrail behavior includes:
 
-- With no `path`, the command loads the root role at the selected local root.
-- With a `path`, it loads the nested role under `<prefix>/<path>`.
+- timeout closes conversation with timeout message
+- repeated invalid verification tokens terminate registration attempt
+- permission issues during nickname/role assignment notify configured TA channel and terminate flow
 
-Expected outcome on success:
+### `assignment_feedback`
 
-- Executes the target role's `load.py`.
-- Prints the role instructions.
-- Prints built-in guidance about roles, skills, and tools when the loader includes it.
-- Prints the immediately discoverable child roles, child skills, and Python tools exposed from that node.
+Expected user-facing sequence:
 
-User-visible result:
+- optional initial instructions
+- list of supported assignments
+- prompt for markdown upload (up to three attempts)
+- assignment detection from report headers, with AI fallback selection
+- rubric-based grading response in markdown format
 
-- The caller receives the instructions and local discovery context for that role.
-- When loading the root role generated by `myteam init`, the caller also receives an upgrade notice if the installed `myteam` release is newer than the tracked version for the selected local tree.
-- If the tracked version file is missing, the generated root role treats the selected local tree as an untracked legacy tree and may still print upgrade guidance instead of failing.
-- The generated root role can tell the caller that it may assist with migrating the existing
-  local tree and that, if the user agrees, the agent should load
-  `myteam get skill builtins/migration` to perform the migration correctly.
+Observable failure/guardrail behavior includes:
 
-Failure conditions that matter at the interface:
+- non-markdown or missing uploads trigger retry prompts
+- unsupported assignment names terminate with an explicit unsupported message
+- missing report sections produce explicit unsatisfactory rubric feedback for those sections
 
-- If the target path is not a valid role directory, the command exits with an error.
-- If the target role exists but lacks `load.py`, the command exits with an error.
-- If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
+## Admin Command Contract
 
-### `myteam get skill <path> [--prefix <path>]`
+The following commands are registered and available through admin-channel command routing.
 
-Loads and prints a skill's instructions.
+### `!status`
 
-Inputs:
+- Returns `I am alive. 🦆`.
 
-- `<path>` is a slash-delimited skill path.
+### `!messages`, `!usage`, `!feedback`
 
-Expected outcome on success:
+- Each command returns a zip file export for its respective table.
 
-- Resolves `builtins/...` from the packaged built-in skill tree.
-- Resolves all other skill paths from the selected local tree root.
-- Executes the resolved skill's loader.
-- Prints the skill instructions.
-- Prints any child roles, child skills, and Python tools exposed from that node by the loader.
+### `!metrics`
 
-User-visible result:
+- Returns all three table exports (`messages`, `usage`, `feedback`).
 
-- The caller receives the instructions and local discovery context for that skill.
-- Built-in maintenance skills may additionally print migration guidance or release notes derived from the installed `myteam` package.
-- If the tracked version file for the selected local root is missing, built-in maintenance skills treat that tree as an untracked legacy local tree and still print the relevant upgrade guidance.
+### `!report`
 
-Failure conditions that matter at the interface:
+- `!report` / `!report help` / `!report h` return report help text.
+- other valid forms return generated report images and/or text output.
+- failures return an explicit report-generation error message.
 
-- If the target path is not a valid skill in the selected source tree, the command exits with an error.
-- If the resolved skill exists but lacks the required loader entry point, the command exits with an error.
-- If the loader itself exits non-zero, `myteam` exits with the same non-zero status.
+### `!log`
 
-### `myteam remove <path> [--prefix <path>]`
+- If logging path is configured and log files exist, returns a zip of logs.
+- If logging is not configured, returns `Log export disabled: no log path configured.`
+- If no logs are present, returns a no-logs message.
 
-Removes a role or skill directory from the selected local tree root.
+### `!active [full]`
 
-Inputs:
+- `!active` returns workflow counts by type.
+- `!active full` returns detailed active workflow entries with Mountain Time timestamps.
 
-- `<path>` is a slash-delimited path under the selected local root.
+### `!cache`
 
-Expected outcome on success:
+- `!cache` lists current cache entries and sends a CSV report.
+- `!cache cleanup` removes expired entries.
+- `!cache remove <cache_tool> <entry_index>` removes one entry.
+- `!cache clear confirm` clears all cache entries.
+- invalid forms return usage/help-style error messages.
 
-- Deletes the target directory and all of its contents recursively.
+## Configuration Contract
 
-User-visible result:
+The external config contract includes:
 
-- The removed node is no longer available to load.
+- source: local path or S3 URI
+- format: JSON or YAML
+- recursive `$include` support with optional JSONPath selectors
+- deep-merge semantics for dict-style includes
 
-Failure conditions that matter at the interface:
+Required top-level runtime sections include:
 
-- If the target path does not exist, the command exits with an error.
-- If the target path exists but is not a directory, the command exits with an error.
-- If the directory cannot be removed, the command exits with an error.
+- `sql`
+- `containers`
+- `tools`
+- `ducks`
+- `servers`
+- `admin_settings`
+- `ai_completion_retry_protocol`
+- `reporter_settings`
+- `sender_email`
 
-### `myteam list`
+Optional sections include:
 
-Lists roster entries available from the default remote roster repository.
-
-Expected outcome on success:
-
-- Connects to the configured roster repository.
-- Prints one available roster entry path per line.
-
-User-visible result:
-
-- The caller can inspect the output and choose a roster name for `myteam download`.
-
-Failure conditions that matter at the interface:
-
-- If the repository path is invalid or the remote request fails, the command exits with an error.
-
-### `myteam download <roster> [destination] [--prefix <path>]`
-
-Downloads a named roster folder from a remote repository as a managed local install.
-
-Inputs:
-
-- `<roster>` identifies the remote roster folder to download.
-- The command also supports an optional destination and alternate repository through its CLI wiring.
-- If no destination is provided, the roster path is installed under the selected local root using the
-  same relative folder path as the remote roster.
-
-Expected outcome on success:
-
-- Downloads the requested roster folder content from the configured repository.
-- Creates one managed local folder for that install.
-- Writes a `.source.yml` provenance file at the root of the managed local folder.
-- Writes downloaded files inside that managed local folder while preserving their relative paths within
-  the roster.
-- Prints progress while downloading.
-
-User-visible result:
-
-- The downloaded roster becomes available on disk as a managed folder, ready to be loaded or edited.
-- The managed folder records enough source information for later provenance-aware commands.
-
-Failure conditions that matter at the interface:
-
-- If the roster name does not exist in the repository, the command exits with an error and reports available roster names.
-- If the requested roster resolves to a single file instead of a folder, the command exits with an error.
-- If the destination already contains the same managed source, the command exits with an error that
-  tells the caller to run `myteam update <path>` instead of using `download` again.
-- If unrelated content already exists at the destination path, the command exits with an error that
-  explains the content is not the same managed source and tells the caller to delete it or choose a
-  different destination instead of merging.
-- If the remote metadata or file downloads fail, the command exits with an error.
-
-### `myteam update [path] [--prefix <path>]`
-
-Refreshes one or more managed downloaded folders from their recorded source metadata.
-
-Inputs:
-
-- With a `path`, the command updates the managed folder rooted at the selected local root.
-- With no path, the command scans the selected local root recursively for managed download roots and
-  updates each one independently.
-
-Expected outcome on success:
-
-- Reads `.source.yml` from each targeted managed folder.
-- Re-downloads the folder content from the recorded repository, roster path, and ref.
-- Existing content at the managed target is deleted before re-download.
-- After deletion, the command performs the same managed install behavior as `myteam download` using the
-  recorded source metadata.
-
-User-visible result:
-
-- Managed downloaded content can be refreshed without re-specifying its remote source.
-- A project with multiple managed downloaded folders can refresh all of them in one command.
-
-Failure conditions that matter at the interface:
-
-- If the requested path does not identify a managed downloaded folder with `.source.yml`, the command
-  exits with an error.
-- If `myteam update` is run with no path and no managed downloaded folders are found, the command exits
-  with an error.
-- If a targeted managed folder has invalid or incomplete source metadata, the command exits with an
-  error.
-- If the recorded remote roster no longer exists, resolves to a file, or cannot be fetched, the command
-  exits with an error.
-
-### `myteam --version`
-
-Reports the application version.
-
-Expected outcome on success:
-
-- Returns a version string in the form `myteam <version>`.
-
-User-visible result:
-
-- The caller can verify which installed version of `myteam` is running.
+- `feedback_notifier_settings`
+- `cache_cleanup_settings`
+- `agents_as_tools`
 
 ## Observable Conventions
 
-The following behavior is part of the current application contract:
+The following conventions are part of the user/operator-observable contract:
 
-- Paths are interpreted relative to the current working directory.
-- Nested role and skill names use slash-delimited paths.
-- Instruction loading is driven by executable `load.py` files stored alongside role and skill definitions.
-- The `builtins/` skill namespace is reserved for packaged built-in skills shipped with the installed
-  `myteam` version.
-- `builtins/...` paths resolve only from the packaged built-in tree.
-- All other skill paths resolve only from the selected project-local tree.
-- Role and skill metadata may be surfaced from YAML frontmatter in definition files.
-- A local tree may carry a stored `myteam` version used for upgrade notices and migration guidance.
-- Upgrade guidance is surfaced through the generated root role and built-in maintenance skills, not through a dedicated migration CLI command.
-- If the tracked version file is missing, upgrade-related built-in loaders treat the tree as a legacy untracked local tree rather than failing.
-- Managed downloaded folders are identified by a `.source.yml` file at the root of the managed install.
-- Errors are communicated as command failure plus an error message on standard error.
-
-## Developer Concerns
-
-The following notes describe internal implementation constraints that support the public interface.
-
-### `load.py`
-
-- `myteam get role ...` and `myteam get skill ...` execute the target `load.py` as a separate Python
-  process rather than importing it in-process.
-- This process boundary is intentional. It keeps loader execution isolated from the main CLI process
-  and lets loader exit status propagate naturally as command success or failure.
-- When one invocation selects a non-default local root with `--prefix`, the CLI passes that selected
-  project-local root to the loader process through the internal `MYTEAM_PROJECT_ROOT` environment
-  variable.
-- Loader helpers such as `get_active_myteam_root()` and the compatibility helper
-  `get_myteam_root()` consult that environment variable so generated loaders, packaged built-in
-  loaders, and older project loaders can all resolve the active local root consistently.
-- `MYTEAM_PROJECT_ROOT` is an internal loader-execution mechanism, not part of the user-facing CLI
-  contract.
+- Channel and server routing is ID-based from config.
+- New duck conversations are thread-scoped.
+- Thread inactivity and workflow-complete conditions close user-facing conversations.
+- Admin command outputs are delivered in Discord as messages/files.
+- Metrics and feedback are persisted for export/reporting behavior.
 
 ## Out of Scope
 
 This interface document does not define:
 
-- internal module boundaries,
-- template implementation details,
-- the specific prose content of any project's role or skill instructions,
-- or the contents of any external roster repository.
+- internal class/module boundaries
+- AI prompt text contents
+- SQL schema implementation details
+- internal dependency injection/wiring mechanics
+- non-observable helper utilities
