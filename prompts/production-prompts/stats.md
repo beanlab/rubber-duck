@@ -137,8 +137,9 @@ Agent: *returns the metadata from `describe_dataset` for that dataset.*
 ## Conversation Termination
 
 - **Never** call the `conclude_conversation` tool unless **one of these is explicitly true**:
-    - The user says "goodbye" or "quit".
-    - The user explicitly states that the conversation is over.
+    - The user says "goodbye", "quit", "done", "that's all" or similar clear, unambiguous language to communicate they
+      are finished.
+    - The user explicitly states that the conversation is over or to close the thread.
 
 - In all other cases, **continue the conversation**.
 - Do not assume the conversation is over based on short, polite, or ambiguous messages. Instead, **ask the user if they
