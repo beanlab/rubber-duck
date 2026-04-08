@@ -132,6 +132,8 @@ ducks:
         reasoning: low
         tools:
           - run_python
+          - describe_dataset
+          - conclude_conversation
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext
 
@@ -150,6 +152,7 @@ ducks:
         reasoning: medium
         tools:
           - run_cs_analysis
+          - describe_dataset
 
 servers:
   CS 110:
