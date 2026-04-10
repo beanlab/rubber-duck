@@ -1,34 +1,26 @@
 ---
 name: Meeting Minutes
 description: |
-  Transcribe an audio recording into a cleaned raw transcript and a
-  meeting summary.
-  Load this skill if you are tasked with transcribing audio files
-  or summarizing transcripts into meeting minutes.
+  Turn pasted transcript text into structured meeting minutes.
+  Load this skill when transcript text is provided directly and must
+  be summarized into project-focused meeting notes.
 ---
 
-# Transcription
+# Transcript Processing
 
-This skill outlines the process and format for transcribing audio files
-into markdown outputs.
+This skill outlines the process and format for turning pasted meeting
+transcript text into markdown minutes.
 
 ## Outputs
 
-Given a recording, use the file creation timestamp to create:
+Create:
 
-- `../raw-transcripts/<repo name>/YYYY-MM-DD-HHMM.raw.md`
 - `meetings/YYYY-MM-DD-HHMM.md`
 
-Use the file creation timestamp, not the current time, for the
-filename.
+If the user provides the meeting date and time, use that timestamp.
+Otherwise, use the current local timestamp for the filename.
 
 e.g `2026-04-02-1430.md`
-
-## Dependencies
-
-This workflow depends on `faster-whisper` for audio transcription.
-If this package is not installed in the current environment,
-offer to install it.
 
 ## Agent Instructions
 
@@ -48,21 +40,19 @@ as an action to be taken without human review and approval.
 
 ## Workflow
 
-1. Read the file creation timestamp from the source audio file.
-   On macOS, `stat -f '%SB' -t '%Y-%m-%d-%H%M' <file>` works.
-   - If the transcript text is provided for you, ask the user for the timestamp to use. 
-2. Check that meetings and raw transcript folders exists; create them if needed.
-3. Run transcription locally and save an intermediate raw output if
-   needed.
-4. Clean the transcript before saving it:
+1. Receive the transcript text from the user.
+2. Determine timestamp for output filename:
+   - use user-provided meeting date/time when available
+   - otherwise use current local date/time
+3. Check that the `meetings` folder exists; create it if needed.
+4. Clean the transcript before summarizing:
    - fix obvious punctuation and capitalization
    - merge sentence fragments into readable paragraphs
    - correct obvious recognition mistakes
    - do not invent missing content
    - if a phrase is too garbled to recover, mark it as `[unclear]`
-5. Save the cleaned raw transcript to the raw transcripts folder.
-6. Write a separate summary to `meetings/YYYY-MM-DD-HHMM.md`.
-7. Review agent-assigned tasks with the user.
+5. Write the summary to `meetings/YYYY-MM-DD-HHMM.md`.
+6. Review agent-assigned tasks with the user.
 
 When writing markdown files, keep the line length to 70 characters max. 
 
@@ -88,19 +78,10 @@ Omit side conversations, personal details, tangents, etc.
 If you are unsure whether something is relevant to the project,
 *ask the user*.
 
-## Local Transcription Notes
-
-- Use repository-local caches when practical so downloaded model
-  artifacts stay in the workspace.
-- If `faster-whisper` is used, a workable pattern is:
-  `HF_HOME=<repo>/.cache/huggingface`
-  `XDG_CACHE_HOME=<repo>/.cache`
-- CPU transcription is acceptable for one-off meeting recordings.
-
 ## Validation
 
 Before finishing:
 
-- verify both output files exist
-- confirm the filenames match the source file creation timestamp
-- confirm the raw transcript has the `.raw.md` suffix
+- verify the meeting minutes file exists
+- confirm the filename matches the chosen timestamp
+- confirm the summary includes all required sections
