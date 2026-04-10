@@ -325,7 +325,8 @@ def build_armory(
     if dataset_containers:
         dataset_tools = DatasetTools(dataset_containers)
         describe_dataset_description = (
-            "Returns the full description for a dataset by exact dataset filename.\n"
+            "Returns the full description for a dataset by filename.\n"
+            "Accepts either a filename or a path that ends in that filename.\n"
             "Use this when you need full column-level metadata."
             + dataset_tools.get_resource_metadata()
         )

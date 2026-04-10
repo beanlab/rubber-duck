@@ -1,5 +1,6 @@
 import io
 import re
+from pathlib import Path
 from decimal import Decimal, InvalidOperation
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
@@ -243,12 +244,14 @@ class DatasetTools:
 
     async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
         """
-        Returns the full dataset description for an exact dataset filename match.
-        Use the exact filename shown in the available dataset list (not Dataset Name).
+        Returns the full dataset description for a dataset filename.
+        Accepts either the exact staged filename or any path ending in that filename.
+        Do not use Dataset Name values.
         """
         duck_logger.debug(f"describe_dataset called with dataset_name={dataset_filename!r}")
+        normalized_filename = Path(dataset_filename).name
         for container in self._containers:
-            description = container.describe_dataset(dataset_filename)
+            description = container.describe_dataset(normalized_filename)
             if description:
                 duck_logger.debug(f"\n{description}")
                 return description
