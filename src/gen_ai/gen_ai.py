@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import json
 import os
@@ -34,6 +35,10 @@ class RecordUsage(Protocol):
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
 
+class SendMessage(Protocol):
+    async def __call__(self, channel_id: int, message: str = None, file=None, view=None) -> int: ...
+
+
 ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | ToolChoiceFunctionParam
 
 
@@ -65,12 +70,41 @@ def format_function_call_history_items(result: str, call: Response) -> FunctionC
 
 
 class AIClient:
-    def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage):
+    RETRY_DELAY_SECONDS = 2
+    MAX_RETRIES = 1
+
+    def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage,
+                 send_message: Optional[SendMessage] = None):
         self._armory = armory
         self._typing = typing
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
+        self._send_message = step(send_message) if send_message else None
         self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    @staticmethod
+    def _is_retryable_server_overload(error: InternalServerError) -> bool:
+        if getattr(error, "status_code", None) != 503:
+            return False
+        body = getattr(error, "body", None)
+        if not isinstance(body, dict):
+            return True
+        payload = body.get("error")
+        if not isinstance(payload, dict):
+            return True
+        return payload.get("code") == "server_is_overloaded"
+
+    async def _notify_retry(self, ctx: DuckContext):
+        if not self._send_message:
+            return
+        message = (
+            "I hit a temporary connection issue with the AI server. "
+            "Retrying in 2 seconds..."
+        )
+        try:
+            await self._send_message(ctx.thread_id, message)
+        except Exception as error:
+            duck_logger.debug(f"Failed to send retry message in thread <#{ctx.thread_id}>: {error}")
 
     @step
     async def _get_completion(
@@ -100,7 +134,19 @@ class AIClient:
             if reasoning:
                 params["reasoning"] = {"effort": reasoning}
 
-            response = await self._client.responses.create(**params)
+            for attempt in range(self.MAX_RETRIES + 1):
+                try:
+                    response = await self._client.responses.create(**params)
+                    break
+                except InternalServerError as error:
+                    should_retry = (
+                        attempt < self.MAX_RETRIES and
+                        self._is_retryable_server_overload(error)
+                    )
+                    if not should_retry:
+                        raise
+                    await self._notify_retry(ctx)
+                    await asyncio.sleep(self.RETRY_DELAY_SECONDS)
 
             if response.usage:
                 usage = response.usage
