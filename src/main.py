@@ -410,6 +410,7 @@ async def _main(config: Config, log_dir: Path):
                     bot.typing,
                     metrics_handler.record_message,
                     metrics_handler.record_usage,
+                    config["ai_completion_retry_protocol"],
                     bot.send_message
                 )
                 add_agent_tools_to_armory(config, armory, ai_client)

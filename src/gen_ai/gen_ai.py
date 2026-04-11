@@ -14,7 +14,7 @@ from quest import step
 
 from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
-from ..utils.config_types import DuckContext, HistoryType
+from ..utils.config_types import DuckContext, HistoryType, RetryProtocol
 from ..utils.logger import duck_logger
 
 
@@ -70,15 +70,14 @@ def format_function_call_history_items(result: str, call: Response) -> FunctionC
 
 
 class AIClient:
-    RETRY_DELAY_SECONDS = 2
-    MAX_RETRIES = 1
-
     def __init__(self, armory: Armory, typing, record_message, record_usage: RecordUsage,
+                 retry_protocol: RetryProtocol,
                  send_message: Optional[SendMessage] = None):
         self._armory = armory
         self._typing = typing
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
+        self._retry_protocol = retry_protocol
         self._send_message = step(send_message) if send_message else None
         self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -94,12 +93,29 @@ class AIClient:
             return True
         return payload.get("code") == "server_is_overloaded"
 
-    async def _notify_retry(self, ctx: DuckContext):
+    @staticmethod
+    def _is_retryable_discord_server_error(error: Exception) -> bool:
+        return (
+            error.__class__.__name__ == "DiscordServerError" and
+            getattr(error, "status", None) == 503
+        )
+
+    def _should_retry(self, error: Exception) -> bool:
+        if isinstance(error, InternalServerError):
+            return self._is_retryable_server_overload(error)
+        return self._is_retryable_discord_server_error(error)
+
+    def _retry_delay_seconds(self, attempt: int) -> int:
+        base_delay = max(0, int(self._retry_protocol.get("delay", 0)))
+        backoff = max(1, int(self._retry_protocol.get("backoff", 1)))
+        return base_delay * (backoff ** attempt)
+
+    async def _notify_retry(self, ctx: DuckContext, delay_seconds: int):
         if not self._send_message:
             return
         message = (
-            "I hit a temporary connection issue with the AI server. "
-            "Retrying in 2 seconds..."
+            "I hit a temporary connection issue with an upstream server. "
+            f"Retrying in {delay_seconds} seconds..."
         )
         try:
             await self._send_message(ctx.thread_id, message)
@@ -119,46 +135,48 @@ class AIClient:
             output_format: Type[BaseModel] | None,
             reasoning: str | None = None
     ) -> list[Response]:
-        async with self._typing(ctx.thread_id):
-            params = dict(
-                model=model,
-                instructions=prompt,
-                input=(context + local_history),
-                tools=tools,
-                tool_choice=tool_settings
-            )
+        params = dict(
+            model=model,
+            instructions=prompt,
+            input=(context + local_history),
+            tools=tools,
+            tool_choice=tool_settings
+        )
 
-            if output_format:
-                params["text"] = output_format
+        if output_format:
+            params["text"] = output_format
 
-            if reasoning:
-                params["reasoning"] = {"effort": reasoning}
+        if reasoning:
+            params["reasoning"] = {"effort": reasoning}
 
-            for attempt in range(self.MAX_RETRIES + 1):
-                try:
+        max_retries = max(0, int(self._retry_protocol.get("max_retries", 0)))
+        for attempt in range(max_retries + 1):
+            try:
+                async with self._typing(ctx.thread_id):
                     response = await self._client.responses.create(**params)
-                    break
-                except InternalServerError as error:
-                    should_retry = (
-                        attempt < self.MAX_RETRIES and
-                        self._is_retryable_server_overload(error)
-                    )
-                    if not should_retry:
-                        raise
-                    await self._notify_retry(ctx)
-                    await asyncio.sleep(self.RETRY_DELAY_SECONDS)
+                break
+            except Exception as error:
+                should_retry = (
+                    attempt < max_retries and
+                    self._should_retry(error)
+                )
+                if not should_retry:
+                    raise
+                delay_seconds = self._retry_delay_seconds(attempt)
+                await self._notify_retry(ctx, delay_seconds)
+                await asyncio.sleep(delay_seconds)
 
-            if response.usage:
-                usage = response.usage
-                await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
-                                         usage.input_tokens, usage.output_tokens,
-                                         usage.input_tokens_details.cached_tokens,
-                                         usage.output_tokens_details.reasoning_tokens)
+        if response.usage:
+            usage = response.usage
+            await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
+                                     usage.input_tokens, usage.output_tokens,
+                                     usage.input_tokens_details.cached_tokens,
+                                     usage.output_tokens_details.reasoning_tokens)
 
-            return [
-                resp.model_dump(exclude_none=True)
-                for resp in response.output
-            ]
+        return [
+            resp.model_dump(exclude_none=True)
+            for resp in response.output
+        ]
 
     @step
     async def _run_tool(self, tool, ctx, tool_args) -> tuple[str | None, bool]:
