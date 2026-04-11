@@ -234,12 +234,12 @@ class DatasetTools:
         self._containers = containers
 
     def get_resource_metadata(self) -> str:
-        lines = ["\n### Available Files:"]
+        lines = ["\n### Available Datasets:"]
         for container in self._containers:
             for dataset in container.get_dataset_inventory():
-                lines.append(f"\nDataset file path: {dataset['path']}")
                 dataset_name = dataset.get("dataset_name", dataset["filename"])
-                lines.append(f"Dataset name: {dataset_name}")
+                lines.append(f"Name: {dataset_name}")
+                lines.append(f"\nFilepath: {dataset['path']}")
         return "\n".join(lines)
 
     async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
