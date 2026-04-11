@@ -23,7 +23,6 @@ class DuckConversation(Protocol):
 
 def generate_error_message(thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
-    duck_logger.exception('Error: ' + error_code)
     error_message = (
         f'😵 **Error code {error_code}** 😵'
         f'\n<@#{thread_id}>'
