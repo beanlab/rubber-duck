@@ -133,6 +133,7 @@ ducks:
         tools:
           - run_python
           - describe_dataset
+          - send_datasets_to_user
           - conclude_conversation
       file_size_limit: *file_size_limit
       file_type_ext: *file_type_ext

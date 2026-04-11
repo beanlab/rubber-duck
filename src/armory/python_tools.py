@@ -230,8 +230,21 @@ class PythonTools:
 
 
 class DatasetTools:
-    def __init__(self, containers: list[PythonExecContainer]):
+    def __init__(self, containers: list[PythonExecContainer], send_message: SendMessage):
         self._containers = containers
+        self._send_message = send_message
+
+    def _get_sorted_dataset_names(self) -> list[str]:
+        seen: set[str] = set()
+        dataset_names: list[str] = []
+        for container in self._containers:
+            for dataset in container.get_dataset_inventory():
+                display_name = dataset.get("dataset_name") or dataset.get("filename")
+                if not display_name or display_name in seen:
+                    continue
+                seen.add(display_name)
+                dataset_names.append(display_name)
+        return sorted(dataset_names, key=str.casefold)
 
     def get_resource_metadata(self) -> str:
         lines = ["\n### Available Datasets:"]
@@ -241,6 +254,20 @@ class DatasetTools:
                 lines.append(f"Name: {dataset_name}")
                 lines.append(f"\nFilepath: {dataset['path']}")
         return "\n".join(lines)
+
+    async def send_datasets_to_user(self, ctx: DuckContext) -> ConcludesResponse:
+        """
+        Sends the full canonical dataset-name list directly to the user.
+        """
+        dataset_names = self._get_sorted_dataset_names()
+        if not dataset_names:
+            message = "No datasets are currently available."
+            await self._send_message(ctx.thread_id, message)
+            return ConcludesResponse(message)
+
+        message = "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
+        await self._send_message(ctx.thread_id, message)
+        return ConcludesResponse(f"Sent {len(dataset_names)} dataset names.")
 
     async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
         """

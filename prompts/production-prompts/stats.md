@@ -27,8 +27,8 @@ conventions.
 ## Execution Workflow
 
 - Dataset filenames are provided via tool descriptions.
-- When a user asks what datasets you have, provide them with a bulleted list of the "Dataset name" attributes in
-  alphabetical order.
+- When a user asks what datasets you have (list/show/available datasets), call `send_datasets_to_user`.
+- Do not manually type dataset names for this request.
 - Resolve the user-requested dataset to exactly one filename.
     - If there are multiple matches or no match, ask a clarifying question before calling `describe_dataset` or
       `run_python`.
