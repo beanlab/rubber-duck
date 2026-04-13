@@ -323,9 +323,10 @@ def build_armory(
 
     dataset_containers = [containers[name] for name in sorted(container_names_for_python_tools)]
     if dataset_containers:
-        dataset_tools = DatasetTools(dataset_containers)
+        dataset_tools = DatasetTools(dataset_containers, send_message)
         describe_dataset_description = (
-            "Returns the full description for a dataset by exact dataset filename.\n"
+            "Returns the full description for a dataset by filename.\n"
+            "Accepts either a filename or a path that ends in that filename.\n"
             "Use this when you need full column-level metadata."
             + dataset_tools.get_resource_metadata()
         )
@@ -333,6 +334,10 @@ def build_armory(
             dataset_tools.describe_dataset,
             name="describe_dataset",
             description=describe_dataset_description
+        )
+        armory.add_tool(
+            dataset_tools.send_datasets_to_user,
+            name="send_datasets_to_user"
         )
 
     talk_tool = TalkTool(send_message)
