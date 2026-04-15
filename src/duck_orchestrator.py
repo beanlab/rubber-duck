@@ -87,7 +87,6 @@ class DuckOrchestrator:
             except Exception as ex:
                 error_message, error_code = generate_error_message(thread_id, ex)
                 await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵\n')
-                duck_logger.exception("Error in duck conversation")
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
