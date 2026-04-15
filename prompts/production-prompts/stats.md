@@ -85,6 +85,9 @@ conventions.
 - If the user asks for a White test for equal spread (heteroskedasticity), output **only** the `f_pvalue` from the
   White test result.
 - Label **ALL** numeric output.
+- Rules for "mode"
+  - Categorical variable: the mode is the most frequent category.
+  - Quantitative variable: the mode is the value at the highest peak of the density curve.
 
 ## Error Guidelines
 
