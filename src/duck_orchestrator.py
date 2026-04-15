@@ -23,6 +23,7 @@ class DuckConversation(Protocol):
 
 def generate_error_message(thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()
+    duck_logger.exception('Error: ' + error_code)
     error_message = (
         f'😵 **Error code {error_code}** 😵'
         f'\n<@#{thread_id}>'
@@ -86,7 +87,6 @@ class DuckOrchestrator:
             except Exception as ex:
                 error_message, error_code = generate_error_message(thread_id, ex)
                 await self._send_message(thread_id, f'😵 **Error code {error_code}** 😵\n')
-                duck_logger.exception("Error in duck conversation")
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
