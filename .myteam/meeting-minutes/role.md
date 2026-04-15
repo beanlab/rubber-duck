@@ -3,13 +3,13 @@ name: Meeting Minutes
 description: |
   Transcribe an audio recording into a cleaned raw transcript and a
   meeting summary.
-  Load this skill if you are tasked with transcribing audio files
+  Delegate to this role if you are tasked with transcribing audio files
   or summarizing transcripts into meeting minutes.
 ---
 
 # Transcription
 
-This skill outlines the process and format for transcribing audio files
+This role outlines the process and format for transcribing audio files
 into markdown outputs.
 
 ## Outputs
@@ -24,10 +24,15 @@ filename.
 
 e.g `2026-04-02-1430.md`
 
+Please be sure to use the parent `raw-transcripts` folder. 
+The raw transcripts are NOT to be checked into git
+and must reside outside the git tree.
+
 ## Dependencies
 
 This workflow depends on `faster-whisper` for audio transcription.
 If this package is not installed in the current environment,
+and you need to transcribe from an audio input,
 offer to install it.
 
 ## Agent Instructions
@@ -52,17 +57,16 @@ as an action to be taken without human review and approval.
    On macOS, `stat -f '%SB' -t '%Y-%m-%d-%H%M' <file>` works.
    - If the transcript text is provided for you, ask the user for the timestamp to use. 
 2. Check that meetings and raw transcript folders exists; create them if needed.
-3. Run transcription locally and save an intermediate raw output if
-   needed.
-4. Clean the transcript before saving it:
+3. If given an audio input, run transcription locally and save the raw output text.
+   If given raw transcript text, save it.
+4. Clean the raw transcript:
    - fix obvious punctuation and capitalization
    - merge sentence fragments into readable paragraphs
    - correct obvious recognition mistakes
    - do not invent missing content
    - if a phrase is too garbled to recover, mark it as `[unclear]`
-5. Save the cleaned raw transcript to the raw transcripts folder.
-6. Write a separate summary to `meetings/YYYY-MM-DD-HHMM.md`.
-7. Review agent-assigned tasks with the user.
+5. Write a separate summary to `meetings/YYYY-MM-DD-HHMM.md`.
+6. Review agent-assigned tasks with the user.
 
 When writing markdown files, keep the line length to 70 characters max. 
 
@@ -96,6 +100,7 @@ If you are unsure whether something is relevant to the project,
   `HF_HOME=<repo>/.cache/huggingface`
   `XDG_CACHE_HOME=<repo>/.cache`
 - CPU transcription is acceptable for one-off meeting recordings.
+- make sure the `.cache` folder is NOT tracked by git.
 
 ## Validation
 
