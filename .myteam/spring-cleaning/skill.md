@@ -20,7 +20,7 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 1. Load `spring-cleaning/identify-weak-points` role to collect structural and hygiene findings.
 2. Wait for the spawned agent
 3. Explain the found weaknesses and potential fixes to the user.
-4. Load `dev-assistance`
+4. Load `feature-pipeline`
 5. Implement one change at a time. After each one:
     - Explain to the user why that change is important.
     - Suggest a commit message.
