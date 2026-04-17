@@ -1,11 +1,58 @@
 import io
+import re
+from pathlib import Path
+from decimal import Decimal, InvalidOperation
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from ..utils.protocols import ToolCache, CacheKeyBuilder
 from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import SendMessage, ConcludesResponse
 from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
+
+
+_SCI_NOTATION_PATTERN = re.compile(
+    r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+)(?![\w.])"
+)
+
+
+def _to_plain_decimal(token: str) -> str:
+    try:
+        value = Decimal(token)
+    except InvalidOperation:
+        return token
+
+    if not value.is_finite():
+        return token
+
+    formatted = format(value, "f")
+    if "." in formatted:
+        formatted = formatted.rstrip("0").rstrip(".")
+    if formatted in {"", "-0", "+0"}:
+        return "0"
+    return formatted
+
+
+def _remove_scientific_notation(text: str) -> str:
+    return _SCI_NOTATION_PATTERN.sub(lambda m: _to_plain_decimal(m.group(1)), text)
+
+
+def _format_rounded_decimal(value: float, places: int = 4) -> str:
+    formatted = format(float(value), f".{places}f")
+    formatted = formatted.rstrip("0").rstrip(".")
+    return formatted if formatted else "0"
+
+
+def _format_table_values(table: pd.DataFrame) -> pd.DataFrame:
+    formatted_table = table.copy()
+    for col in formatted_table.columns:
+        if not is_numeric_dtype(formatted_table[col]):
+            continue
+        formatted_table[col] = formatted_table[col].map(
+            lambda value: _format_rounded_decimal(value, 4) if pd.notna(value) else ""
+        )
+    return formatted_table
 
 
 def _estimate_column_widths(df, sample_rows=20):
@@ -61,7 +108,7 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
         filtered_lines.append(line)
 
     stdout = "\n".join(filtered_lines).strip()
-    return stdout
+    return _remove_scientific_notation(stdout)
 
 
 async def send_table(
@@ -70,12 +117,12 @@ async def send_table(
         table: pd.DataFrame,
         max_rows: int = 100,
 ) -> list[str]:
-    table = table.head(max_rows)
+    table = _format_table_values(table.head(max_rows))
     col_chunk = _determine_col_chunk(table)
     table_chunks = []
 
     for i in range(0, table.shape[1], col_chunk):
-        md_table = table.iloc[:, i:i + col_chunk].to_markdown()
+        md_table = table.iloc[:, i:i + col_chunk].to_markdown(disable_numparse=True)
         table_chunk = f"```\n{md_table}\n```"
         table_chunks.append(table_chunk)
         await send_message(channel_id, table_chunk)
@@ -115,7 +162,7 @@ class PythonTools:
         if self._tool_cache and self._cache_key_builder:
             cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
             key = self._tool_cache.get_key(cache_key)
-            duck_logger.debug(f"\nCache key:\n{key}")
+            duck_logger.debug(f"Cache key: {key}")
 
             if self._tool_cache.check_if_cached(key):
                 duck_logger.debug(f" Cache HIT ".center(20, '-'))
@@ -132,7 +179,7 @@ class PythonTools:
         results = await self._container.run_code(code)
 
         stdout = results.get('stdout').strip()
-        stderr = results.get('stderr').strip()
+        stderr = _remove_scientific_notation(results.get('stderr').strip())
         files = results.get('files', {})
 
         # log created files
@@ -180,3 +227,74 @@ class PythonTools:
             output = ConcludesResponse(output)
 
         return output
+
+
+class DatasetTools:
+    def __init__(self, containers: list[PythonExecContainer], send_message: SendMessage):
+        self._containers = containers
+        self._send_message = send_message
+
+    def _get_sorted_dataset_names(self) -> list[str]:
+        seen: set[str] = set()
+        dataset_names: list[str] = []
+        for container in self._containers:
+            for dataset in container.get_dataset_inventory():
+                display_name = dataset.get("dataset_name") or dataset.get("filename")
+                if not display_name or display_name in seen:
+                    continue
+                seen.add(display_name)
+                dataset_names.append(display_name)
+        return sorted(dataset_names, key=str.casefold)
+
+    def get_resource_metadata(self) -> str:
+        lines = ["\n### Available Datasets:"]
+        for container in self._containers:
+            for dataset in container.get_dataset_inventory():
+                dataset_name = dataset.get("dataset_name", dataset["filename"])
+                lines.append(f"Name: {dataset_name}")
+                lines.append(f"\nFilepath: {dataset['path']}")
+        return "\n".join(lines)
+
+    async def send_datasets_to_user(self, ctx: DuckContext) -> ConcludesResponse:
+        """
+        Sends the full canonical dataset-name list directly to the user.
+        """
+        dataset_names = self._get_sorted_dataset_names()
+        if not dataset_names:
+            message = "No datasets are currently available."
+            await self._send_message(ctx.thread_id, message)
+            return ConcludesResponse(message)
+
+        message = "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
+        await self._send_message(ctx.thread_id, message)
+        return ConcludesResponse(f"Sent {len(dataset_names)} dataset names.")
+
+    async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
+        """
+        Returns the full dataset description for a dataset filename.
+        Accepts either the exact staged filename or any path ending in that filename.
+        Do not use Dataset Name values.
+        """
+        duck_logger.debug(f"describe_dataset called with dataset_name={dataset_filename!r}")
+        normalized_filename = Path(dataset_filename).name
+        for container in self._containers:
+            description = container.describe_dataset(normalized_filename)
+            if description:
+                duck_logger.debug(f"\n{description}")
+                return description
+
+        available = sorted({
+            filename
+            for container in self._containers
+            for filename in container.get_dataset_filenames()
+        })
+        if not available:
+            duck_logger.debug(f"describe_dataset no datasets available for dataset_name={dataset_filename!r}")
+            return "No datasets are currently available."
+
+        message = (
+            f"Dataset '{dataset_filename}' not found. "
+            f"Available dataset filenames: {', '.join(available)}"
+        )
+        duck_logger.debug(f"describe_dataset no match for dataset_name={dataset_filename!r}; {message}")
+        return message

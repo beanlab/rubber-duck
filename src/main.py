@@ -12,38 +12,38 @@ from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.utils.protocols import ToolCache, CacheKeyBuilder
-from src.armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
-from src.workflows.registration import Registration
-from src.workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
-from src.utils.python_exec_container import build_containers, PythonExecContainer
-from src.armory.python_tools import PythonTools
-from src.armory.armory import Armory
-from src.armory.talk_tool import TalkTool
-from src.bot.discord_bot import DiscordBot
-from src.commands.bot_commands import BotCommands
-from src.commands.command import create_commands
-from src.conversation.conversation import AgentLedConversation, UserLedConversation
-from src.conversation.threads import SetupPrivateThread
-from src.duck_orchestrator import DuckOrchestrator, DuckConversation
-from src.gen_ai.build import build_agent
-from src.gen_ai.gen_ai import AIClient
-from src.metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
-from src.metrics.feedback_manager import FeedbackManager, CHANNEL_ID
-from src.metrics.reporter import Reporter
-from src.rubber_duck_app import RubberDuckApp
-from src.storage.sql_connection import create_sql_session
-from src.storage.sql_metrics import SQLMetricsHandler
-from src.storage.sql_quest import create_sql_manager
-from src.utils.config_loader import load_configuration
-from src.utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
+from .utils.protocols import ToolCache, CacheKeyBuilder
+from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
+from .workflows.registration import Registration
+from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from .utils.python_exec_container import build_containers, PythonExecContainer
+from .armory.python_tools import PythonTools, DatasetTools
+from .armory.armory import Armory
+from .armory.talk_tool import TalkTool
+from .bot.discord_bot import DiscordBot
+from .commands.bot_commands import BotCommands
+from .commands.command import create_commands
+from .conversation.conversation import AgentLedConversation, UserLedConversation
+from .conversation.threads import SetupPrivateThread
+from .duck_orchestrator import DuckOrchestrator, DuckConversation
+from .gen_ai.build import build_agent
+from .gen_ai.gen_ai import AIClient
+from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
+from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
+from .metrics.reporter import Reporter
+from .rubber_duck_app import RubberDuckApp
+from .storage.sql_connection import create_sql_session
+from .storage.sql_metrics import SQLMetricsHandler
+from .storage.sql_quest import create_sql_manager
+from .utils.config_loader import load_configuration
+from .utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
     DuckConfig, ToolConfig
-from src.utils.cache_cleaner import CacheCleaner
-from src.utils.feedback_notifier import FeedbackNotifier
-from src.utils.logger import duck_logger, filter_logs, add_console_handler, add_file_handler
-from src.utils.persistent_queue import PersistentQueue
-from src.utils.send_email import EmailSender
-from src.workflows.registration_workflow import RegistrationWorkflow
+from .utils.cache_cleaner import CacheCleaner
+from .utils.feedback_notifier import FeedbackNotifier
+from .utils.logger import duck_logger, filter_logs, add_console_handler, add_file_handler
+from .utils.persistent_queue import PersistentQueue
+from .utils.send_email import EmailSender
+from .workflows.registration_workflow import RegistrationWorkflow
 
 _log_forwarding_lock = threading.Lock()
 _log_forwarding_installed = False
@@ -305,12 +305,14 @@ def build_armory(
 ) -> tuple[Armory, TalkTool, list[ToolCache]]:
     armory = Armory(send_message)
     tool_caches: list[ToolCache] = []
+    container_names_for_python_tools: set[str] = set()
 
     # setup tools
     config_tools = config.get("tools", [])
     for tool_name, tool_config in config_tools.items():
         if tool_config['type'] == 'container_exec':
             container_name = tool_config['container']
+            container_names_for_python_tools.add(container_name)
             cache_settings = _get_tool_cache_settings(tool_config)
             tool_cache = None
             cache_key_builder = None
@@ -325,14 +327,29 @@ def build_armory(
                 tool_cache,
                 cache_key_builder
             )
-            amended_description = (
-                    tool_config.get('description', python_tools.run_code.__doc__)
-                    + '\n'
-                    + containers[container_name].get_resource_metadata()
-            )
+            amended_description = tool_config.get('description', python_tools.run_code.__doc__)
             armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
         else:
             duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
+
+    dataset_containers = [containers[name] for name in sorted(container_names_for_python_tools)]
+    if dataset_containers:
+        dataset_tools = DatasetTools(dataset_containers, send_message)
+        describe_dataset_description = (
+            "Returns the full description for a dataset by filename.\n"
+            "Accepts either a filename or a path that ends in that filename.\n"
+            "Use this when you need full column-level metadata."
+            + dataset_tools.get_resource_metadata()
+        )
+        armory.add_tool(
+            dataset_tools.describe_dataset,
+            name="describe_dataset",
+            description=describe_dataset_description
+        )
+        armory.add_tool(
+            dataset_tools.send_datasets_to_user,
+            name="send_datasets_to_user"
+        )
 
     talk_tool = TalkTool(send_message)
     armory.scrub_tools(talk_tool)
@@ -406,7 +423,14 @@ async def run_discord_mode(config: Config, log_dir: Path | None):
                     containers,
                     sql_session,
                 )
-                ai_client = AIClient(armory, bot.typing, metrics_handler.record_message, metrics_handler.record_usage)
+                ai_client = AIClient(
+                    armory,
+                    bot.typing,
+                    metrics_handler.record_message,
+                    metrics_handler.record_usage,
+                    config["ai_completion_retry_protocol"],
+                    bot.send_message
+                )
                 add_agent_tools_to_armory(config, armory, ai_client)
 
                 ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
@@ -624,7 +648,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
 def _configure_logging(debug: bool, log_path: Path | None) -> None:
     if debug:
         duck_logger.setLevel(logging.DEBUG)
-        quest_logger.setLevel(logging.DEBUG)
+        # quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)

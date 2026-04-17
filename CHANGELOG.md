@@ -13,6 +13,24 @@ All notable changes in this repository are documented here.
 ### Removed / Archived
 - Removed legacy entry scripts `run_discord.py` and `run_teams.py`.
 
+## stats-updates (2026-04-03T15:44:35-06:00)
+
+### Added
+- Added `describe_dataset` tool registration in `src/main.py` so stats ducks can request full dataset metadata by exact filename.
+- Added `DatasetTools` in `src/armory/python_tools.py` to expose available dataset file paths and serve full metadata descriptions.
+- Added regression coverage in `tests/test_python_tools_formatting.py` for numeric table formatting and scientific-notation suppression.
+
+### Changed
+- Updated stats prompts (`prompts/production-prompts/stats.md` and `prompts/production-prompts/cs-stats.md`) to require `describe_dataset` in metadata workflows and tighten output/error handling rules.
+- Updated `production-config.yaml` so stats ducks include `describe_dataset`; standard stats also includes `conclude_conversation`.
+- Updated `PythonTools` output formatting to normalize scientific notation in stdout/stderr and render numeric tables with trimmed decimal strings and markdown-safe parsing behavior.
+- Updated `PythonExecContainer` runtime setup to configure numpy/pandas float display without scientific notation.
+- Updated container resource metadata storage to retain exact filename, dataset name, and full description for dataset lookup.
+
+### Fixed
+- Aligned dataset-description call signatures and strict filename matching so dataset metadata lookups fail clearly when no exact match exists.
+- Ensured White test output guidance in prompts returns only `f_pvalue`.
+
 ## writing-docs-skill (2026-03-26T11:59:55-06:00)
 
 ### Added
