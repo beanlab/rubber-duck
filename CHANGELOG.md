@@ -2,6 +2,17 @@
 
 All notable changes in this repository are documented here.
 
+## unified-startup (2026-03-31T00:00:00-06:00)
+
+### Changed
+- Unified runtime startup into `src/main.py` with `--platform discord|teams|both`.
+- Added `--discord-config` and `--teams-config` for `--platform both`.
+- Preserved single-platform `CONFIG_FILE_S3_PATH` fallback when `--config` is omitted.
+- Kept Teams runtime `--port` behavior (`PORT` env fallback, default `3000`).
+
+### Removed / Archived
+- Removed legacy entry scripts `run_discord.py` and `run_teams.py`.
+
 ## stats-updates (2026-04-03T15:44:35-06:00)
 
 ### Added

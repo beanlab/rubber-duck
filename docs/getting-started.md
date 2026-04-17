@@ -57,6 +57,13 @@ Before you begin, you'll need:
     export DISCORD_TOKEN=your_discord_bot_token
     export OPENAI_API_KEY=your_openai_key
     ```
+    - **Optional for Teams Runtime**:
+      ```bash
+      export MICROSOFT_APP_ID=your_azure_app_id
+      export MICROSOFT_APP_PASSWORD=your_azure_app_password
+      export MICROSOFT_APP_TENANT_ID=your_azure_tenant_id   # optional in some setups
+      export PORT=3000                                       # optional; default is 3000
+      ```
 
 ## Discord Bot Setup
 
@@ -104,7 +111,15 @@ Before you begin, you'll need:
 2. **Run the Bot Locally**
     - Run from the repo root:
       ```bash
-      poetry run python -m src.main --config ./local-testing-configs/local_<name>_config.yaml --debug
+      poetry run python src/main.py --platform discord --config ./local-testing-configs/local_<name>_config.yaml --debug
+      ```
+    - Teams mode:
+      ```bash
+      poetry run python src/main.py --platform teams --config ./local-testing-configs/local_<name>_config.yaml --debug --port 3000
+      ```
+    - Both mode (separate configs):
+      ```bash
+      poetry run python src/main.py --platform both --discord-config ./local-testing-configs/local_<name>_discord.yaml --teams-config ./local-testing-configs/local_<name>_teams.yaml --debug --port 3000
       ```
 
 3. **Test the Bot**

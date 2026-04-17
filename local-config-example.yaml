@@ -42,7 +42,7 @@ multiple-includes:
 string-include:
   $include: "production-config.yaml@$.sender_email"
 
-# ========== STARTER CONFIG TEMPLATE ========== #
+# ========== MINIMAL STARTER CONFIG TEMPLATE ========== #
 
 sql:
   db_type: sqlite
@@ -53,13 +53,14 @@ ducks:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
 
 servers:
-  BeanLab:
-    server_id: <server_id>
-    channels:
-      Ducks/<name>-chat-bot:
-        channel_id: <channel_id>
-        timeout: 300
-        duck: standard-rubber-duck
+  discord:
+    BeanLab:
+      server_id: <server_id>
+      channels:
+        Ducks/<name>-chat-bot:
+          channel_id: <channel_id>
+          timeout: 300
+          duck: standard-rubber-duck
 
 agents_as_tools:
   $include: "production-config.yaml@$.agents_as_tools"
