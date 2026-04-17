@@ -14,14 +14,14 @@ def main() -> int:
     print_instructions(base)
     print_directory_tree(myteam.parent)
 
-    explain_roles()
-    list_roles(base, myteam, [])
-
     explain_skills()
     list_skills(base, myteam, [])
 
     explain_tools()
     list_tools(base, myteam, [])
+
+    explain_roles()
+    list_roles(base, myteam, [])
 
     return 0
 
