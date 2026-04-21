@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from myteam.utils import print_instructions, get_active_myteam_root, explain_skills, explain_roles, explain_tools, list_skills, \
-    list_roles, list_tools, print_directory_tree
+from myteam.utils import get_active_myteam_root, print_directory_tree, print_instructions
 
 
 def main() -> int:
@@ -12,12 +11,9 @@ def main() -> int:
     myteam = get_active_myteam_root(base)
 
     print_instructions(base)
-    docs = [
-        "intent.md",
-        "structure.md",
-    ]
+    docs = ["intent.md", "structure.md"]
     for doc in docs:
-        print((base / doc).read_text())
+        print((base.parent / doc).read_text())
 
     application_docs = myteam.parent / 'application-design'
     if application_docs.exists():
