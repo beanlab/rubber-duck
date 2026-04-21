@@ -14,7 +14,10 @@ def main() -> int:
 
     print_instructions(base)
     print_upgrade_notice(myteam)
-    print_directory_tree(myteam.parent)
+    print_directory_tree(
+        myteam.parent,
+        exclude=(".*", "_*", "archive", "datasets", "meetings", "python_tools_sandbox", "scripts", "rubrics", )
+    )
 
     explain_skills()
     list_skills(base, myteam, [])
