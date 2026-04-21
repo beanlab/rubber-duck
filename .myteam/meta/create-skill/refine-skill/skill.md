@@ -20,3 +20,4 @@ Skill Refinement Workflow:
 5. Create a proposed set of changes for the user and write it to a file with name convention `docs/plans/<skill-name>-edits.md`.
 6. Inform the user that `<skill-name>-edits.md` is complete. Wait for the user's approval before continuing.
 7. Strictly following `<skill-name>-edits.md`, implement the skill.
+8. After completion and explicit user acceptance, remove any local planning docs created for the refinement (e.g., `<skill-name>-design.md`, `<skill-name>-edits.md`) unless the user requests they be retained.
