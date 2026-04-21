@@ -14,12 +14,15 @@ Keep the repository organized, maintainable, and easy to navigate without changi
   placement.
 - Improve consistency in naming, module boundaries, and local documentation where needed for maintainability.
 - Avoid introducing new product features or altering expected runtime behavior.
+- Treat feature-neutral cleanup as **behavior-preserving refactoring/cleanup** only.
 
 ## Workflow
 
 1. Load `spring-cleaning/identify-weak-points` role to collect structural and hygiene findings.
 2. Wait for the spawned agent
+   - If the role cannot be spawned, perform the identify checklist manually and proceed.
 3. Explain the found weaknesses and potential fixes to the user.
+   - If no high/medium-confidence findings exist, report that result and stop.
 4. If cleanup affects the application design contract, load `application-docs`
    and follow its change workflow.
 5. If a cleanup finding should be tracked for later implementation,
@@ -29,6 +32,7 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 7. Implement one change at a time. After each one:
     - Explain to the user why that change is important.
     - Suggest a commit message.
+    - Run relevant tests or targeted checks; if unavailable, note the risk.
     - Wait for confirmation.
     - Repeat for the rest of the changes
 
@@ -38,8 +42,15 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 - Prefer incremental edits over broad rewrites.
 - For removals, require evidence of unused status (search references, runtime wiring, tests, or config usage).
 - If a cleanup action has uncertainty or behavior risk, surface it explicitly and keep it out of the default fix set.
+- Expect verification after each change; record risk when tests are unavailable.
 - When files/modules are moved or ownership boundaries change, update both source and destination directory `DOCS.md`
   files in the same cleanup batch.
 - Treat `DOCS.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
 - Do not refactor application-design documents yourself. Delegate to
   `application-docs/refactoring`.
+
+## Verification Guidance
+
+- Prefer the smallest test/check that exercises the changed area.
+- If a targeted test does not exist, run the closest available suite.
+- If no tests are available, document the gap and the risk explicitly.

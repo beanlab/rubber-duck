@@ -6,6 +6,7 @@ description: |
 ---
 
 Audit the repository to identify cleanup opportunities that do not change product behavior.
+Do not modify files during this identify phase.
 
 ## Checklist
 
@@ -25,6 +26,10 @@ Audit the repository to identify cleanup opportunities that do not change produc
 - For every finding, include supporting evidence (reference search results, import/call sites, config wiring, or test
   coverage signals).
 - Mark findings with confidence (`high`, `medium`, `low`) and risk level.
+- Evidence must include categories, when applicable:
+  - imports/references
+  - runtime wiring/config
+  - tests/CI signals
 
 ## Output
 
@@ -33,6 +38,7 @@ Return findings ordered by severity with:
 - exact file path(s),
 - concise issue statement,
 - evidence summary,
+- confirmed vs suspected tag,
 - recommended cleanup direction.
 
 Do not edit `DOCS.md` during this identify phase. Report proposed doc updates as part of findings/planning outputs.
