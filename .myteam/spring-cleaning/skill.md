@@ -20,8 +20,13 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 1. Load `spring-cleaning/identify-weak-points` role to collect structural and hygiene findings.
 2. Wait for the spawned agent
 3. Explain the found weaknesses and potential fixes to the user.
-4. Load `feature-pipeline`
-5. Implement one change at a time. After each one:
+4. If cleanup affects the application design contract, load `application-docs`
+   and follow its change workflow.
+5. If a cleanup finding should be tracked for later implementation,
+   propose a backlog item to the user and, if approved, load `backlog`
+   to capture it.
+6. Load `feature-pipeline`
+7. Implement one change at a time. After each one:
     - Explain to the user why that change is important.
     - Suggest a commit message.
     - Wait for confirmation.
@@ -36,3 +41,5 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 - When files/modules are moved or ownership boundaries change, update both source and destination directory `DOCS.md`
   files in the same cleanup batch.
 - Treat `DOCS.md` as maintained source-of-truth context: reconcile docs with code before and after cleanup changes.
+- Do not refactor application-design documents yourself. Delegate to
+  `application-docs/refactoring`.

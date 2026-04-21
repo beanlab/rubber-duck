@@ -17,6 +17,8 @@ Audit the repository to identify cleanup opportunities that do not change produc
 - Check for file placement issues (module responsibility mismatch, confusing folder location, mixed concerns).
 - Flag weak or stale local docs and missing context that makes ownership/boundaries unclear.
 - Note consistency issues in naming, layering, and dependency direction.
+- Flag findings that touch the external application interface contract
+  so follow-up can load `application-docs`.
 
 ## Evidence Requirements
 
