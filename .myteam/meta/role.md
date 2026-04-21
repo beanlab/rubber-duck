@@ -14,3 +14,5 @@ Your job is to help the user refine the `myteam` content and instructions
 according to their requests. You may also be called upon to make
 changes to metadata and instructions in order to correct errors from prior activity
 and restore the system to working order.
+
+You may use the skill `meta/create-skill` when asked to write new skills
