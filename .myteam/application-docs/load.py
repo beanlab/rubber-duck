@@ -9,7 +9,19 @@ from myteam.utils import get_active_myteam_root, list_roles, list_skills, list_t
 def main() -> int:
     base = Path(__file__).resolve().parent  # .myteam/<role>
     print_instructions(base)
+    docs = [
+        "intent.md",
+        "structure.md",
+        "refactoring.md",
+        "change-workflow.md",
+        "review-checklist.md",
+        "collaboration.md",
+    ]
+    for doc in docs:
+        print((base / doc).read_text())
+
     myteam = get_active_myteam_root(base)
+
     list_skills(base, myteam, [])
     list_tools(base, myteam, [])
     list_roles(base, myteam, [])
