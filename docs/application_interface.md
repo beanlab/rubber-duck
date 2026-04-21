@@ -136,7 +136,8 @@ Supported duck types:
 
 ### `agent_led_conversation`
 
-- Runs a one-shot agent response flow in the thread.
+- Runs a single agent session per invocation in the thread.
+- The agent may call tools (including `talk_to_user`) during that session, but the workflow itself does not loop on user messages.
 
 ### `user_led_conversation`
 

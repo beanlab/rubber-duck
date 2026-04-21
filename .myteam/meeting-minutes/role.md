@@ -17,7 +17,7 @@ into markdown outputs.
 Given a recording, use the file creation timestamp to create:
 
 - `../raw-transcripts/<repo name>/YYYY-MM-DD-HHMM.raw.md`
-- `meetings/YYYY-MM-DD-HHMM.md`
+- `docs/meetings/YYYY-MM-DD-HHMM.md`
 
 e.g `2026-04-02-1430.md`
 
@@ -66,13 +66,13 @@ as an action to be taken without human review and approval.
    - correct obvious recognition mistakes
    - do not invent missing content
    - if a phrase is too garbled to recover, mark it as `[unclear]`
-5. Write a separate summary to `meetings/YYYY-MM-DD-HHMM.md`.
+5. Write a separate summary to `docs/meetings/YYYY-MM-DD-HHMM.md`.
 6. Review agent-assigned tasks with the user.
 
 When writing markdown files, keep the line length to 70 characters max. 
 
 When asking for permission to create files,
-ask for permission to modify or create files in the meetings folder 
+ask for permission to modify or create files in the docs/meetings folder 
 and the `../raw-transcripts/<repo>/` folder.
 If the permission is scoped to the specific files, 
 permission has to be granted for each run of this process, 

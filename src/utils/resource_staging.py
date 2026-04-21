@@ -261,39 +261,3 @@ def get_dataset_info(file_path: str) -> DatasetInfo:
         source_path=file_path,
     )
 
-
-# DEBUG
-
-
-def debug_list_s3_prefix(path: str, max_keys: int = 1000) -> list[str]:
-    """
-    Lists all object keys under an S3 prefix for debugging purposes.
-    """
-    bucket, prefix = _split_s3_path(path)
-    if prefix and not prefix.endswith("/"):
-        prefix += "/"
-
-    print(f"Listing S3 objects under s3://{bucket}/{prefix}")
-
-    paginator = _s3_client.get_paginator("list_objects_v2")
-    keys: list[str] = []
-
-    for page in paginator.paginate(
-            Bucket=bucket,
-            Prefix=prefix,
-            PaginationConfig={"MaxItems": max_keys},
-    ):
-        for obj in page.get("Contents", []):
-            keys.append(obj["Key"])
-
-    for key in keys:
-        print(f"  s3://{bucket}/{key}")
-
-    if not keys:
-        print("No objects found under this prefix.")
-
-    return keys
-
-
-if __name__ == "__main__":
-    debug_list_s3_prefix("s3://stats121-datasets/datasets/")

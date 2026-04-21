@@ -4,8 +4,6 @@ from typing import Any, Callable, get_type_hints, Literal, get_origin, get_args,
 
 from openai.types.responses import FunctionToolParam
 
-_tools: dict[str, Callable] = {}
-
 
 def register_tool(func):
     setattr(func, "is_tool", True)

@@ -7,7 +7,7 @@ description: |
 
 # Backlog
 
-The backlog for this project is stored in markdown files in `<project-root>/backlog/`.
+The backlog for this project is stored in markdown files in `<project-root>/docs/backlog/`.
 
 If this folder does not yet exist, please make it.
 

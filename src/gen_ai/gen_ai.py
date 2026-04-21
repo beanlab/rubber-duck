@@ -16,6 +16,7 @@ from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
 from ..utils.config_types import DuckContext, HistoryType, RetryProtocol
 from ..utils.logger import duck_logger
+from ..utils.protocols import SendMessage
 
 
 class GenAIException(Exception):
@@ -33,10 +34,6 @@ class RecordUsage(Protocol):
     async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str,
                        input_tokens: int,
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
-
-
-class SendMessage(Protocol):
-    async def __call__(self, channel_id: int, message: str = None, file=None, view=None) -> int: ...
 
 
 ToolChoiceTypes = Literal["none", "auto", "required"] | ToolChoiceTypesParam | ToolChoiceFunctionParam
