@@ -1,9 +1,18 @@
 ---
 name: Identify Weak Points
 description: |
-  Audits repository structure and code hygiene for **feature-neutral** cleanup opportunities.
-  Use this role to find duplication, unused code, mislocated files, and maintainability gaps.
+  Legacy spring-cleaning audit role. Superseded by the multi-agent deep review
+  workflow, but kept for backward compatibility when invoked directly.
 ---
+
+## Status
+
+This role is superseded by:
+- `spring-cleaning/project-structure`
+- `spring-cleaning/prompt-evaluator`
+- `spring-cleaning/src-evaluator`
+
+Prefer the multi-agent workflow in `.myteam/spring-cleaning/skill.md`.
 
 Audit the repository to identify cleanup opportunities that do not change product behavior.
 Do not modify files during this identify phase.

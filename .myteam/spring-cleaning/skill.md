@@ -2,7 +2,8 @@
 name: Spring Cleaning
 description: |
   Guides feature-neutral cleanup and organization of the rubber-duck project.
-  Use this skill to audit project structure, plan safe cleanup, and implement non-behavioral improvements.
+  Use this skill when a user asks for spring cleaning or a deep, behavior-preserving
+  audit of the repo. Always run a multi-agent review and consolidate findings.
 ---
 
 Keep the repository organized, maintainable, and easy to navigate without changing product behavior.
@@ -18,23 +19,36 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 
 ## Workflow
 
-1. Load `spring-cleaning/identify-weak-points` role to collect structural and hygiene findings.
-2. Wait for the spawned agent
-   - If the role cannot be spawned, perform the identify checklist manually and proceed.
-3. Explain the found weaknesses and potential fixes to the user.
+1. Create (or reuse) the report directory and file:
+   - `docs/spring-cleanings/spring-cleaning-<mm-dd>.md`
+   - If the file does not exist, initialize it with sections:
+     - `Project Structure`
+     - `Prompt Evaluation`
+     - `Src Evaluation`
+2. Spawn the deep-review roles in parallel:
+   - `spring-cleaning/project-structure`
+   - `spring-cleaning/prompt-evaluator`
+   - `spring-cleaning/src-evaluator`
+3. Each role must:
+   - Read `docs/application_interface.md` first
+   - Read `production-config.yaml` second
+   - Append findings to its matching section in the shared report file
+4. Wait for all agents to complete.
+   - If agents cannot be spawned, perform the same scoped audits manually.
+5. Explain the found weaknesses and potential fixes to the user.
    - If no high/medium-confidence findings exist, report that result and stop.
-4. If cleanup affects the application design contract, load `application-docs`
+6. If cleanup affects the application design contract, load `application-docs`
    and follow its change workflow.
-5. If a cleanup finding should be tracked for later implementation,
+7. If a cleanup finding should be tracked for later implementation,
    propose a backlog item to the user and, if approved, load `backlog`
    to capture it.
-6. Load `feature-pipeline`
-7. Implement one change at a time. After each one:
-    - Explain to the user why that change is important.
-    - Suggest a commit message.
-    - Run relevant tests or targeted checks; if unavailable, note the risk.
-    - Wait for confirmation.
-    - Repeat for the rest of the changes
+8. Load `feature-pipeline`
+9. Implement one change at a time. After each one:
+   - Explain to the user why that change is important.
+   - Suggest a commit message.
+   - Run relevant tests or targeted checks; if unavailable, note the risk.
+   - Wait for confirmation.
+   - Repeat for the rest of the changes
 
 ## Guardrails
 
