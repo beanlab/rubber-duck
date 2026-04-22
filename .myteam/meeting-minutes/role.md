@@ -19,12 +19,13 @@ Given a recording, use the file creation timestamp to create:
 - `../raw-transcripts/<repo name>/YYYY-MM-DD-HHMM.raw.md`
 - `meetings/YYYY-MM-DD-HHMM.md`
 
-Use the file creation timestamp, not the current time, for the
-filename.
-
 e.g `2026-04-02-1430.md`
 
-Please be sure to use the parent `raw-transcripts` folder. 
+Use the file creation timestamp, not the current time, timestamp of the meeting. 
+If the raw text is provided without a timestamp or time information, 
+ask the user for the date and time of the meeting.
+
+Please be sure to use the parent `../raw-transcripts` folder. 
 The raw transcripts are NOT to be checked into git
 and must reside outside the git tree.
 
@@ -56,7 +57,7 @@ as an action to be taken without human review and approval.
 1. Read the file creation timestamp from the source audio file.
    On macOS, `stat -f '%SB' -t '%Y-%m-%d-%H%M' <file>` works.
    - If the transcript text is provided for you, ask the user for the timestamp to use. 
-2. Check that meetings and raw transcript folders exists; create them if needed.
+2. Check that meetings and raw transcript folders exists; create them if needed. 
 3. If given an audio input, run transcription locally and save the raw output text.
    If given raw transcript text, save it.
 4. Clean the raw transcript:
@@ -69,6 +70,13 @@ as an action to be taken without human review and approval.
 6. Review agent-assigned tasks with the user.
 
 When writing markdown files, keep the line length to 70 characters max. 
+
+When asking for permission to create files,
+ask for permission to modify or create files in the meetings folder 
+and the `../raw-transcripts/<repo>/` folder.
+If the permission is scoped to the specific files, 
+permission has to be granted for each run of this process, 
+and that's not helpful.
 
 ## Summary Format
 
@@ -109,3 +117,4 @@ Before finishing:
 - verify both output files exist
 - confirm the filenames match the source file creation timestamp
 - confirm the raw transcript has the `.raw.md` suffix
+- confirm that there are not raw transcript files in the project git tree
