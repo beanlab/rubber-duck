@@ -3,7 +3,7 @@
 As applications grow, the design documents will need to be reorganized.
 
 Do not refactor these documents yourself.
-Delegate to the `application-docs/refactoring` role.
+Delegate to the `refactoring` role.
 
 Refactoring should be considered when:
 

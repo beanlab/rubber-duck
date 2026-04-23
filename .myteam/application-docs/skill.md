@@ -11,7 +11,7 @@ description: |
 # Application Design
 
 We document the design and intent of the application in a document tree
-rooted at `application-design/`.
+rooted at `docs/application-design/`.
 
 If this folder does not yet exist, create it.
 

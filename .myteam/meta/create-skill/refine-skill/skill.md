@@ -14,10 +14,9 @@ Skill Refinement Workflow:
 3. If edits are extensive enough that research is needed, conduct appropriate web searches for relevant topics. Consider the following:
   - Are implemented tools/features/dependencies being used correctly? Do they work in a way contrary to the implementation in the skill?
   - What alternative tools/approaches/dependencies exist to accomplish the same task? What trade-offs exist if a switch is made?
-4. Confirm that there is not already a `docs/plans/<skill-name>-edits.md` in the working directory.
+4. Confirm that there is not already a `<skill-name>-edits.md` in the working directory.
    - If one exists, verify the edits outlined inside are consistent with steps 2 and 3 then skip to step 6.
    - If it is incomplete, clear the file and resume normal workflow from step 5.
-5. Create a proposed set of changes for the user and write it to a file with name convention `docs/plans/<skill-name>-edits.md`.
-6. Inform the user that `<skill-name>-edits.md` is complete. Wait for the user's approval before continuing.
+5. Create a proposed set of changes for the user and write it to a file with name convention `<skill-name>-edits.md`.
+6. Inform the user that `<skill-name>-edits.md` is complete. Wait for the user's approvale before continuing.
 7. Strictly following `<skill-name>-edits.md`, implement the skill.
-8. After completion and explicit user acceptance, remove any local planning docs created for the refinement (e.g., `<skill-name>-design.md`, `<skill-name>-edits.md`) unless the user requests they be retained.

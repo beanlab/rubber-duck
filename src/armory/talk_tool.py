@@ -1,11 +1,9 @@
-import asyncio
-
-from quest import queue, step
+from quest import step
 
 from .tools import register_tool
 from ..utils.config_types import DuckContext
-from ..utils.protocols import Message
 from ..utils.protocols import ConversationComplete
+from ..utils.message_utils import wait_for_message
 
 class TalkTool:
     def __init__(self, send_message):
@@ -35,15 +33,10 @@ class TalkTool:
         Wait for a message from the user. This tool is used to receive messages from the user.
         :return: responses: str: The response from the user.
         """
-        try:
-            async with queue('messages', None) as messages:
-                message: Message = await asyncio.wait_for(
-                    messages.get(),
-                    timeout=ctx.timeout
-                )
-            return message['content']
-        except asyncio.TimeoutError:
+        message = await wait_for_message(ctx.timeout)
+        if message is None:
             raise ConversationComplete()
+        return message["content"]
 
     @register_tool
     async def talk_to_user(self, ctx: DuckContext, message_to_user: str) -> str:

@@ -1,6 +1,6 @@
 ---
 name: "spring-cleaning/src-evaluator"
-description: "Deep audit of src/ for duplication, dead paths, and maintainability risks. Use this role during spring-cleaning to evaluate code structure without changing behavior. Append findings to the shared spring-cleaning report under Src Evaluation."
+description: "Deep audit of src/ for duplication, dead paths, and maintainability risks. Use this role during spring-cleaning to evaluate code structure without changing behavior."
 ---
 
 ## Responsibilities
@@ -20,6 +20,6 @@ description: "Deep audit of src/ for duplication, dead paths, and maintainabilit
 - Write under the `Src Evaluation` section only.
 - Use concise bullets with:
   - finding summary
-  - evidence (paths / searches)
   - confidence (high/med/low)
   - suggested next step (optional)
+  - complexity (how in-depth the cleanup will be)

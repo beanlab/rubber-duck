@@ -4,7 +4,7 @@ The application design should be organized so that the right information
 is easy to find and easy to maintain.
 
 For simple projects, the entire application design may reside in a
-single document named `application_interface.md`.
+single document named `application-design.md`.
 
 As the project grows, the design should be broken into multiple
 documents organized by interface area or theme.
@@ -13,12 +13,12 @@ documents organized by interface area or theme.
 
 Start with:
 
-- `application_interface.md`
+- `application-design.md`
 
 This top-level document should serve as the overview for the design
 tree.
 
-When multiple documents are needed, `application_interface.md` should act
+When multiple documents are needed, `application-design.md` should act
 as a table of contents and summary of the major interfaces. It should
 link to child documents.
 
@@ -106,7 +106,7 @@ When multiple documents are used:
 - ensure parent documents summarize and link to children
 - ensure child documents link back to their parent or related overview
 
-A reader should be able to start at `application_interface.md` and find
+A reader should be able to start at `application-design.md` and find
 the relevant detailed document without guessing.
 
 ## Naming Guidance

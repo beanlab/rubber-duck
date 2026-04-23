@@ -15,7 +15,7 @@ Skill Design Workflow:
   - What commands or functions specifically need to be used to achieve the desired result?
   - What credentials need to be provided to access the functionality of the tools you have decided to use?
   - What might the user need to provide you with that you are unable to obtain yourself to ensure the skill is completely functional per your design?
-4. Structure the skill. This means writing your comprehensive findings to a `docs/plans/<skill-name>-design.md` file. Adhere to the following when writing this file:
+4. Structure the skill. This means writing your comprehensive findings to a `<skill-name>-design.md` file. Adhere to the following when writing this file:
   - Frame the file content around high-level architecture the skill will require (e.g. proposed tools, dependencies, and `skill.md` prompt inclusions to make these work)
   - Include all relevant findings of your research in the file (if a research item yielded information that will be incorporated into the skill, include it).
   - The file should provide a user or agent with no context of your research all the information they would need to implement the skill themselves. Be thorough enough that a web search will not be needed.
