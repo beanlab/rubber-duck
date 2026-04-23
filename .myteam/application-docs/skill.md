@@ -4,7 +4,7 @@ description: |
   Instructions for how to create and maintain documents that describe
   the intent and design of the application.
   Load this skill if you need to create or modify anything in the
-  `application-design/` folder, or if you are asked to update the
+  `docs/` folder, or if you are asked to update the
   application design.
 ---
 

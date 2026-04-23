@@ -15,7 +15,7 @@ def main() -> int:
     for doc in docs:
         print((base.parent / doc).read_text())
 
-    application_docs = myteam.parent / 'application-design'
+    application_docs = myteam.parent / 'docs'
     if application_docs.exists():
         print_directory_tree(application_docs)
 
