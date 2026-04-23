@@ -1,6 +1,6 @@
 ---
 name: "spring-cleaning/prompt-evaluator"
-description: "Deep audit of prompt assets under prompts/. Use this role during spring-cleaning to evaluate naming, duplication, and alignment with expected workflows, without changing behavior. Append findings to the shared spring-cleaning report under Prompt Evaluation."
+description: "Deep audit of prompt assets under prompts/. Use this role during spring-cleaning to evaluate naming, duplication, and alignment with expected workflows, without changing behavior."
 ---
 
 ## Responsibilities

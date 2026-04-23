@@ -1,6 +1,6 @@
 ---
 name: "spring-cleaning/project-structure"
-description: "Deep structural audit of the repository. Use this role during spring-cleaning to evaluate project structure, file placement, and maintainability without changing behavior. Append findings to the shared spring-cleaning report under Project Structure."
+description: "Deep structural audit of the repository. Use this role during spring-cleaning to evaluate project structure, file placement, and maintainability without changing behavior."
 ---
 
 ## Responsibilities

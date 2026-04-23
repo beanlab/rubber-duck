@@ -26,14 +26,17 @@ multi-agent review and consolidate findings.
         - `Project Structure`
         - `Prompt Evaluation`
         - `Src Evaluation`
+        - `Test Evaluation`
 2. Spawn the deep-review roles in parallel:
     - `spring-cleaning/project-structure`
     - `spring-cleaning/prompt-evaluator`
     - `spring-cleaning/src-evaluator`
+    - `spring-cleaning/test-evaluator`
 3. Each role must:
     - Read `docs/application_interface.md` first
     - Read `production-config.yaml` second
     - Append findings to its matching section in the shared report file
+    - Exception: `spring-cleaning/test-evaluator` must derive its audit criteria from the application's interface documents, using `development/application-docs/` as the definition of what belongs in that contract. It should treat missing or weak interface docs as findings rather than substituting implementation-detail-based test expectations.
 4. Wait for all agents to complete.
     - If agents cannot be spawned, perform the same scoped audits manually.
 5. Explain the found weaknesses and potential fixes to the user.
