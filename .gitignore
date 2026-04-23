@@ -1,5 +1,6 @@
 .DS_Store
 .idea/
+.tyteam/
 /conversations/
 /local-testing-convos/
 /local-testing-configs/
@@ -19,10 +20,6 @@ rubber-duck_results.html
 scratch/secrets.env
 github_secrets.txt
 pre-production.env
-
-v2-production-config.json
-nic.yaml
-nic2.yaml
 
 *.db
 *.env
