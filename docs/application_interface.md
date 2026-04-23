@@ -9,116 +9,72 @@ At the black-box level, the application:
 - receives Discord messages in configured channels
 - routes each message into either admin command handling or a duck workflow
 - creates and manages private thread conversations for duck workflows
-- runs AI-backed conversation and workflow logic according to duck configuration
-- records messages, usage, and feedback metrics for later export and reporting
+- runs AI-backed workflow logic according to duck configuration
+- records messages, usage, and feedback for later export and reporting
 
-The intended workflow is:
+## Scope
+
+Included:
+
+- user-visible Discord workflows, states, and failure modes
+- admin command behavior and operational outputs
+- startup interface and configuration contract
+- external integrations and data boundaries visible to operators
+
+Excluded:
+
+- internal module structure and class layout
+- prompt implementation details
+- SQL schema internals beyond external export and persistence expectations
+- private refactors, helper utilities, and other implementation-only changes
+
+## User Interface
+
+### Workflow overview
+
+Expected user-visible sequence:
 
 1. An operator starts the app with a configuration file.
 2. The bot announces availability in the configured admin channel.
 3. Users send messages in configured duck channels.
-4. The app creates a private thread per new duck conversation and runs the configured workflow.
-5. Admins run commands in the admin channel for health checks, metrics export, logs, reports, and workflow visibility.
+4. The app creates a private thread for each new duck conversation.
+5. The configured workflow runs inside that thread.
 
-## Operating Model
+Successful runtime interactions produce one or more of the following:
 
-The runtime contract is Discord-first and config-driven.
+- Discord messages, reactions, or file attachments
+- new Discord threads
+- exported artifacts such as zip, CSV, image, or text outputs
 
-- The app runs as a single process started from `python -m src.main`.
-- Behavior is driven by a resolved config (local file or S3 URI).
-- Each configured channel can map to a named global duck or an inline duck definition.
-- Incoming messages are routed by channel identity and workflow state:
-  - admin channel => command workflow
-  - configured duck channel => new duck-orchestrator workflow
-  - existing active conversation thread => forwarded into the active workflow queue
-- Unmatched non-admin/non-configured messages are ignored.
+### Message routing contract
 
-## Startup Interface
+General inbound message filters:
 
-### `python -m src.main [--config <path-or-s3-uri>] [--debug] [--log-path <path>]`
+- messages from the bot are ignored
+- messages from other bots are ignored
+- messages starting with `//` are ignored
+- unmatched non-admin and non-configured messages are ignored
 
-Starts the bot runtime.
+Admin-channel behavior:
 
-Inputs:
+- messages in the configured admin channel are treated as commands
+- `!help` returns a generated help list of registered commands
+- unknown commands return `Unknown command. Try !help`
+- command execution errors return a generic unexpected-error message
 
-- `--config`: optional local JSON/YAML path or `s3://...` URI
-- `--debug`: optional flag for debug log level
-- `--log-path`: optional path used for file-based logging
+Duck-channel behavior:
 
-Expected outcome on success:
+- a message in a configured duck channel starts a new duck workflow
+- the app creates a thread using the first 20 characters of the triggering message
+- the user is mentioned in the new thread
+- the parent channel receives a join-link message mentioning the user
+- if the original message contains `duck`, the app adds a `🦆` reaction
 
-- Loads and resolves config including recursive `$include` directives.
-- Connects runtime dependencies (Discord client, SQL metrics/session, configured ducks/tools).
-- Starts the Discord bot loop.
-- Sends `Duck online` to the configured admin channel when ready.
+Active-thread behavior:
 
-Config fallback behavior:
+- messages in an active conversation thread are delivered to the running workflow
 
-- If `--config` is omitted, the app attempts to read `CONFIG_FILE_S3_PATH` from environment variables.
-
-User-visible/operator-visible failure behavior:
-
-- If required runtime dependencies or configuration are invalid, startup fails and logs an error.
-- If `--log-path` is omitted, runtime continues and warns that logging is console-only.
-
-## Interface Guarantees
-
-At the black-box level, Rubber Duck provides these behavior categories:
-
-- Admin command handling in one configured admin channel.
-- Configured duck channel conversations that always begin in a private thread.
-- Thread-based AI workflow execution for supported duck types.
-- SQL-backed recording of message/usage/feedback telemetry.
-- Export/report surfaces through admin commands.
-- Graceful close messaging for duck conversations.
-
-Successful runtime interactions either:
-
-- send Discord messages/reactions/files,
-- create Discord threads,
-- or produce command outputs and artifacts (e.g., zip/csv/image files).
-
-When a workflow fails unexpectedly:
-
-- the thread receives an error-code message,
-- the conversation is then closed with `*This conversation has been closed.*`.
-
-## Message Routing Contract
-
-### General inbound message filters
-
-The bot ignores:
-
-- messages from itself
-- messages from other bots
-- messages starting with `//`
-
-### Admin-channel behavior
-
-Messages in the configured admin channel are treated as commands.
-
-- `!help` returns a generated help list of registered commands.
-- unknown commands return `Unknown command. Try !help`.
-- command execution errors return a generic unexpected-error message.
-
-### Duck-channel behavior
-
-A message in a configured duck channel starts a new duck workflow.
-
-Expected observable behavior:
-
-- The app creates a thread using the first 20 characters of the triggering message.
-- The user is mentioned in the new thread.
-- The parent channel receives a join link message mentioning the user.
-- If the original message contains `duck`, the app adds a 🦆 reaction to it.
-
-### Active-thread behavior
-
-Messages in an active conversation thread are delivered to the running workflow via its message queue.
-
-## Duck Workflow Contract
-
-Configured ducks are selected by `duck_type`.
+### Duck workflow contract
 
 Supported duck types:
 
@@ -128,110 +84,147 @@ Supported duck types:
 - `registration`
 - `assignment_feedback`
 
-### Shared lifecycle behavior
+Shared lifecycle behavior:
 
-- Duck workflows run inside the created thread.
-- On completion (or handled failure), the app sends `*This conversation has been closed.*`.
-- Completed duck conversations are recorded for feedback-queue processing when applicable.
+- duck workflows run inside the created thread
+- on completion or handled failure, the app sends `*This conversation has been closed.*`
+- completed duck conversations are recorded for feedback-queue processing when applicable
+- unexpected workflow failures surface an error-code message before the conversation closes
 
-### `agent_led_conversation`
+`agent_led_conversation`:
 
-- Runs a single agent session per invocation in the thread.
-- The agent may call tools (including `talk_to_user`) during that session, but the workflow itself does not loop on user messages.
+- runs a single agent session per invocation in the thread
+- the agent may call tools during the session, but the workflow does not loop on later user messages
 
-### `user_led_conversation`
+`user_led_conversation`:
 
-- Sends configured introduction text.
-- Continues turn-based conversation until completion/timeout conditions are reached.
+- sends configured introduction text
+- continues a turn-based conversation until completion or timeout conditions are reached
 
-### `conversation_review`
+`conversation_review`:
 
-- Serves queued student conversations to TA/reviewer threads.
-- Uses reaction-based scoring (`1️⃣`-`5️⃣`, skip via `⏭️`).
-- Prompts for optional written feedback after numeric scoring.
-- Ends inactive sessions with timeout messaging.
+- serves queued student conversations to TA or reviewer threads
+- uses reaction-based scoring (`1️⃣` through `5️⃣`, skip via `⏭️`)
+- prompts for optional written feedback after numeric scoring
+- ends inactive sessions with timeout messaging
 
-### `registration`
+`registration`:
 
 Expected user-facing sequence:
 
 - prompt for Net ID
-- Net ID format validation
-- email verification challenge with retry/resend path
-- nickname selection and validation
-- role assignment flow
+- validate Net ID format
+- run an email verification challenge with retry and resend paths
+- prompt for nickname selection and validate the result
+- run the role-assignment flow
 
-Observable failure/guardrail behavior includes:
+Observable failure or guardrail behavior:
 
-- timeout closes conversation with timeout message
-- repeated invalid verification tokens terminate registration attempt
-- permission issues during nickname/role assignment notify configured TA channel and terminate flow
+- timeout closes the conversation with a timeout message
+- repeated invalid verification tokens terminate the registration attempt
+- permission issues during nickname or role assignment notify the configured TA channel
 
-### `assignment_feedback`
+`assignment_feedback`:
 
 Expected user-facing sequence:
 
-- optional initial instructions
-- list of supported assignments
-- prompt for markdown upload (up to three attempts)
-- assignment detection from report headers, with AI fallback selection
-- rubric-based grading response in markdown format
+- send optional initial instructions
+- list supported assignments
+- prompt for a markdown upload with up to three attempts
+- detect the assignment from report headers, with AI fallback selection when needed
+- return a rubric-based grading response in markdown format
 
-Observable failure/guardrail behavior includes:
+Observable failure or guardrail behavior:
 
 - non-markdown or missing uploads trigger retry prompts
 - unsupported assignment names terminate with an explicit unsupported message
-- missing report sections produce explicit unsatisfactory rubric feedback for those sections
+- missing report sections produce explicit unsatisfactory rubric feedback
 
-## Admin Command Contract
+## Operations Interface
 
-The following commands are registered and available through admin-channel command routing.
+### Operating model
 
-### `!status`
+- the app runs as a single process started from `python -m src.main`
+- behavior is driven by a resolved config loaded at startup
+- each configured channel maps to either admin command handling or a duck workflow
+- the resolved config is authoritative for the runtime and is not reloaded after startup
 
-- Returns `I am alive. 🦆`.
+### Startup interface
 
-### `!messages`, `!usage`, `!feedback`
+`python -m src.main [--config <path-or-s3-uri>] [--debug] [--log-path <path>]`
 
-- Each command returns a zip file export for its respective table.
+Inputs:
 
-### `!metrics`
+- `--config`: optional local JSON or YAML path, or an `s3://...` URI
+- `--debug`: optional flag that enables debug log level
+- `--log-path`: optional path used for file-based logging
 
-- Returns all three table exports (`messages`, `usage`, `feedback`).
+Expected outcome on success:
 
-### `!report`
+- load and resolve config, including recursive `$include` directives
+- connect runtime dependencies such as the Discord client, SQL session, ducks, and tools
+- start the Discord bot loop
+- send `Duck online` to the configured admin channel when ready
 
-- `!report` / `!report help` / `!report h` return report help text.
-- other valid forms return generated report images and/or text output.
-- failures return an explicit report-generation error message.
+Config fallback behavior:
 
-### `!log`
+- if `--config` is omitted, the app attempts to read `CONFIG_FILE_S3_PATH` from the environment
 
-- If logging path is configured and log files exist, returns a zip of logs.
-- If logging is not configured, returns `Log export disabled: no log path configured.`
-- If no logs are present, returns a no-logs message.
+Failure behavior:
 
-### `!active [full]`
+- invalid configuration or missing dependencies cause startup to fail and log an error
+- if `--log-path` is omitted, runtime continues and warns that logging is console-only
 
-- `!active` returns workflow counts by type.
-- `!active full` returns detailed active workflow entries with Mountain Time timestamps.
+### Admin command contract
 
-### `!cache`
+The following commands are available through admin-channel routing:
 
-- `!cache` lists current cache entries and sends a CSV report.
-- `!cache cleanup` removes expired entries.
-- `!cache remove <cache_tool> <entry_index>` removes one entry.
-- `!cache clear confirm` clears all cache entries.
-- invalid forms return usage/help-style error messages.
+`!status`:
 
-## Configuration Contract
+- returns `I am alive. 🦆`
 
-The external config contract includes:
+`!messages`, `!usage`, `!feedback`:
+
+- each command returns a zip file export for its respective table
+
+`!metrics`:
+
+- returns all three table exports
+
+`!report`:
+
+- `!report`, `!report help`, and `!report h` return report help text
+- other valid forms return generated report images or text output
+- failures return an explicit report-generation error message
+
+`!log`:
+
+- if logging path is configured and log files exist, returns a zip of logs
+- if logging is not configured, returns `Log export disabled: no log path configured.`
+- if no logs are present, returns a no-logs message
+
+`!active [full]`:
+
+- `!active` returns workflow counts by type
+- `!active full` returns detailed active workflow entries with Mountain Time timestamps
+
+`!cache`:
+
+- `!cache` lists current cache entries and sends a CSV report
+- `!cache cleanup` removes expired entries
+- `!cache remove <cache_tool> <entry_index>` removes one entry
+- `!cache clear confirm` clears all cache entries
+- invalid forms return usage or help-style error messages
+
+### Configuration contract
+
+The external configuration contract includes:
 
 - source: local path or S3 URI
 - format: JSON or YAML
 - recursive `$include` support with optional JSONPath selectors
 - deep-merge semantics for dict-style includes
+- a single resolved config assembled before runtime wiring begins
 
 Required top-level runtime sections include:
 
@@ -251,22 +244,27 @@ Optional sections include:
 - `cache_cleanup_settings`
 - `agents_as_tools`
 
-## Observable Conventions
+Configuration-driven wiring guarantees:
 
-The following conventions are part of the user/operator-observable contract:
+- the resolved config defines the runtime wiring for ducks, tools, containers, channels, and workflows
+- startup consumes that resolved config to construct runtime subsystems and map channels to duck workflows
 
-- Channel and server routing is ID-based from config.
-- New duck conversations are thread-scoped.
-- Thread inactivity and workflow-complete conditions close user-facing conversations.
-- Admin command outputs are delivered in Discord as messages/files.
-- Metrics and feedback are persisted for export/reporting behavior.
+## Constraints and Assumptions
 
-## Out of Scope
+- the bot runs as a single operator-started process
+- Discord credentials must be available at runtime
+- SQL connectivity is required for metrics and feedback persistence
+- S3 access is required only when configuration is loaded from an `s3://...` URI
+- channel and server routing is ID-based from config
+- new duck conversations are thread-scoped
 
-This interface document does not define:
+## Open Questions
 
-- internal class/module boundaries
-- AI prompt text contents
-- SQL schema implementation details
-- internal dependency injection/wiring mechanics
-- non-observable helper utilities
+None currently.
+
+## Related Documents
+
+- `application-design/application_interface.md`
+- `docs/deployment.md`
+- `docs/getting-started.md`
+- `docs/backlog/registration-prompt-resume-only-mismatch.md`
