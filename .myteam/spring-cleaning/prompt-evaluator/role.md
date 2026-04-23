@@ -20,6 +20,6 @@ description: "Deep audit of prompt assets under prompts/. Use this role during s
 - Write under the `Prompt Evaluation` section only.
 - Use concise bullets with:
   - finding summary
-  - evidence (paths / searches)
   - confidence (high/med/low)
   - suggested next step (optional)
+  - complexity (how in-depth the cleanup will be)

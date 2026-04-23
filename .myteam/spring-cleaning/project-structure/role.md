@@ -20,6 +20,6 @@ description: "Deep structural audit of the repository. Use this role during spri
 - Write under the `Project Structure` section only.
 - Use concise bullets with:
   - finding summary
-  - evidence (paths / searches)
   - confidence (high/med/low)
   - suggested next step (optional)
+  - complexity (how in-depth the cleanup will be)

@@ -1,12 +1,13 @@
 ---
 name: Spring Cleaning
 description: |
-  Guides feature-neutral cleanup and organization of the rubber-duck project.
+  Guides feature-neutral cleanup and general organization of the project.
   Use this skill when a user asks for spring cleaning or a deep, behavior-preserving
-  audit of the repo. Always run a multi-agent review and consolidate findings.
+  audit of the repo. 
 ---
 
-Keep the repository organized, maintainable, and easy to navigate without changing product behavior.
+Keep the repository organized, maintainable, and easy to navigate without changing product behavior. Always run a
+multi-agent review and consolidate findings.
 
 ## Scope
 
@@ -20,23 +21,23 @@ Keep the repository organized, maintainable, and easy to navigate without changi
 ## Workflow
 
 1. Create (or reuse) the report directory and file:
-   - `docs/spring-cleanings/spring-cleaning-<mm-dd>.md`
-   - If the file does not exist, initialize it with sections:
-     - `Project Structure`
-     - `Prompt Evaluation`
-     - `Src Evaluation`
+    - `docs/spring-cleanings/spring-cleaning-<mm-dd>.md`
+    - If the file does not exist, initialize it with sections:
+        - `Project Structure`
+        - `Prompt Evaluation`
+        - `Src Evaluation`
 2. Spawn the deep-review roles in parallel:
-   - `spring-cleaning/project-structure`
-   - `spring-cleaning/prompt-evaluator`
-   - `spring-cleaning/src-evaluator`
+    - `spring-cleaning/project-structure`
+    - `spring-cleaning/prompt-evaluator`
+    - `spring-cleaning/src-evaluator`
 3. Each role must:
-   - Read `docs/application_interface.md` first
-   - Read `production-config.yaml` second
-   - Append findings to its matching section in the shared report file
+    - Read `docs/application_interface.md` first
+    - Read `production-config.yaml` second
+    - Append findings to its matching section in the shared report file
 4. Wait for all agents to complete.
-   - If agents cannot be spawned, perform the same scoped audits manually.
+    - If agents cannot be spawned, perform the same scoped audits manually.
 5. Explain the found weaknesses and potential fixes to the user.
-   - If no high/medium-confidence findings exist, report that result and stop.
+    - If no high/medium-confidence findings exist, report that result and stop.
 6. If cleanup affects the application design contract, load `application-docs`
    and follow its change workflow.
 7. If a cleanup finding should be tracked for later implementation,
@@ -44,11 +45,11 @@ Keep the repository organized, maintainable, and easy to navigate without changi
    to capture it.
 8. Load `feature-pipeline`
 9. Implement one change at a time. After each one:
-   - Explain to the user why that change is important.
-   - Suggest a commit message.
-   - Run relevant tests or targeted checks; if unavailable, note the risk.
-   - Wait for confirmation.
-   - Repeat for the rest of the changes
+    - Explain to the user why that change is important.
+    - Suggest a commit message.
+    - Run relevant tests or targeted checks; if unavailable, note the risk.
+    - Wait for confirmation.
+    - Repeat for the rest of the changes
 
 ## Guardrails
 

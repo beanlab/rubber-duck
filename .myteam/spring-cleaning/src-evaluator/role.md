@@ -20,6 +20,6 @@ description: "Deep audit of src/ for duplication, dead paths, and maintainabilit
 - Write under the `Src Evaluation` section only.
 - Use concise bullets with:
   - finding summary
-  - evidence (paths / searches)
   - confidence (high/med/low)
   - suggested next step (optional)
+  - complexity (how in-depth the cleanup will be)
