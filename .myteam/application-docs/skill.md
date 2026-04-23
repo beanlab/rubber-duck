@@ -11,7 +11,7 @@ description: |
 # Application Design
 
 We document the design and intent of the application in a document tree
-rooted at `application-design/`.
+rooted at `docs/`.
 
 If this folder does not yet exist, create it.
 
@@ -19,7 +19,7 @@ The purpose of these documents is to describe the application's
 external behavior and operational contract, not its internal code
 structure.
 
-Read the following documents before making changes:
+Read the following documents in `.myteam/application-docs/` before making changes:
 
 - `intent.md`
 - `structure.md`
