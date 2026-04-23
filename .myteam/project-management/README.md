@@ -1,0 +1,1 @@
+This folder contains skills and roles that are useful in managing a project.
