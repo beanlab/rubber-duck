@@ -213,7 +213,7 @@ The following commands are available through admin-channel routing:
 - `!cache` lists current cache entries and sends a CSV report
 - `!cache cleanup` removes expired entries
 - `!cache remove <cache_tool> <entry_index>` removes one entry
-- `!cache clear confirm` clears all cache entries
+- `!cache clear` clears all cache entries
 - invalid forms return usage or help-style error messages
 
 ### Configuration contract
@@ -264,7 +264,5 @@ None currently.
 
 ## Related Documents
 
-- `application-design/application_interface.md`
 - `docs/deployment.md`
 - `docs/getting-started.md`
-- `docs/backlog/registration-prompt-resume-only-mismatch.md`
