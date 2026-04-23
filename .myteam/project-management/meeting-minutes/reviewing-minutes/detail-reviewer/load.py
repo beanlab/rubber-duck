@@ -12,22 +12,16 @@ def main() -> int:
     myteam = get_active_myteam_root(base)
 
     print_instructions(base)
-    docs = [
-        "intent.md",
-        "structure.md",
-    ]
-    for doc in docs:
-        print((base / doc).read_text())
+    print_directory_tree(myteam.parent)
 
-    application_docs = myteam.parent / 'application-design'
-    if application_docs.exists():
-        print_directory_tree(application_docs)
+    explain_skills()
+    list_skills(base, myteam, [])
 
-    # explain_skills()
-    # list_skills(base, myteam, [])
-    #
-    # explain_tools()
-    # list_tools(base, myteam, [])
+    explain_tools()
+    list_tools(base, myteam, [])
+
+    explain_roles()
+    list_roles(base, myteam, [])
 
     return 0
 

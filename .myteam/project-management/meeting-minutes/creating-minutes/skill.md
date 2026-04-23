@@ -37,9 +37,27 @@ Then include a section for each theme.
 Each section should include:
 
 - a summary of the discussion
+- designs discussed
 - the decisions that were made
 - the tasks assigned (prefix with `[name]`)
 - open items/questions
+
+### Designs
+
+Some meetings may have very technical discussions.
+Capture these portions of the meeting in more depth than 
+the administrative details.
+
+Provide a complete account of the designs or work presented,
+as well as ultimate design decisions made and the designs that were rejected and why.
+ 
+Review this portion of the transcript and compare it to your summary.
+Are there details missing? 
+Does the summary contain all the information discussed? 
+
+The design or work itself might not be complete or ready for implementation,
+but the summary of the discussion should not lose important
+information already presented. 
 
 ## Scope
 
