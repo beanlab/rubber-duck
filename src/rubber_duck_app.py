@@ -20,7 +20,21 @@ class RubberDuckApp:
             )
             return
 
-        # Duck channel
+        # Belongs to an existing conversation.
+        # Checked before duck-channel so that Teams conversations (where thread_id ==
+        # parent_channel_id) route to the active workflow rather than starting a new one.
+        # Discord is unaffected: thread_id != parent_channel_id there, so this check
+        # never fires for messages arriving on the parent channel.
+        str_id = str(message["channel_id"])
+        if self._workflow_manager.has_workflow(str_id):
+            duck_logger.debug(f"Existing conversation message: {message}")
+            await self._workflow_manager.send_event(
+                str_id, 'messages', None, 'put',
+                message
+            )
+            return
+
+        # Duck channel — start a new conversation.
         if message['channel_id'] in self._channel_configs:
             # Call DuckOrchestrator
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
@@ -28,16 +42,6 @@ class RubberDuckApp:
                 'duck-orchestrator',
                 workflow_id,
                 self._channel_configs[message['channel_id']],
-                message
-            )
-            return
-
-        # Belongs to an existing conversation
-        str_id = str(message["channel_id"])
-        if self._workflow_manager.has_workflow(str_id):
-            duck_logger.debug(f"Existing conversation message: {message}")
-            await self._workflow_manager.send_event(
-                str_id, 'messages', None, 'put',
                 message
             )
             return

@@ -1,11 +1,11 @@
 # Rubber Duck
 
-Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.
+Rubber Duck is a configurable chat-bot platform for AI-assisted learning workflows.
 It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, registration, assignment feedback, and conversation review), all selected through config.
 
 ## What This Project Does
 
-- Routes Discord messages into workflow-based conversations
+- Routes Discord and Teams messages into workflow-based conversations
 - Runs OpenAI Responses API agents with optional tool calling
 - Supports containerized Python execution tools for stats/code workflows
 - Tracks messages, usage, and feedback metrics in SQL
@@ -15,7 +15,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 ## Repository Layout
 
 - `src/main.py`: app entrypoint and system wiring
-- `src/bot/`: Discord client integration
+- `src/bot/`: Discord and Teams transport adapters
 - `src/rubber_duck_app.py`: channel/admin message routing
 - `src/duck_orchestrator.py`: thread creation + duck dispatch
 - `src/conversation/`: conversation implementations
@@ -39,6 +39,23 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - Docker (required if you enable container tools such as code execution)
 - Discord bot token
 - OpenAI API key
+
+## Running The Bot
+
+Use a single entrypoint with platform selection:
+
+- Discord:
+  - `python src/main.py --platform discord --config <discord-config-path> [--debug] [--log-path <path>]`
+- Teams:
+  - `python src/main.py --platform teams --config <teams-config-path> [--debug] [--log-path <path>] [--port <int>]`
+- Both:
+  - `python src/main.py --platform both --discord-config <discord-config-path> --teams-config <teams-config-path> [--debug] [--log-path <path>] [--port <int>]`
+
+Notes:
+
+- `run_discord.py` and `run_teams.py` have been removed.
+- For single-platform modes (`discord` and `teams`), if `--config` is omitted the runtime falls back to `CONFIG_FILE_S3_PATH`.
+- Teams `--port` defaults to `PORT` from the environment, otherwise `3000`.
 
 ## Duck Types (Implemented)
 

@@ -88,7 +88,7 @@ class AssignmentFeedbackWorkflow:
         rubric_contents = all_loaded_contents.get(project_name)
 
         if not rubric_contents:
-            duck_logger.warn(f"No rubric for {project_name}")
+            duck_logger.warning(f"No rubric for {project_name}")
 
         return {project_name: rubric_contents}
 
@@ -203,7 +203,7 @@ class AssignmentFeedbackWorkflow:
             rule_contents[rule_name] = rule_content
 
             if not rule_content:
-                duck_logger.warn(f'Rule name "{rule_name}" not found')
+                duck_logger.warning(f'Rule name "{rule_name}" not found')
                 continue
 
         return rule_contents

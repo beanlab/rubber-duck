@@ -229,7 +229,7 @@ def determine_staging_case(remote_path: str, target_path: str) -> str:
     if not remote_path.endswith("/") and not target_path.endswith("/"):
         return "file: file"
 
-    duck_logger.warn(f"Invalid staging case - remote path: {remote_path}, target path: {target_path}")
+    duck_logger.warning(f"Invalid staging case - remote path: {remote_path}, target path: {target_path}")
     return ""
 
 

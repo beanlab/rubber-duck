@@ -2,8 +2,6 @@ import re
 import uuid
 from dataclasses import dataclass
 
-import discord
-from discord import Guild, utils
 from quest import step
 
 from ..armory.tools import register_tool
@@ -171,7 +169,7 @@ class Registration:
                     return False
         return False
 
-    async def get_user_roles(self, member: discord.Member) -> list[int]:
+    async def get_user_roles(self, member) -> list[int]:
         roles = [role.id for role in member.roles if role.name != "@everyone"]
         return roles
 
@@ -269,11 +267,11 @@ class Registration:
         if settings.get('roles') is None:
             duck_logger.info("No roles configured for this server. Using authenticated user role only.")
             role_name = settings['authenticated_user_role_name']
-            guild: Guild = await self._get_guild(server_id)
+            guild = await self._get_guild(server_id)
             member = await guild.fetch_member(user_id)
 
             # Find role by name instead of ID
-            role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
+            role = next((r for r in guild.roles if r.name == role_name), None)
             if not role:
                 raise ValueError(f"Role '{role_name}' not found in guild '{guild.name}'.")
 
@@ -281,7 +279,7 @@ class Registration:
             role_names = ", ".join(role.name for role in selected_roles)
             try:
                 await member.add_roles(role, reason="User registration")
-            except discord.Forbidden:
+            except Exception:
                 await self._send_message(
                     self._settings['ta_channel_id'],
                     f"ERROR in <#{thread_id}>: RubberDuck doesn't have high enough access to assign role: {role}"
@@ -300,7 +298,7 @@ class Registration:
             selected_role_ids.append(authenticated_role_id)
 
             # Get Discord guild and member
-            guild: Guild = await self._get_guild(server_id)
+            guild = await self._get_guild(server_id)
             member = await guild.fetch_member(user_id)
 
             # Get member's current roles
@@ -327,7 +325,7 @@ class Registration:
             if new_roles:
                 try:
                     await member.add_roles(*new_roles, reason="User registration")
-                except discord.Forbidden:
+                except Exception:
                     duck_logger.exception(f"Failed to assign roles: {new_roles} to user in thread: <#{thread_id}>")
                     await self._send_message(
                         self._settings['ta_channel_id'],
@@ -386,7 +384,7 @@ class Registration:
 
             await member.edit(nick=name, reason="Student registration")
             return True, "Nickname set successfully"
-        except discord.Forbidden:
+        except Exception:
             await self._send_message(
                 self._settings['ta_channel_id'],
                 f"Error in <#{ctx.thread_id}>: The bot doesn't have high enough access to assign a nickname"

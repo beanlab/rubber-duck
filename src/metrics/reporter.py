@@ -108,7 +108,7 @@ class Reporter:
         # Create a flat mapping of channel IDs to channel names
         self._channels = {}
         for server_channels in self._reporting_config.values():
-            self._channels.update({int(channel_id): channel_name for channel_id, channel_name in server_channels.items()})
+            self._channels.update({channel_id: channel_name for channel_id, channel_name in server_channels.items()})
 
     def _make_reporting_config(self, server_configs: dict[str, ServerConfig]) -> dict:
         """This function converts the server_config into a dictionary that maps server names to their channels."""

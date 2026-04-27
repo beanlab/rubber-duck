@@ -4,6 +4,8 @@ from typing import NotRequired, Literal, Union
 from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
 
+PlatformId = str | int
+
 CHANNEL_ID = int
 DUCK_WEIGHT = float
 DUCK_NAME = str
@@ -103,13 +105,13 @@ class AgentConversationSettings(TypedDict):
 
 @dataclass
 class DuckContext:
-    guild_id: int
-    parent_channel_id: int
-    author_id: int
+    guild_id: PlatformId
+    parent_channel_id: PlatformId
+    author_id: PlatformId
     author_mention: str
     content: str
-    message_id: int
-    thread_id: int
+    message_id: PlatformId
+    thread_id: PlatformId
     timeout: int
 
 
@@ -119,15 +121,20 @@ class DuckConfig(TypedDict):
 
 
 class ChannelConfig(TypedDict):
-    channel_id: int
+    channel_id: PlatformId
     duck: DUCK_NAME | DuckConfig
     timeout: int
     channel_name: NotRequired[str]
 
 
 class ServerConfig(TypedDict):
-    server_id: int
+    server_id: PlatformId
     channels: dict[str, ChannelConfig]
+
+
+class PlatformServers(TypedDict, total=False):
+    discord: dict[str, ServerConfig]
+    teams: dict[str, ServerConfig]
 
 
 class SQLConfig(TypedDict):
@@ -207,7 +214,7 @@ class Config(TypedDict):
     cache_cleanup_settings: NotRequired[CacheCleanupSettings]
     ducks: dict[DUCK_NAME, DuckConfig]
     agents_as_tools: dict[str, AgentAsToolSettings]
-    servers: dict[str, ServerConfig]
+    servers: PlatformServers
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
