@@ -1,0 +1,10 @@
+variables:
+  scope:
+    - variables in python
+  definition:
+    - a variable is a container that stores data values
+  using variables:
+    - variables don't need type declaration, and can change type even after being made
+    - variables are created with a name, a "=", and the data they are meant to hold
+    - variable names are cases sensitive (a is different than A)
+  

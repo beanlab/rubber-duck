@@ -14,6 +14,7 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from .workflows.student_duck_workflow import StudentDuckRubricTools, StudentDuckWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
@@ -176,6 +177,23 @@ def build_ducks(
                 project_scanner_agent,
                 ai_client,
                 bot.read_url
+            )
+
+        elif duck_type == 'student_duck':
+            student_agent = build_agent(settings["agent"])
+            error_checker_agent = build_agent(settings["error_checker_agent"])
+            omission_checker_agent = build_agent(settings["omission_checker_agent"])
+            rubric_tools = StudentDuckRubricTools(settings)
+            armory.scrub_tools(rubric_tools)
+            ducks[name] = StudentDuckWorkflow(
+                name,
+                bot.send_message,
+                settings,
+                student_agent,
+                error_checker_agent,
+                omission_checker_agent,
+                ai_client,
+                rubric_tools,
             )
 
         else:

@@ -78,6 +78,17 @@ class AssignmentFeedbackSettings(TypedDict):
     project_scanner_agent: SingleAgentSettings
 
 
+class StudentDuckSettings(TypedDict):
+    agent: SingleAgentSettings
+    error_checker_agent: SingleAgentSettings
+    omission_checker_agent: SingleAgentSettings
+    first_message: NotRequired[str]
+    rubric_path: NotRequired[str | list[str]]
+    rubric_root: NotRequired[str | list[str]]
+    rubric_roots: NotRequired[str | list[str]]
+    max_review_turns: NotRequired[int]
+
+
 class RubricItemResponse(TypedDict):
     rubric_item: str
     justification: str
