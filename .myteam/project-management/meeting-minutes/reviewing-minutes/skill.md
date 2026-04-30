@@ -12,6 +12,9 @@ review tasks and open items.
 The meeting minutes are organized by theme. 
 Perform the review one thematic section at a time.
 
+As decisions are made, update the meeting minutes document
+to reflect these decisions.
+
 ## Tasks
 
 Tasks should be assigned to someone.
@@ -38,7 +41,10 @@ others may be converted to backlog items or to tasks.
 
 If you are asked to create a backlog item, load the appropriate skill.
 
+After the backlog document is created, 
 ## Concluding
 
-After reviewing the minutes, update the minutes with the 
-decisions from the user.
+Tell the user that the review is complete and given them the
+opportunity to review the changes.
+
+If they approve, commit these changes.
