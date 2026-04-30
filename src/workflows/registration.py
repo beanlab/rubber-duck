@@ -7,10 +7,11 @@ from discord import Guild, utils
 from quest import step
 
 from ..armory.tools import register_tool
-from ..utils.config_types import RegistrationSettings, DuckContext
+from ..utils.config_types import RegistrationSettings, DuckContext, RetryProtocol
 from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message
 from ..utils.protocols import ConversationComplete
+from ..utils.retry import retry_async, is_retryable_discord_server_error
 from ..utils.send_email import EmailSender
 
 
@@ -37,13 +38,45 @@ class Registration:
                  get_channel,
                  fetch_guild,
                  email_sender: EmailSender,
-                 settings: RegistrationSettings
+                 settings: RegistrationSettings,
+                 retry_protocol: RetryProtocol,
                  ):
         self._send_message = step(send_message)
         self._get_channel = get_channel
         self._get_guild = fetch_guild
         self._email_sender = email_sender
         self._settings = settings
+        self._retry_protocol = retry_protocol
+
+    async def _handle_discord_retry_exhausted(self, ctx: DuckContext, operation_name: str, error: Exception):
+        duck_logger.warning(
+            "Discord connection issue persisted after retries during registration "
+            f"({operation_name}) in thread <#{ctx.thread_id}>: {error}"
+        )
+
+        await self._send_message(
+            ctx.thread_id,
+            "I'm having temporary connection issues with Discord right now. "
+            "Please try again later. I've notified a TA."
+        )
+
+        ta_channel_id = self._settings.get('ta_channel_id')
+        if ta_channel_id:
+            await self._send_message(
+                ta_channel_id,
+                "Registration hit repeated Discord connection issues "
+                f"during `{operation_name}` in thread <#{ctx.thread_id}> for user <@{ctx.author_id}>."
+            )
+
+        raise ConversationComplete()
+
+    async def _retry_discord_call(self, ctx: DuckContext, operation_name: str, operation):
+        return await retry_async(
+            operation,
+            self._retry_protocol,
+            is_retryable_discord_server_error,
+            on_exhausted=lambda error, _attempt: self._handle_discord_retry_exhausted(ctx, operation_name, error)
+        )
 
     async def run(self, ctx: DuckContext) -> RegistrationInfo | None:
         # Start the registration process
@@ -270,7 +303,7 @@ class Registration:
             duck_logger.info("No roles configured for this server. Using authenticated user role only.")
             role_name = settings['authenticated_user_role_name']
             guild: Guild = await self._get_guild(server_id)
-            member = await guild.fetch_member(user_id)
+            member = await self._retry_discord_call(ctx, "fetch_member", lambda: guild.fetch_member(user_id))
 
             # Find role by name instead of ID
             role = utils.get(guild.roles, name=role_name)  # This function is from the discord.utils module
@@ -280,7 +313,11 @@ class Registration:
             selected_roles = [role]
             role_names = ", ".join(role.name for role in selected_roles)
             try:
-                await member.add_roles(role, reason="User registration")
+                await self._retry_discord_call(
+                    ctx,
+                    "add_roles",
+                    lambda: member.add_roles(role, reason="User registration")
+                )
             except discord.Forbidden:
                 await self._send_message(
                     self._settings['ta_channel_id'],
@@ -301,7 +338,7 @@ class Registration:
 
             # Get Discord guild and member
             guild: Guild = await self._get_guild(server_id)
-            member = await guild.fetch_member(user_id)
+            member = await self._retry_discord_call(ctx, "fetch_member", lambda: guild.fetch_member(user_id))
 
             # Get member's current roles
             current_role_ids = await self.get_user_roles(member)
@@ -326,7 +363,11 @@ class Registration:
             new_roles = [role for role in selected_roles if role not in member.roles]
             if new_roles:
                 try:
-                    await member.add_roles(*new_roles, reason="User registration")
+                    await self._retry_discord_call(
+                        ctx,
+                        "add_roles",
+                        lambda: member.add_roles(*new_roles, reason="User registration")
+                    )
                 except discord.Forbidden:
                     duck_logger.exception(f"Failed to assign roles: {new_roles} to user in thread: <#{thread_id}>")
                     await self._send_message(
@@ -375,7 +416,7 @@ class Registration:
         """Try assigning the nickname, return (success, reason)."""
         try:
             guild: Guild = await self._get_guild(ctx.guild_id)
-            member = await guild.fetch_member(ctx.author_id)
+            member = await self._retry_discord_call(ctx, "fetch_member", lambda: guild.fetch_member(ctx.author_id))
 
             suspicious, reason = await self._is_suspicious(name)
             if suspicious:
@@ -384,7 +425,11 @@ class Registration:
             if member.guild.owner_id == member.id:
                 return False, "Cannot change the server owner's nickname"
 
-            await member.edit(nick=name, reason="Student registration")
+            await self._retry_discord_call(
+                ctx,
+                "edit_nickname",
+                lambda: member.edit(nick=name, reason="Student registration")
+            )
             return True, "Nickname set successfully"
         except discord.Forbidden:
             await self._send_message(

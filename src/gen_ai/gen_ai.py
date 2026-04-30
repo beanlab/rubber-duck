@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 import json
 import os
@@ -16,6 +15,7 @@ from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
 from ..utils.config_types import DuckContext, HistoryType, RetryProtocol
 from ..utils.logger import duck_logger
+from ..utils.retry import retry_async, retry_delay_seconds, is_retryable_discord_server_error
 
 
 class GenAIException(Exception):
@@ -93,22 +93,13 @@ class AIClient:
             return True
         return payload.get("code") == "server_is_overloaded"
 
-    @staticmethod
-    def _is_retryable_discord_server_error(error: Exception) -> bool:
-        return (
-            error.__class__.__name__ == "DiscordServerError" and
-            getattr(error, "status", None) == 503
-        )
-
     def _should_retry(self, error: Exception) -> bool:
         if isinstance(error, InternalServerError):
             return self._is_retryable_server_overload(error)
-        return self._is_retryable_discord_server_error(error)
+        return is_retryable_discord_server_error(error)
 
     def _retry_delay_seconds(self, attempt: int) -> int:
-        base_delay = max(0, int(self._retry_protocol.get("delay", 0)))
-        backoff = max(1, int(self._retry_protocol.get("backoff", 1)))
-        return base_delay * (backoff ** attempt)
+        return retry_delay_seconds(self._retry_protocol, attempt)
 
     async def _notify_retry(self, ctx: DuckContext, delay_seconds: int):
         if not self._send_message:
@@ -149,22 +140,19 @@ class AIClient:
         if reasoning:
             params["reasoning"] = {"effort": reasoning}
 
-        max_retries = max(0, int(self._retry_protocol.get("max_retries", 0)))
-        for attempt in range(max_retries + 1):
-            try:
-                async with self._typing(ctx.thread_id):
-                    response = await self._client.responses.create(**params)
-                break
-            except Exception as error:
-                should_retry = (
-                    attempt < max_retries and
-                    self._should_retry(error)
-                )
-                if not should_retry:
-                    raise
-                delay_seconds = self._retry_delay_seconds(attempt)
-                await self._notify_retry(ctx, delay_seconds)
-                await asyncio.sleep(delay_seconds)
+        async def create_completion():
+            async with self._typing(ctx.thread_id):
+                return await self._client.responses.create(**params)
+
+        async def on_retry(_error: Exception, attempt: int, _delay_seconds: int):
+            await self._notify_retry(ctx, self._retry_delay_seconds(attempt))
+
+        response = await retry_async(
+            create_completion,
+            self._retry_protocol,
+            self._should_retry,
+            on_retry
+        )
 
         if response.usage:
             usage = response.usage
