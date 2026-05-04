@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,6 @@ from ..utils.protocols import ConversationComplete
 
 CheckResult = dict[str, str]
 ConversationTurn = dict[str, Any]
-DEFAULT_FIRST_MESSAGE = "What are we going to learn today?"
 
 
 def _check_output_format(check_type: str) -> dict[str, Any]:
@@ -53,6 +53,15 @@ class StudentDuckRubricTools:
     def get_selected_rubric(self, thread_id: int) -> tuple[str, dict[str, Any]] | None:
         return self._selected_rubrics.get(thread_id)
 
+    def select_best_rubric(self, ctx: DuckContext, subject: str, topic: str) -> tuple[str, dict[str, Any]] | None:
+        matches = self._rank_rubrics(subject, topic)
+        if not matches:
+            return None
+
+        _, rubric_id, _, rubric = matches[0]
+        self._selected_rubrics[ctx.thread_id] = (rubric_id, rubric)
+        return rubric_id, rubric
+
     def get_catalog(self) -> list[dict[str, str]]:
         return [
             {
@@ -67,39 +76,45 @@ class StudentDuckRubricTools:
     async def select_student_duck_rubric(self, ctx: DuckContext, subject: str, topic: str) -> str:
         """
         Select and load the best available student-duck rubric for a subject and topic.
-        Returns JSON with selected, rubric_id, description, and available_rubrics fields.
+        Returns JSON with selected, rubric_id, description, rubric, and available_rubrics fields.
         """
-        matches = self._rank_rubrics(subject, topic)
-        if not matches:
+        selected_rubric = self.select_best_rubric(ctx, subject, topic)
+        if not selected_rubric:
             return json.dumps({
                 "selected": False,
                 "rubric_id": "",
                 "description": "No available rubric matched the requested subject and topic.",
+                "rubric": {},
                 "available_rubrics": self.get_catalog(),
             })
 
-        _, rubric_id, _, rubric = matches[0]
-        self._selected_rubrics[ctx.thread_id] = (rubric_id, rubric)
+        rubric_id, rubric = selected_rubric
         return json.dumps({
             "selected": True,
             "rubric_id": rubric_id,
             "description": self._rubric_description(rubric),
+            "rubric": rubric,
             "available_rubrics": self.get_catalog(),
         })
 
     def _rank_rubrics(self, subject: str, topic: str) -> list[tuple[int, str, Path, dict[str, Any]]]:
-        search_terms = self._search_terms(f"{subject} {topic}")
+        subject_terms = self._search_terms(subject)
+        topic_terms = self._search_terms(topic)
         matches: list[tuple[int, str, Path, dict[str, Any]]] = []
 
         for rubric_id, path, rubric in self._iter_rubrics():
             searchable_text = " ".join([
+                self._root_name(path),
                 rubric_id,
                 path.stem,
                 json.dumps(rubric),
             ]).lower()
-            score = sum(1 for term in search_terms if term in searchable_text)
-            if score:
-                matches.append((score, rubric_id, path, rubric))
+            topic_score = sum(1 for term in topic_terms if term in searchable_text)
+            if not topic_score:
+                continue
+
+            subject_score = sum(1 for term in subject_terms if term in searchable_text)
+            matches.append(((topic_score * 10) + subject_score, rubric_id, path, rubric))
 
         return sorted(matches, key=lambda match: (-match[0], match[1]))
 
@@ -144,11 +159,20 @@ class StudentDuckRubricTools:
 
     @staticmethod
     def _search_terms(text: str) -> list[str]:
-        return [
-            term.lower()
-            for term in text.replace("/", " ").replace("-", " ").replace("_", " ").split()
-            if len(term) > 1
-        ]
+        terms = []
+        for term in re.findall(r"[a-z0-9]+", text.lower()):
+            if len(term) <= 1:
+                continue
+            terms.append(term)
+            if len(term) > 3 and term.endswith("s"):
+                terms.append(term[:-1])
+        return terms
+
+    def _root_name(self, path: Path) -> str:
+        for root in self._rubric_roots:
+            if self._is_allowed_path(root, path):
+                return root.name
+        return ""
 
 
 class StudentDuckWorkflow:
@@ -179,6 +203,9 @@ class StudentDuckWorkflow:
             conversation_context: list[ConversationTurn] = []
 
             await self._send_message(context.thread_id, self._first_message())
+            topic_declaration = await self._wait_for_user_response(context)
+            self._select_rubric_for_topic(context, topic_declaration)
+            await self._send_message(context.thread_id, self._topic_acknowledgement())
             user_response = await self._wait_for_user_response(context)
 
             max_review_turns = self._settings.get("max_review_turns", 5)
@@ -254,7 +281,19 @@ class StudentDuckWorkflow:
         return message["content"]
 
     def _first_message(self) -> str:
-        return self._settings.get("first_message", DEFAULT_FIRST_MESSAGE)
+        return self._settings["first_message"]
+
+    def _topic_acknowledgement(self) -> str:
+        return self._settings["topic_acknowledgement"]
+
+    def _select_rubric_for_topic(self, context: DuckContext, topic_declaration: str):
+        if not self._rubric_tools:
+            return
+        if self._settings.get("rubric_path"):
+            return
+        if self._rubric_tools.get_selected_rubric(context.thread_id):
+            return
+        self._rubric_tools.select_best_rubric(context, context.content, topic_declaration)
 
     async def _check_for_errors(
             self,

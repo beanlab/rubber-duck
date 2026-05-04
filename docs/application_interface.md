@@ -187,14 +187,16 @@ Observable failure/guardrail behavior includes:
 
 Expected user-facing sequence:
 
-- send `What are we going to learn today?` as the default first message, unless configured otherwise
-- collect the user's response from the first thread reply after that prompt
-- load configured YAML rubric criteria when present, or use the student-duck selected rubric for the current thread
-- run a configured error-checking agent against the current user response, forcing workflow-owned structured output
+- send the configured `first_message`
+- collect the user's response from the first thread reply after that prompt as a topic declaration
+- load configured YAML rubric criteria when present; otherwise select the best matching YAML rubric from configured `rubric_roots` using the topic declaration
+- send the configured `topic_acknowledgement`
+- collect the next user response as the first response passed to the review loop
+- run a configured error-checking agent against the current user response, rubric, and accumulated conversation context, forcing workflow-owned structured output
 - run a configured omission-checking agent against the current user response and accumulated conversation context, forcing workflow-owned structured output
 - attach structured checker results (`check_type`, `assessment`) to the matching user turn in the conversation context
 - pass the user response, rubric, selected rubric ID, available rubric catalog, current checker results, and conversation context to the configured user-facing student agent
-- allow the user-facing student agent to call `select_student_duck_rubric` to choose a YAML rubric from configured rubric roots
+- allow the user-facing student agent to call `select_student_duck_rubric` to choose a YAML rubric from configured rubric roots and receive the selected rubric contents in the tool response
 - send the student agent's learner-style follow-up question in the thread
 - continue this review/follow-up loop until timeout or configured turn limit
 
@@ -202,8 +204,9 @@ Observable failure/guardrail behavior includes:
 
 - empty rubric files are treated as no criteria
 - rubric selection is limited to YAML files under configured `rubric_roots`
+- rubric selection requires a topic/user-response match; subject/course matches are used only to rank otherwise matching rubrics
 - checker agent configuration does not need to provide `output_format`; the workflow always requires `check_type` and `assessment`
-- the triggering thread title/message is not treated as a student response and is not sent to error or omission checker agents
+- the triggering thread title/message and first topic-declaration reply are not treated as student responses and are not sent to error or omission checker agents
 - the user-facing student agent may use `conclude_conversation` to end the workflow
 - user-message collection remains workflow-owned so every user response passes through the error and omission checks
 - thread inactivity terminates the workflow through the shared conversation-close lifecycle

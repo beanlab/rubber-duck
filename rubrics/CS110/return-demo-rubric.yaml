@@ -1,0 +1,6 @@
+return:
+  scope:
+    - return in python
+  using return:
+    - return is a method to exit the current function
+    - return lets the function send a value back to the caller by putting that value after the "return"
