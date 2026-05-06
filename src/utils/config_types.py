@@ -87,7 +87,15 @@ class StudentDuckSettings(TypedDict):
     rubric_path: NotRequired[str | list[str]]
     rubric_root: NotRequired[str | list[str]]
     rubric_roots: NotRequired[str | list[str]]
-    max_review_turns: NotRequired[int]
+    review_turns: NotRequired[int | Literal["full"]]
+
+
+class CodeDuckSettings(TypedDict):
+    agent: NotRequired[SingleAgentSettings]
+    conversation_review_agent: SingleAgentSettings
+    first_message: str
+    rubric_path: str | list[str]
+    review_turns: NotRequired[int | Literal["full"]]
 
 
 class RubricItemResponse(TypedDict):

@@ -14,6 +14,7 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from .workflows.code_duck_workflow import CodeDuckWorkflow
 from .workflows.student_duck_workflow import StudentDuckRubricTools, StudentDuckWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
@@ -194,6 +195,16 @@ def build_ducks(
                 omission_checker_agent,
                 ai_client,
                 rubric_tools,
+            )
+
+        elif duck_type == 'code_duck':
+            conversation_review_agent = build_agent(settings["conversation_review_agent"])
+            ducks[name] = CodeDuckWorkflow(
+                name,
+                bot.send_message,
+                settings,
+                conversation_review_agent,
+                ai_client,
             )
 
         else:

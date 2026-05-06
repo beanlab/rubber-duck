@@ -72,7 +72,7 @@ variables:
     rubric_tools = StudentDuckRubricTools({"rubric_roots": [str(rubric_root)]})
 
     response = asyncio.run(
-        rubric_tools.select_student_duck_rubric(_ctx("CS110"), "CS110", "returns")
+        rubric_tools.select_rubric(_ctx("CS110"), "CS110", "returns")
     )
 
     payload = json.loads(response)
@@ -99,7 +99,7 @@ return:
     rubric_tools = StudentDuckRubricTools({"rubric_roots": [str(rubric_root)]})
 
     response = asyncio.run(
-        rubric_tools.select_student_duck_rubric(_ctx("CS110"), "CS110", "loops")
+        rubric_tools.select_rubric(_ctx("CS110"), "CS110", "loops")
     )
 
     payload = json.loads(response)
@@ -361,3 +361,39 @@ def test_student_duck_first_message_can_be_configured(monkeypatch):
     asyncio.run(workflow(_ctx()))
 
     assert sent_messages[0] == "Custom first prompt."
+
+
+def test_student_duck_full_review_turns_runs_until_timeout(monkeypatch):
+    user_messages = [
+        {"content": "I want to learn recursion."},
+        {"content": "Recursion is when a function calls itself."},
+        {"content": "It needs a base case so it can stop."},
+        None,
+    ]
+
+    async def _send_message(_thread_id, message=None, file=None, view=None):
+        return 1
+
+    async def _wait_for_message(_timeout):
+        return user_messages.pop(0)
+
+    monkeypatch.setattr(student_duck_workflow, "wait_for_message", _wait_for_message)
+
+    ai_client = _FakeAIClient()
+    workflow = StudentDuckWorkflow(
+        "student_duck",
+        _send_message,
+        _student_duck_settings(review_turns="full"),
+        _agent("student"),
+        _agent("error"),
+        _agent("omission"),
+        ai_client,
+    )
+
+    asyncio.run(workflow(_ctx()))
+
+    checker_calls = [
+        call for call in ai_client.calls
+        if call["agent"] in {"error", "omission"}
+    ]
+    assert len(checker_calls) == 4

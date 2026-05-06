@@ -41,6 +41,13 @@ def _check_output_format(check_type: str) -> dict[str, Any]:
     }
 
 
+def _review_turns(settings: dict[str, Any]):
+    review_turns = settings.get("review_turns", 5)
+    if review_turns == "full":
+        return iter(int, 1)
+    return range(review_turns)
+
+
 class StudentDuckRubricTools:
     def __init__(self, settings: StudentDuckSettings):
         rubric_roots = settings.get("rubric_roots", settings.get("rubric_root", "rubrics"))
@@ -73,7 +80,7 @@ class StudentDuckRubricTools:
         ]
 
     @register_tool
-    async def select_student_duck_rubric(self, ctx: DuckContext, subject: str, topic: str) -> str:
+    async def select_rubric(self, ctx: DuckContext, subject: str, topic: str) -> str:
         """
         Select and load the best available student-duck rubric for a subject and topic.
         Returns JSON with selected, rubric_id, description, rubric, and available_rubrics fields.
@@ -208,8 +215,7 @@ class StudentDuckWorkflow:
             await self._send_message(context.thread_id, self._topic_acknowledgement())
             user_response = await self._wait_for_user_response(context)
 
-            max_review_turns = self._settings.get("max_review_turns", 5)
-            for _ in range(max_review_turns):
+            for _ in _review_turns(self._settings):
                 rubric = await self._load_rubric(context)
                 user_turn: ConversationTurn = {"role": "user", "content": user_response}
                 conversation_context.append(user_turn)
