@@ -15,6 +15,9 @@ The runtime contract is Discord-first and config-driven:
 
 ## Scenario Areas
 
+Each scenario area includes a README that defines shared context for
+the scenarios in that folder.
+
 - [Startup](startup/)
 - [Routing](routing/)
 - [Conversations](conversations/)

@@ -19,12 +19,22 @@ An operator sends a `!cache` command in the configured admin channel.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The operator sends `!cache`. | The application lists current cache entries and sends a CSV report. |
+| The operator sends `!cache cleanup`. | The application removes expired cache entries and reports the cleanup result. |
+| The operator sends `!cache remove <cache_tool> <entry_index>`. | The application removes the selected cache entry and reports the removal result. |
+| The operator sends `!cache clear confirm`. | The application clears all cache entries and reports the clear result. |
+| The operator sends an invalid `!cache` form. | The application returns usage or help-style error messaging. |
+
+---
+
 # Outcome
 
-`!cache` lists current cache entries and sends a CSV report. `!cache
-cleanup` removes expired entries. `!cache remove <cache_tool>
-<entry_index>` removes one entry. `!cache clear confirm` clears all
-cache entries. Invalid forms return usage or help-style error messages.
+Cache management commands provide observable Discord responses for
+listing, cleaning, removing, clearing, and invalid command forms.
 
 ---
 

@@ -21,6 +21,17 @@ channel, configured duck channels, and active conversation threads.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| Discord delivers a message from the bot itself. | The application ignores the message. |
+| Discord delivers a message from another bot. | The application ignores the message. |
+| Discord delivers a message that starts with `//`. | The application ignores the message. |
+| Discord delivers a message outside the configured admin channel, configured duck channels, and active conversation threads. | The application ignores the message. |
+
+---
+
 # Outcome
 
 The application does not start a command workflow, does not start a duck

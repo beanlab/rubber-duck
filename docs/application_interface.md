@@ -3,6 +3,9 @@
 Rubber Duck is a configurable Discord bot platform for AI-assisted
 learning workflows. Its external behavior is documented as scenario
 files under [scenarios](scenarios/README.md).
+Scenario area README files define shared context for related
+capabilities, while individual scenario files define externally
+observable guarantees.
 
 At the black-box level, the application:
 

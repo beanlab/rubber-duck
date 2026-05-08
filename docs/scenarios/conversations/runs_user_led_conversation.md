@@ -19,11 +19,20 @@ The user-led conversation workflow runs in the created thread.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The workflow starts in the created thread. | The application sends the configured introduction text. |
+| The user sends follow-up messages while the workflow is active. | The application continues the turn-based conversation. |
+| The workflow reaches completion or timeout conditions. | The conversation proceeds to the configured closure behavior. |
+
+---
+
 # Outcome
 
-The application sends the configured introduction text and continues a
-turn-based conversation with the user until the workflow reaches its
-completion or timeout conditions.
+User-led conversations continue through turn-based Discord exchanges
+until the workflow completes or times out.
 
 ---
 

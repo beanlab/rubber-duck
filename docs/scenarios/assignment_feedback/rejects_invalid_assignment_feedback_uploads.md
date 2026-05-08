@@ -21,11 +21,21 @@ assignment.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The student submits a non-markdown upload. | The application prompts the student to retry while upload attempts remain. |
+| The student omits the upload. | The application prompts the student to retry while upload attempts remain. |
+| The student exceeds the allowed upload attempts. | The application terminates the upload attempt. |
+| The student submits a report for an unsupported assignment. | The application terminates the workflow with an explicit unsupported-assignment message. |
+
+---
+
 # Outcome
 
-Non-markdown or missing uploads trigger retry prompts for up to three
-attempts. Unsupported assignment names terminate the workflow with an
-explicit unsupported-assignment message.
+Invalid assignment feedback uploads do not produce grading feedback and
+receive retry or termination messaging appropriate to the invalid input.
 
 ---
 

@@ -19,10 +19,19 @@ channel.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The operator sends `!active`. | The application returns active workflow counts by type. |
+| The operator sends `!active full`. | The application returns detailed active workflow entries with Mountain Time timestamps. |
+
+---
+
 # Outcome
 
-`!active` returns workflow counts by type. `!active full` returns
-detailed active workflow entries with Mountain Time timestamps.
+Active workflow commands report the currently running workflows at the
+requested level of detail.
 
 ---
 

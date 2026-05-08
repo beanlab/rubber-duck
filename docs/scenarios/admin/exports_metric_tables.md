@@ -20,10 +20,21 @@ the configured admin channel.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The operator sends `!messages`. | The application returns a zip file export for message telemetry. |
+| The operator sends `!usage`. | The application returns a zip file export for usage telemetry. |
+| The operator sends `!feedback`. | The application returns a zip file export for feedback telemetry. |
+| The operator sends `!metrics`. | The application returns all message, usage, and feedback table exports. |
+
+---
+
 # Outcome
 
-`!messages`, `!usage`, and `!feedback` each return a zip file export for
-their respective table. `!metrics` returns all three table exports.
+Metric export commands return the requested telemetry table exports as
+Discord file responses.
 
 ---
 

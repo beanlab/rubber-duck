@@ -19,6 +19,15 @@ Discord permission issues prevent nickname or role assignment.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| Discord prevents nickname assignment. | The application notifies the configured TA channel about the permission issue and terminates the registration flow. |
+| Discord prevents role assignment. | The application notifies the configured TA channel about the permission issue and terminates the registration flow. |
+
+---
+
 # Outcome
 
 The application notifies the configured TA channel about the permission

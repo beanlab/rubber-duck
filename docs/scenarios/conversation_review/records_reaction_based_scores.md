@@ -20,12 +20,19 @@ with `⏭️`, or enters optional written feedback after numeric scoring.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The reviewer reacts with a numeric score from `1️⃣` through `5️⃣`. | The application records the numeric review score. |
+| The reviewer reacts with `⏭️`. | The application records that the conversation was skipped. |
+| The reviewer enters optional written feedback after numeric scoring. | The application records the written feedback with the review result. |
+
+---
+
 # Outcome
 
-The application uses reaction-based scoring for `1️⃣` through `5️⃣`,
-supports skipping with `⏭️`, prompts for optional written feedback after
-numeric scoring, and records the review result for later metrics and
-reporting.
+Reaction-based review input is recorded for later metrics and reporting.
 
 ---
 

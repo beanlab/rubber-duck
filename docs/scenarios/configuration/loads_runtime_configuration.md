@@ -9,7 +9,9 @@ Select config source.
 # Context
 
 An operator starts the application with a local path, an S3 URI, or no
-explicit `--config` argument.
+explicit `--config` argument. The required and optional top-level
+configuration sections are defined in [Configuration
+Scenarios](README.md).
 
 ---
 
@@ -19,18 +21,20 @@ The application begins startup configuration loading.
 
 ---
 
+# Interaction
+
+| Action | Outcome |
+| --- | --- |
+| The operator provides a local JSON or YAML path with `--config`. | The application reads runtime configuration from the local file. |
+| The operator provides an `s3://` URI with `--config`. | The application reads runtime configuration from S3. |
+| The operator omits `--config`. | The application attempts to read the configuration source from `CONFIG_FILE_S3_PATH`. |
+
+---
+
 # Outcome
 
-The application accepts JSON or YAML configuration from a local path or
-an `s3://` URI. If `--config` is omitted, the application attempts to
-read the configuration source from `CONFIG_FILE_S3_PATH`.
-
-The external configuration contract includes the required top-level
-runtime sections `sql`, `containers`, `tools`, `ducks`, `servers`,
-`admin_settings`, `ai_completion_retry_protocol`, `reporter_settings`,
-and `sender_email`. Optional top-level sections include
-`feedback_notifier_settings`, `cache_cleanup_settings`, and
-`agents_as_tools`.
+The selected configuration source is loaded before runtime validation
+and startup can continue.
 
 ---
 
