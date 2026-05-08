@@ -15,15 +15,15 @@ routable user message has started a new duck conversation thread.
 
 # Action
 
-The agent-led conversation workflow runs in the created thread.
+The user asks a question or makes a request in the created thread.
 
 ---
 
 # Outcome
 
-The application runs the configured AI-backed one-shot agent response
-flow in the thread and sends the response output to Discord as part of
-that thread conversation.
+The application starts the configured agent in the thread. The agent may
+send messages, receive user replies, and use configured tools until it
+finishes or ends the conversation.
 
 ---
 
