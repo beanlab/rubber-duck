@@ -22,11 +22,11 @@ An operator sends a `!cache` command in the configured admin channel.
 # Interaction
 
 | Action | Outcome |
-| --- | --- |
+|---|---|
 | `!cache` | Lists current cache entries and sends a CSV report. |
 | `!cache cleanup` | Removes expired cache entries and reports the cleanup result. |
 | `!cache remove <cache_tool> <entry_index>` | Removes the selected cache entry and reports the removal result. |
-| `!cache clear confirm` | Clears all cache entries and reports the clear result. |
+| `!cache clear` | Prompts user to confirm, clears all cache entries and reports the clear result. |
 | Invalid `!cache` form | Returns usage or help-style error messaging. |
 
 ---
