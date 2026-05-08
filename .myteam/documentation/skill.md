@@ -74,7 +74,10 @@ contains multiple independent guarantees, split it into separate
 scenario files.
 
 Individual scenarios use `Context`, `Action`, and `Outcome` as their
-core sections.
+core sections. When a single scenario requires a short sequence of
+externally visible exchanges, it may use an optional `Interaction`
+section with an `Action` / `Outcome` table to describe the ordered
+steps.
 
 ## Relationship To Application Design
 

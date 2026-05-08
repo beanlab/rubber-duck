@@ -103,6 +103,14 @@ The RetryManager invokes validate_output() in a loop.
 
 ---
 
+# Interaction (Optional)
+
+| Action | Outcome |
+| --- | --- |
+| <Actor action or system event> | <Observable application response> |
+
+---
+
 # Outcome
 
 <Observable required outcomes>
@@ -140,6 +148,25 @@ permissions, inherited guarantees, or relevant constraints.
 Define the concrete triggering event: function invocation, CLI
 execution, user interaction, message receipt, lifecycle transition, or
 system event. Actions must be reproducible and unambiguous.
+
+### Interaction
+
+Use an `Interaction` section when one atomic scenario is best described
+as an ordered series of externally visible exchanges.
+
+Interaction tables must use exactly these columns:
+
+```md
+| Action | Outcome |
+| --- | --- |
+```
+
+Each row should describe one user, operator, integration, or system
+action and the observable application outcome that follows.
+
+Do not use an interaction table to combine independent guarantees. If
+rows can be tested, implemented, or changed independently without
+affecting the rest of the flow, split them into separate scenarios.
 
 ### Outcome
 
