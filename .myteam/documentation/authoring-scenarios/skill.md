@@ -107,7 +107,7 @@ The RetryManager invokes validate_output() in a loop.
 
 | Action | Outcome |
 | --- | --- |
-| <Actor action or system event> | <Observable application response> |
+| <Context-relative action or state> | <Observable response> |
 
 ---
 
@@ -133,7 +133,7 @@ The RetryManager invokes validate_output() in a loop.
 ### Purpose
 
 State the capability being defined and why it exists. Keep it short,
-about 10 words or less. Omit this section if the title and context make
+about 10 words or less. **Omit this section** if the title and context make
 the purpose obvious.
 
 ### Context
@@ -152,7 +152,8 @@ system event. Actions must be reproducible and unambiguous.
 ### Interaction
 
 Use an `Interaction` section when one atomic scenario is best described
-as an ordered series of externally visible exchanges.
+as an ordered series of externally visible exchanges or tightly related
+variants of one capability.
 
 Interaction tables must use exactly these columns:
 
@@ -162,11 +163,37 @@ Interaction tables must use exactly these columns:
 ```
 
 Each row should describe one user, operator, integration, or system
-action and the observable application outcome that follows.
+action and the observable outcome that follows.
 
-Do not use an interaction table to combine independent guarantees. If
-rows can be tested, implemented, or changed independently without
-affecting the rest of the flow, split them into separate scenarios.
+Rows should be concise and context-relative. Do not repeat actors,
+channels, command surfaces, or system names already established by
+`Context` and `Action`.
+
+Prefer:
+
+```md
+| Action | Outcome |
+| --- | --- |
+| `!cache cleanup` | Removes expired cache entries and reports the cleanup result. |
+| Unknown command | Returns `Unknown command. Try !help`. |
+| Valid Net ID | Sends an email verification challenge. |
+```
+
+Avoid:
+
+```md
+| Action | Outcome |
+| --- | --- |
+| The operator sends `!cache cleanup` in the configured admin channel. | The application removes expired cache entries and reports the cleanup result. |
+```
+
+Do not split a scenario only because it has multiple related command
+forms, validation branches, or workflow phases. If the variants belong
+to one user/operator capability, keep them in one scenario and use an
+`Interaction` table.
+
+Split only when rows describe different behavioral contracts that would
+naturally be discovered, tested, or maintained separately.
 
 ### Outcome
 
@@ -226,5 +253,8 @@ Before finalizing a scenario, verify:
 - Is the scope narrow?
 - Does the filename describe the guarantee?
 - Does the scenario avoid ambiguity?
+- Does any `Interaction` table avoid repeating context from surrounding sections?
+- Are interaction action labels short enough to scan while still reproducible?
+- Do interaction outcomes describe observable behavior without repeating the application actor on every row?
 - Could a test be written directly from this file?
 - Could another engineer implement the behavior from this file alone?

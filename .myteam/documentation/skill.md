@@ -71,13 +71,16 @@ and should not repeat it unnecessarily.
 
 Scenario files should describe localized guarantees. If a document
 contains multiple independent guarantees, split it into separate
-scenario files.
+scenario files. If a document contains tightly related variants or
+workflow phases of one user/operator capability, keep them together and
+use an `Interaction` table.
 
 Individual scenarios use `Context`, `Action`, and `Outcome` as their
 core sections. When a single scenario requires a short sequence of
-externally visible exchanges, it may use an optional `Interaction`
-section with an `Action` / `Outcome` table to describe the ordered
-steps.
+externally visible exchanges or related variants, it may use an optional
+`Interaction` section with an `Action` / `Outcome` table. Table rows
+should be concise and inherit actors, channels, and system context from
+the surrounding sections.
 
 ## Relationship To Application Design
 

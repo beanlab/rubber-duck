@@ -19,6 +19,8 @@ improving the documentation tree.
 Refactor when:
 
 - a document contains multiple independent behavioral guarantees
+- a document uses prose where a concise `Interaction` table would better
+  describe related variants or workflow phases
 - a folder mixes unrelated capability areas
 - parent context is duplicated across child scenarios
 - it is unclear where a new scenario belongs
@@ -31,9 +33,9 @@ Refactor when:
 
 Do not lose information.
 
-When moving or splitting files, preserve every behavioral guarantee,
-context, action, outcome, non-goal, related scenario, and shared
-assumption.
+When moving, splitting, or converting prose to interaction tables,
+preserve every behavioral guarantee, context, action, outcome,
+non-goal, related scenario, and shared assumption.
 
 Keep hierarchy semantic. Organize by externally meaningful capability
 or operational concern, not internal module layout.
@@ -50,8 +52,10 @@ avoid repeating inherited context.
    discoverable.
 3. Move shared terminology or assumptions into parent `README.md` or
    index documents.
-4. Split broad documents so each child scenario defines one guarantee
-   through `Context`, `Action`, and `Outcome`.
+4. Split broad documents only when they contain independent behavioral
+   contracts. For cohesive command families, validation branches, or
+   workflow phases, keep one scenario and use a concise `Interaction`
+   table.
 5. Update related-scenario links after moving files.
 6. Review the original and refactored documents to confirm no guarantee
    was lost.
