@@ -25,9 +25,9 @@ The application begins startup configuration loading.
 
 | Action | Outcome |
 | --- | --- |
-| The operator provides a local JSON or YAML path with `--config`. | The application reads runtime configuration from the local file. |
-| The operator provides an `s3://` URI with `--config`. | The application reads runtime configuration from S3. |
-| The operator omits `--config`. | The application attempts to read the configuration source from `CONFIG_FILE_S3_PATH`. |
+| Local JSON or YAML path with `--config` | Reads runtime configuration from the local file. |
+| `s3://` URI with `--config` | Reads runtime configuration from S3. |
+| No `--config` argument | Attempts to read the configuration source from `CONFIG_FILE_S3_PATH`. |
 
 ---
 

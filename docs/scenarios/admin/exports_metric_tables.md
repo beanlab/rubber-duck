@@ -24,10 +24,10 @@ the configured admin channel.
 
 | Action | Outcome |
 | --- | --- |
-| The operator sends `!messages`. | The application returns a zip file export for message telemetry. |
-| The operator sends `!usage`. | The application returns a zip file export for usage telemetry. |
-| The operator sends `!feedback`. | The application returns a zip file export for feedback telemetry. |
-| The operator sends `!metrics`. | The application returns all message, usage, and feedback table exports. |
+| `!messages` | Returns a zip file export for message telemetry. |
+| `!usage` | Returns a zip file export for usage telemetry. |
+| `!feedback` | Returns a zip file export for feedback telemetry. |
+| `!metrics` | Returns all message, usage, and feedback table exports. |
 
 ---
 

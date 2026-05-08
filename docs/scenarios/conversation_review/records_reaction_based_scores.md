@@ -24,9 +24,9 @@ with `⏭️`, or enters optional written feedback after numeric scoring.
 
 | Action | Outcome |
 | --- | --- |
-| The reviewer reacts with a numeric score from `1️⃣` through `5️⃣`. | The application records the numeric review score. |
-| The reviewer reacts with `⏭️`. | The application records that the conversation was skipped. |
-| The reviewer enters optional written feedback after numeric scoring. | The application records the written feedback with the review result. |
+| Numeric reaction from `1️⃣` through `5️⃣` | Records the numeric review score. |
+| `⏭️` reaction | Records that the conversation was skipped. |
+| Optional written feedback after numeric scoring | Records the written feedback with the review result. |
 
 ---
 

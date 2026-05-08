@@ -24,10 +24,10 @@ markdown report for a supported assignment.
 
 | Action | Outcome |
 | --- | --- |
-| Initial instructions are configured. | The application sends the initial instructions before prompting for the report upload. |
-| The workflow is ready for the report upload. | The application lists supported assignments and prompts for a markdown upload. |
-| The student uploads a supported markdown report. | The application detects the assignment from report headers, using AI fallback selection when needed. |
-| The assignment is supported. | The application returns rubric-based grading feedback in markdown format. |
+| Initial instructions configured | Sends the initial instructions before prompting for the report upload. |
+| Ready for report upload | Lists supported assignments and prompts for a markdown upload. |
+| Supported markdown report | Detects the assignment from report headers, using AI fallback selection when needed. |
+| Supported assignment | Returns rubric-based grading feedback in markdown format. |
 
 ---
 

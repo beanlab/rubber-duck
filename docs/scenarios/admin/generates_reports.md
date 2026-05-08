@@ -23,9 +23,9 @@ An operator sends a `!report` command in the configured admin channel.
 
 | Action | Outcome |
 | --- | --- |
-| The operator sends `!report`, `!report help`, or `!report h`. | The application returns report help text. |
-| The operator sends another valid report command form. | The application returns generated report images and/or text output. |
-| Report generation fails. | The application returns an explicit report-generation error message. |
+| `!report`, `!report help`, or `!report h` | Returns report help text. |
+| Other valid report command form | Returns generated report images and/or text output. |
+| Report-generation failure | Returns an explicit report-generation error message. |
 
 ---
 

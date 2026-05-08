@@ -22,9 +22,9 @@ An operator sends `!log` in the configured admin channel.
 
 | Action | Outcome |
 | --- | --- |
-| The operator sends `!log` while a logging path is configured and log files exist. | The application returns a zip file containing logs. |
-| The operator sends `!log` while logging is not configured. | The application replies `Log export disabled: no log path configured.` |
-| The operator sends `!log` while no logs are present. | The application returns a no-logs message. |
+| `!log` with configured log files | Returns a zip file containing logs. |
+| `!log` without logging configured | Replies `Log export disabled: no log path configured.` |
+| `!log` with no logs present | Returns a no-logs message. |
 
 ---
 

@@ -26,10 +26,10 @@ The operator runs `python -m src.main` with optional `--config`,
 
 | Action | Outcome |
 | --- | --- |
-| The operator starts the application with valid runtime configuration. | The application loads and resolves configuration, connects required runtime dependencies, initializes configured ducks and tools, and starts the Discord bot loop. |
-| Startup completes successfully. | The application sends `Duck online` to the configured admin channel. |
-| The operator provides `--debug`. | Runtime logging uses debug verbosity. |
-| The operator provides `--log-path`. | Runtime logs are written to that path. |
+| Valid runtime configuration | Loads and resolves configuration, connects required runtime dependencies, initializes configured ducks and tools, and starts the Discord bot loop. |
+| Successful startup | Sends `Duck online` to the configured admin channel. |
+| `--debug` | Uses debug verbosity for runtime logging. |
+| `--log-path` | Writes runtime logs to that path. |
 
 ---
 

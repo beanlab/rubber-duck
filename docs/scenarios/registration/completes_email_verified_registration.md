@@ -25,11 +25,11 @@ to apply the configured Discord nickname and role changes.
 
 | Action | Outcome |
 | --- | --- |
-| The registration workflow starts. | The application prompts for the user's Net ID. |
-| The user provides a valid Net ID. | The application validates the Net ID format and sends an email challenge. |
-| The user completes the email verification challenge. | The application accepts the verified email challenge, including configured retry and resend support. |
-| The application prompts for nickname selection and the user selects a valid nickname. | The application validates the nickname. |
-| The application has permission to apply Discord account changes. | The application completes the configured nickname and role-assignment flow for the registered user. |
+| Workflow starts | Prompts for the user's Net ID. |
+| Valid Net ID | Validates the Net ID format and sends an email challenge. |
+| Email verification succeeds | Accepts the verified email challenge, including configured retry and resend support. |
+| Valid nickname selection | Validates the nickname. |
+| Discord account changes permitted | Completes the configured nickname and role-assignment flow for the registered user. |
 
 ---
 

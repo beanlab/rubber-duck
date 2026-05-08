@@ -23,8 +23,8 @@ channel.
 
 | Action | Outcome |
 | --- | --- |
-| The operator sends `!active`. | The application returns active workflow counts by type. |
-| The operator sends `!active full`. | The application returns detailed active workflow entries with Mountain Time timestamps. |
+| `!active` | Returns active workflow counts by type. |
+| `!active full` | Returns detailed active workflow entries with Mountain Time timestamps. |
 
 ---
 

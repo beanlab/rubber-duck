@@ -23,9 +23,9 @@ A TA or reviewer starts a conversation review workflow.
 
 | Action | Outcome |
 | --- | --- |
-| A reviewer starts the conversation review workflow. | The application serves a queued student conversation into the reviewer thread. |
-| The reviewer continues through the queue. | The application presents each available queued conversation for scoring or skipping. |
-| The reviewer chooses to provide written feedback. | The application accepts optional written feedback for the reviewed conversation. |
+| Review workflow starts | Serves a queued student conversation into the reviewer thread. |
+| Reviewer continues through the queue | Presents each available queued conversation for scoring or skipping. |
+| Written feedback provided | Accepts optional written feedback for the reviewed conversation. |
 
 ---
 

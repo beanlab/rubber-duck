@@ -24,9 +24,9 @@ source selected by `--config` or `CONFIG_FILE_S3_PATH`.
 
 | Action | Outcome |
 | --- | --- |
-| The selected runtime configuration is missing, malformed, or invalid. | Startup fails before the bot becomes available, and the application logs an error for the invalid configuration. |
-| A required runtime dependency is unavailable. | Startup fails before the bot becomes available, and the application logs an error for the unavailable dependency. |
-| `--log-path` is omitted while the remaining runtime configuration is valid. | Startup continues, and the application warns that logging is console-only. |
+| Missing, malformed, or invalid runtime configuration | Startup fails before the bot becomes available and logs an error for the invalid configuration. |
+| Unavailable required runtime dependency | Startup fails before the bot becomes available and logs an error for the unavailable dependency. |
+| Omitted `--log-path` with otherwise valid configuration | Startup continues and warns that logging is console-only. |
 
 ---
 

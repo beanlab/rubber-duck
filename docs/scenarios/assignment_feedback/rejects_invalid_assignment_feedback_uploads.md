@@ -25,10 +25,10 @@ assignment.
 
 | Action | Outcome |
 | --- | --- |
-| The student submits a non-markdown upload. | The application prompts the student to retry while upload attempts remain. |
-| The student omits the upload. | The application prompts the student to retry while upload attempts remain. |
-| The student exceeds the allowed upload attempts. | The application terminates the upload attempt. |
-| The student submits a report for an unsupported assignment. | The application terminates the workflow with an explicit unsupported-assignment message. |
+| Non-markdown upload | Prompts the student to retry while upload attempts remain. |
+| Missing upload | Prompts the student to retry while upload attempts remain. |
+| Upload attempts exceeded | Terminates the upload attempt. |
+| Unsupported assignment | Terminates the workflow with an explicit unsupported-assignment message. |
 
 ---
 

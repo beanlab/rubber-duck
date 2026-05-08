@@ -24,9 +24,9 @@ otherwise fails registration validation.
 
 | Action | Outcome |
 | --- | --- |
-| The user remains inactive until the configured timeout is reached. | The application closes the conversation with timeout messaging. |
-| The user repeatedly submits invalid verification tokens. | The application terminates the registration attempt. |
-| The user otherwise fails registration validation. | The failed registration does not complete the nickname and role-assignment flow. |
+| Configured timeout reached | Closes the conversation with timeout messaging. |
+| Repeated invalid verification tokens | Terminates the registration attempt. |
+| Other registration validation failure | Does not complete the nickname and role-assignment flow. |
 
 ---
 

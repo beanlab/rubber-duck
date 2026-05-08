@@ -23,9 +23,9 @@ The user-led conversation workflow runs in the created thread.
 
 | Action | Outcome |
 | --- | --- |
-| The workflow starts in the created thread. | The application sends the configured introduction text. |
-| The user sends follow-up messages while the workflow is active. | The application continues the turn-based conversation. |
-| The workflow reaches completion or timeout conditions. | The conversation proceeds to the configured closure behavior. |
+| Workflow starts in the created thread | Sends the configured introduction text. |
+| Follow-up message while active | Continues the turn-based conversation. |
+| Completion or timeout condition | Proceeds to the configured closure behavior. |
 
 ---
 

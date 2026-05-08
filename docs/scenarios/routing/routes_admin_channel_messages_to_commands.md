@@ -22,10 +22,10 @@ A non-bot Discord message is posted in the configured admin channel.
 
 | Action | Outcome |
 | --- | --- |
-| A non-bot Discord message is posted in the configured admin channel. | The application treats the message as an admin command. |
-| The message is `!help`. | The application returns a generated help list of registered commands. |
-| The message names an unknown command. | The application returns `Unknown command. Try !help`. |
-| Command execution raises an error. | The application returns a generic unexpected-error message instead of exposing an unhandled exception to Discord users. |
+| Non-bot admin-channel message | Treats the message as an admin command. |
+| `!help` | Returns a generated help list of registered commands. |
+| Unknown command | Returns `Unknown command. Try !help`. |
+| Command execution error | Returns a generic unexpected-error message instead of exposing an unhandled exception to Discord users. |
 
 ---
 

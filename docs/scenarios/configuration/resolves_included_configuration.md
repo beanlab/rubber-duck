@@ -23,10 +23,10 @@ The application resolves the runtime configuration during startup.
 
 | Action | Outcome |
 | --- | --- |
-| The configuration contains `$include` directives. | The application recursively resolves the included content. |
-| An include specifies a JSONPath selector. | The application includes only the selected content. |
-| Included dictionary content overlaps with local dictionary content. | The application applies deep-merge semantics. |
-| Server and channel configuration is resolved. | Routing uses configured Discord IDs, and each configured channel maps to a named global duck or an inline duck definition. |
+| `$include` directives | Recursively resolves the included content. |
+| Include with JSONPath selector | Includes only the selected content. |
+| Overlapping dictionary content | Applies deep-merge semantics. |
+| Server and channel configuration | Uses configured Discord IDs, with each configured channel mapped to a named global duck or an inline duck definition. |
 
 ---
 
