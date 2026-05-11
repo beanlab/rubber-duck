@@ -1,7 +1,7 @@
 # Scenarios
 
 Rubber Duck scenario documentation defines externally observable
-behavior at the Discord, command, workflow, and configuration
+behavior at the Discord, command, conversation, and configuration
 interfaces.
 
 The runtime contract is Discord-first and config-driven:
@@ -9,9 +9,11 @@ The runtime contract is Discord-first and config-driven:
 - the app runs as a single process started from `python -m src.main`
 - behavior is driven by a resolved local file or S3 configuration
 - each configured channel can map to a named global duck or an inline duck definition
-- incoming messages are routed by channel identity and workflow state
+- incoming messages are routed by channel identity and conversation state
 - admin command outputs are delivered in Discord as messages or files
 - new duck conversations are scoped to private Discord threads
+- duck behavior scenarios describe the black-box response contract that
+  each named duck presents to users
 
 ## Scenario Areas
 

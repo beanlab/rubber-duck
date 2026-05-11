@@ -19,5 +19,5 @@ one command area has several related forms.
 - [Exports metric tables](exports_metric_tables.md)
 - [Generates reports](generates_reports.md)
 - [Exports logs](exports_logs.md)
-- [Reports active workflows](reports_active_workflows.md)
+- [Reports active conversations](reports_active_conversations.md)
 - [Manages cache entries](manages_cache_entries.md)

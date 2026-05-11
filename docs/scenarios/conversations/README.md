@@ -1,18 +1,22 @@
 # Conversation Scenarios
 
 Conversation scenarios describe behavior inside private Discord threads
-created for duck workflows.
+created for duck conversations.
 
 The shared conversation context is:
 
-- a routable Discord message has started a duck workflow thread
-- subsequent thread messages may be forwarded to the active workflow
-- workflow output is sent back to Discord in the thread
-- completed or failed workflows close the conversation visibly
+- a routable Discord message has started a private duck conversation
+- subsequent thread messages continue the active conversation
+- duck responses are sent back to Discord in the thread
+- completed or failed conversations close visibly
+
+Platform scenarios describe thread lifecycle behavior. Duck behavior
+scenarios describe the response contract for a named duck from the
+student or reviewer point of view.
 
 ## Scenarios
 
-- [Runs agent-led conversation](runs_agent_led_conversation.md)
-- [Runs user-led conversation](runs_user_led_conversation.md)
 - [Closes conversation after completion](closes_conversation_after_completion.md)
-- [Reports workflow failure to thread](reports_workflow_failure_to_thread.md)
+- [Reports conversation failure to thread](reports_conversation_failure_to_thread.md)
+- [Standard Duck supports student learning](standard_duck_supports_student_learning.md)
+- [Stats Duck provides statistical outputs](stats_duck_provides_statistical_outputs.md)

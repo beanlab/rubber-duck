@@ -8,8 +8,8 @@ Validate feedback uploads.
 
 # Context
 
-An assignment feedback workflow is running in a Discord conversation
-thread and is waiting for the student's report upload.
+An assignment feedback conversation is active in a Discord thread and is
+waiting for the student's report upload.
 
 ---
 
@@ -28,7 +28,7 @@ assignment.
 | Non-markdown upload | Prompts the student to retry while upload attempts remain. |
 | Missing upload | Prompts the student to retry while upload attempts remain. |
 | Upload attempts exceeded | Terminates the upload attempt. |
-| Unsupported assignment | Terminates the workflow with an explicit unsupported-assignment message. |
+| Unsupported assignment | Ends the conversation with an explicit unsupported-assignment message. |
 
 ---
 

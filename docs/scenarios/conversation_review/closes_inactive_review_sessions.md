@@ -8,7 +8,7 @@ Timeout idle reviews.
 
 # Context
 
-A conversation review workflow is active in a reviewer thread and is
+A conversation review session is active in a reviewer thread and is
 waiting for reviewer input.
 
 ---

@@ -1,15 +1,16 @@
 # Routing Scenarios
 
 Routing scenarios describe how Discord messages become admin commands,
-duck conversations, active workflow input, or ignored messages.
+duck conversations, active conversation input, or ignored messages.
 
 The shared routing context is:
 
 - the bot is running with configured Discord channel IDs
 - admin messages are routed by the configured admin channel
 - duck messages are routed by configured duck channels
-- active workflow messages are routed by conversation thread state
-- ignored messages do not start commands, workflows, or active workflow input
+- active conversation messages are routed by conversation thread state
+- ignored messages do not start commands, duck conversations, or active
+  conversation input
 
 ## Scenarios
 

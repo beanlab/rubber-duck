@@ -34,9 +34,9 @@ channel, configured duck channels, and active conversation threads.
 
 # Outcome
 
-The application does not start a command workflow, does not start a duck
-workflow, does not forward the message to an active workflow queue, and
-does not send a user-visible response for that message.
+The application does not handle the message as an admin command, does
+not start a duck conversation, does not continue an active conversation,
+and does not send a user-visible response for that message.
 
 ---
 

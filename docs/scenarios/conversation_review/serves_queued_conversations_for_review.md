@@ -8,14 +8,13 @@ Present feedback queue items.
 
 # Context
 
-A configured duck has `duck_type` set to `conversation_review`, and
-student conversations have been recorded for feedback-queue processing.
+Student conversations have been recorded for feedback-queue processing.
 
 ---
 
 # Action
 
-A TA or reviewer starts a conversation review workflow.
+A TA or reviewer starts a conversation review session.
 
 ---
 
@@ -23,7 +22,7 @@ A TA or reviewer starts a conversation review workflow.
 
 | Action | Outcome |
 | --- | --- |
-| Review workflow starts | Serves a queued student conversation into the reviewer thread. |
+| Review session starts | Serves a queued student conversation into the reviewer thread. |
 | Reviewer continues through the queue | Presents each available queued conversation for scoring or skipping. |
 | Written feedback provided | Accepts optional written feedback for the reviewed conversation. |
 

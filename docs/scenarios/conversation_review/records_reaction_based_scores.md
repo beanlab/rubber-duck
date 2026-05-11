@@ -8,8 +8,8 @@ Capture reviewer scores.
 
 # Context
 
-A conversation review workflow has presented a queued student
-conversation to a reviewer in a Discord thread.
+A conversation review session has presented a queued student conversation
+to a reviewer in a Discord thread.
 
 ---
 

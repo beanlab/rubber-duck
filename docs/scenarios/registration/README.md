@@ -1,13 +1,13 @@
 # Registration Scenarios
 
-Registration scenarios describe Discord-thread registration workflows
-for ducks configured with `duck_type` set to `registration`.
+Registration scenarios describe Discord-thread registration behavior for
+users who need verified access.
 
 The shared registration context is:
 
 - a user has started a registration conversation thread
-- the workflow validates a Net ID
-- the workflow verifies the user through an email challenge
+- the conversation validates a Net ID
+- the user is verified through an email challenge
 - successful registration may update the user's Discord nickname and role
 - failed registration must not complete the nickname and role-assignment flow
 

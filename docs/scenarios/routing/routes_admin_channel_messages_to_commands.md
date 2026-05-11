@@ -42,5 +42,5 @@ including help, unknown-command, and command-error responses.
 - [Exports metric tables](../admin/exports_metric_tables.md)
 - [Generates reports](../admin/generates_reports.md)
 - [Exports logs](../admin/exports_logs.md)
-- [Reports active workflows](../admin/reports_active_workflows.md)
+- [Reports active conversations](../admin/reports_active_conversations.md)
 - [Manages cache entries](../admin/manages_cache_entries.md)

@@ -8,7 +8,7 @@ Notify registration operators.
 
 # Context
 
-A registration workflow has validated the user and is attempting to
+A registration conversation has validated the user and is attempting to
 apply the configured nickname or role changes in Discord.
 
 ---
@@ -23,15 +23,15 @@ Discord permission issues prevent nickname or role assignment.
 
 | Action | Outcome |
 | --- | --- |
-| Nickname assignment blocked | Notifies the configured TA channel about the permission issue and terminates the registration flow. |
-| Role assignment blocked | Notifies the configured TA channel about the permission issue and terminates the registration flow. |
+| Nickname assignment blocked | Notifies the configured TA channel about the permission issue and ends registration. |
+| Role assignment blocked | Notifies the configured TA channel about the permission issue and ends registration. |
 
 ---
 
 # Outcome
 
 The application notifies the configured TA channel about the permission
-issue and terminates the registration flow.
+issue and ends registration.
 
 ---
 

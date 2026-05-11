@@ -1,14 +1,14 @@
-# Reports Active Workflows
+# Reports Active Conversations
 
 ## Purpose
 
-Inspect running workflows.
+Inspect active work.
 
 ---
 
 # Context
 
-The bot is running and may have active duck workflows.
+The bot is running and may have active conversations or background jobs.
 
 ---
 
@@ -23,15 +23,15 @@ channel.
 
 | Action | Outcome |
 | --- | --- |
-| `!active` | Returns active workflow counts by type. |
-| `!active full` | Returns detailed active workflow entries with Mountain Time timestamps. |
+| `!active` | Returns active conversation or job counts by kind. |
+| `!active full` | Returns detailed active conversation or job entries with Mountain Time timestamps. |
 
 ---
 
 # Outcome
 
-Active workflow commands report the currently running workflows at the
-requested level of detail.
+Active-work commands report currently running conversations or jobs at
+the requested level of detail.
 
 ---
 

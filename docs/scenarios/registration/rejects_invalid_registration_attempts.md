@@ -8,8 +8,7 @@ Guard registration flow.
 
 # Context
 
-A configured registration workflow is running in a Discord conversation
-thread.
+A registration conversation is active in a Discord thread.
 
 ---
 

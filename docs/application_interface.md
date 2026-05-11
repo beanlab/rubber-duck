@@ -1,8 +1,8 @@
 # Application Interface
 
 Rubber Duck is a configurable Discord bot platform for AI-assisted
-learning workflows. Its external behavior is documented as scenario
-files under [scenarios](scenarios/README.md).
+learning conversations and operational tasks. Its external behavior is
+documented as scenario files under [scenarios](scenarios/README.md).
 Scenario area README files define shared context for related
 capabilities, while individual scenario files define externally
 observable guarantees.
@@ -10,9 +10,10 @@ observable guarantees.
 At the black-box level, the application:
 
 - receives Discord messages in configured channels
-- routes each message into either admin command handling or a duck workflow
-- creates and manages private thread conversations for duck workflows
-- runs AI-backed conversation and workflow logic according to duck configuration
+- routes each message into admin command handling, duck conversation
+  handling, or ignored-message behavior
+- creates and manages private thread conversations for ducks
+- applies each duck's user-facing behavior contract according to configuration
 - records messages, usage, and feedback metrics for later export and reporting
 
 ## Scenario Index
@@ -33,12 +34,12 @@ Message routing:
 
 Duck conversations:
 
-- [Runs agent-led conversation](scenarios/conversations/runs_agent_led_conversation.md)
-- [Runs user-led conversation](scenarios/conversations/runs_user_led_conversation.md)
 - [Closes conversation after completion](scenarios/conversations/closes_conversation_after_completion.md)
-- [Reports workflow failure to thread](scenarios/conversations/reports_workflow_failure_to_thread.md)
+- [Reports conversation failure to thread](scenarios/conversations/reports_conversation_failure_to_thread.md)
+- [Standard Duck supports student learning](scenarios/conversations/standard_duck_supports_student_learning.md)
+- [Stats Duck provides statistical outputs](scenarios/conversations/stats_duck_provides_statistical_outputs.md)
 
-Workflow-specific behavior:
+Specialized conversation behavior:
 
 - [Completes email-verified registration](scenarios/registration/completes_email_verified_registration.md)
 - [Rejects invalid registration attempts](scenarios/registration/rejects_invalid_registration_attempts.md)
@@ -56,7 +57,7 @@ Admin commands:
 - [Exports metric tables](scenarios/admin/exports_metric_tables.md)
 - [Generates reports](scenarios/admin/generates_reports.md)
 - [Exports logs](scenarios/admin/exports_logs.md)
-- [Reports active workflows](scenarios/admin/reports_active_workflows.md)
+- [Reports active conversations](scenarios/admin/reports_active_conversations.md)
 - [Manages cache entries](scenarios/admin/manages_cache_entries.md)
 
 ## Related Guides

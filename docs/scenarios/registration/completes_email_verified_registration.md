@@ -8,8 +8,7 @@ Register verified users.
 
 # Context
 
-A configured duck has `duck_type` set to `registration`, and a user has
-started a new registration conversation thread.
+A user has started a new registration conversation thread.
 
 ---
 
@@ -25,7 +24,7 @@ to apply the configured Discord nickname and role changes.
 
 | Action | Outcome |
 | --- | --- |
-| Workflow starts | Prompts for the user's Net ID. |
+| Conversation starts | Prompts for the user's Net ID. |
 | Valid Net ID | Validates the Net ID format and sends an email challenge. |
 | Email verification succeeds | Accepts the verified email challenge, including configured retry and resend support. |
 | Valid nickname selection | Validates the nickname. |

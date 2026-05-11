@@ -8,8 +8,7 @@ Grade report submissions.
 
 # Context
 
-A configured duck has `duck_type` set to `assignment_feedback`, and a
-student has started a new assignment feedback conversation thread.
+A student has started a new assignment feedback conversation thread.
 
 ---
 
@@ -26,7 +25,7 @@ markdown report for a supported assignment.
 | --- | --- |
 | Initial instructions configured | Sends the initial instructions before prompting for the report upload. |
 | Ready for report upload | Lists supported assignments and prompts for a markdown upload. |
-| Supported markdown report | Detects the assignment from report headers, using AI fallback selection when needed. |
+| Supported markdown report | Detects or asks for the assignment associated with the report. |
 | Supported assignment | Returns rubric-based grading feedback in markdown format. |
 
 ---

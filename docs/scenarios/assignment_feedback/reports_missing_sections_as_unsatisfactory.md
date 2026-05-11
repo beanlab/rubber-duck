@@ -8,8 +8,8 @@ Grade absent report sections.
 
 # Context
 
-An assignment feedback workflow is grading a markdown report against the
-rubric for the detected assignment.
+An assignment feedback conversation is grading a markdown report against
+the rubric for the detected assignment.
 
 ---
 
