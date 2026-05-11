@@ -34,22 +34,15 @@ Message routing:
 
 Duck conversations:
 
-- [Closes conversation after completion](scenarios/conversations/closes_conversation_after_completion.md)
-- [Reports conversation failure to thread](scenarios/conversations/reports_conversation_failure_to_thread.md)
+- [Ends conversation threads](scenarios/conversations/ends_conversation_threads.md)
 - [Standard Duck supports student learning](scenarios/conversations/standard_duck_supports_student_learning.md)
 - [Stats Duck provides statistical outputs](scenarios/conversations/stats_duck_provides_statistical_outputs.md)
 
 Specialized conversation behavior:
 
-- [Completes email-verified registration](scenarios/registration/completes_email_verified_registration.md)
-- [Rejects invalid registration attempts](scenarios/registration/rejects_invalid_registration_attempts.md)
-- [Reports registration permission failures](scenarios/registration/reports_registration_permission_failures.md)
-- [Grades markdown report upload](scenarios/assignment_feedback/grades_markdown_report_upload.md)
-- [Rejects invalid assignment feedback uploads](scenarios/assignment_feedback/rejects_invalid_assignment_feedback_uploads.md)
-- [Reports missing sections as unsatisfactory](scenarios/assignment_feedback/reports_missing_sections_as_unsatisfactory.md)
-- [Serves queued conversations for review](scenarios/conversation_review/serves_queued_conversations_for_review.md)
-- [Records reaction-based scores](scenarios/conversation_review/records_reaction_based_scores.md)
-- [Closes inactive review sessions](scenarios/conversation_review/closes_inactive_review_sessions.md)
+- [Registration verifies and registers users](scenarios/registration/registration_verifies_and_registers_users.md)
+- [Assignment feedback grades report submissions](scenarios/assignment_feedback/assignment_feedback_grades_report_submissions.md)
+- [Conversation review scores queued conversations](scenarios/conversation_review/conversation_review_scores_queued_conversations.md)
 
 Admin commands:
 

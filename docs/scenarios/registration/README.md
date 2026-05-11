@@ -13,6 +13,4 @@ The shared registration context is:
 
 ## Scenarios
 
-- [Completes email-verified registration](completes_email_verified_registration.md)
-- [Rejects invalid registration attempts](rejects_invalid_registration_attempts.md)
-- [Reports registration permission failures](reports_registration_permission_failures.md)
+- [Registration verifies and registers users](registration_verifies_and_registers_users.md)

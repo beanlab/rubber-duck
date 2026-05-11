@@ -30,7 +30,7 @@ assignment instructions.
 | Student shares code that fails. | Helps interpret the error and asks the student to form or test a hypothesis. |
 | Student asks for rewritten code. | Provides written feedback or debugging direction without rewriting the code. |
 | Student says, "thanks." | Asks whether the student has further questions. |
-| Student says, "that's all I needed." | Ends the conversation. |
+| Student explicitly indicates the conversation is over | Ends the conversation. |
 
 ---
 
@@ -51,4 +51,4 @@ or end the conversation on ambiguous politeness.
 
 # Related Scenarios
 
-- [Closes conversation after completion](closes_conversation_after_completion.md)
+- [Ends conversation threads](ends_conversation_threads.md)

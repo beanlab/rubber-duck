@@ -12,6 +12,4 @@ The shared assignment feedback context is:
 
 ## Scenarios
 
-- [Grades markdown report upload](grades_markdown_report_upload.md)
-- [Rejects invalid assignment feedback uploads](rejects_invalid_assignment_feedback_uploads.md)
-- [Reports missing sections as unsatisfactory](reports_missing_sections_as_unsatisfactory.md)
+- [Assignment feedback grades report submissions](assignment_feedback_grades_report_submissions.md)

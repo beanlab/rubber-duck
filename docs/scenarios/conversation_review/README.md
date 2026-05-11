@@ -11,6 +11,4 @@ The shared conversation review context is:
 
 ## Scenarios
 
-- [Serves queued conversations for review](serves_queued_conversations_for_review.md)
-- [Records reaction-based scores](records_reaction_based_scores.md)
-- [Closes inactive review sessions](closes_inactive_review_sessions.md)
+- [Conversation review scores queued conversations](conversation_review_scores_queued_conversations.md)

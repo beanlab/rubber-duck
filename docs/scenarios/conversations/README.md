@@ -16,7 +16,6 @@ student or reviewer point of view.
 
 ## Scenarios
 
-- [Closes conversation after completion](closes_conversation_after_completion.md)
-- [Reports conversation failure to thread](reports_conversation_failure_to_thread.md)
+- [Ends conversation threads](ends_conversation_threads.md)
 - [Standard Duck supports student learning](standard_duck_supports_student_learning.md)
 - [Stats Duck provides statistical outputs](stats_duck_provides_statistical_outputs.md)

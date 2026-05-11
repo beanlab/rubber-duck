@@ -34,5 +34,5 @@ reaction to the original message.
 
 - [Standard Duck supports student learning](../conversations/standard_duck_supports_student_learning.md)
 - [Stats Duck provides statistical outputs](../conversations/stats_duck_provides_statistical_outputs.md)
-- [Completes email-verified registration](../registration/completes_email_verified_registration.md)
-- [Grades markdown report upload](../assignment_feedback/grades_markdown_report_upload.md)
+- [Registration verifies and registers users](../registration/registration_verifies_and_registers_users.md)
+- [Assignment feedback grades report submissions](../assignment_feedback/assignment_feedback_grades_report_submissions.md)

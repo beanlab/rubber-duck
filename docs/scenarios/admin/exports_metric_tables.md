@@ -41,4 +41,4 @@ Discord file responses.
 # Related Scenarios
 
 - [Routes admin channel messages to commands](../routing/routes_admin_channel_messages_to_commands.md)
-- [Records reaction-based scores](../conversation_review/records_reaction_based_scores.md)
+- [Conversation review scores queued conversations](../conversation_review/conversation_review_scores_queued_conversations.md)

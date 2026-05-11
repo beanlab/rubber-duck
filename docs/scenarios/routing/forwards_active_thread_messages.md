@@ -27,5 +27,4 @@ a new duck conversation and is not routed as an admin command.
 
 # Related Scenarios
 
-- [Closes conversation after completion](../conversations/closes_conversation_after_completion.md)
-- [Reports conversation failure to thread](../conversations/reports_conversation_failure_to_thread.md)
+- [Ends conversation threads](../conversations/ends_conversation_threads.md)
