@@ -30,6 +30,9 @@ that do not affect the external contract.
 A scenario is a human-readable, implementation-independent behavioral
 guarantee.
 
+It should remain valid if the implementation is rewritten but the
+externally visible behavior stays the same.
+
 It describes:
 
 - the relevant context
@@ -49,9 +52,9 @@ Prefer domain-oriented hierarchy:
 
 ```text
 scenarios/
-  registration/
-  conversation/
-  assignment-feedback/
+  accounts/
+  sessions/
+  reports/
   operations/
 ```
 
@@ -74,6 +77,11 @@ contains multiple independent guarantees, split it into separate
 scenario files. If a document contains tightly related variants or
 workflow phases of one user/operator capability, keep them together and
 use an `Interaction` table.
+
+Organize scenario areas around externally meaningful interfaces,
+capabilities, roles, artifacts, or operational concerns. Do not organize
+them around classes, services, queues, workers, frameworks, or other
+private implementation boundaries.
 
 Individual scenarios use `Context`, `Action`, and `Outcome` as their
 core sections. When a single scenario requires a short sequence of

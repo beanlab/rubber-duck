@@ -37,6 +37,12 @@ Focus on:
 What behavior must the system guarantee in this situation?
 ```
 
+Use this test when scope is unclear:
+
+```text
+Would this scenario still be true after replacing the implementation?
+```
+
 ### Keep Scenarios Atomic
 
 Each scenario defines exactly one behavioral guarantee.
@@ -44,13 +50,13 @@ Each scenario defines exactly one behavioral guarantee.
 Good:
 
 ```text
-rejects registration without configured course
+rejects unsupported file upload
 ```
 
 Bad:
 
 ```text
-registration workflow
+file processing workflow
 ```
 
 If the scenario contains multiple independent outcomes or multiple
@@ -79,6 +85,43 @@ Bad:
 ```text
 The RetryManager invokes validate_output() in a loop.
 ```
+
+### Focus On External Contracts
+
+Write scenarios from the perspective of users, operators, integrations,
+or downstream systems.
+
+Prefer describing:
+
+- visible inputs
+- visible outputs
+- accepted and rejected actions
+- observable state transitions
+- externally meaningful side effects
+- required response patterns
+
+Avoid describing:
+
+- internal classes, functions, queues, services, workers, prompts, tools,
+  model choices, framework behavior, storage layout, or configuration
+  keys unless they are part of the external contract
+
+### Document Capabilities By Behavior
+
+When documenting a named capability, mode, assistant, policy, or
+user-facing feature, describe the behavioral promise rather than the
+implementation path.
+
+Capability scenarios may include representative user inputs and
+acceptable response patterns when exact output is variable.
+
+Focus on:
+
+- what the capability should do
+- what it should refuse or avoid
+- how it handles ambiguity
+- what kinds of outputs are acceptable
+- what completion or failure looks like from the outside
 
 ## Scenario Template
 
@@ -155,6 +198,10 @@ Use an `Interaction` section when one atomic scenario is best described
 as an ordered series of externally visible exchanges or tightly related
 variants of one capability.
 
+Use representative examples when exact output is variable. Examples
+should define the expected response pattern, not prescribe hidden
+implementation steps or full internal instructions.
+
 Interaction tables must use exactly these columns:
 
 ```md
@@ -174,9 +221,9 @@ Prefer:
 ```md
 | Action | Outcome |
 | --- | --- |
-| `!cache cleanup` | Removes expired cache entries and reports the cleanup result. |
-| Unknown command | Returns `Unknown command. Try !help`. |
-| Valid Net ID | Sends an email verification challenge. |
+| Supported file uploaded | Accepts the file and reports that processing started. |
+| Unknown command | Returns a help-style message listing supported actions. |
+| Ambiguous request | Asks a clarifying question before continuing. |
 ```
 
 Avoid:
@@ -184,7 +231,7 @@ Avoid:
 ```md
 | Action | Outcome |
 | --- | --- |
-| The operator sends `!cache cleanup` in the configured admin channel. | The application removes expired cache entries and reports the cleanup result. |
+| The operator sends the cleanup command through the command router. | The application removes expired entries and reports the cleanup result. |
 ```
 
 Do not split a scenario only because it has multiple related command
@@ -224,12 +271,25 @@ Prefer:
 verb + behavioral outcome
 ```
 
+Prefer names based on the promised behavior, not the mechanism that
+provides it.
+
 Examples:
 
 ```text
 rejects_invalid_schema.md
 closes_session_after_completion.md
 preserves_feedback_submission.md
+asks_clarifying_question_for_ambiguous_request.md
+exports_report_as_csv.md
+```
+
+Avoid:
+
+```text
+runs_worker_job.md
+calls_validation_service.md
+processes_queue_message.md
 ```
 
 ## Relationship To Tests
@@ -250,6 +310,10 @@ Before finalizing a scenario, verify:
 - Is the behavior observable?
 - Is every outcome testable?
 - Is implementation detail minimized?
+- Would this scenario still be true after replacing the implementation?
+- Does the title describe user-visible behavior instead of an internal process?
+- Are internal mechanisms mentioned only when they are externally contractual?
+- Could a black-box test verify this behavior?
 - Is the scope narrow?
 - Does the filename describe the guarantee?
 - Does the scenario avoid ambiguity?

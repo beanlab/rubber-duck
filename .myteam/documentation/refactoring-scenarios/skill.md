@@ -26,6 +26,12 @@ Refactor when:
 - it is unclear where a new scenario belongs
 - the same guarantee appears in multiple places
 - filenames or folders no longer describe observable behavior
+- scenario names or sections describe internal mechanisms instead of
+  externally visible behavior
+- scenarios are grouped by implementation type rather than user-facing
+  capability, interface, role, artifact, or operational concern
+- setup relies on private configuration keys, class names, tool names,
+  framework details, or runtime internals that are not external contract
 - broad application design prose needs to become scenario-style
   documentation
 
@@ -48,18 +54,23 @@ avoid repeating inherited context.
 
 1. Read the existing scenario documents and identify every distinct
    behavioral guarantee.
-2. Choose a domain-oriented tree structure that makes those guarantees
+2. Classify each guarantee as an interface/lifecycle guarantee or a
+   capability-specific guarantee, then keep those concerns distinct when
+   doing so improves discoverability.
+3. Choose a domain-oriented tree structure that makes those guarantees
    discoverable.
-3. Move shared terminology or assumptions into parent `README.md` or
+4. Move shared terminology or assumptions into parent `README.md` or
    index documents.
-4. Split broad documents only when they contain independent behavioral
+5. Split broad documents only when they contain independent behavioral
    contracts. For cohesive command families, validation branches, or
    workflow phases, keep one scenario and use a concise `Interaction`
    table.
-5. Update related-scenario links after moving files.
-6. Review the original and refactored documents to confirm no guarantee
+6. Rename scenarios that describe internal mechanisms so their names
+   describe externally observable behavior.
+7. Update related-scenario links after moving files.
+8. Review the original and refactored documents to confirm no guarantee
    was lost.
-7. Review the final tree again for coherence, naming, and navigation.
+9. Review the final tree again for coherence, naming, and navigation.
 
 ## Report Back
 
