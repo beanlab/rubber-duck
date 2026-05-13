@@ -1,40 +1,103 @@
 # Resolves Included Configuration
 
-## Purpose
-
-Compose config files.
-
----
-
 # Context
 
-The selected JSON or YAML runtime configuration contains one or more
-`$include` directives.
+The `$include` directive allows YAML configuration files to inherit
+values from another configuration file and path. It is used to reduce
+duplication and prevent configuration drift between production and
+local development environments.
+
+Local configurations can extend production defaults while overriding
+only specific fields.
 
 ---
 
-# Action
+# Purpose
 
-The application resolves the runtime configuration during startup.
+Developers maintain separate local configuration files that diverge
+from production over time. This typically results in:
 
----
+- duplicated configuration structures
+- missing updates when production config changes
+- increased maintenance overhead
+- inconsistent behavior between environments
 
-# Interaction
-
-| Action | Outcome |
-| --- | --- |
-| `$include` directives | Recursively resolves the included content. |
-| Include with JSONPath selector | Includes only the selected content. |
-| Overlapping dictionary content | Applies deep-merge semantics. |
-| Server and channel configuration | Uses configured Discord IDs, with each configured channel mapped to a named global duck or an inline duck definition. |
+The $include directive addresses this by enabling local configs to
+inherit directly from production definitions.
 
 ---
 
-# Outcome
+# Examples
 
-Resolved runtime configuration contains included content, merged
-dictionary values, and channel-to-duck routing information needed for
-startup.
+## Include with Override
+
+Production Configuration:
+
+```yaml
+ducks:
+  standard-rubber-duck:
+    settings:
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - prompts/production-prompts/standard-rubber-duck.md
+        engine: gpt-5.4-mini
+        reasoning: low
+```
+
+Local Configuration:
+
+```yaml
+ducks:
+  standard-rubber-duck:
+    $include: "production-config.yaml@$.ducks.standard-rubber-duck"
+    settings:
+      agent:
+        engine: gpt-5-nano # value to override
+```
+
+Resolved Configuration:
+
+```yaml
+ducks:
+  standard-rubber-duck:
+    settings:
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - prompts/production-prompts/standard-rubber-duck.md
+        engine: gpt-5.4-nano # overridden value
+        reasoning: low
+```
+
+## Include Scalar
+
+Including scalar values (such as strings) is supported, but the $include
+key must be the only key in the mapping. No sibling keys are allowed.
+
+Working example:
+
+```yaml
+sender_email:
+  $include: "production-config.yaml@$.sender_email"
+```
+
+Error-raising example:
+
+```yaml
+sender_email:
+  $include: "production-config.yaml@$.sender_email"
+  some_override_key: hello
+```
+---
+
+# Rules and Constraints
+
+- The include target must resolve to an object/map
+- Circular includes are not supported
+- Missing or invalid JSONPath expressions result in an informative error
+- Local configuration values always take precedence over included values
+- Scalars and Arrays are fully replaced
 
 ---
 
