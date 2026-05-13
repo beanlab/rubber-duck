@@ -4,13 +4,16 @@
 
 # Overview
 
-The `$include` directive allows a YAML configuration file to reuse values from another configuration file and path. It is used to extend existing configuration while allowing selective overrides.
+The `$include` directive allows a YAML configuration file to reuse
+values from another configuration file and path. It is used to extend 
+existing configuration while allowing selective overrides.
 
 ---
 
 # Context
 
-In many systems, production configuration evolves frequently while local development configuration is manually copied and modified.
+In many systems, production configuration evolves frequently while 
+local development configuration is manually copied and modified.
 
 Over time, this leads to:
 - duplicated configuration structures
@@ -18,7 +21,9 @@ Over time, this leads to:
 - divergence between environments
 - unnecessary maintenance overhead
 
-This feature exists to reduce configuration drift by allowing local configurations to reference production definitions directly instead of duplicating them.
+This feature exists to reduce configuration drift by allowing local
+configurations to reference production definitions directly instead of 
+duplicating them.
 
 ---
 
@@ -29,13 +34,15 @@ When `$include` is used in a configuration:
 - The referenced configuration value is used as the base
 - The local configuration overrides specific fields on top of it
 - Only the referenced path is imported
-- The result behaves as if the base configuration was written directly in place, with overrides applied
+- The result behaves as if the base configuration was written directly
+in place, with overrides applied
 
 ### Object behavior
 
 When the included value is an object:
 - fields from the included object are retained
-- any overlapping fields in the local configuration override the included values
+- any overlapping fields in the local configuration override the 
+included values
 - non-overlapping fields are preserved
 
 ---
@@ -85,7 +92,8 @@ ducks:
 
 ## Include Scalar
 
-When the included value is a scalar (such as a string), the entire value is replaced by the included value.
+When the included value is a scalar (such as a string), the entire
+value is replaced by the included value.
 No additional fields may be defined alongside `$include` in this case.
 
 Valid example:
@@ -107,7 +115,8 @@ sender_email:
 # Edge Cases
 
 - Including a non-existent path results in an error
-- Including a value that is not compatible with the expected type results in an error
+- Including a value that is not compatible with the expected type 
+results in an error
 - Circular includes are not allowed
 - Scalar includes do not allow additional sibling keys
 
