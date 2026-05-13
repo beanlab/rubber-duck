@@ -1,29 +1,42 @@
 # Resolves Included Configuration
 
-# Context
+---
 
-The `$include` directive allows YAML configuration files to inherit
-values from another configuration file and path. It is used to reduce
-duplication and prevent configuration drift between production and
-local development environments.
+# Overview
 
-Local configurations can extend production defaults while overriding
-only specific fields.
+The `$include` directive allows a YAML configuration file to reuse values from another configuration file and path. It is used to extend existing configuration while allowing selective overrides.
 
 ---
 
-# Purpose
+# Context
 
-Developers maintain separate local configuration files that diverge
-from production over time. This typically results in:
+In many systems, production configuration evolves frequently while local development configuration is manually copied and modified.
 
+Over time, this leads to:
 - duplicated configuration structures
-- missing updates when production config changes
-- increased maintenance overhead
-- inconsistent behavior between environments
+- missing updates from production changes
+- divergence between environments
+- unnecessary maintenance overhead
 
-The $include directive addresses this by enabling local configs to
-inherit directly from production definitions.
+This feature exists to reduce configuration drift by allowing local configurations to reference production definitions directly instead of duplicating them.
+
+---
+
+# Behavior
+
+When `$include` is used in a configuration:
+
+- The referenced configuration value is used as the base
+- The local configuration overrides specific fields on top of it
+- Only the referenced path is imported
+- The result behaves as if the base configuration was written directly in place, with overrides applied
+
+### Object behavior
+
+When the included value is an object:
+- fields from the included object are retained
+- any overlapping fields in the local configuration override the included values
+- non-overlapping fields are preserved
 
 ---
 
@@ -56,7 +69,7 @@ ducks:
         engine: gpt-5-nano # value to override
 ```
 
-Resolved Configuration:
+Result:
 
 ```yaml
 ducks:
@@ -72,17 +85,17 @@ ducks:
 
 ## Include Scalar
 
-Including scalar values (such as strings) is supported, but the $include
-key must be the only key in the mapping. No sibling keys are allowed.
+When the included value is a scalar (such as a string), the entire value is replaced by the included value.
+No additional fields may be defined alongside `$include` in this case.
 
-Working example:
+Valid example:
 
 ```yaml
 sender_email:
   $include: "production-config.yaml@$.sender_email"
 ```
 
-Error-raising example:
+Invalid example:
 
 ```yaml
 sender_email:
@@ -91,17 +104,23 @@ sender_email:
 ```
 ---
 
-# Rules and Constraints
+# Edge Cases
 
-- The include target must resolve to an object/map
-- Circular includes are not supported
-- Missing or invalid JSONPath expressions result in an informative error
-- Local configuration values always take precedence over included values
-- Scalars and Arrays are fully replaced
+- Including a non-existent path results in an error
+- Including a value that is not compatible with the expected type results in an error
+- Circular includes are not allowed
+- Scalar includes do not allow additional sibling keys
+
+
+# Constraints
+
+- Only object values support field-level overrides
+- Scalar and Array values fully replace the included value
+- Invalid paths must produce a clear error
 
 ---
 
 # Related Scenarios
 
-- [Loads runtime configuration](loads_runtime_configuration.md)
-- [Starts bot runtime](../startup/starts_bot_runtime.md)
+- Loads runtime configuration
+- Starts bot runtime
