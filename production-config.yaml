@@ -261,10 +261,10 @@ servers:
             duck_type: conversation_review
             settings:
               target_channel_ids:
-                - 1406039546721730582
+                - 1497345204225577131
 
       student-text-channels/duck-pond:
-        channel_id: 1406039546721730582
+        channel_id: 1497345204225577131
         timeout: 600
         duck:
           standard-rubber-duck
