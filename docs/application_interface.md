@@ -127,6 +127,7 @@ Supported duck types:
 - `conversation_review`
 - `registration`
 - `assignment_feedback`
+- `debugging_practice_duck`
 
 ### Shared lifecycle behavior
 
@@ -181,6 +182,24 @@ Observable failure/guardrail behavior includes:
 - non-markdown or missing uploads trigger retry prompts
 - unsupported assignment names terminate with an explicit unsupported message
 - missing report sections produce explicit unsatisfactory rubric feedback for those sections
+
+### `debugging_practice_duck`
+
+Expected user-facing sequence:
+
+- loads configured traceback scenarios from `rubric_path`
+- shows the user code, traceback, and a prompt asking them to explain the error
+- asks the user to identify the error meaning, location, intended behavior, and fix
+- moves to the next traceback when the current one is complete
+- ends after all configured traceback scenarios are complete, timeout occurs, or the configured turn limit is reached
+
+Observable failure/guardrail behavior includes:
+
+- empty rubric files are treated as no criteria
+- `rubric_path` is the sole configured rubric input; there is no topic intake or dynamic rubric selection
+- review-agent output is structured assessment JSON and is not sent directly to the user
+- malformed or empty review JSON does not clear existing progress
+- thread inactivity terminates the workflow through the shared conversation-close lifecycle
 
 ## Admin Command Contract
 
@@ -259,6 +278,16 @@ The following conventions are part of the user/operator-observable contract:
 - Thread inactivity and workflow-complete conditions close user-facing conversations.
 - Admin command outputs are delivered in Discord as messages/files.
 - Metrics and feedback are persisted for export/reporting behavior.
+
+## Rubricize Utility Contract
+
+The `scripts/rubricize.py` operator utility supports source-Python generation for debugging-practice rubrics:
+
+- each agent step runs the current source version, records the observed traceback, `error line`, `intended behavior`, `required concept`, and `required fix`, then returns the next one-fix source version
+- the utility, not the agent, populates each rubric item's `code` field from the source version for that step
+- generated per-item `code` fields use deterministic line numbering formatted as `01| <source line>`
+- when the source reaches a no-error step, the utility records `correct code` with the same deterministic line-number format
+- traceback path concealment applies only inside `traceback` fields and does not rewrite rubric explanations or required fixes
 
 ## Out of Scope
 
