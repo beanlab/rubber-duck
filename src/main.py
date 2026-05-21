@@ -105,7 +105,8 @@ def build_registration_duck(
         bot.get_channel,
         bot.fetch_guild,
         email_confirmation,
-        settings
+        settings,
+        config["ai_completion_retry_protocol"]
     )
     armory.scrub_tools(registration)
     registration_workflow = RegistrationWorkflow(name, registration, registration_bot)
