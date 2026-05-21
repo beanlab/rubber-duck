@@ -14,8 +14,7 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
-from .workflows.code_duck_workflow import CodeDuckWorkflow
-from .workflows.student_duck_workflow import StudentDuckRubricTools, StudentDuckWorkflow
+from .workflows.debugging_practice_duck_workflow import DebuggingPracticeDuckWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
@@ -180,31 +179,26 @@ def build_ducks(
                 bot.read_url
             )
 
-        elif duck_type == 'student_duck':
-            student_agent = build_agent(settings["agent"])
-            error_checker_agent = build_agent(settings["error_checker_agent"])
-            omission_checker_agent = build_agent(settings["omission_checker_agent"])
-            rubric_tools = StudentDuckRubricTools(settings)
-            armory.scrub_tools(rubric_tools)
-            ducks[name] = StudentDuckWorkflow(
-                name,
-                bot.send_message,
-                settings,
-                student_agent,
-                error_checker_agent,
-                omission_checker_agent,
-                ai_client,
-                rubric_tools,
-            )
-
-        elif duck_type == 'code_duck':
+        elif duck_type == 'debugging_practice_duck':
             conversation_review_agent = build_agent(settings["conversation_review_agent"])
-            ducks[name] = CodeDuckWorkflow(
+            incomplete_subprocess = (
+                build_agent(settings["incomplete_subprocess"])
+                if "incomplete_subprocess" in settings
+                else None
+            )
+            incorrect_subprocess = (
+                build_agent(settings["incorrect_subprocess"])
+                if "incorrect_subprocess" in settings
+                else None
+            )
+            ducks[name] = DebuggingPracticeDuckWorkflow(
                 name,
                 bot.send_message,
                 settings,
                 conversation_review_agent,
                 ai_client,
+                incomplete_subprocess,
+                incorrect_subprocess,
             )
 
         else:

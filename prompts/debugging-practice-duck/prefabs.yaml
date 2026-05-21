@@ -1,0 +1,99 @@
+item_complete:
+  - Well done, that error is fixed.
+  - Good job, that change resolves the current error.
+  - Nice work, the program gets past that traceback now.
+  - Well done, the fix addresses the issue.
+  - Good job, that response matches the current traceback.
+  - Nice work, the program can move past that line now.
+  - Well done, that answer handles the current error.
+  - Good job, the current issue is resolved.
+  - Nice work, that answer covers the problem.
+  - Well done, that traceback is handled.
+next_item:
+  - Now look at the next error from the program.
+  - Here is the next traceback to work through.
+  - Move on to the next issue in the code.
+  - The program now reaches this next error.
+  - Use the next code sample and traceback.
+  - Continue by working through the next error.
+  - The next traceback is below.
+  - Review the next code context and traceback.
+  - Now address the next problem in the program.
+  - Here is what the program reports next.
+retry_fix:
+  - That answer does not resolve the current error yet.
+  - The proposed fix does not address the traceback yet.
+  - That response needs another pass for this error.
+  - The current answer does not fix the issue shown in the traceback.
+  - That change does not resolve the problem in the code.
+  - The program still needs a correction for this error.
+  - That answer is not enough to resolve the current traceback.
+  - Revisit the traceback and try a different fix.
+  - The proposed change does not match the issue in the program.
+  - This error still needs a fix that addresses it directly.
+retry_incomplete:
+  - That response is incomplete. Would you explain that in more detail?
+  - I think that answer leaves something out. Is there more you could tell me about that?
+  - That looks incomplete to me. Would you say a bit more?
+  - I think there is still missing information there. Could you expand on that?
+  - That answer seems partial. What else would you add?
+  - I do not think that quite covers it. Would you explain a little more?
+  - That response is close, but incomplete. Is there more you could tell me?
+  - I think you are leaving out a detail. Would you explain that part more fully?
+  - That is not the full picture yet. Could you say a little more?
+  - I think that response needs another detail. Would you expand on it?
+ask_error_meaning:
+  - What does this {error_type} mean?
+  - Before we change the code, what does this {error_type} mean?
+  - What is the {error_type} telling us?
+  - How would you explain this {error_type}?
+  - What does the error type {error_type} usually mean?
+  - Start by explaining what this {error_type} means.
+  - What is this {error_type} saying about the program?
+  - How should we interpret this {error_type}?
+  - What does {error_type} mean here?
+  - What is the meaning of this {error_type}?
+ask_error_location:
+  - Correct! Where is the error located in the code?
+  - Well done. Where should I look for the line causing this error?
+  - Right, what part of the code is the traceback identifying?
+  - Nice, where in the code does this error show up?
+  - Yes, where in the code should we inspect first?
+  - Good, where does the error appear to happen?
+  - Exactly, what code location is associated with the traceback?
+  - Great, which line looks suspicious here?
+  - Correct, what line is the traceback pointing to?
+  - Good job. Where should we focus in the code?
+ask_intended_behavior:
+  - Correct! What does this line look like it is trying to do?
+  - Well done. What is the code trying to accomplish here?
+  - Right, before changing it, what should this line do?
+  - Nice, what seems to be the intended behavior of this line?
+  - Yes, what result does this line appear to be aiming for?
+  - Good, how would you describe what this code is trying to do?
+  - Exactly, what purpose does this line seem to have?
+  - Great, what should happen when this line runs correctly?
+  - Correct, what is this part of the program meant to do?
+  - Good job. What does the code look like it wants to happen here?
+ask_for_fix:
+  - Correct! What change needs to be made for that to happen?
+  - Well done. What specific code change would make the line work that way?
+  - Right, which edit should be made to fix this error?
+  - Nice, what should change in the code now?
+  - Yes, what concrete fix would address this traceback?
+  - Good, which line or expression should change for this traceback?
+  - Exactly, how would you turn that into a code change?
+  - Great, what exact edit is needed to fix the error?
+  - Correct, what should be changed in the code sample?
+  - Good job. What code change would resolve the current issue?
+exercise_complete:
+  - Well done, the program gets through all of the errors now.
+  - Good job, all of the reported errors are resolved.
+  - Nice work, the full debugging sequence is resolved.
+  - Well done, the final error is fixed.
+  - Good job, the program now satisfies the debugging goals.
+  - Nice work, every traceback has been addressed.
+  - Well done, the fixes cover the program's errors.
+  - Good job, this debugging practice is complete.
+  - Nice work, the program is in good shape now.
+  - Well done, all required debugging issues are resolved.

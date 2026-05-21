@@ -78,21 +78,10 @@ class AssignmentFeedbackSettings(TypedDict):
     project_scanner_agent: SingleAgentSettings
 
 
-class StudentDuckSettings(TypedDict):
-    agent: SingleAgentSettings
-    error_checker_agent: SingleAgentSettings
-    omission_checker_agent: SingleAgentSettings
-    first_message: str
-    topic_acknowledgement: str
-    rubric_path: NotRequired[str | list[str]]
-    rubric_root: NotRequired[str | list[str]]
-    rubric_roots: NotRequired[str | list[str]]
-    review_turns: NotRequired[int | Literal["full"]]
-
-
-class CodeDuckSettings(TypedDict):
-    agent: NotRequired[SingleAgentSettings]
+class DebuggingPracticeDuckSettings(TypedDict):
     conversation_review_agent: SingleAgentSettings
+    incomplete_subprocess: NotRequired[SingleAgentSettings]
+    incorrect_subprocess: NotRequired[SingleAgentSettings]
     first_message: str
     rubric_path: str | list[str]
     review_turns: NotRequired[int | Literal["full"]]

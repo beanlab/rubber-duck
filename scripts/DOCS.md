@@ -1,4 +1,12 @@
-## Purpose
+# Scripts
+
+Scripts available are as follows:
+  - generate_metadata.py: for downloading datasets from S3
+  - rubricize.py: for generating debugging-practice-duck rubrics from code
+
+## generate_metadata.py Usage
+
+### Purpose
 
 `scripts/generate_metadata.py` generates `.meta.json` files for CSV datasets in S3.
 It can target:
@@ -9,7 +17,7 @@ It can target:
 
 The script drafts metadata from column data types, refines it with an OpenAI model, and writes JSON metadata next to the dataset in S3.
 
-## Operational Flow
+### Operational Flow
 
 1. Parse CLI flags (`--s3-uri`, `--mode`, `--dry-run`, `--model`).
 2. Resolve target S3 bucket/key or prefix from `--s3-uri`.
@@ -27,7 +35,7 @@ If `--s3-uri` is not provided, default behavior remains:
 - bucket: `stats121-datasets`
 - prefix: `datasets/`
 
-## CLI Reference
+### CLI Reference
 
 ```bash
 python scripts/generate_metadata.py [options]
@@ -41,7 +49,7 @@ python scripts/generate_metadata.py [options]
 - `--model <name>`: overrides the model used for refinement
 - `--debug`: enables debug logging
 
-## Environment Requirements
+### Environment Requirements
 
 Set these before running:
 
@@ -57,7 +65,7 @@ Also ensure AWS credentials have permissions for:
 - `s3:PutObject` (not required for `--dry-run`)
 - `s3:HeadObject`
 
-## Common Commands
+### Common Commands
 
 Generate metadata for one CSV (skip if metadata already exists):
 
@@ -93,7 +101,7 @@ Run default legacy behavior:
 python scripts/generate_metadata.py --model gpt-5-mini
 ```
 
-## Output Contract
+### Output Contract
 
 For each dataset `path/name.csv`, metadata is written to:
 
@@ -116,7 +124,7 @@ JSON shape:
 }
 ```
 
-## Failure Modes and Guardrails
+### Failure Modes and Guardrails
 
 - If `--s3-uri` is malformed, the script exits with a validation error.
 - If no CSV/TXT keys are found for a target URI, the script logs a warning and exits successfully.
@@ -125,7 +133,7 @@ JSON shape:
 - If OpenAI model access is denied (for example model not enabled for the project), rerun with a permitted model using `--model`.
 - TXT conversion tries multiple delimiters; non-standard delimiter usage is logged.
 
-## Notes for Safe Use
+### Notes for Safe Use
 
 - Start with `--dry-run` for new buckets or prefixes.
 - Use `--mode overwrite` only when intentional metadata replacement is desired.

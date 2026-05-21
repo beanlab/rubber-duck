@@ -1,7 +1,7 @@
 # Rubber Duck
 
 Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.
-It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, registration, assignment feedback, and conversation review), all selected through config.
+It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, registration, assignment feedback, debugging practice, and conversation review), all selected through config.
 
 ## What This Project Does
 
@@ -19,7 +19,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `src/rubber_duck_app.py`: channel/admin message routing
 - `src/duck_orchestrator.py`: thread creation + duck dispatch
 - `src/conversation/`: conversation implementations
-- `src/workflows/`: registration, assignment feedback, student-duck, and code-duck workflows
+- `src/workflows/`: registration, assignment feedback, and debugging-practice workflows
 - `src/gen_ai/`: OpenAI client orchestration + agent execution
 - `src/armory/`: tool registration, Python tool execution, and caching
 - `src/storage/` + `src/metrics/`: SQL persistence and reporting
@@ -49,8 +49,7 @@ Configured ducks are built by `duck_type`.
 - `conversation_review`: TA/reviewer scoring workflow
 - `registration`: NetID/email verification + role assignment workflow
 - `assignment_feedback`: rubric-based grading workflow for markdown reports
-- `student_duck`: learner-style topic review with rubric-backed error and omission checks
-- `code_duck`: debugging practice workflow where one review agent evaluates traceback-based rubric scenarios and replies directly as the student
+- `debugging_practice_duck`: debugging practice workflow where a review agent assesses traceback-based rubric scenarios as JSON, optional subprocess agents handle incomplete or incorrect answers, and the workflow sends student-facing replies
 
 ## Admin Commands
 

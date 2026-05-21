@@ -1,9 +1,0 @@
-variables:
-  scope:
-    - variables in python
-  definition:
-    - a variable stores data values
-  using variables:
-    - variables are created with a name, a "=", and the value being assigned to it
-    - variable names are case sensitive
-  

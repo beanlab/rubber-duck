@@ -127,8 +127,7 @@ Supported duck types:
 - `conversation_review`
 - `registration`
 - `assignment_feedback`
-- `student_duck`
-- `code_duck`
+- `debugging_practice_duck`
 
 ### Shared lifecycle behavior
 
@@ -184,57 +183,22 @@ Observable failure/guardrail behavior includes:
 - unsupported assignment names terminate with an explicit unsupported message
 - missing report sections produce explicit unsatisfactory rubric feedback for those sections
 
-### `student_duck`
+### `debugging_practice_duck`
 
 Expected user-facing sequence:
 
-- send the configured `first_message`
-- collect the user's response from the first thread reply after that prompt as a topic declaration
-- load configured YAML rubric criteria when present; otherwise select the best matching YAML rubric from configured `rubric_roots` using the topic declaration
-- send the configured `topic_acknowledgement`
-- collect the next user response as the first response passed to the review loop
-- run a configured error-checking agent against the current user response, rubric, and accumulated conversation context, forcing workflow-owned structured output
-- run a configured omission-checking agent against the current user response and accumulated conversation context, forcing workflow-owned structured output
-- attach structured checker results (`check_type`, `assessment`) to the matching user turn in the conversation context
-- pass the user response, rubric, selected rubric ID, available rubric catalog, current checker results, and conversation context to the configured user-facing student agent
-- allow the user-facing student agent to call `select_rubric` to choose a YAML rubric from configured rubric roots and receive the selected rubric contents in the tool response
-- send the student agent's learner-style follow-up question in the thread
-- continue this review/follow-up loop until timeout, configured turn limit, or indefinitely when `review_turns` is `full`
+- loads configured traceback scenarios from `rubric_path`
+- shows the user code, traceback, and a prompt asking them to explain the error
+- asks the user to identify the error meaning, location, intended behavior, and fix
+- moves to the next traceback when the current one is complete
+- ends after all configured traceback scenarios are complete, timeout occurs, or the configured turn limit is reached
 
 Observable failure/guardrail behavior includes:
 
 - empty rubric files are treated as no criteria
-- rubric selection is limited to YAML files under configured `rubric_roots`
-- rubric selection requires a topic/user-response match; subject/course matches are used only to rank otherwise matching rubrics
-- checker agent configuration does not need to provide `output_format`; the workflow always requires `check_type` and `assessment`
-- the triggering thread title/message and first topic-declaration reply are not treated as student responses and are not sent to error or omission checker agents
-- the user-facing student agent may use `conclude_conversation` to end the workflow
-- user-message collection remains workflow-owned so every user response passes through the error and omission checks
-- thread inactivity terminates the workflow through the shared conversation-close lifecycle
-
-### `code_duck`
-
-Expected user-facing sequence:
-
-- load configured YAML rubric criteria from `rubric_path`, including the learner-level `full project` and documented traceback scenarios
-- send a deterministic opening message made from the configured `first_message` followed by the rubric `full project`
-- collect the user's response as the first response passed to the review loop
-- build a script-style analysis string containing the rubric traceback scenarios, current `full_project`, and a `Student:`/`TA:` conversation transcript
-- run a configured conversation-review agent as one completion whose system prompt is the review prompt and whose single user input is that analysis string
-- treat the conversation-review response as the next student-facing code-duck message
-- send the conversation-review response directly in the thread
-- end the conversation when the conversation-review agent calls `conclude_conversation` or returns no next message
-- continue this review/follow-up loop until timeout, configured turn limit, or indefinitely when `review_turns` is `full`
-
-Observable failure/guardrail behavior includes:
-
-- empty rubric files are treated as no criteria
-- `rubric_path` is the sole rubric selector for the chat; code-duck does not perform topic intake or dynamic rubric selection
-- no separate user-facing code duck agent runs after conversation review
-- conversation-review output is plain text containing only the next student-facing message, or an empty response when the rubric concepts are complete
-- conversation-review agent configuration does not need to provide `output_format`; the workflow ignores structured review output
-- conversation-review agent configuration may include `conclude_conversation` so the duck can explicitly close after all rubric concepts are addressed
-- the triggering thread title/message is not treated as a user code-fix response and is not sent to the conversation-review agent
+- `rubric_path` is the sole configured rubric input; there is no topic intake or dynamic rubric selection
+- review-agent output is structured assessment JSON and is not sent directly to the user
+- malformed or empty review JSON does not clear existing progress
 - thread inactivity terminates the workflow through the shared conversation-close lifecycle
 
 ## Admin Command Contract
@@ -314,6 +278,16 @@ The following conventions are part of the user/operator-observable contract:
 - Thread inactivity and workflow-complete conditions close user-facing conversations.
 - Admin command outputs are delivered in Discord as messages/files.
 - Metrics and feedback are persisted for export/reporting behavior.
+
+## Rubricize Utility Contract
+
+The `scripts/rubricize.py` operator utility supports source-Python generation for debugging-practice rubrics:
+
+- each agent step runs the current source version, records the observed traceback, `error line`, `intended behavior`, `required concept`, and `required fix`, then returns the next one-fix source version
+- the utility, not the agent, populates each rubric item's `code` field from the source version for that step
+- generated per-item `code` fields use deterministic line numbering formatted as `01| <source line>`
+- when the source reaches a no-error step, the utility records `correct code` with the same deterministic line-number format
+- traceback path concealment applies only inside `traceback` fields and does not rewrite rubric explanations or required fixes
 
 ## Out of Scope
 
