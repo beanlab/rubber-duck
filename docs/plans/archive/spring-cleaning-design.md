@@ -82,7 +82,7 @@ Each section should include:
 
 Scope:
 - Repository structure, file placement, duplication, stale docs
-- Mislocated assets across `docs/`, `scripts/`, `prompts/`, `archive/`, etc.
+- Mislocated assets across `docs/`, `scripts/`, `src/prompts/`, `archive/`, etc.
 
 Special requirement:
 - The role’s `load.py` **must** print the full project tree using
@@ -91,7 +91,7 @@ Special requirement:
 ### 5.2 `spring-cleaning/prompt-evaluator` role
 
 Scope:
-- `prompts/` only (exclude `archive/`)
+- `src/prompts/` only (exclude `archive/`)
 - Consistency, duplication, naming, alignment with expected workflows
 
 ### 5.3 `spring-cleaning/src-evaluator` role
@@ -141,7 +141,7 @@ Modify:
 - Report location: `docs/spring-cleanings/`
 - Filename date format: `spring-cleaning-<mm-dd>.md`
 - Report sections: `Project Structure`, `Prompt Evaluation`, `Src Evaluation`
-- Prompt scope: `prompts/` only (exclude `archive/`)
+- Prompt scope: `src/prompts/` only (exclude `archive/`)
 - Structure agent directory output: use `print_directory_tree`
 - All agents must read `docs/application_interface.md` and `production-config.yaml`
 

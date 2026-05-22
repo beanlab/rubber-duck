@@ -59,7 +59,7 @@ tools:
     container: stats-python-sandbox
     cache:
       backend: database
-      prompt: prompts/production-prompts/stats-cache.md
+      prompt: src/prompts/production-prompts/stats-cache.md
       engine: gpt-5-mini
       reasoning: minimal
 
@@ -78,7 +78,7 @@ agents_as_tools:
     agent:
       name: RegistrationBot
       prompt_files:
-        - prompts/production-prompts/registration.txt
+        - src/prompts/production-prompts/registration.txt
       engine: gpt-5-mini
       reasoning: minimal
       tools:
@@ -98,7 +98,7 @@ agents_as_tools:
     agent:
       name: CodeComplexityAgent
       prompt_files:
-        - prompts/312-project-design/generate-code-complexity.md
+        - src/prompts/312-project-design/generate-code-complexity.md
       engine: gpt-4.1
       tools: []
 
@@ -109,7 +109,7 @@ ducks:
       agent:
         name: RubberDuck
         prompt_files:
-          - prompts/production-prompts/standard-rubber-duck.md
+          - src/prompts/production-prompts/standard-rubber-duck.md
         engine: gpt-5.4-mini
         reasoning: low
         tools:
@@ -127,7 +127,7 @@ ducks:
       agent:
         name: stats_duck
         prompt_files:
-          - prompts/production-prompts/stats.md
+          - src/prompts/production-prompts/stats.md
         engine: gpt-5.4-mini
         reasoning: low
         tools:
@@ -148,7 +148,7 @@ ducks:
       agent:
         name: cs_stats_duck
         prompt_files:
-          - prompts/production-prompts/cs-stats.md
+          - src/prompts/production-prompts/cs-stats.md
         engine: gpt-5
         reasoning: medium
         tools:
@@ -167,7 +167,7 @@ ducks:
       conversation_review_agent:
         name: DebuggingPracticeDuck
         prompt_files:
-          - prompts/debugging-practice-duck/eval-step.md
+          - src/prompts/debugging-practice-duck/eval-step.md
         engine: gpt-5.4-mini
         reasoning: low
         tools:
@@ -175,14 +175,14 @@ ducks:
       incomplete_subprocess:
         name: incomplete_subprocess
         prompt_files:
-          - prompts/debugging-practice-duck/TA-incomplete.md
+          - src/prompts/debugging-practice-duck/TA-incomplete.md
         engine: gpt-5.4-mini
         reasoning: low
         tools: []
       incorrect_subprocess:
         name: incorrect_subprocess
         prompt_files:
-          - prompts/debugging-practice-duck/concept-transfer.md
+          - src/prompts/debugging-practice-duck/concept-transfer.md
         engine: gpt-5.4-mini
         reasoning: low
         tools: []
@@ -390,7 +390,7 @@ servers:
                 name: grader
                 engine: gpt-5-mini
                 prompt_files:
-                  - prompts/assignment-feedback/tier-grader-structured-output-single.md
+                  - src/prompts/assignment-feedback/tier-grader-structured-output-single.md
                 reasoning: minimal
                 output_format:
                   format:
@@ -417,7 +417,7 @@ servers:
                 name: project_scanner
                 engine: gpt-5-mini
                 prompt_files:
-                  - prompts/assignment-feedback/project-determiner.md
+                  - src/prompts/assignment-feedback/project-determiner.md
                 output_format:
                   format:
                     type: json_schema
@@ -545,7 +545,7 @@ servers:
                 name: emoji-duck
                 engine: gpt-4.1
                 prompt_files:
-                  - prompts/production-prompts/emoji.txt
+                  - src/prompts/production-prompts/emoji.txt
                 tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -582,7 +582,7 @@ servers:
               agent:
                 name: socrates
                 prompt_files:
-                  - prompts/production-prompts/socratic-duck.txt
+                  - src/prompts/production-prompts/socratic-duck.txt
                 engine: gpt-4.1
                 tools: [ ]
               file_size_limit: *file_size_limit
@@ -618,8 +618,8 @@ servers:
                 name: PhdDuck
                 engine: gpt-4.1
                 prompt_files:
-                  - prompts/312-project-design/phd-duck.txt
-                  - prompts/312-project-design/convex-hull/project-design-convex-hull.txt
+                  - src/prompts/312-project-design/phd-duck.txt
+                  - src/prompts/312-project-design/convex-hull/project-design-convex-hull.txt
                 tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext

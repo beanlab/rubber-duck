@@ -15,7 +15,7 @@ from ..utils.protocols import ConversationComplete
 
 
 ConversationTurn = tuple[str, str]
-PROMPT_DIRECTORY = Path(__file__).parents[2] / "prompts" / "debugging-practice-duck"
+PROMPT_DIRECTORY = Path(__file__).parents[1] / "prompts" / "debugging-practice-duck"
 PREFAB_RESPONSES_PATH = PROMPT_DIRECTORY / "prefabs.yaml"
 EVAL_STEP_PROMPT_PATH = PROMPT_DIRECTORY / "eval-step.md"
 TA_INCOMPLETE_PROMPT_PATH = PROMPT_DIRECTORY / "TA-incomplete.md"
