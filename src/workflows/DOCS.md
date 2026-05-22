@@ -10,12 +10,14 @@
   - `debugging_practice_duck` -> `DebuggingPracticeDuckWorkflow`
 - `RegistrationWorkflow` runs `Registration.run(...)`, summarizes progress, and hands off continuation guidance to the configured registration bot tool.
 - `AssignmentFeedbackWorkflow` collects a markdown report, resolves assignment/project, loads rubric/rules, grades each rubric item, and returns markdown-formatted feedback.
-- `DebuggingPracticeDuckWorkflow` sends the configured opening message with the first scenario's code and traceback, builds a script-style `Student:`/`TA:` transcript for conversation review, parses structured review JSON, and sends workflow-owned replies to the thread.
+- `DebuggingPracticeDuckWorkflow` owns the Discord conversation wiring for debugging-practice threads, including the opening message, turn loop, and closeout messaging.
+- `debugging_agents.DuckAgent` owns the structured review/parsing and completion-generation decisions used by the workflow.
 
 ## Dependencies
 
 - Uses `AIClient` agents for project detection fallback and rubric-item grading.
 - Uses one configured `AIClient` agent for debugging-practice rubric assessment JSON, plus process agents for incomplete-answer support, concept-transfer support after incorrect answers, and unrelated/direct-answer redirection.
+- `debugging_agents.DuckAgent` owns the completion-generation facade while reusing `Rubric` and `ValidationSchema`.
 - Uses Discord messaging/read-url hooks passed in from runtime wiring.
 
 ## Failure Modes and Guardrails
