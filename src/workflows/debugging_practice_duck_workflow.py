@@ -15,7 +15,7 @@ from .debugging_rubric import Rubric
 ConversationTurn = tuple[str, str]
 DEBUGGING_PRACTICE_FEEDBACK_MESSAGE = (
     "*The debugging practice duck is an experimental feature that is actively being developed. "
-    "Please leave feedback as to your experience using the duck.*"
+    "Please leave feedback below as to your experience using the duck.*"
 )
 
 
