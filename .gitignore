@@ -26,3 +26,4 @@ nic2.yaml
 
 *.db
 *.env
+.codex
