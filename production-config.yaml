@@ -164,25 +164,60 @@ ducks:
         The duck will present both code that has mistakes and the traceback error from running the code.
         Identify what the traceback error means, what part of the code is causing the issue, what the code should do, and how it should be fixed.
       review_turns: full
-      conversation_review_agent:
-        name: DebuggingPracticeDuck
-        prompt_files:
-          - src/prompts/debugging-practice-duck/eval-step.md
-        engine: gpt-5.4-mini
-        reasoning: low
-        tools:
-          - conclude_conversation
+      assessors:
+        concept:
+          name: debugging_concept_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-concept.md
+          engine: gpt-5.4-mini
+          reasoning: low
+          tools: []
+        location:
+          name: debugging_location_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-location.md
+          engine: gpt-5.4-mini
+          reasoning: low
+          tools: []
+        intent:
+          name: debugging_intent_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-intent.md
+          engine: gpt-5.4-mini
+          reasoning: low
+          tools: []
+        fix:
+          name: debugging_fix_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-fix.md
+          engine: gpt-5.4-mini
+          reasoning: low
+          tools: []
+        unrelated:
+          name: debugging_unrelated_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-unrelated.md
+          engine: gpt-5.4-mini
+          reasoning: low
+          tools: []
       incomplete_subprocess:
         name: incomplete_subprocess
         prompt_files:
-          - src/prompts/debugging-practice-duck/TA-incomplete.md
+          - src/prompts/debugging-practice-duck/incomplete-completions.md
         engine: gpt-5.4-mini
         reasoning: low
         tools: []
       incorrect_subprocess:
         name: incorrect_subprocess
         prompt_files:
-          - src/prompts/debugging-practice-duck/concept-transfer.md
+          - src/prompts/debugging-practice-duck/incorrect-completions.md
+        engine: gpt-5.4-mini
+        reasoning: low
+        tools: []
+      unrelated_subprocess:
+        name: unrelated_subprocess
+        prompt_files:
+          - src/prompts/debugging-practice-duck/unrelated-completions.md
         engine: gpt-5.4-mini
         reasoning: low
         tools: []

@@ -36,13 +36,10 @@ retry_incomplete:
   - I think that answer leaves something out. Is there more you could tell me about that?
   - That looks incomplete to me. Would you say a bit more?
   - I think there is still missing information there. Could you expand on that?
-  - That answer seems partial. What else would you add?
+  - That answer seems partial. What else could you add?
   - I do not think that quite covers it. Would you explain a little more?
   - That response is close, but incomplete. Is there more you could tell me?
-  - I think you are leaving out a detail. Would you explain that part more fully?
-  - That is not the full picture yet. Could you say a little more?
-  - I think that response needs another detail. Would you expand on it?
-ask_error_meaning:
+concept:
   - What does this {error_type} mean?
   - Before we change the code, what does this {error_type} mean?
   - What is the {error_type} telling us?
@@ -53,16 +50,16 @@ ask_error_meaning:
   - How should we interpret this {error_type}?
   - What does {error_type} mean here?
   - What is the meaning of this {error_type}?
-ask_error_location:
+location:
   - Correct! Which part of the code is causing the error?
   - Well done. Where in the program did this happen?
   - Exactly, what spot in the code does the traceback point to?
   - That's right! Where does the traceback say the error happened?
-ask_intended_behavior:
+intent:
   - Correct! What was the code supposed to do here?
   - Well done. What should the code do?
   - Good, how would you describe what this code is trying to do?
-ask_for_fix:
+fix:
   - Correct! What change needs to be made for that to happen?
   - Well done. What specific code change would make the line work that way?
   - Right, which edit should be made to fix this error?

@@ -25,7 +25,7 @@ issue 1:
     intended behavior:
         - what the error-producing line appears intended to do in the program
     required concept:
-        - governing principle behind the error
+        - what the traceback error means in this scenario
     required fix:
         - the exact code change made to correct the error
 ```

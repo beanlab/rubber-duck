@@ -181,7 +181,10 @@ def build_ducks(
             )
 
         elif duck_type == 'debugging_practice_duck':
-            conversation_review_agent = build_agent(settings["conversation_review_agent"])
+            assessor_agents = {
+                assessor_name: build_agent(assessor_settings)
+                for assessor_name, assessor_settings in settings["assessors"].items()
+            }
             incomplete_subprocess = (
                 build_agent(settings["incomplete_subprocess"])
                 if "incomplete_subprocess" in settings
@@ -192,14 +195,20 @@ def build_ducks(
                 if "incorrect_subprocess" in settings
                 else None
             )
+            unrelated_subprocess = (
+                build_agent(settings["unrelated_subprocess"])
+                if "unrelated_subprocess" in settings
+                else None
+            )
             ducks[name] = DebuggingPracticeDuckWorkflow(
                 name,
                 bot.send_message,
                 settings,
-                conversation_review_agent,
+                assessor_agents,
                 ai_client,
                 incomplete_subprocess,
                 incorrect_subprocess,
+                unrelated_subprocess,
             )
 
         else:

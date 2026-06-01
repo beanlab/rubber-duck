@@ -190,6 +190,8 @@ Expected user-facing sequence:
 - loads configured traceback scenarios from `rubric_path`
 - shows the user code, traceback, and a prompt asking them to explain the error
 - asks the user to identify the error meaning, location, intended behavior, and fix
+- evaluates each response with configured concept, location, intent, fix, and unrelated assessors run in parallel
+- routes incorrect and repeated incomplete priority responses through the configured `incorrect_subprocess` agent
 - moves to the next traceback when the current one is complete
 - ends after all configured traceback scenarios are complete, timeout occurs, or the configured turn limit is reached
 
@@ -197,8 +199,9 @@ Observable failure/guardrail behavior includes:
 
 - empty rubric files are treated as no criteria
 - `rubric_path` is the sole configured rubric input; there is no topic intake or dynamic rubric selection
-- review-agent output is structured assessment JSON and is not sent directly to the user
-- malformed or empty review JSON does not clear existing progress
+- assessor output is pydantic-validated JSON and is not sent directly to the user
+- malformed, empty, or schema-invalid assessor JSON does not clear existing progress
+- an exercise is complete when concept and fix are complete, or when concept, location, intent, and fix are all complete
 - thread inactivity terminates the workflow through the shared conversation-close lifecycle
 
 ## Admin Command Contract
