@@ -155,6 +155,38 @@ ducks:
           - run_cs_analysis
           - describe_dataset
 
+  debugging-practice-duck:
+    duck_type: debugging_practice_duck
+    settings:
+      rubric_path: rubrics/CS110/3b-rubric.yaml
+      first_message: |
+        The debugging practice duck is an exercise intended to strengthen your ability to correct code errors.
+        The duck will present both code that has mistakes and the traceback error from running the code.
+        Identify what the traceback error means, what part of the code is causing the issue, what the code should do, and how it should be fixed.
+      review_turns: full
+      conversation_review_agent:
+        name: DebuggingPracticeDuck
+        prompt_files:
+          - prompts/debugging-practice-duck/eval-step.md
+        engine: gpt-5.4-mini
+        reasoning: low
+        tools:
+          - conclude_conversation
+      incomplete_subprocess:
+        name: incomplete_subprocess
+        prompt_files:
+          - prompts/debugging-practice-duck/TA-incomplete.md
+        engine: gpt-5.4-mini
+        reasoning: low
+        tools: []
+      incorrect_subprocess:
+        name: incorrect_subprocess
+        prompt_files:
+          - prompts/debugging-practice-duck/concept-transfer.md
+        engine: gpt-5.4-mini
+        reasoning: low
+        tools: []
+
 servers:
   CS 110:
     server_id: 927616651409649675
@@ -168,12 +200,19 @@ servers:
             settings:
               target_channel_ids:
                 - 1457781730202095616
+                - 1507071078198018279
 
       general/duck-pond:
         channel_id: 1457781730202095616
         timeout: 600
         duck:
           standard-rubber-duck
+
+      debugging-duck:
+        channel_id: 1507071078198018279
+        timeout: 600
+        duck:
+          debugging-practice-duck
 
       join-the-server:
         channel_id: 1399777118380097648

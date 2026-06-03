@@ -2,6 +2,19 @@
 
 All notable changes in this repository are documented here.
 
+## debugging-practice-duck (2026-05-21T11:36:23-06:00)
+
+### Added
+- Added the `debugging_practice_duck` workflow for traceback-based debugging practice with structured rubric assessment, prefab follow-up prompts, and optional incomplete/incorrect subprocess support.
+- Added CS 110 production wiring for the `debugging-duck` channel using `rubrics/CS110/3b-rubric.yaml`.
+- Added debugging-practice prompt assets, prefab responses, rubric assets, and rubric generation helper coverage.
+
+### Changed
+- Updated docs to replace legacy student/code duck references with the current debugging-practice workflow contract.
+
+### Fixed
+- Fixed `production-config.yaml` so `debugging-practice-duck` is registered as a top-level duck and resolves correctly from the CS 110 channel.
+
 ## stats-updates (2026-04-03T15:44:35-06:00)
 
 ### Added

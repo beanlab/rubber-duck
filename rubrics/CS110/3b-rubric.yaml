@@ -1,0 +1,127 @@
+issue 1:
+  traceback:
+  - "File \"demo-user/documents/CS110/homework-3b-rubric/3b-rubric.py\", line 27\n\
+    \  pass_word == get_credential(Set Password: )\n                             \
+    \ ^^^^^^^^^^^^\nSyntaxError: invalid syntax. Perhaps you forgot a comma?\n"
+  error line:
+  - 'line 27: pass_word == get_credential(Set Password: )'
+  intended behavior:
+  - Prompt the user to set a password and store the entered value.
+  required concept:
+  - String literals must be enclosed in quotes when passed as text arguments to a
+    function.
+  required fix:
+  - 'Change `pass_word == get_credential(Set Password: )` to `pass_word == get_credential("Set
+    Password: ")`.'
+  code: "01| '''\n02| This program should let the user set a username and password,\
+    \ then let them try to log in.\n03| '''\n04| \n05| \n06| def get_credential(prompt:\
+    \ str) -> str:\n07|     return input(prompt)\n08| \n09| \n10| def login_loop(username:\
+    \ str, password: str):\n11|     print(\"Type your username, then your password\"\
+    )\n12|     while True:\n13|         name = input(\"Username: \")\n14|        \
+    \ if Name == username and p_word == password:\n15|             print(\"Login successful.\
+    \ I'd hope you'd remember your username and password.\")\n16|             break\n\
+    17|         else:\n18|             print(\"Not quite right.\")\n19|         p_word\
+    \ = input(\"Password: \")\n20|         quit_input = input(\"Want to quit y/n?\"\
+    )\n21|         if quit_input == 'y':\n22|             break\n23| \n24| \n25| def\
+    \ main():\n26|     user_name = get_credential(\"Set Username: \")\n27|     pass_word\
+    \ == get_credential(Set Password: )\n28|     login_loop(user_name, pass_word)\n\
+    29| \n30| \n31| if __name__ == \"__main__\":\n32|     main()"
+issue 2:
+  traceback:
+  - "Traceback (most recent call last):\n  File \"<string>\", line 32, in <module>\n\
+    \  File \"<string>\", line 27, in main\nNameError: name 'pass_word' is not defined\n"
+  error line:
+  - 'line 27: pass_word == get_credential("Set Password: ")'
+  intended behavior:
+  - Prompt the user to set a password and store the entered value in pass_word.
+  required concept:
+  - Assignment uses a single equals sign; a double equals sign compares existing values
+    and requires the variable on the left to already be defined.
+  required fix:
+  - 'Change `pass_word == get_credential("Set Password: ")` to `pass_word = get_credential("Set
+    Password: ")`.'
+  code: "01| '''\n02| This program should let the user set a username and password,\
+    \ then let them try to log in.\n03| '''\n04| \n05| \n06| def get_credential(prompt:\
+    \ str) -> str:\n07|     return input(prompt)\n08| \n09| \n10| def login_loop(username:\
+    \ str, password: str):\n11|     print(\"Type your username, then your password\"\
+    )\n12|     while True:\n13|         name = input(\"Username: \")\n14|        \
+    \ if Name == username and p_word == password:\n15|             print(\"Login successful.\
+    \ I'd hope you'd remember your username and password.\")\n16|             break\n\
+    17|         else:\n18|             print(\"Not quite right.\")\n19|         p_word\
+    \ = input(\"Password: \")\n20|         quit_input = input(\"Want to quit y/n?\"\
+    )\n21|         if quit_input == 'y':\n22|             break\n23| \n24| \n25| def\
+    \ main():\n26|     user_name = get_credential(\"Set Username: \")\n27|     pass_word\
+    \ == get_credential(\"Set Password: \")\n28|     login_loop(user_name, pass_word)\n\
+    29| \n30| \n31| if __name__ == \"__main__\":\n32|     main()"
+issue 3:
+  traceback:
+  - "Traceback (most recent call last):\n  File \"<string>\", line 32, in <module>\n\
+    \  File \"<string>\", line 28, in main\n  File \"<string>\", line 14, in login_loop\n\
+    NameError: name 'Name' is not defined. Did you mean: 'name'?\n"
+  error line:
+  - 'line 14: if Name == username and p_word == password:'
+  intended behavior:
+  - Compare the username entered at the login prompt with the saved username.
+  required concept:
+  - Python variable names are case-sensitive, so `Name` and `name` refer to different
+    identifiers.
+  required fix:
+  - Change `if Name == username and p_word == password:` to `if name == username and
+    p_word == password:`.
+  code: "01| '''\n02| This program should let the user set a username and password,\
+    \ then let them try to log in.\n03| '''\n04| \n05| \n06| def get_credential(prompt:\
+    \ str) -> str:\n07|     return input(prompt)\n08| \n09| \n10| def login_loop(username:\
+    \ str, password: str):\n11|     print(\"Type your username, then your password\"\
+    )\n12|     while True:\n13|         name = input(\"Username: \")\n14|        \
+    \ if Name == username and p_word == password:\n15|             print(\"Login successful.\
+    \ I'd hope you'd remember your username and password.\")\n16|             break\n\
+    17|         else:\n18|             print(\"Not quite right.\")\n19|         p_word\
+    \ = input(\"Password: \")\n20|         quit_input = input(\"Want to quit y/n?\"\
+    )\n21|         if quit_input == 'y':\n22|             break\n23| \n24| \n25| def\
+    \ main():\n26|     user_name = get_credential(\"Set Username: \")\n27|     pass_word\
+    \ = get_credential(\"Set Password: \")\n28|     login_loop(user_name, pass_word)\n\
+    29| \n30| \n31| if __name__ == \"__main__\":\n32|     main()"
+issue 4:
+  traceback:
+  - "Traceback (most recent call last):\n  File \"<string>\", line 32, in <module>\n\
+    \  File \"<string>\", line 28, in main\n  File \"<string>\", line 14, in login_loop\n\
+    UnboundLocalError: cannot access local variable 'p_word' where it is not associated\
+    \ with a value\n"
+  error line:
+  - 'line 14: if name == username and p_word == password:'
+  intended behavior:
+  - Compare the username and password entered at the login prompts with the saved
+    username and password.
+  required concept:
+  - A local variable must be assigned a value before it is read; code that prompts
+    for a value must run before the condition that compares that value.
+  required fix:
+  - 'Move `p_word = input("Password: ")` from after the `if`/`else` block to immediately
+    after `name = input("Username: ")` and before `if name == username and p_word
+    == password:`.'
+  code: "01| '''\n02| This program should let the user set a username and password,\
+    \ then let them try to log in.\n03| '''\n04| \n05| \n06| def get_credential(prompt:\
+    \ str) -> str:\n07|     return input(prompt)\n08| \n09| \n10| def login_loop(username:\
+    \ str, password: str):\n11|     print(\"Type your username, then your password\"\
+    )\n12|     while True:\n13|         name = input(\"Username: \")\n14|        \
+    \ if name == username and p_word == password:\n15|             print(\"Login successful.\
+    \ I'd hope you'd remember your username and password.\")\n16|             break\n\
+    17|         else:\n18|             print(\"Not quite right.\")\n19|         p_word\
+    \ = input(\"Password: \")\n20|         quit_input = input(\"Want to quit y/n?\"\
+    )\n21|         if quit_input == 'y':\n22|             break\n23| \n24| \n25| def\
+    \ main():\n26|     user_name = get_credential(\"Set Username: \")\n27|     pass_word\
+    \ = get_credential(\"Set Password: \")\n28|     login_loop(user_name, pass_word)\n\
+    29| \n30| \n31| if __name__ == \"__main__\":\n32|     main()"
+correct code: "01| '''\n02| This program should let the user set a username and password,\
+  \ then let them try to log in.\n03| '''\n04| \n05| \n06| def get_credential(prompt:\
+  \ str) -> str:\n07|     return input(prompt)\n08| \n09| \n10| def login_loop(username:\
+  \ str, password: str):\n11|     print(\"Type your username, then your password\"\
+  )\n12|     while True:\n13|         name = input(\"Username: \")\n14|         p_word\
+  \ = input(\"Password: \")\n15|         if name == username and p_word == password:\n\
+  16|             print(\"Login successful. I'd hope you'd remember your username\
+  \ and password.\")\n17|             break\n18|         else:\n19|             print(\"\
+  Not quite right.\")\n20|         quit_input = input(\"Want to quit y/n?\")\n21|\
+  \         if quit_input == 'y':\n22|             break\n23| \n24| \n25| def main():\n\
+  26|     user_name = get_credential(\"Set Username: \")\n27|     pass_word = get_credential(\"\
+  Set Password: \")\n28|     login_loop(user_name, pass_word)\n29| \n30| \n31| if\
+  \ __name__ == \"__main__\":\n32|     main()"

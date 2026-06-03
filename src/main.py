@@ -14,6 +14,7 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from .workflows.debugging_practice_duck_workflow import DebuggingPracticeDuckWorkflow
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
@@ -177,6 +178,28 @@ def build_ducks(
                 project_scanner_agent,
                 ai_client,
                 bot.read_url
+            )
+
+        elif duck_type == 'debugging_practice_duck':
+            conversation_review_agent = build_agent(settings["conversation_review_agent"])
+            incomplete_subprocess = (
+                build_agent(settings["incomplete_subprocess"])
+                if "incomplete_subprocess" in settings
+                else None
+            )
+            incorrect_subprocess = (
+                build_agent(settings["incorrect_subprocess"])
+                if "incorrect_subprocess" in settings
+                else None
+            )
+            ducks[name] = DebuggingPracticeDuckWorkflow(
+                name,
+                bot.send_message,
+                settings,
+                conversation_review_agent,
+                ai_client,
+                incomplete_subprocess,
+                incorrect_subprocess,
             )
 
         else:

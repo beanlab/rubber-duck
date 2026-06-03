@@ -78,6 +78,15 @@ class AssignmentFeedbackSettings(TypedDict):
     project_scanner_agent: SingleAgentSettings
 
 
+class DebuggingPracticeDuckSettings(TypedDict):
+    conversation_review_agent: SingleAgentSettings
+    incomplete_subprocess: NotRequired[SingleAgentSettings]
+    incorrect_subprocess: NotRequired[SingleAgentSettings]
+    first_message: str
+    rubric_path: str | list[str]
+    review_turns: NotRequired[int | Literal["full"]]
+
+
 class RubricItemResponse(TypedDict):
     rubric_item: str
     justification: str
