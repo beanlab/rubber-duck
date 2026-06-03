@@ -189,6 +189,9 @@ servers:
                   Teacher Sections:
                     pattern: "-section-"
                     description: Sorted by teacher's name (e.g. smith-section-000)
+                  Independent Study:
+                    patter: "independent-study"
+                    description: For students enrolled in the BYU-IS program
 
   CS Faculty:
     server_id: 911014551263268916
