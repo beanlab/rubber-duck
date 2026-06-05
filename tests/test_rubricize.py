@@ -1,4 +1,11 @@
-from scripts.rubricize import conceal_traceback_paths, populate_correct_code_field, populate_error_code_fields
+import pytest
+
+from scripts.rubricize import (
+    _apply_single_replacement,
+    conceal_traceback_paths,
+    populate_correct_code_field,
+    populate_error_code_fields,
+)
 from yaml import safe_load
 
 
@@ -83,6 +90,30 @@ issue 1:
     assert contents["issue 1"]["error line"] == ["line 3: print(Count)"]
 
 
+def test_populate_error_code_fields_quotes_plain_scalars_with_colons(tmp_path):
+    rubric = tmp_path / "example.yaml"
+    rubric.write_text(
+        """
+issue 1:
+  traceback:
+    - |-
+      Traceback (most recent call last):
+        File "/tmp/example.py", line 2, in <module>
+          password == get_credential(Set Password: )
+      NameError: name 'password' is not defined
+  required fix:
+    - Change password == get_credential(Set Password: ) to an assignment.
+""".strip()
+    )
+
+    populate_error_code_fields(rubric, "password == get_credential(Set Password: )\n")
+
+    contents = safe_load(rubric.read_text())
+    assert contents["issue 1"]["required fix"] == [
+        "Change password == get_credential(Set Password: ) to an assignment."
+    ]
+
+
 def test_populate_correct_code_field_creates_rubric_with_numbered_lines(tmp_path):
     rubric = tmp_path / "example.yaml"
 
@@ -90,3 +121,18 @@ def test_populate_correct_code_field_creates_rubric_with_numbered_lines(tmp_path
 
     contents = safe_load(rubric.read_text())
     assert contents["correct code"] == "01| count = 0\n02| print(count)"
+
+
+def test_apply_single_replacement_changes_only_requested_fragment():
+    code = 'password == get_credential(Set Password: )\n'
+
+    next_code = _apply_single_replacement(code, "==", "=")
+
+    assert next_code == 'password = get_credential(Set Password: )\n'
+
+
+def test_apply_single_replacement_rejects_ambiguous_fragments():
+    code = "count == count\n"
+
+    with pytest.raises(ValueError, match="exactly once"):
+        _apply_single_replacement(code, "count", "total")

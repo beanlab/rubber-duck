@@ -51,6 +51,8 @@ sql:
 ducks:
   standard-rubber-duck:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
+  debugging-practice-duck:
+    $include: "production-config.yaml@$.ducks.debugging-practice-duck"
 
 servers:
   BeanLab:

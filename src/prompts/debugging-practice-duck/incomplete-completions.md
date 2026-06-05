@@ -20,11 +20,9 @@ When the input includes an active incomplete-response subprocess and a target pr
 
 Determine:
 
-- the shortest exact portion of the TA response that is incomplete
-- why that portion leaves out necessary information for the attempted priority, according to the rubric's required fix, required concept, code, or error line
+- whether the TA response is incomplete for the attempted priority
+- why the response leaves out necessary information for the attempted priority, according to the rubric's required fix, required concept, code, or error line
 - a concise student role response that gently asks for the missing detail
-
-The student response must not give the correct fix or concept. It should only point to the missing information and gently invite the TA to explain more. Do not tell the TA to research and return; the workflow will add the appropriate next prompt.
 
 There may be multiple pieces of information missing from the line of code or explanation. If the TA gives a response that is topically related but omits the detail needed to satisfy the priority it attempted, acknowledge the progress while noting that the answer is incomplete.
 

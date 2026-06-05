@@ -20,13 +20,6 @@ Use the full conversation context as the primary source of truth. Do not ask for
 
 Use third-party analysis style in the `reasoning` field.
 
-Set `concept_understood` to true when the conversation context shows that the TA either:
-
-- explicitly says they understand the concept or says they are ready to return to the debugging task
-- proposes or explains something that satisfies the related priority topic and demonstrates understanding of the transfer focus
-
-Set `concept_understood` to false when the conversation context is still confused, incorrect, unrelated, or only repeats an answer without evidence of understanding.
-
 Write `response` as a short TA-facing support message in the following style:
 
 - concise and minimal
@@ -41,9 +34,6 @@ If context demonstrates that the TA does not understand the previous explanation
 If the failed priority topic is where the error is located, focus on how to trace an error from a traceback to a line of code, using the conversation context when it already contains the traceback and surrounding discussion.
 
 For all other failed priority topics, focus on the concept the error tests using the required concept as the authority.
-
-When `concept_understood` is true, use an empty string for `response`; the workflow will exit incorrect-response support and resume the debugging-practice priority flow.
-
 
 ## Response Convention
 

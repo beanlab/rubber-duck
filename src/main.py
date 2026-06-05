@@ -14,7 +14,9 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
-from .workflows.debugging_practice_duck_workflow import DebuggingPracticeDuckWorkflow
+from .workflows.debugging_duck.debugging_practice_duck_workflow import (
+    DebuggingPracticeDuckWorkflow,
+)
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
@@ -201,14 +203,14 @@ def build_ducks(
                 else None
             )
             ducks[name] = DebuggingPracticeDuckWorkflow(
-                name,
-                bot.send_message,
-                settings,
-                assessor_agents,
-                ai_client,
-                incomplete_subprocess,
-                incorrect_subprocess,
-                unrelated_subprocess,
+                name=name,
+                send_message=bot.send_message,
+                settings=settings,
+                ai_client=ai_client,
+                assessor_agents=assessor_agents,
+                incomplete_subprocess=incomplete_subprocess,
+                incorrect_subprocess=incorrect_subprocess,
+                unrelated_subprocess=unrelated_subprocess,
             )
 
         else:

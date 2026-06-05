@@ -191,8 +191,9 @@ Expected user-facing sequence:
 - shows the user code, traceback, and a prompt asking them to explain the error
 - asks the user to identify the error meaning, location, intended behavior, and fix
 - evaluates each response with configured concept, location, intent, fix, and unrelated assessors run in parallel
-- routes incorrect and repeated incomplete priority responses through the configured `incorrect_subprocess` agent
+- routes incorrect and repeated incomplete priority responses through the configured agents
 - moves to the next traceback when the current one is complete
+- sends the configured feedback message after all traceback scenarios are complete
 - ends after all configured traceback scenarios are complete, timeout occurs, or the configured turn limit is reached
 
 Observable failure/guardrail behavior includes:

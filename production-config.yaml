@@ -163,7 +163,9 @@ ducks:
         The debugging practice duck is an exercise intended to strengthen your ability to correct code errors.
         The duck will present both code that has mistakes and the traceback error from running the code.
         Identify what the traceback error means, what part of the code is causing the issue, what the code should do, and how it should be fixed.
-      review_turns: full
+      feedback_message: |
+        *The debugging practice duck is an experimental feature that is actively being developed.
+        Please leave feedback below as to your experience using the duck.*
       assessors:
         concept:
           name: debugging_concept_assessor
