@@ -3,6 +3,7 @@ from typing import Callable
 from .registration import Registration, RegistrationInfo
 from ..utils.config_types import DuckContext
 
+
 def describe_registration_progress(info: RegistrationInfo) -> str:
     completed = []
     pending = []
@@ -54,6 +55,7 @@ def describe_registration_progress(info: RegistrationInfo) -> str:
 
     return "\n".join(lines)
 
+
 class RegistrationWorkflow:
     def __init__(self,
                  name: str,
@@ -72,4 +74,3 @@ class RegistrationWorkflow:
                 context,
                 f"Please finish the registration process for this user given the current progress: {user_query}"
             )
-
