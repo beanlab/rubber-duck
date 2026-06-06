@@ -1,16 +1,14 @@
-from __future__ import annotations
-
-import asyncio
 import json
 import random
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict
+from quest import step, task
 import yaml
 
-from ...gen_ai.gen_ai import AIClient, Agent, GenAIException
+from ...gen_ai.gen_ai import AIClient, Agent
 from ...utils.config_types import DebuggingPracticeDuckSettings, DuckContext
 from ...utils.protocols import ConversationComplete
 from .conversation import DebuggingConversation
@@ -178,21 +176,22 @@ class DebuggingPracticeDuckWorkflow:
         self._incorrect_agent = incorrect_subprocess
         self._unrelated_agent = unrelated_subprocess
 
-    async def _run_parsed_completion(
+    @task
+    async def _run_assessor(
             self,
             context: DuckContext,
-            agent: Agent,
-            query: str,
-            output_format: type[BaseModel],
-    ) -> BaseModel:
-        raw_response = await self._ai_client.run_agent(context, agent, query)
-        if raw_response is None:
-            raise GenAIException(
-                ValueError(f"No response returned for {agent.name}"),
-                f"An error occurred while processing query for {agent.name}",
-            )
-        return output_format.model_validate_json(raw_response)
+            priority_key: str,
+            prompt: str,
+    ) -> GeneralAssessor:
+        result = await self._ai_client.run_agent(
+            context,
+            self._assessor_agents[priority_key],
+            prompt,
+            output_format=GeneralAssessor,
+        )
+        return cast(GeneralAssessor, result)
 
+    @step
     async def _run_assessors(
             self,
             context: DuckContext,
@@ -208,15 +207,14 @@ class DebuggingPracticeDuckWorkflow:
         ).strip()
 
         priority_assessments = [
-            self._run_parsed_completion(
+            self._run_assessor(
                 context,
-                self._assessor_agents[priority_key],
+                priority_key,
                 self._assessor_agents[priority_key].prompt.format(
                     output_contract=output_contract,
                     exercise_rubric_item=exercise["rubric_text"],
                     conversation_context=conversation_context,
                 ),
-                GeneralAssessor,
             )
             for priority_key in PRIORITY_ORDER
         ]
@@ -226,27 +224,29 @@ class DebuggingPracticeDuckWorkflow:
             conversation_context=conversation_context,
         )
 
-        *priority_results, unrelated_result = await asyncio.gather(
-            *priority_assessments,
-            self._run_parsed_completion(
-                context,
-                self._assessor_agents["unrelated"],
-                unrelated_prompt,
-                GeneralAssessor,
-            ),
+        unrelated_assessment_task = self._run_assessor(
+            context,
+            "unrelated",
+            unrelated_prompt,
         )
+        priority_results = [
+            await priority_assessment
+            for priority_assessment in priority_assessments
+        ]
+        unrelated_assessment = await unrelated_assessment_task
         priority_status: dict[str, AssessmentStatus] = {
-            priority_key: priority_results[index].status
+            priority_key: cast(GeneralAssessor, priority_results[index]).status
             for index, priority_key in enumerate(PRIORITY_ORDER)
         }
-        if unrelated_result.status == "unrelated":
+        if unrelated_assessment.status == "unrelated":
             priority_status[goal] = "unrelated"
         print(
             f"DEBUG assessor statuses for goal={goal}: "
-            f"priority={priority_status}, unrelated={unrelated_result.status}"
+            f"priority={priority_status}, unrelated={unrelated_assessment.status}"
         )
         return priority_status
 
+    @step
     async def _run_completion_subprocess(
             self,
             context: DuckContext,
@@ -267,13 +267,13 @@ class DebuggingPracticeDuckWorkflow:
             active_priority=priority_key or "none",
             priority_topic=priority_key or "",
         )
-        result = await self._run_parsed_completion(
+        result = await self._ai_client.run_agent(
             context,
             agent,
             rendered_prompt,
-            SubprocessCompletion,
+            output_format=SubprocessCompletion,
         )
-        return result
+        return cast(SubprocessCompletion, result)
 
     def _compose_exercise_context_message(
             self,
@@ -301,6 +301,7 @@ class DebuggingPracticeDuckWorkflow:
             ])
         return "\n\n".join(message_parts)
 
+    @step
     async def _build_incomplete_response_message(
             self,
             context: DuckContext,
@@ -322,6 +323,7 @@ class DebuggingPracticeDuckWorkflow:
         responses = load_debugging_practice_responses()
         return random.choice(responses["retry_incomplete"])
 
+    @step
     async def _build_unrelated_completion_message(
             self,
             context: DuckContext,
@@ -341,6 +343,7 @@ class DebuggingPracticeDuckWorkflow:
         responses = load_debugging_practice_responses()
         return random.choice(responses["retry_fix"])
 
+    @step
     async def _build_incorrect_response_message(
             self,
             context: DuckContext,

@@ -36,6 +36,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .storage.serializer import workflow_serializer
 from .utils.config_loader import load_configuration
 from .utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
     DuckConfig, ToolConfig
@@ -74,7 +75,12 @@ def setup_workflow_manager(
 
     namespace = 'rubber-duck'  # TODO - move to config.
 
-    workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
+    workflow_manager = create_sql_manager(
+        namespace,
+        create_workflow,
+        sql_session,
+        serializer=workflow_serializer,
+    )
 
     return workflow_manager
 

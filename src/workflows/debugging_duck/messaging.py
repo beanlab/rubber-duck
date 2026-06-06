@@ -1,8 +1,8 @@
 from collections.abc import Awaitable, Callable
 
-from ..utils.config_types import DuckContext
-from ..utils.message_utils import wait_for_message
-from ..utils.protocols import ConversationComplete, Message, SendMessage
+from ...utils.config_types import DuckContext
+from ...utils.message_utils import wait_for_message
+from ...utils.protocols import ConversationComplete, Message, SendMessage
 
 
 WaitForMessage = Callable[[int], Awaitable[Message | None]]
