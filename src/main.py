@@ -14,7 +14,10 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
-from .workflows.debugging_practice_duck_workflow import DebuggingPracticeDuckWorkflow
+from .workflows.debugging_duck.rubric_build import build_rubric_state, load_rubric_files
+from .workflows.debugging_duck.debugging_practice_duck_workflow import (
+    DebuggingPracticeDuckWorkflow,
+)
 from .utils.python_exec_container import build_containers, PythonExecContainer
 from .armory.python_tools import PythonTools, DatasetTools
 from .armory.armory import Armory
@@ -34,6 +37,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
+from .storage.serializer import workflow_serializer
 from .utils.config_loader import load_configuration
 from .utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
     DuckConfig, ToolConfig
@@ -72,7 +76,12 @@ def setup_workflow_manager(
 
     namespace = 'rubber-duck'  # TODO - move to config.
 
-    workflow_manager = create_sql_manager(namespace, create_workflow, sql_session)
+    workflow_manager = create_sql_manager(
+        namespace,
+        create_workflow,
+        sql_session,
+        serializer=workflow_serializer,
+    )
 
     return workflow_manager
 
@@ -181,7 +190,12 @@ def build_ducks(
             )
 
         elif duck_type == 'debugging_practice_duck':
-            conversation_review_agent = build_agent(settings["conversation_review_agent"])
+            loaded_rubric = load_rubric_files(settings)
+            rubric = build_rubric_state(loaded_rubric)
+            assessor_agents = {
+                assessor_name: build_agent(assessor_settings)
+                for assessor_name, assessor_settings in settings["assessors"].items()
+            }
             incomplete_subprocess = (
                 build_agent(settings["incomplete_subprocess"])
                 if "incomplete_subprocess" in settings
@@ -192,14 +206,21 @@ def build_ducks(
                 if "incorrect_subprocess" in settings
                 else None
             )
+            unrelated_subprocess = (
+                build_agent(settings["unrelated_subprocess"])
+                if "unrelated_subprocess" in settings
+                else None
+            )
             ducks[name] = DebuggingPracticeDuckWorkflow(
-                name,
-                bot.send_message,
-                settings,
-                conversation_review_agent,
-                ai_client,
-                incomplete_subprocess,
-                incorrect_subprocess,
+                name=name,
+                send_message=bot.send_message,
+                settings=settings,
+                rubric=rubric,
+                ai_client=ai_client,
+                assessor_agents=assessor_agents,
+                incomplete_subprocess=incomplete_subprocess,
+                incorrect_subprocess=incorrect_subprocess,
+                unrelated_subprocess=unrelated_subprocess,
             )
 
         else:

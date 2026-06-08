@@ -23,26 +23,19 @@ next_item:
 retry_fix:
   - That answer does not resolve the current error yet.
   - The proposed fix does not address the traceback yet.
-  - That response needs another pass for this error.
   - The current answer does not fix the issue shown in the traceback.
   - That change does not resolve the problem in the code.
-  - The program still needs a correction for this error.
-  - That answer is not enough to resolve the current traceback.
+  - That answer is not quite enough to resolve the current traceback.
   - Revisit the traceback and try a different fix.
   - The proposed change does not match the issue in the program.
   - This error still needs a fix that addresses it directly.
 retry_incomplete:
   - That response is incomplete. Would you explain that in more detail?
   - I think that answer leaves something out. Is there more you could tell me about that?
-  - That looks incomplete to me. Would you say a bit more?
   - I think there is still missing information there. Could you expand on that?
-  - That answer seems partial. What else would you add?
   - I do not think that quite covers it. Would you explain a little more?
   - That response is close, but incomplete. Is there more you could tell me?
-  - I think you are leaving out a detail. Would you explain that part more fully?
-  - That is not the full picture yet. Could you say a little more?
-  - I think that response needs another detail. Would you expand on it?
-ask_error_meaning:
+concept:
   - What does this {error_type} mean?
   - Before we change the code, what does this {error_type} mean?
   - What is the {error_type} telling us?
@@ -53,29 +46,16 @@ ask_error_meaning:
   - How should we interpret this {error_type}?
   - What does {error_type} mean here?
   - What is the meaning of this {error_type}?
-ask_error_location:
-  - Correct! Where is the error located in the code?
-  - Well done. Where should I look for the line causing this error?
-  - Right, what part of the code is the traceback identifying?
-  - Nice, where in the code does this error show up?
-  - Yes, where in the code should we inspect first?
-  - Good, where does the error appear to happen?
-  - Exactly, what code location is associated with the traceback?
-  - Great, which line looks suspicious here?
-  - Correct, what line is the traceback pointing to?
-  - Good job. Where should we focus in the code?
-ask_intended_behavior:
-  - Correct! What does this line look like it is trying to do?
-  - Well done. What is the code trying to accomplish here?
-  - Right, before changing it, what should this line do?
-  - Nice, what seems to be the intended behavior of this line?
-  - Yes, what result does this line appear to be aiming for?
+location:
+  - Correct! Which part of the code is causing the error?
+  - Well done. Where in the program did this happen?
+  - Exactly, what spot in the code does the traceback point to?
+  - That's right! Where does the traceback say the error happened?
+intent:
+  - Correct! What was the code supposed to do here?
+  - Well done. What should the code do?
   - Good, how would you describe what this code is trying to do?
-  - Exactly, what purpose does this line seem to have?
-  - Great, what should happen when this line runs correctly?
-  - Correct, what is this part of the program meant to do?
-  - Good job. What does the code look like it wants to happen here?
-ask_for_fix:
+fix:
   - Correct! What change needs to be made for that to happen?
   - Well done. What specific code change would make the line work that way?
   - Right, which edit should be made to fix this error?

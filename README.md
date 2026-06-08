@@ -23,7 +23,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `src/gen_ai/`: OpenAI client orchestration + agent execution
 - `src/armory/`: tool registration, Python tool execution, and caching
 - `src/storage/` + `src/metrics/`: SQL persistence and reporting
-- `prompts/`: prompt assets used by configured ducks/agents
+- `src/prompts/`: prompt assets used by configured ducks/agents
 - `archive/prompts/`: legacy and unreferenced prompt assets kept for historical reference
 - `rubrics/`: grading rubrics for assignment feedback workflows
 - `rubrics/examples/`: non-runtime rubric examples and demos
