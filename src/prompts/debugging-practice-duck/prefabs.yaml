@@ -23,20 +23,16 @@ next_item:
 retry_fix:
   - That answer does not resolve the current error yet.
   - The proposed fix does not address the traceback yet.
-  - That response needs another pass for this error.
   - The current answer does not fix the issue shown in the traceback.
   - That change does not resolve the problem in the code.
-  - The program still needs a correction for this error.
-  - That answer is not enough to resolve the current traceback.
+  - That answer is not quite enough to resolve the current traceback.
   - Revisit the traceback and try a different fix.
   - The proposed change does not match the issue in the program.
   - This error still needs a fix that addresses it directly.
 retry_incomplete:
   - That response is incomplete. Would you explain that in more detail?
   - I think that answer leaves something out. Is there more you could tell me about that?
-  - That looks incomplete to me. Would you say a bit more?
   - I think there is still missing information there. Could you expand on that?
-  - That answer seems partial. What else could you add?
   - I do not think that quite covers it. Would you explain a little more?
   - That response is close, but incomplete. Is there more you could tell me?
 concept:

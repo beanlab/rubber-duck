@@ -240,10 +240,6 @@ class DebuggingPracticeDuckWorkflow:
         }
         if unrelated_assessment.status == "unrelated":
             priority_status[goal] = "unrelated"
-        print(
-            f"DEBUG assessor statuses for goal={goal}: "
-            f"priority={priority_status}, unrelated={unrelated_assessment.status}"
-        )
         return priority_status
 
     @step
@@ -317,11 +313,7 @@ class DebuggingPracticeDuckWorkflow:
             priority_key=priority_key,
         )
         response = completion.response.strip()
-        if response:
-            return response
-
-        responses = load_debugging_practice_responses()
-        return random.choice(responses["retry_incomplete"])
+        return response
 
     @step
     async def _build_unrelated_completion_message(
@@ -337,11 +329,7 @@ class DebuggingPracticeDuckWorkflow:
             self._unrelated_agent,
         )
         response = completion.response.strip()
-        if response:
-            return response
-
-        responses = load_debugging_practice_responses()
-        return random.choice(responses["retry_fix"])
+        return response
 
     @step
     async def _build_incorrect_response_message(
@@ -359,13 +347,7 @@ class DebuggingPracticeDuckWorkflow:
             priority_key=priority_key,
         )
         response = completion.response.strip()
-        if response:
-            return response
-
-        responses = load_debugging_practice_responses()
-        return random.choice(responses[priority_key]).format(
-            error_type=exercise["error_type"],
-        )
+        return response
 
     async def __call__(self, context: DuckContext):
         conversation = DebuggingConversation()
