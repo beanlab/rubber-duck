@@ -13,6 +13,7 @@ from ...utils.config_types import DebuggingPracticeDuckSettings, DuckContext
 from ...utils.protocols import ConversationComplete
 from .conversation import DebuggingConversation
 from .messaging import MessageRouting
+from .rubric_build import error_type
 
 
 PRIORITY_ORDER = ["concept", "location", "intent", "fix"]
@@ -41,81 +42,6 @@ def load_debugging_practice_responses() -> dict[str, list[str]]:
         for key, value in responses.items()
         if isinstance(value, list)
     }
-
-
-def load_rubric_files(settings: dict[str, Any]) -> dict[str, Any]:
-    rubric_files = settings["rubric_path"]
-    if isinstance(rubric_files, str):
-        rubric_files = [rubric_files]
-
-    loaded_rubric: dict[str, Any] = {}
-    for rubric_file in rubric_files:
-        file_contents = Path(rubric_file).read_text()
-        if not file_contents.strip():
-            continue
-
-        parsed = yaml.safe_load(file_contents)
-        if parsed:
-            loaded_rubric |= parsed
-
-    return loaded_rubric
-
-
-def build_rubric_state(rubric_data: dict[str, Any]) -> dict[str, Any]:
-    exercises = []
-
-    project_fields = {"full project", "code", "correct code"}
-    exercise_names = [
-        name
-        for name in rubric_data
-        if name not in project_fields
-    ]
-
-    for name in exercise_names:
-        rubric_item = rubric_data[name]
-        traceback = "\n".join(rubric_item["traceback"]).strip()
-        code = rubric_item.get("code")
-
-        if isinstance(code, list):
-            code = "\n".join(str(item).strip()
-                             for item in code if str(item).strip())
-        elif code is None:
-            code = ""
-        else:
-            code = str(code).strip()
-
-        exercise = {
-            "name": str(name),
-            "rubric_text": yaml.safe_dump(
-                {name: rubric_item},
-                sort_keys=False,
-            ).strip(),
-            "traceback": traceback,
-            "error_type": error_type(traceback),
-            "code": code,
-        }
-
-        exercises.append(exercise)
-
-    return {
-        "exercises": exercises,
-        "text": yaml.safe_dump(rubric_data, sort_keys=False).strip(),
-    }
-
-
-def error_type(traceback: str) -> str:
-    for line in reversed(traceback.splitlines()):
-        stripped_line = line.strip()
-        if not stripped_line:
-            continue
-        if ":" in stripped_line:
-            candidate = stripped_line.split(":", 1)[0].strip()
-        else:
-            candidate = stripped_line.split(maxsplit=1)[0].strip()
-        if candidate.endswith("Error") or candidate in {"Exception", "SyntaxError"}:
-            return candidate
-    return "error"
-
 
 def conversation_context_text(conversation: DebuggingConversation) -> str:
     role_map = {
@@ -161,6 +87,7 @@ class DebuggingPracticeDuckWorkflow:
             name: str,
             send_message,
             settings: DebuggingPracticeDuckSettings,
+            rubric: dict[str, Any],
             ai_client: AIClient,
             assessor_agents: dict[str, Agent],
             incomplete_subprocess: Agent | None = None,
@@ -170,6 +97,7 @@ class DebuggingPracticeDuckWorkflow:
         self.name = name
         self._send_message = send_message
         self._settings = settings
+        self._rubric = rubric
         self._assessor_agents = assessor_agents
         self._ai_client = ai_client
         self._incomplete_agent = incomplete_subprocess
@@ -206,6 +134,7 @@ class DebuggingPracticeDuckWorkflow:
             indent=2,
         ).strip()
 
+        #TODO: will need asyncio.gather to gather if it will actually gather them
         priority_assessments = [
             self._run_assessor(
                 context,
@@ -250,12 +179,9 @@ class DebuggingPracticeDuckWorkflow:
             conversation: DebuggingConversation,
             agent: Agent,
             priority_key: str | None = None,
-    ) -> SubprocessCompletion:
+    ) -> str:
         conversation_context = conversation_context_text(conversation)
-        output_contract = json.dumps(
-            SubprocessCompletion.model_json_schema(),
-            indent=2,
-        ).strip()
+        output_contract = json.dumps(SubprocessCompletion.model_json_schema(), indent=2).strip()
         rendered_prompt = agent.prompt.format(
             output_contract=output_contract,
             exercise_rubric_item=exercise["rubric_text"],
@@ -269,7 +195,8 @@ class DebuggingPracticeDuckWorkflow:
             rendered_prompt,
             output_format=SubprocessCompletion,
         )
-        return cast(SubprocessCompletion, result)
+        completion = cast(SubprocessCompletion, result)
+        return completion.response.strip()
 
     def _compose_exercise_context_message(
             self,
@@ -297,70 +224,16 @@ class DebuggingPracticeDuckWorkflow:
             ])
         return "\n\n".join(message_parts)
 
-    @step
-    async def _build_incomplete_response_message(
-            self,
-            context: DuckContext,
-            exercise: dict[str, Any],
-            conversation: DebuggingConversation,
-            priority_key: str,
-    ) -> str:
-        completion = await self._run_completion_subprocess(
-            context,
-            exercise,
-            conversation,
-            self._incomplete_agent,
-            priority_key=priority_key,
-        )
-        response = completion.response.strip()
-        return response
-
-    @step
-    async def _build_unrelated_completion_message(
-            self,
-            context: DuckContext,
-            exercise: dict[str, Any],
-            conversation: DebuggingConversation,
-    ) -> str:
-        completion = await self._run_completion_subprocess(
-            context,
-            exercise,
-            conversation,
-            self._unrelated_agent,
-        )
-        response = completion.response.strip()
-        return response
-
-    @step
-    async def _build_incorrect_response_message(
-            self,
-            context: DuckContext,
-            exercise: dict[str, Any],
-            conversation: DebuggingConversation,
-            priority_key: str,
-    ) -> str:
-        completion = await self._run_completion_subprocess(
-            context,
-            exercise,
-            conversation,
-            self._incorrect_agent,
-            priority_key=priority_key,
-        )
-        response = completion.response.strip()
-        return response
-
     async def __call__(self, context: DuckContext):
         conversation = DebuggingConversation()
         routing = MessageRouting(context, self._send_message)
 
         try:
-            loaded_rubric = load_rubric_files(self._settings)
-            rubric = build_rubric_state(loaded_rubric)
             conversation.append_duck(
                 await routing.send(f"*{self._settings['first_message'].strip()}*"),
             )
 
-            for exercise_index, exercise in enumerate(rubric["exercises"]):
+            for exercise_index, exercise in enumerate(self._rubric["exercises"]):
                 message = self._compose_exercise_context_message(
                     exercise,
                     completed_previous=exercise_index > 0,
@@ -386,28 +259,31 @@ class DebuggingPracticeDuckWorkflow:
                             )
 
                         elif status[goal] == "unrelated":
-                            response = await self._build_unrelated_completion_message(
+                            response = await self._run_completion_subprocess(
                                 context,
                                 exercise,
                                 conversation,
+                                self._unrelated_agent,
                             )
 
                         elif status[goal] == "incomplete" and grace:
                             grace -= 1
-                            response = await self._build_incomplete_response_message(
+                            response = await self._run_completion_subprocess(
                                 context,
                                 exercise,
                                 conversation,
+                                self._incomplete_agent,
                                 goal,
                             )
 
                         elif status[goal] == "incorrect" or (
                             status[goal] == "incomplete" and not grace
                         ):
-                            response = await self._build_incorrect_response_message(
+                            response = await self._run_completion_subprocess(
                                 context,
                                 exercise,
                                 conversation,
+                                self._incorrect_agent,
                                 goal,
                             )
 
@@ -420,7 +296,7 @@ class DebuggingPracticeDuckWorkflow:
 
                         status = await self._run_assessors(
                             context,
-                            rubric,
+                            self._rubric,
                             exercise,
                             conversation,
                             goal,

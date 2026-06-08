@@ -14,6 +14,7 @@ from .utils.protocols import ToolCache, CacheKeyBuilder
 from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .workflows.registration import Registration
 from .workflows.assignment_feedback_workflow import AssignmentFeedbackWorkflow
+from .workflows.debugging_duck.rubric_build import build_rubric_state, load_rubric_files
 from .workflows.debugging_duck.debugging_practice_duck_workflow import (
     DebuggingPracticeDuckWorkflow,
 )
@@ -189,6 +190,8 @@ def build_ducks(
             )
 
         elif duck_type == 'debugging_practice_duck':
+            loaded_rubric = load_rubric_files(settings)
+            rubric = build_rubric_state(loaded_rubric)
             assessor_agents = {
                 assessor_name: build_agent(assessor_settings)
                 for assessor_name, assessor_settings in settings["assessors"].items()
@@ -212,6 +215,7 @@ def build_ducks(
                 name=name,
                 send_message=bot.send_message,
                 settings=settings,
+                rubric=rubric,
                 ai_client=ai_client,
                 assessor_agents=assessor_agents,
                 incomplete_subprocess=incomplete_subprocess,
