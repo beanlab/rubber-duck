@@ -8,7 +8,7 @@ from openai import APITimeoutError, InternalServerError, UnprocessableEntityErro
     BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
 from openai.types.responses import FunctionToolParam, ToolChoiceTypesParam, \
     ToolChoiceFunctionParam, Response, EasyInputMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from quest import step
 
 from ..armory.armory import Armory
@@ -183,7 +183,31 @@ class AIClient:
 
         return result
 
-    async def run_agent(self, ctx: DuckContext, agent: Agent, query: str | None) -> str | None:
+    @staticmethod
+    def _validate_output(
+            agent: Agent,
+            message: str | None,
+            output_format: Type[BaseModel] | None,
+    ) -> str | BaseModel | None:
+        if output_format is None:
+            return message
+
+        try:
+            return output_format.model_validate_json(message)
+        except ValidationError as error:
+            raise GenAIException(
+                error,
+                f"{agent.name} returned invalid structured output, expected {output_format.__name__}",
+            ) from error
+
+    async def run_agent(
+            self,
+            ctx: DuckContext,
+            agent: Agent,
+            query: str | None,
+            *,
+            output_format: Type[BaseModel] | None = None,
+    ) -> str | BaseModel | None:
         initial_history = []
 
         if query is not None:
@@ -196,7 +220,7 @@ class AIClient:
             # This is likely a bug, and at some point we could drop this else block.
             initial_history.append(EasyInputMessage(role='user', content='Hi', type='message').model_dump())
 
-        message, history, _ = await self._run_agent(ctx, agent, initial_history)
+        message, history, _ = await self._run_agent(ctx, agent, initial_history, output_format)
         return message
 
     async def run_conversation(self, ctx: DuckContext, agent: Agent, get_user_message, send_user_message) -> list[
@@ -227,8 +251,9 @@ class AIClient:
 
     @step
     async def _run_agent(self,
-                         ctx: DuckContext, agent: Agent, context: list[HistoryType]
-                         ) -> tuple[str | None, list[HistoryType], bool]:
+                         ctx: DuckContext, agent: Agent, context: list[HistoryType],
+                         output_format: Type[BaseModel] | None = None
+                         ) -> tuple[str | BaseModel | None, list[HistoryType], bool]:
         tools_json = [self._armory.get_tool_schema(tool_name) for tool_name in agent.tools]
         history: list[HistoryType] = []
         try:
@@ -275,7 +300,7 @@ class AIClient:
 
                     elif output['type'] == "message":
                         message = output['content'][0]['text']  # TODO - should we be more intelligent here?
-                        return message, history, False
+                        return self._validate_output(agent, message, output_format), history, False
 
                     elif output['type'] == 'reasoning':
                         pass  # FUTURE - could do something clever with this
@@ -286,6 +311,8 @@ class AIClient:
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
+        except GenAIException:
+            raise
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 

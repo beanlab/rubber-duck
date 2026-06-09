@@ -6,6 +6,7 @@
 
 - `create_sql_session(...)` builds a SQLAlchemy session from config (`env:` values are resolved before connect).
 - `create_sql_manager(...)` builds the quest `WorkflowManager` with SQL-backed blob storage and per-workflow persistent history.
+- `serializer.py` centralizes quest step serializers for workflow-owned Pydantic models that need SQL history round-tripping.
 - `SQLMetricsHandler` creates and writes the `messages`, `usage`, and `feedback` tables and exposes read methods for reporting/exports.
 
 ## Dependencies

@@ -23,7 +23,7 @@ All notable changes in this repository are documented here.
 - Added regression coverage in `tests/test_python_tools_formatting.py` for numeric table formatting and scientific-notation suppression.
 
 ### Changed
-- Updated stats prompts (`prompts/production-prompts/stats.md` and `prompts/production-prompts/cs-stats.md`) to require `describe_dataset` in metadata workflows and tighten output/error handling rules.
+- Updated stats prompts (`src/prompts/production-prompts/stats.md` and `src/prompts/production-prompts/cs-stats.md`) to require `describe_dataset` in metadata workflows and tighten output/error handling rules.
 - Updated `production-config.yaml` so stats ducks include `describe_dataset`; standard stats also includes `conclude_conversation`.
 - Updated `PythonTools` output formatting to normalize scientific notation in stdout/stderr and render numeric tables with trimmed decimal strings and markdown-safe parsing behavior.
 - Updated `PythonExecContainer` runtime setup to configure numpy/pandas float display without scientific notation.
