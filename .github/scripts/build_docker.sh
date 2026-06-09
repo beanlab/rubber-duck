@@ -15,7 +15,6 @@ docker build -t ${IMAGE_NAME}:latest -f - . <<EOF
 FROM python:3.12
 LABEL authors="Gordon Bean"
 COPY src /app/src
-COPY prompts /app/prompts
 COPY datasets /app/datasets
 COPY rubrics /app/rubrics
 ADD pyproject.toml /app/pyproject.toml
