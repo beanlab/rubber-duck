@@ -1,3 +1,4 @@
+import asyncio
 import json
 import random
 from functools import lru_cache
@@ -134,7 +135,6 @@ class DebuggingPracticeDuckWorkflow:
             indent=2,
         ).strip()
 
-        #TODO: will need asyncio.gather to gather if it will actually gather them
         priority_assessments = [
             self._run_assessor(
                 context,
@@ -158,11 +158,10 @@ class DebuggingPracticeDuckWorkflow:
             "unrelated",
             unrelated_prompt,
         )
-        priority_results = [
-            await priority_assessment
-            for priority_assessment in priority_assessments
-        ]
-        unrelated_assessment = await unrelated_assessment_task
+        *priority_results, unrelated_assessment = await asyncio.gather(
+            *priority_assessments,
+            unrelated_assessment_task,
+        )
         priority_status: dict[str, AssessmentStatus] = {
             priority_key: cast(GeneralAssessor, priority_results[index]).status
             for index, priority_key in enumerate(PRIORITY_ORDER)

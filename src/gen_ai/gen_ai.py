@@ -185,7 +185,7 @@ class AIClient:
 
     @staticmethod
     def _validate_output(
-            agent: Agent,
+            agent_name: str,
             message: str | None,
             output_format: Type[BaseModel] | None,
     ) -> str | BaseModel | None:
@@ -197,7 +197,7 @@ class AIClient:
         except ValidationError as error:
             raise GenAIException(
                 error,
-                f"{agent.name} returned invalid structured output, expected {output_format.__name__}",
+                f"{agent_name} returned invalid structured output, expected {output_format.__name__}",
             ) from error
 
     async def run_agent(
@@ -300,7 +300,7 @@ class AIClient:
 
                     elif output['type'] == "message":
                         message = output['content'][0]['text']  # TODO - should we be more intelligent here?
-                        return self._validate_output(agent, message, output_format), history, False
+                        return self._validate_output(agent.name, message, output_format), history, False
 
                     elif output['type'] == 'reasoning':
                         pass  # FUTURE - could do something clever with this
