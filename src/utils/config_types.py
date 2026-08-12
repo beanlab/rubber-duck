@@ -223,3 +223,4 @@ class Config(TypedDict):
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
     reporter_settings: ReporterConfig
     sender_email: str
+    bot_friends: NotRequired[list[int]]

@@ -436,7 +436,7 @@ async def main(config: Config, log_dir: Path):
 async def _main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
-    async with DiscordBot() as bot:
+    async with DiscordBot(bot_friend_ids=set(config.get("bot-friends", []))) as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
             bot.send_message

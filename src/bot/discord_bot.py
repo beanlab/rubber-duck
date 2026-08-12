@@ -70,13 +70,17 @@ def _parse_blocks(text: str, limit=1990):
 
 
 class DiscordBot(discord.Client):
-    def __init__(self):
+    def __init__(self, bot_friend_ids: set[int] | None = None):
         # adding intents module to prevent intents error in __init__ method in newer versions of Discord.py
         intents = discord.Intents.default()  # Select all the intents in your bot settings
         intents.message_content = True
         super().__init__(intents=intents)
         self._rubber_duck = None
         self._admin_channel = None  # Will be set when rubber duck app is set
+        self._bot_friend_ids = bot_friend_ids or set()
+
+    def _is_allowed_bot(self, user_id: int) -> bool:
+        return user_id in self._bot_friend_ids
 
     def set_duck_app(self, rubber_duck, admin_channel_id: int):
         self._rubber_duck = rubber_duck
@@ -114,8 +118,8 @@ class DiscordBot(discord.Client):
         if message.author.id == self.user.id:
             return
 
-        # ignore messages from other bots
-        if message.author.bot:
+        # ignore messages from other bots unless they are allowed bot friends
+        if message.author.bot and not self._is_allowed_bot(message.author.id):
             return
 
         # ignore messages that start with //
@@ -125,8 +129,12 @@ class DiscordBot(discord.Client):
         await self._rubber_duck.route_message(as_message(message))
 
     async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
-        # Ignore messages from the bot or other bots
-        if user.id == self.user.id or user.bot:
+        # Ignore messages from the bot itself
+        if user.id == self.user.id:
+            return
+
+        # ignore reactions from other bots unless they are allowed bot friends
+        if user.bot and not self._is_allowed_bot(user.id):
             return
 
         await self._rubber_duck.route_reaction(reaction.emoji, reaction.message.id, user.id)
