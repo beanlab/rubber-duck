@@ -308,8 +308,8 @@ def _build_cache_key_builder(cache_settings: CacheSettings, tool_name: str) -> C
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
         prompt=Path(prompt).read_text(),
-        model=cache_settings.get("engine", "gpt-5-nano"),
-        reasoning_effort=cache_settings.get("reasoning", "minimal"),
+        model=cache_settings.get("engine", "gpt-5.6-luna"),
+        reasoning_effort=cache_settings.get("reasoning", "none"),
     )
 
 

@@ -8,6 +8,7 @@ state/
 /logs
 /.run/
 /.venv/
+/.cteam
 
 my_config.json
 myConfig.json

@@ -60,8 +60,8 @@ tools:
     cache:
       backend: database
       prompt: src/prompts/production-prompts/stats-cache.md
-      engine: gpt-5-mini
-      reasoning: minimal
+      engine: gpt-5.6-luna
+      reasoning: none
 
   run_cs_analysis:
     type: container_exec
@@ -79,8 +79,8 @@ agents_as_tools:
       name: RegistrationBot
       prompt_files:
         - src/prompts/production-prompts/registration.txt
-      engine: gpt-5-mini
-      reasoning: minimal
+      engine: gpt-5.6-luna
+      reasoning: none
       tools:
         - send_message_to_user
         - receive_message_from_user
@@ -99,7 +99,7 @@ agents_as_tools:
       name: CodeComplexityAgent
       prompt_files:
         - src/prompts/312-project-design/generate-code-complexity.md
-      engine: gpt-4.1
+      engine: gpt-5.6-luna
       tools: []
 
 ducks:
@@ -110,7 +110,7 @@ ducks:
         name: RubberDuck
         prompt_files:
           - src/prompts/production-prompts/standard-rubber-duck.md
-        engine: gpt-5.4-mini
+        engine: gpt-5.6-luna
         reasoning: low
         tools:
           - talk_to_user
@@ -128,7 +128,7 @@ ducks:
         name: stats_duck
         prompt_files:
           - src/prompts/production-prompts/stats.md
-        engine: gpt-5.4-mini
+        engine: gpt-5.6-luna
         reasoning: low
         tools:
           - run_python
@@ -149,7 +149,7 @@ ducks:
         name: cs_stats_duck
         prompt_files:
           - src/prompts/production-prompts/cs-stats.md
-        engine: gpt-5
+        engine: gpt-5.6-luna
         reasoning: medium
         tools:
           - run_cs_analysis
@@ -171,56 +171,56 @@ ducks:
           name: debugging_concept_assessor
           prompt_files:
             - src/prompts/debugging-practice-duck/priority-concept.md
-          engine: gpt-5.4-mini
+          engine: gpt-5.6-luna
           reasoning: low
           tools: []
         location:
           name: debugging_location_assessor
           prompt_files:
             - src/prompts/debugging-practice-duck/priority-location.md
-          engine: gpt-5.4-mini
+          engine: gpt-5.6-luna
           reasoning: low
           tools: []
         intent:
           name: debugging_intent_assessor
           prompt_files:
             - src/prompts/debugging-practice-duck/priority-intent.md
-          engine: gpt-5.4-mini
+          engine: gpt-5.6-luna
           reasoning: low
           tools: []
         fix:
           name: debugging_fix_assessor
           prompt_files:
             - src/prompts/debugging-practice-duck/priority-fix.md
-          engine: gpt-5.4-mini
+          engine: gpt-5.6-luna
           reasoning: low
           tools: []
         unrelated:
           name: debugging_unrelated_assessor
           prompt_files:
             - src/prompts/debugging-practice-duck/priority-unrelated.md
-          engine: gpt-5.4-mini
+          engine: gpt-5.6-luna
           reasoning: low
           tools: []
       incomplete_subprocess:
         name: incomplete_subprocess
         prompt_files:
           - src/prompts/debugging-practice-duck/incomplete-completions.md
-        engine: gpt-5.4-mini
+        engine: gpt-5.6-luna
         reasoning: low
         tools: []
       incorrect_subprocess:
         name: incorrect_subprocess
         prompt_files:
           - src/prompts/debugging-practice-duck/incorrect-completions.md
-        engine: gpt-5.4-mini
+        engine: gpt-5.6-luna
         reasoning: low
         tools: []
       unrelated_subprocess:
         name: unrelated_subprocess
         prompt_files:
           - src/prompts/debugging-practice-duck/unrelated-completions.md
-        engine: gpt-5.4-mini
+        engine: gpt-5.6-luna
         reasoning: low
         tools: []
 
@@ -428,10 +428,10 @@ servers:
               single_rubric_item_grader:
                 # This agent expects a part of a report and a single requirement
                 name: grader
-                engine: gpt-5-mini
+                engine: gpt-5.6-luna
                 prompt_files:
                   - src/prompts/assignment-feedback/tier-grader-structured-output-single.md
-                reasoning: minimal
+                reasoning: none
                 output_format:
                   format:
                     type: json_schema
@@ -455,7 +455,7 @@ servers:
               project_scanner_agent:
                 # This agent gets the desired report and section name(s) from the user based on the report
                 name: project_scanner
-                engine: gpt-5-mini
+                engine: gpt-5.6-luna
                 prompt_files:
                   - src/prompts/assignment-feedback/project-determiner.md
                 output_format:
@@ -472,7 +472,7 @@ servers:
                       required: [ "project_name" ]
                       additionalProperties: false
 
-                reasoning: minimal
+                reasoning: none
       duck-review:
         channel_id: 1442908515147710558
         duck:
@@ -583,7 +583,7 @@ servers:
             settings:
               agent:
                 name: emoji-duck
-                engine: gpt-4.1
+                engine: gpt-5.6-luna
                 prompt_files:
                   - src/prompts/production-prompts/emoji.txt
                 tools: [ ]
@@ -609,8 +609,8 @@ servers:
                   Keep your responses brief and clear. Provide the tool output to the user verbatim.
                 tools:
                   - generate_code_complexity_analysis
-                engine: gpt-5-mini
-                reasoning: minimal
+                engine: gpt-5.6-luna
+                reasoning: none
 
       socratic-duck:
         channel_id: 1379953844540407969
@@ -623,7 +623,7 @@ servers:
                 name: socrates
                 prompt_files:
                   - src/prompts/production-prompts/socratic-duck.txt
-                engine: gpt-4.1
+                engine: gpt-5.6-luna
                 tools: [ ]
               file_size_limit: *file_size_limit
               file_type_ext: *file_type_ext
@@ -656,7 +656,7 @@ servers:
             settings:
               agent:
                 name: PhdDuck
-                engine: gpt-4.1
+                engine: gpt-5.6-luna
                 prompt_files:
                   - src/prompts/312-project-design/phd-duck.txt
                   - src/prompts/312-project-design/convex-hull/project-design-convex-hull.txt
@@ -693,6 +693,7 @@ reporter_settings:
     "gpt-5.4-nano": [0.20, 1.25]
 
     "gpt-5": [ 1.25, 10.00 ]
+    "gpt-5.6-luna": [ 1.00, 6.00 ]
     "gpt-5-mini": [ 0.25, 2.00 ]
     "gpt-5-nano": [ 0.05, 0.40 ]
     "gpt-4.1": [ 2.00, 8.00 ]

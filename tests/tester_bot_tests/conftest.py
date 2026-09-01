@@ -7,25 +7,32 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import select
+
 import pytest
 
 from src.gen_ai.gen_ai import Agent
 from src.utils.config_loader import load_configuration
+from src.storage.sql_connection import create_sql_session
+from src.storage.sql_metrics import UsageModel
 from src.testing.tester_bot_scaffold.assessments import (
     PostConversationAssessment,
     assess_conversation,
 )
+from src.testing.tester_bot_scaffold.model_pricing import calculate_token_cost
 from src.testing.tester_bot_scaffold.testerbot import TesterBot
 
 
 APPLICATION_ROOT = Path(__file__).resolve().parents[2]
 
 DEFAULT_RUBBER_DUCK_CONFIG = (
-    APPLICATION_ROOT / "local-testing-configs/local_christian_config.yaml"
+    Path(__file__).resolve().parent / "tests_config.yaml"
 )
 DISCORD_STARTUP_TIMEOUT = 60
 RUBBER_DUCK_ONLINE_TIMEOUT = 90
 TESTERBOT_DEBOUNCE_SECONDS = 4.0
+TESTERBOT_TOKEN_ENV = "ACTOR_TOKEN"
+TESTERBOT_MODEL = "gpt-5.6-luna"
 
 
 def pytest_addoption(parser):
@@ -63,14 +70,14 @@ def rubber_duck_config(pytestconfig):
 @pytest.fixture(scope="session")
 def duck_channel_id(rubber_duck_config):
     def find_channel_id(duck_name: str) -> int:
-        matches = [
+        matches = {
             channel["channel_id"]
             for server in rubber_duck_config["servers"].values()
             for channel in server["channels"].values()
             if channel.get("duck") == duck_name
             or isinstance(channel.get("duck"), dict)
             and duck_name in channel["duck"]
-        ]
+        }
 
         if len(matches) != 1:
             raise ValueError(
@@ -78,7 +85,7 @@ def duck_channel_id(rubber_duck_config):
                 f"found {len(matches)}."
             )
 
-        return int(matches[0])
+        return int(next(iter(matches)))
 
     return find_channel_id
 
@@ -86,6 +93,117 @@ def duck_channel_id(rubber_duck_config):
 _DISCORD_PROCESSES: list[subprocess.Popen] = []
 _CLEANUP_REGISTERED = False
 _PREVIOUS_SIGNAL_HANDLERS = {}
+
+
+class UsageCollector:
+    def __init__(self):
+        self.rows = []
+
+    async def record_usage(
+        self,
+        guild_id,
+        parent_channel_id,
+        thread_id,
+        user_id,
+        model,
+        input_tokens,
+        output_tokens,
+        cached_tokens=0,
+        reasoning_tokens=0,
+    ):
+        self.rows.append({
+            "guild_id": guild_id,
+            "parent_channel_id": parent_channel_id,
+            "thread_id": thread_id,
+            "user_id": user_id,
+            "model": model,
+            "input_tokens": int(input_tokens or 0),
+            "output_tokens": int(output_tokens or 0),
+            "cached_tokens": int(cached_tokens or 0),
+            "reasoning_tokens": int(reasoning_tokens or 0),
+        })
+
+
+def _usage_summary(rows):
+    summary = {
+        "calls": len(rows),
+        "input_tokens": sum(row["input_tokens"] for row in rows),
+        "output_tokens": sum(row["output_tokens"] for row in rows),
+        "cached_tokens": sum(row["cached_tokens"] for row in rows),
+        "reasoning_tokens": sum(row["reasoning_tokens"] for row in rows),
+        "cost_usd": 0,
+    }
+    for row in rows:
+        summary["cost_usd"] += calculate_token_cost(
+            row["model"],
+            row["input_tokens"],
+            row["output_tokens"],
+            row["cached_tokens"],
+        ).total
+    return summary
+
+
+def conversation_cost_report(testerbot, rubber_duck_config):
+    if testerbot.last_context is None:
+        raise RuntimeError("TesterBot did not create a DuckContext.")
+
+    thread_id = testerbot.last_context.thread_id
+    tester_rows = [
+        row for row in testerbot.usage_collector.rows
+        if row["thread_id"] == thread_id
+    ]
+
+    sql_config = dict(rubber_duck_config["sql"])
+    database_path = Path(sql_config["database"])
+    if not database_path.is_absolute():
+        database_path = APPLICATION_ROOT / database_path
+    sql_config["database"] = str(database_path)
+
+    session = create_sql_session(sql_config)
+    try:
+        duck_rows = [
+            {
+                "thread_id": row.thread_id,
+                "model": row.engine,
+                "input_tokens": int(row.input_tokens or 0),
+                "output_tokens": int(row.output_tokens or 0),
+                "cached_tokens": int(row.cached_tokens or 0),
+                "reasoning_tokens": int(row.reasoning_tokens or 0),
+            }
+            for row in session.scalars(
+                select(UsageModel).where(UsageModel.thread_id == thread_id)
+            )
+        ]
+    finally:
+        session.close()
+
+    tester_summary = _usage_summary(tester_rows)
+    duck_summary = _usage_summary(duck_rows)
+    total = _usage_summary(tester_rows + duck_rows)
+    report = {
+        "tester_bot": tester_summary,
+        "rubber_duck": duck_summary,
+        "total": total,
+    }
+    print(f"\nConversation usage (thread {thread_id})")
+    print(
+        f"  tester bot: tokens={tester_summary['input_tokens'] + tester_summary['output_tokens']} "
+        f"(input={tester_summary['input_tokens']}, "
+        f"output={tester_summary['output_tokens']}), "
+        f"cost=${tester_summary['cost_usd']:.6f}"
+    )
+    print(
+        f"  rubber duck: tokens={duck_summary['input_tokens'] + duck_summary['output_tokens']} "
+        f"(input={duck_summary['input_tokens']}, "
+        f"output={duck_summary['output_tokens']}), "
+        f"cost=${duck_summary['cost_usd']:.6f}"
+    )
+    print(
+        f"  total: tokens={total['input_tokens'] + total['output_tokens']} "
+        f"(input={total['input_tokens']}, output={total['output_tokens']}), "
+        f"cost=${total['cost_usd']:.6f}"
+    )
+    return report
 
 
 def terminate_discord_process(process: subprocess.Popen) -> None:
@@ -160,7 +278,7 @@ async def rubber_duck_run(pytestconfig, rubber_duck_config):
 
     require_env("DISCORD_TOKEN")
     require_env("OPENAI_API_KEY")
-    actor_token = require_env("ACTOR_TOKEN")
+    actor_token = require_env(TESTERBOT_TOKEN_ENV)
     rubber_duck_config_path = get_rubber_duck_config_path(pytestconfig)
     admin_channel_id = int(rubber_duck_config["admin_settings"]["admin_channel_id"])
 
@@ -243,10 +361,16 @@ async def rubber_duck_run(pytestconfig, rubber_duck_config):
             unregister_discord_process_cleanup(process)
 
 
+@pytest.fixture
+def report_conversation_cost(rubber_duck_config):
+    return lambda testerbot: conversation_cost_report(testerbot, rubber_duck_config)
+
+
 @pytest.fixture(scope="session")
 async def testerbot(rubber_duck_run, rubber_duck_config):
-    token = require_env("ACTOR_TOKEN")
+    token = require_env(TESTERBOT_TOKEN_ENV)
     admin_channel_id = int(rubber_duck_config["admin_settings"]["admin_channel_id"])
+    usage_collector = UsageCollector()
 
     bot = TesterBot(
         admin_channel_id=admin_channel_id,
@@ -254,11 +378,13 @@ async def testerbot(rubber_duck_run, rubber_duck_config):
         agent=Agent(
             name="TestBot",
             prompt="",
-            model="gpt-5.4-nano",
+            model=TESTERBOT_MODEL,
             tools=[],
             reasoning="low",
         ),
+        record_usage=usage_collector.record_usage,
     )
+    bot.usage_collector = usage_collector
 
     async with bot:
         bot_task = asyncio.create_task(bot.start(token))

@@ -9,7 +9,7 @@ The student first asks what datasets are available. After the chatbot responds w
 You have one full-process case to test:
     Stats Case 1:
         - Ask what datasets are available.
-        - After the available datasets are listed, ask for the first 10 lines of one available dataset.
+        - After the available datasets are listed, ask for the first 10 lines of the car price data set.
         - After the first 10 lines are shown, identify two variables available in that dataset and ask for a chi-square test of association between them.
         - After the chi-square test results are provided, send exactly: quit
         - After the chatbot informs you that the conversation is closed, thank it briefly.

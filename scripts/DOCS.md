@@ -73,7 +73,7 @@ Generate metadata for one CSV (skip if metadata already exists):
 python scripts/generate_metadata.py \
   --s3-uri s3://byu-cms-metrics/cs-merged-dashboard.csv \
   --mode create \
-  --model gpt-5-mini
+  --model gpt-5.6-luna
 ```
 
 Dry run for one CSV (recommended first):
@@ -83,7 +83,7 @@ python scripts/generate_metadata.py \
   --s3-uri s3://byu-cms-metrics/cs-merged-dashboard.csv \
   --mode overwrite \
   --dry-run \
-  --model gpt-5-mini
+  --model gpt-5.6-luna
 ```
 
 Generate for an entire prefix:
@@ -92,13 +92,13 @@ Generate for an entire prefix:
 python scripts/generate_metadata.py \
   --s3-uri s3://byu-cms-metrics/ \
   --mode create \
-  --model gpt-5-mini
+  --model gpt-5.6-luna
 ```
 
 Run default legacy behavior:
 
 ```bash
-python scripts/generate_metadata.py --model gpt-5-mini
+python scripts/generate_metadata.py --model gpt-5.6-luna
 ```
 
 ### Output Contract

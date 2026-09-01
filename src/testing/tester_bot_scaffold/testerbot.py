@@ -30,6 +30,7 @@ class TesterBot(discord.Client):
         agent: Agent,
         target_channel_id: int | None = None,
         ai_client: AIClient | None = None,
+        record_usage=None,
     ):
         intents = discord.Intents.default()
         intents.message_content = True
@@ -45,7 +46,7 @@ class TesterBot(discord.Client):
             Armory(self._send_message_for_ai_client),
             self.discord_io.typing,
             record_message_noop,
-            record_usage_noop,
+            record_usage or record_usage_noop,
             {"max_retries": 3, "delay": 1, "backoff": 2},
             self._send_message_for_ai_client,
         )

@@ -1,12 +1,11 @@
-import csv
-import os
-from datetime import datetime, timezone
+import asyncio
+import json
+import re
 from pathlib import Path
 
 from openai.lib._parsing._responses import type_to_text_format_param
 
 from ...gen_ai.gen_ai import Agent, AIClient
-from .model_pricing import calculate_token_cost
 from ...storage.assessment_models import (
     PostConversationAssessment,
     ProgressAssessment,
@@ -14,7 +13,66 @@ from ...storage.assessment_models import (
 from ...utils.config_types import DuckContext, HistoryType
 
 
-ASSESSOR_COSTS_FILENAME = "assessor_costs.csv"
+_ASSESSOR_MARKER_RE = re.compile(r"\{\{\s*(/?)assessor\s*\}\}")
+
+
+def split_assessor_prompt(prompt: str, *, battery: bool = False) -> list[str]:
+    """Split or normalize a prompt containing assessor blocks.
+
+    Text outside ``{{assessor}}``/``{{/assessor}}`` blocks is shared by every
+    generated prompt. When ``battery`` is false, the markers are removed and
+    all prompt content is returned as one prompt.
+    """
+    parts: list[tuple[str, str]] = []
+    cursor = 0
+    open_block = False
+    item_parts: list[str] = []
+
+    for match in _ASSESSOR_MARKER_RE.finditer(prompt):
+        text = prompt[cursor:match.start()]
+        is_close = bool(match.group(1))
+
+        if is_close:
+            if not open_block:
+                raise ValueError("Found {{/assessor}} without {{assessor}}.")
+            item_parts.append(text)
+            parts.append(("item", "".join(item_parts)))
+            item_parts = []
+            open_block = False
+        else:
+            if open_block:
+                raise ValueError("Nested {{assessor}} blocks are not supported.")
+            parts.append(("shared", text))
+            open_block = True
+
+        cursor = match.end()
+
+    if open_block:
+        raise ValueError("Unclosed {{assessor}} block.")
+
+    if not parts:
+        return [prompt]
+
+    parts.append(("shared", prompt[cursor:]))
+    if not battery:
+        return ["".join(text for _, text in parts)]
+
+    item_count = sum(kind == "item" for kind, _ in parts)
+    prompts = []
+    for item_index in range(item_count):
+        item_number = 0
+        prompt_parts = []
+        for kind, text in parts:
+            if kind == "shared":
+                prompt_parts.append(text)
+            elif item_number == item_index:
+                prompt_parts.append(text)
+                item_number += 1
+            else:
+                item_number += 1
+        prompts.append("".join(prompt_parts))
+
+    return prompts
 
 
 def make_agents(source: str | list[str | Path], model: str) -> list[Agent]:
@@ -48,6 +106,10 @@ def format_history_for_assessor(history: list[HistoryType]) -> str:
             continue
 
         role = str(item.get("role", "")).lower() or "unknown"
+        role = {
+            "user": "duck",
+            "assistant": "tester",
+        }.get(role, role)
         lines.append(f"{role}: {content}")
 
     return "\n\n".join(lines)
@@ -75,61 +137,47 @@ async def _request_assessment(
     )
 
 
-def _make_usage_row(
-    response,
-    assessor: Agent,
+async def assess_prompt(
     *,
-    timestamp: str,
-    set_id: str,
-    call_number: int,
-) -> dict[str, object]:
-    usage = response.usage
-    input_tokens = getattr(usage, "input_tokens", 0) or 0
-    output_tokens = getattr(usage, "output_tokens", 0) or 0
-    cached_tokens = (
-        getattr(
-            getattr(usage, "input_tokens_details", None),
-            "cached_tokens",
-            0,
+    ai_client: AIClient,
+    history: list[HistoryType],
+    prompt: str,
+    model: str,
+    ctx: DuckContext | None = None,
+    name: str = "assessor",
+    reasoning: str | None = None,
+    battery: bool = False,
+) -> list[PostConversationAssessment]:
+    """Assess a conversation with one prompt or a marked assessor battery."""
+    prompt_parts = split_assessor_prompt(prompt, battery=battery)
+    output_contract = json.dumps(
+        PostConversationAssessment.model_json_schema(),
+        indent=2,
+    )
+    assessors = [
+        Agent(
+            name=f"{name}_{index}",
+            prompt=prompt_part.replace("{{output_contract}}", output_contract),
+            model=model,
+            tools=[],
+            reasoning=reasoning,
         )
-        or 0
-    )
-    reasoning_tokens = (
-        getattr(
-            getattr(usage, "output_tokens_details", None),
-            "reasoning_tokens",
-            0,
+        for index, prompt_part in enumerate(prompt_parts, start=1)
+    ]
+
+    return list(
+        await asyncio.gather(
+            *(
+                assess_conversation(
+                    ai_client=ai_client,
+                    history=history,
+                    assessor=assessor,
+                    ctx=ctx,
+                )
+                for assessor in assessors
+            )
         )
-        or 0
     )
-    cost = calculate_token_cost(
-        assessor.model,
-        input_tokens,
-        output_tokens,
-        cached_tokens,
-    )
-
-    return {
-        "timestamp": timestamp,
-        "set_id": set_id,
-        "call_number": call_number,
-        "assessor_name": assessor.name,
-        "model": assessor.model,
-        "input_tokens": input_tokens,
-        "cached_tokens": cached_tokens,
-        "output_tokens": output_tokens,
-        "reasoning_tokens": reasoning_tokens,
-        "input_cost_usd": cost.input_cost,
-        "output_cost_usd": cost.output_cost,
-        "total_cost_usd": cost.total,
-    }
-
-
-def _run_metadata() -> tuple[str, str]:
-    timestamp = datetime.now(timezone.utc).isoformat()
-    current_test = os.getenv("PYTEST_CURRENT_TEST", "").split(" ", 1)[0]
-    set_id = current_test.rsplit("::", 1)[-1] if current_test else timestamp
-    return timestamp, set_id
 
 
 async def assess_conversation(
@@ -138,8 +186,6 @@ async def assess_conversation(
     history: list[HistoryType],
     assessor: Agent,
     ctx: DuckContext | None = None,
-    output_directory: str | Path | None = None,
-    close_group: bool = True,
 ) -> PostConversationAssessment:
     formatted_history = format_history_for_assessor(history)
 
@@ -152,66 +198,8 @@ async def assess_conversation(
         )
         return assessment
 
-    usage_rows = []
-    timestamp, set_id = _run_metadata()
-    try:
-        response = await _request_assessment(ai_client, assessor, formatted_history)
-        usage_rows.append(
-            _make_usage_row(
-                response,
-                assessor,
-                timestamp=timestamp,
-                set_id=set_id,
-                call_number=1,
-            )
-        )
-        return PostConversationAssessment.model_validate_json(response.output_text)
-    finally:
-        if output_directory is not None:
-            _append_usage(
-                output_directory,
-                usage_rows,
-                close_group=close_group,
-            )
-
-
-def _append_usage(
-    output_directory: str | Path,
-    usage_rows: list[dict[str, object]],
-    *,
-    close_group: bool = True,
-) -> None:
-    if not usage_rows:
-        return
-
-    output_path = Path(output_directory) / ASSESSOR_COSTS_FILENAME
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    has_content = output_path.exists() and output_path.stat().st_size > 0
-
-    with output_path.open("a", encoding="utf-8", newline="") as output_file:
-        writer = csv.DictWriter(
-            output_file,
-            fieldnames=usage_rows[0].keys(),
-        )
-        if not has_content:
-            writer.writeheader()
-
-        writer.writerows(usage_rows)
-        if close_group:
-            writer.writerow({})
-
-
-def append_test_status(
-    output_directory: str | Path,
-    status: str,
-) -> None:
-    if status not in {"pass", "fail"}:
-        raise ValueError(f"Unsupported test status: {status}")
-
-    output_path = Path(output_directory) / ASSESSOR_COSTS_FILENAME
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("a", encoding="utf-8", newline="") as output_file:
-        output_file.write(f"===prev_{status}===\n\n")
+    response = await _request_assessment(ai_client, assessor, formatted_history)
+    return PostConversationAssessment.model_validate_json(response.output_text)
 
 
 async def assess_conversations(
@@ -219,42 +207,19 @@ async def assess_conversations(
     ai_client: AIClient,
     history: list[HistoryType],
     assessors: list[Agent],
-    output_directory: str | Path,
-    close_group: bool = True,
+    ctx: DuckContext | None = None,
 ) -> list[PostConversationAssessment]:
-    formatted_history = format_history_for_assessor(history)
-    assessments = []
-    usage_rows = []
-    timestamp, set_id = _run_metadata()
-
-    try:
-        for call_number, assessor in enumerate(assessors, start=1):
-            response = await _request_assessment(
-                ai_client,
-                assessor,
-                formatted_history,
-            )
-
-            usage_rows.append(
-                _make_usage_row(
-                    response,
-                    assessor,
-                    timestamp=timestamp,
-                    set_id=set_id,
-                    call_number=call_number,
+    """Run multiple assessors concurrently and return their results."""
+    return list(
+        await asyncio.gather(
+            *(
+                assess_conversation(
+                    ai_client=ai_client,
+                    history=history,
+                    assessor=assessor,
+                    ctx=ctx,
                 )
+                for assessor in assessors
             )
-
-            assessments.append(
-                PostConversationAssessment.model_validate_json(
-                    response.output_text
-                )
-            )
-    finally:
-        _append_usage(
-            output_directory,
-            usage_rows,
-            close_group=close_group,
         )
-
-    return assessments
+    )
