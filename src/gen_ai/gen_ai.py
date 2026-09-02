@@ -274,6 +274,8 @@ class AIClient:
                         output['role'], str(output['content'])  # <-- what should output store for each type of output
                     )
 
+                response_complete = False
+                conversation_complete = False
                 for output in outputs:
                     if output['type'] == "function_call":
                         tool_name = output["name"]
@@ -282,31 +284,35 @@ class AIClient:
                         tool = self._armory.get_specific_tool(tool_name)
 
                         try:
-                            result, response_complete = await self._run_tool(tool, ctx, tool_args)
-                            function_item = format_function_call_history_items(result, output)
-                            await self._record_message(
-                                ctx.guild_id, ctx.thread_id, ctx.author_id,
-                                "function_call_output", str(function_item)
-                            )
-
-                            history.append(function_item)
-
-                            if response_complete:
-                                return None, history, False
-                            continue
+                            result, suggest_response_complete = await self._run_tool(tool, ctx, tool_args)
+                            response_complete |= suggest_response_complete
 
                         except ConversationComplete:
-                            return None, history, True
+                            response_complete = True
+                            conversation_complete = True
+                            result = None
+
+                        function_item = format_function_call_history_items(result, output)
+                        await self._record_message(
+                            ctx.guild_id, ctx.thread_id, ctx.author_id,
+                            "function_call_output", str(function_item)
+                        )
+                        history.append(function_item)
 
                     elif output['type'] == "message":
+                        # We're assuming that the model never returns
+                        # a "message" and a "function_call" in the same response
                         message = output['content'][0]['text']  # TODO - should we be more intelligent here?
-                        return self._validate_output(agent.name, message, output_format), history, False
+                        return self._validate_output(agent.name, message, output_format), history, conversation_complete
 
                     elif output['type'] == 'reasoning':
                         pass  # FUTURE - could do something clever with this
 
                     else:
                         raise NotImplementedError(f"Unknown response type: {output['type']}")
+
+                if response_complete:
+                    return None, history, conversation_complete
 
         except (APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
                 BadRequestError, AuthenticationError, ConflictError, NotFoundError, RateLimitError) as e:

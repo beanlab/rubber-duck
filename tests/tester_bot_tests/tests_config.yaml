@@ -1,0 +1,204 @@
+sql:
+  db_type: sqlite
+  database: tests/tester_bot_tests/tester_bot_tests.db
+
+containers:
+  cs-python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    settings:
+      working_dir: /home/sandbox/out
+    resources:
+      - source: datasets/carprice.csv
+        target: /home/sandbox/datasets/
+
+  stats-python-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    settings:
+      timeout: 10
+      working_dir: /home/sandbox/out
+      network_mode: none
+      memory: 1g
+      memory_swap: 1g
+      cpus: 1
+      pids_limit: 128
+      read_only_root: false
+    resources:
+      - source: datasets/
+        target: /home/sandbox/datasets/
+
+tools:
+  run_cs_analysis:
+    type: container_exec
+    container: cs-python-sandbox
+  run_python:
+    type: container_exec
+    container: stats-python-sandbox
+    cache:
+      backend: database
+      prompt: src/prompts/production-prompts/stats-cache.md
+      engine: gpt-5.6-luna
+      reasoning: none
+
+ducks:
+  standard-rubber-duck:
+    duck_type: agent_led_conversation
+    settings:
+      agent:
+        name: RubberDuck
+        prompt_files:
+          - src/prompts/production-prompts/standard-rubber-duck.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools:
+          - talk_to_user
+          - conclude_conversation
+  
+  stats-duck:
+    duck_type: user_led_conversation
+    settings:
+      introduction: >
+        I can perform many statistical operations on a list of provided datasets. 
+        If you want more specifics, please ask. How can I help you with stats?
+      agent:
+        name: stats_duck
+        prompt_files:
+          - src/prompts/production-prompts/stats.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools:
+          - run_python
+          - describe_dataset
+          - send_datasets_to_user
+          - conclude_conversation
+  
+  cs-stats-duck:
+    duck_type: user_led_conversation
+    settings:
+      introduction: >
+        I can answer questions about CS grades and enrollment trends. 
+        If you want more specifics, please ask. 
+        What can I do for you today?
+      agent:
+        name: cs_stats_duck
+        prompt_files:
+          - src/prompts/production-prompts/cs-stats.md
+        engine: gpt-5.6-luna
+        reasoning: medium
+        tools:
+          - run_cs_analysis
+          - describe_dataset
+          - conclude_conversation
+
+  debugging-practice-duck:
+    duck_type: debugging_practice_duck
+    settings:
+      rubric_path: rubrics/CS110/3b-rubric.yaml
+      first_message: |
+        The debugging practice duck is an exercise intended to strengthen your ability to correct code errors.
+        The duck will present both code that has mistakes and the traceback error from running the code.
+        Identify what the traceback error means, what part of the code is causing the issue, what the code should do, and how it should be fixed.
+      feedback_message: |
+        *The debugging practice duck is an experimental feature that is actively being developed.
+        Please leave feedback below as to your experience using the duck.*
+      review_turns: full
+      assessors:
+        concept:
+          name: debugging_concept_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-concept.md
+          engine: gpt-5.6-luna
+          reasoning: low
+          tools: []
+        location:
+          name: debugging_location_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-location.md
+          engine: gpt-5.6-luna
+          reasoning: low
+          tools: []
+        intent:
+          name: debugging_intent_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-intent.md
+          engine: gpt-5.6-luna
+          reasoning: low
+          tools: []
+        fix:
+          name: debugging_fix_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-fix.md
+          engine: gpt-5.6-luna
+          reasoning: low
+          tools: []
+        unrelated:
+          name: debugging_unrelated_assessor
+          prompt_files:
+            - src/prompts/debugging-practice-duck/priority-unrelated.md
+          engine: gpt-5.6-luna
+          reasoning: low
+          tools: []
+      incomplete_subprocess:
+        name: incomplete_subprocess
+        prompt_files:
+          - src/prompts/debugging-practice-duck/incomplete-completions.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools: []
+      incorrect_subprocess:
+        name: incorrect_subprocess
+        prompt_files:
+          - src/prompts/debugging-practice-duck/incorrect-completions.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools: []
+      unrelated_subprocess:
+        name: unrelated_subprocess
+        prompt_files:
+          - src/prompts/debugging-practice-duck/unrelated-completions.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools: []
+        
+servers:
+  BeanLab:
+    server_id: 1058490579799003187
+    channels:
+      Rubber Duck E2E Tests/standard-duck:
+        channel_id: 1539679841203523646
+        timeout: 300
+        duck: standard-rubber-duck
+      Rubber Duck E2E Tests/gen-stats-duck:
+        channel_id: 1539679945553608704
+        timeout: 300
+        duck: stats-duck
+      Rubber Duck E2E Tests/cs-stats-duck:
+        channel_id: 1539679975525851136
+        timeout: 100
+        duck: cs-stats-duck
+      Rubber Duck E2E Tests/debugging-practice-duck:
+        channel_id: 1539680017599172710
+        timeout: 300
+        duck: debugging-practice-duck
+
+agents_as_tools:
+  $include: "../../production-config.yaml@$.agents_as_tools"
+
+sender_email:
+  $include: "../../production-config.yaml@$.sender_email"
+
+admin_settings:
+  $include: "../../production-config.yaml@$.admin_settings"
+  admin_channel_id: 1539679775868715039
+  admin_role_id: 1496960115193155754
+
+bot-friends:
+  - 1537230570688487454
+
+ai_completion_retry_protocol:
+  $include: "../../production-config.yaml@$.ai_completion_retry_protocol"
+
+reporter_settings:
+  $include: "../../production-config.yaml@$.reporter_settings"
+
+cache_cleanup_settings:
+  $include: "../../production-config.yaml@$.cache_cleanup_settings"

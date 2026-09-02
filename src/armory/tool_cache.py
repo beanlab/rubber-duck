@@ -392,8 +392,8 @@ class SemanticCacheKeyBuilder:
             self,
             client: OpenAI,
             prompt: str,
-            model: str = "gpt-5-mini",
-            reasoning_effort: str = "minimal"
+            model: str = "gpt-5.6-luna",
+            reasoning_effort: str = "none"
     ):
         self._client = client
         self._prompt = prompt

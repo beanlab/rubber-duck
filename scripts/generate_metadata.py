@@ -24,7 +24,7 @@ from src.utils.logger import duck_logger, add_console_handler
 # Environment variables required:
 # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, OPENAI_API_KEY
 
-MODEL = "gpt-4.1-mini"
+MODEL = "gpt-5.6-luna"
 MAX_CATEGORIES = 3  # Maximum unique categorical values to list before using "etc."
 
 duck_logger.debug("Initializing OpenAI client...")
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--model',
         default=MODEL,
-        help='OpenAI model to use for metadata refinement (default: gpt-4.1-mini)'
+        help='OpenAI model to use for metadata refinement (default: gpt-5.6-luna)'
     )
     args = parser.parse_args()
 

@@ -15,7 +15,7 @@ override-duck:
     $include: "production-config.yaml@$.ducks.standard-rubber-duck"
     settings:
       agent:
-        engine: gpt-5-nano
+        engine: gpt-5.6-luna
 
 # include all ducks with example override
 all-ducks:
@@ -23,7 +23,7 @@ all-ducks:
   standard-rubber-duck:
     settings:
       agent:
-        engine: gpt-5-nano
+        engine: gpt-5.6-luna
 
 # include multiple specific ducks
 multiple-ducks:

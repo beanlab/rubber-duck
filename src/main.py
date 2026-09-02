@@ -308,8 +308,8 @@ def _build_cache_key_builder(cache_settings: CacheSettings, tool_name: str) -> C
     return SemanticCacheKeyBuilder(
         client=OpenAI(),
         prompt=Path(prompt).read_text(),
-        model=cache_settings.get("engine", "gpt-5-nano"),
-        reasoning_effort=cache_settings.get("reasoning", "minimal"),
+        model=cache_settings.get("engine", "gpt-5.6-luna"),
+        reasoning_effort=cache_settings.get("reasoning", "none"),
     )
 
 
@@ -436,7 +436,7 @@ async def main(config: Config, log_dir: Path):
 async def _main(config: Config, log_dir: Path):
     sql_session = create_sql_session(config['sql'])
 
-    async with DiscordBot() as bot:
+    async with DiscordBot(bot_friend_ids=set(config.get("bot-friends", []))) as bot:
         setup_thread = SetupPrivateThread(
             bot.create_thread,
             bot.send_message
