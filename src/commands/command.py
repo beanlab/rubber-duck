@@ -11,6 +11,7 @@ import pytz
 from quest import step
 from quest.manager import find_workflow_manager
 
+from ..utils import load_logging
 from ..utils.logger import duck_logger
 from ..utils.protocols import Message, ToolCache
 from ..utils.zip_utils import zip_data_file
@@ -217,6 +218,30 @@ class LogCommand(Command):
 
         finally:
             zip_buffer.close()
+
+
+class LoadCommand(Command):
+    name = "!load"
+    help_msg = "get the in-memory load diagnostics"
+
+    def __init__(self, send_message):
+        self.send_message = send_message
+
+    @step
+    async def execute(self, message: Message):
+        log_text = load_logging.get_log_text()
+        if not log_text:
+            await self.send_message(message['channel_id'], 'No load diagnostics recorded.')
+            return
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.writestr('load.log', log_text)
+        zip_buffer.seek(0)
+
+        filename = f"load_{datetime.now().strftime('%Y_%m_%d_%H_%M')}.zip"
+        await self.send_message(message['channel_id'], file=discord.File(zip_buffer, filename=filename))
+        zip_buffer.close()
 
 
 class ActiveWorkflowsCommand(Command):
@@ -520,6 +545,7 @@ def create_commands(send_message, metrics_handler, reporter, log_dir, tool_cache
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
         LogCommand(send_message, log_dir),
+        LoadCommand(send_message),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics),
         CacheCommand(send_message, tool_caches),
     ]
