@@ -1,5 +1,7 @@
 from quest import WorkflowManager
+from time import monotonic
 
+from .utils import load_logging
 from .utils.config_types import ChannelConfig
 from .utils.logger import duck_logger
 from .utils.protocols import Message
@@ -24,12 +26,19 @@ class RubberDuckApp:
         if message['channel_id'] in self._channel_configs:
             # Call DuckOrchestrator
             workflow_id = f'duck-{message["channel_id"]}-{message["message_id"]}'
+            received_at = monotonic()
+            load_logging.workflow_received(
+                workflow_id,
+                message['message_id'],
+                message['channel_id'],
+            )
             self._workflow_manager.start_workflow(
                 'duck-orchestrator',
                 workflow_id,
                 self._channel_configs[message['channel_id']],
                 message
             )
+            load_logging.workflow_started(workflow_id, received_at)
             return
 
         # Belongs to an existing conversation
