@@ -5,7 +5,7 @@ import os
 import tarfile
 import uuid
 from textwrap import dedent, indent
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 import docker
 from docker.errors import NotFound

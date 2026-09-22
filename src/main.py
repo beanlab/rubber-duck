@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from openai import OpenAI
+from dotenv import load_dotenv
 from quest import these
 from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
@@ -518,6 +519,8 @@ async def _main(config: Config, log_dir: Path):
 
 
 if __name__ == '__main__':
+    load_dotenv()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
