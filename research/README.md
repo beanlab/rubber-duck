@@ -2,6 +2,13 @@
 
 Research snapshot: 2026-09-22. This index separates peer-reviewed evidence from preprints, official guidance, vendor practice, and implementation examples. “Strong” means peer-reviewed work, a controlled study, or an authoritative standard/guidance document; “preliminary” means a preprint or early benchmark whose claims still need independent replication; “practice” means official engineering guidance or repository documentation, useful as design evidence but not proof of effectiveness.
 
+## Current design documents
+
+- [Current system and experimental design](current-system-evaluation-design.md) maps the Rubber Duck runtime, evaluation layers, current tests, and staged experiments.
+- [Prompt evaluator experimental design](prompt-evaluator-design.md) defines the response-level evaluator, historical-conversation seed process, semantic-grader validation, and path to multi-turn evaluation.
+- [Prompt evaluator specification](prompt-evaluator-specification.md) defines the capability, evidence, boundaries, and acceptance criteria that an experimental implementation must satisfy.
+- [Prompt evaluator adversarial review](prompt-evaluator-adversarial-review.md) records attacks against the specification, historical-data and refactor audits, corrections, and remaining blockers.
+
 ## Working definition
 
 **Agent Evaluation is the systematic collection of reproducible evidence about whether an AI system—model, prompts, tools, orchestration, state, environment, and human interaction together—satisfies specified constraints and how well it achieves its intended purpose over representative and adversarial situations.** It combines deterministic checks of properties that have executable or formal oracles with empirical estimates for stochastic, semantic, human, and contextual qualities; reports uncertainty, variation, costs, and failure slices; and continues after deployment because the system and its operating distribution change. This definition synthesizes the system-level view in [Anthropic’s agent-evaluation guidance](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents), multi-metric evaluation in [HELM](https://arxiv.org/abs/2211.09110), and NIST’s lifecycle-oriented [AI RMF](https://www.nist.gov/itl/ai-risk-management-framework) and [TEVV terminology draft](https://www.nist.gov/document/outline-proposed-zero-draft-standard-ai-testing-evaluation-verification-and-validation).

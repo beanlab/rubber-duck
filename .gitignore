@@ -29,3 +29,4 @@ nic2.yaml
 *.env
 .codex
 /research/papers/
+/data/
