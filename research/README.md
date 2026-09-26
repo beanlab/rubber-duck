@@ -8,6 +8,8 @@ Research snapshot: 2026-09-22. This index separates peer-reviewed evidence from 
 - [Prompt evaluator experimental design](prompt-evaluator-design.md) defines the response-level evaluator, historical-conversation seed process, semantic-grader validation, and path to multi-turn evaluation.
 - [Prompt evaluator specification](prompt-evaluator-specification.md) defines the capability, evidence, boundaries, and acceptance criteria that an experimental implementation must satisfy.
 - [Prompt evaluator adversarial review](prompt-evaluator-adversarial-review.md) records attacks against the specification, historical-data and refactor audits, corrections, and remaining blockers.
+- [Prompt evaluator implementation plan](../docs/plans/prompt-evaluator-implementation-plan.md) turns the specification into a phased, testable prototype path with explicit integration and approval gates.
+- [Implementation-plan adversarial review](../docs/plans/prompt-evaluator-implementation-plan-adversarial-review.md) records attacks against experimental validity, judge reliability, artifact/privacy safety, and integration feasibility.
 
 ## Working definition
 
