@@ -2,7 +2,20 @@
 
 Scripts available are as follows:
   - generate_metadata.py: for downloading datasets from S3
+  - prompt_eval.py: for running the no-network prompt evaluator prototype
   - rubricize.py: for generating debugging-practice-duck rubrics from code
+
+## prompt_eval.py Usage
+
+Run a strict, development-only recorded-response fixture without Discord or model calls:
+
+```bash
+poetry run python scripts/prompt_eval.py offline \
+  --fixture evaluation_assets/examples/offline-smoke.json \
+  --output data/evaluations
+```
+
+The command validates treatment isolation and provenance, writes immutable evidence envelopes, and generates aggregate JSON and Markdown reports. Recorded fixtures test evaluator mechanics; they do not establish that the prompt text caused the recorded behavior.
 
 ## generate_metadata.py Usage
 

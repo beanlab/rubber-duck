@@ -20,7 +20,8 @@ Each subdirectory owns a subsystem with a focused responsibility.
 - `bot/` owns Discord transport and message conversion.
 - `conversation/` and `workflows/` own user-facing behavior.
 - `gen_ai/` owns model/tool loop execution.
-- `storage/` and `metrics/` own persistence and analytics.
+- `storage/` and `metrics/` own application persistence and analytics.
+- `evaluation/` owns the experimental Discord-independent prompt-evaluation evidence core.
 - `utils/` owns cross-cutting infrastructure helpers.
 
 ## Failure Modes and Guardrails

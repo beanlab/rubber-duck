@@ -3,9 +3,9 @@
 ## Metadata
 
 - Feature: Response-level prompt evaluator prototype
-- Status: planning
+- Status: implementing
 - Last updated: 2026-09-25
-- Planner approval: pending
+- Planner approval: approved by user, 2026-09-25
 - Final user confirmation: pending
 - Governing specification: [prompt-evaluator-specification.md](../../research/prompt-evaluator-specification.md)
 - Supporting design: [prompt-evaluator-design.md](../../research/prompt-evaluator-design.md)
@@ -466,3 +466,4 @@ Semantic calls, the completion adapter, historical data, multi-turn state, and D
 ## 16. Change log
 
 - 2026-09-25: Initial plan derived from the evaluator specification, system design, adversarial review, tests, and completion-refactor inspection.
+- 2026-09-25: Phase 1 offline vertical slice implemented with strict artifacts, recorded responses, deterministic integrity checks, paired comparison, aggregate reports, and synthetic controls.

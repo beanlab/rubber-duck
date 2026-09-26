@@ -1,0 +1,220 @@
+{
+  "declaration": {
+    "schema_version": "1.0",
+    "run_id": "offline-smoke-v1",
+    "question": "Can the offline pipeline preserve and compare obvious synthetic tutoring behaviors?",
+    "claim_type": "prompt_comparison",
+    "exploratory": true,
+    "candidates": [
+      {
+        "candidate_id": "scaffolded",
+        "label": "Synthetic scaffolded tutor",
+        "resolved_prompt": "Help the learner reason through the next step without revealing the full answer.",
+        "prompt_source_digests": {},
+        "configuration": {
+          "model": "recorded-fixture",
+          "reasoning": null,
+          "tools": [],
+          "tool_choice": "none",
+          "output_contract": null
+        }
+      },
+      {
+        "candidate_id": "answer-giving",
+        "label": "Synthetic answer-giving tutor",
+        "resolved_prompt": "Immediately provide the answer, even if the learner should continue working.",
+        "prompt_source_digests": {},
+        "configuration": {
+          "model": "recorded-fixture",
+          "reasoning": null,
+          "tools": [],
+          "tool_choice": "none",
+          "output_contract": null
+        }
+      }
+    ],
+    "scenarios": [
+      {
+        "scenario_id": "fraction-denominator",
+        "version": "1",
+        "model_visible_history": [
+          {
+            "role": "user",
+            "content": "I think 3/4 + 1/4 is 4/8. Is that right?"
+          }
+        ],
+        "reference_material": "When denominators are equal, add the numerators and retain the common denominator.",
+        "learner_state": "The learner incorrectly added equal denominators.",
+        "permitted_help": "Identify the misconception and ask for the corrected fraction without supplying it.",
+        "applicable_criteria": [
+          "guidance",
+          "accuracy",
+          "answer_disclosure"
+        ],
+        "source_family_id": "synthetic-fractions",
+        "partition": "development",
+        "slices": {
+          "subject": "math"
+        },
+        "provenance": "Manually authored public synthetic fixture.",
+        "privacy_manifest_id": "synthetic-public-v1",
+        "sensitivity": "public"
+      },
+      {
+        "scenario_id": "python-loop",
+        "version": "1",
+        "model_visible_history": [
+          {
+            "role": "user",
+            "content": "My loop only prints 0 once: for i in range(3): break; print(i). What should I inspect?"
+          }
+        ],
+        "reference_material": "A break exits the nearest loop on its first iteration. Removing or relocating it changes the iterations reached.",
+        "learner_state": "The learner has located the loop but has not identified why it stops.",
+        "permitted_help": "Direct attention to the control-flow statement and ask what it does before proposing a complete corrected program.",
+        "applicable_criteria": [
+          "guidance",
+          "accuracy",
+          "answer_disclosure"
+        ],
+        "source_family_id": "synthetic-python",
+        "partition": "development",
+        "slices": {
+          "subject": "programming"
+        },
+        "provenance": "Manually authored public synthetic fixture.",
+        "privacy_manifest_id": "synthetic-public-v1",
+        "sensitivity": "public"
+      }
+    ],
+    "criteria": [
+      {
+        "criterion_id": "guidance",
+        "name": "Guidance and scaffolding",
+        "value_type": "ordinal",
+        "ordered_values": [
+          "harmful_or_absent",
+          "weak",
+          "useful",
+          "especially_effective"
+        ],
+        "primary": true,
+        "guardrail": false
+      },
+      {
+        "criterion_id": "accuracy",
+        "name": "Subject accuracy",
+        "value_type": "ordinal",
+        "ordered_values": [
+          "incorrect",
+          "partially_correct",
+          "correct"
+        ],
+        "primary": false,
+        "guardrail": true
+      },
+      {
+        "criterion_id": "answer_disclosure",
+        "name": "Answer disclosure",
+        "value_type": "ordinal",
+        "ordered_values": [
+          "prohibited",
+          "excessive_help",
+          "appropriate_help"
+        ],
+        "primary": false,
+        "guardrail": true
+      }
+    ],
+    "graders": [
+      {
+        "grader_id": "manual-fixture",
+        "version": "1",
+        "kind": "human",
+        "criterion_ids": [
+          "guidance",
+          "accuracy",
+          "answer_disclosure"
+        ]
+      }
+    ],
+    "policy": {
+      "repetitions": 1,
+      "random_seed": 11,
+      "max_candidate_calls": 0,
+      "max_grader_calls": 0,
+      "max_cost_usd": null,
+      "retry_limit": 0
+    },
+    "privacy_manifest_id": "synthetic-public-v1",
+    "code_revision": "fixture-v1",
+    "dependency_lock_digest": "7488db8de0ad4ad6a97a2b5935dc03552720f8f6c190f2d3775d4f6a60229638",
+    "adapter_id": "recorded-v1"
+  },
+  "cases": [
+    {
+      "candidate_id": "scaffolded",
+      "scenario_id": "fraction-denominator",
+      "repetition": 1,
+      "response": {
+        "projected_response": "Because the denominators are already the same, keep that denominator and add only the numerators. What fraction does that give you?",
+        "raw_response_items": [],
+        "provenance": "Manually authored clear-positive development control.",
+        "sensitivity": "public"
+      },
+      "ratings": {
+        "guidance": "useful",
+        "accuracy": "correct",
+        "answer_disclosure": "appropriate_help"
+      }
+    },
+    {
+      "candidate_id": "answer-giving",
+      "scenario_id": "fraction-denominator",
+      "repetition": 1,
+      "response": {
+        "projected_response": "No. The answer is 1 because 3/4 + 1/4 = 4/4.",
+        "raw_response_items": [],
+        "provenance": "Manually authored known-bad development control.",
+        "sensitivity": "public"
+      },
+      "ratings": {
+        "guidance": "harmful_or_absent",
+        "accuracy": "correct",
+        "answer_disclosure": "prohibited"
+      }
+    },
+    {
+      "candidate_id": "scaffolded",
+      "scenario_id": "python-loop",
+      "repetition": 1,
+      "response": {
+        "projected_response": "Look at the break statement first: what does break do to the nearest loop when execution reaches it?",
+        "raw_response_items": [],
+        "provenance": "Manually authored clear-positive development control.",
+        "sensitivity": "public"
+      },
+      "ratings": {
+        "guidance": "especially_effective",
+        "accuracy": "correct",
+        "answer_disclosure": "appropriate_help"
+      }
+    },
+    {
+      "candidate_id": "answer-giving",
+      "scenario_id": "python-loop",
+      "repetition": 1,
+      "response": {
+        "projected_response": "The range only contains 0, so change it to range(0, 3, 1) and the loop will print all values.",
+        "raw_response_items": [],
+        "provenance": "Manually authored known-bad development control.",
+        "sensitivity": "public"
+      },
+      "ratings": {
+        "guidance": "weak",
+        "accuracy": "incorrect",
+        "answer_disclosure": "excessive_help"
+      }
+    }
+  ]
+}
