@@ -1,182 +1,215 @@
-"""Run the no-network prompt evaluator vertical slice."""
+"""Automatically evaluate one prompt with questioner, answerer, and evaluator agents."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
+import hashlib
 import json
-import sys
 from pathlib import Path
+from typing import Any
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-if str(REPOSITORY_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPOSITORY_ROOT))
-
-from src.evaluation.adapters import RecordedResponseRunner
-from src.evaluation.artifacts import ArtifactStore
-from src.evaluation.comparison import compare_candidates
-from src.evaluation.grading import EvidenceIntegrityGrader
-from src.evaluation.reporting import write_reports
-from src.evaluation.schemas import (
-    EvidenceReference,
-    Observation,
-    ObservationStatus,
-    OfflineFixture,
-    digest_json,
-    digest_text,
-)
+import yaml
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+from pydantic import BaseModel, ConfigDict
 
 
-def load_fixture(path: Path) -> OfflineFixture:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
-        raise ValueError(f"fixture is not valid JSON: {path}") from error
-    return OfflineFixture.model_validate(raw)
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CONFIG = ROOT / "evaluation_assets" / "prompt_eval.yaml"
+DEFAULT_OUTPUT = ROOT / "prompt_eval_results.json"
 
 
-def run_offline_fixture(fixture: OfflineFixture, output_root: Path) -> tuple[Path, Path]:
-    declaration = fixture.declaration
-    run_root = output_root / declaration.run_id
-    store = ArtifactStore(run_root / "artifacts")
-    store.put(
-        "declarations",
-        declaration.run_id,
-        declaration,
-        producer="prompt-eval-cli",
-    )
+class StandardResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    criteria = {item.criterion_id: item for item in declaration.criteria}
-    cases = {
-        (item.candidate_id, item.scenario_id, item.repetition): item
-        for item in fixture.cases
+    standard_id: str
+    passed: bool
+    evidence: str
+    reason: str
+
+
+class Grade(BaseModel):
+    """The evaluator returns one result for every scenario standard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    results: list[StandardResult]
+
+
+class OpenAIModel:
+    """The only provider-specific code in the evaluator."""
+
+    def __init__(self) -> None:
+        self.client = AsyncOpenAI()
+
+    async def text(self, *, model: str, instructions: str, input_text: str) -> str:
+        response = await self.client.responses.create(
+            model=model,
+            instructions=instructions,
+            input=input_text,
+            store=False,
+        )
+        return response.output_text.strip()
+
+    async def grade(self, *, model: str, instructions: str, input_text: str) -> Grade:
+        response = await self.client.responses.parse(
+            model=model,
+            instructions=instructions,
+            input=input_text,
+            text_format=Grade,
+            store=False,
+        )
+        if response.output_parsed is None:
+            raise RuntimeError("Evaluator did not return a grade")
+        return response.output_parsed
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def scenario_for_questioner(scenario: dict[str, Any]) -> str:
+    visible = {
+        "learner": scenario["learner"],
+        "task": scenario["task"],
     }
-    runner = RecordedResponseRunner(
-        declaration=declaration,
-        responses={key: item.response for key, item in cases.items()},
-    )
-    integrity_grader = EvidenceIntegrityGrader(declaration)
+    return json.dumps(visible, indent=2)
 
+
+def evaluator_input(
+    scenario: dict[str, Any],
+    metrics: dict[str, Any],
+    question: str,
+    answer: str,
+) -> str:
+    return json.dumps(
+        {
+            "scenario": scenario,
+            "metrics": metrics,
+            "learner_question": question,
+            "tutor_answer": answer,
+        },
+        indent=2,
+    )
+
+
+def summarize(trials: list[dict[str, Any]], metrics: dict[str, Any]) -> dict[str, Any]:
+    summary = {}
+    for name in metrics:
+        results = [
+            result
+            for trial in trials
+            for result in trial["standard_results"]
+            if result["metric"] == name
+        ]
+        passed_count = sum(result["passed"] for result in results)
+        summary[name] = {
+            "passed_standards": passed_count,
+            "total_standards": len(results),
+            "pass_rate": passed_count / len(results),
+            "passed": passed_count == len(results),
+        }
+    return {
+        "metrics": summary,
+        "prompt_passed": all(metric["passed"] for metric in summary.values()),
+    }
+
+
+def match_results_to_standards(
+    grade: Grade,
+    standards: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    expected = {standard["standard_id"]: standard for standard in standards}
+    returned = {result.standard_id: result for result in grade.results}
+    if len(returned) != len(grade.results) or returned.keys() != expected.keys():
+        raise ValueError(
+            "Evaluator must return every declared standard_id exactly once; "
+            f"expected {sorted(expected)}, got {sorted(returned)}"
+        )
+
+    return [
+        {
+            **standard,
+            **returned[standard["standard_id"]].model_dump(exclude={"standard_id"}),
+        }
+        for standard in standards
+    ]
+
+
+async def evaluate(
+    config: dict[str, Any],
+    candidate_prompt: str,
+    gateway: Any,
+) -> dict[str, Any]:
     trials = []
-    comparison_observations = []
-    actual_order = 0
-    for scenario in declaration.scenarios:
-        for repetition in range(1, declaration.policy.repetitions + 1):
-            for candidate in declaration.candidates:
-                actual_order += 1
-                trial = runner.run(
-                    candidate,
-                    scenario,
-                    repetition=repetition,
-                    planned_order=actual_order,
-                    actual_order=actual_order,
-                )
-                trials.append(trial)
-                store.put(
-                    "trials",
-                    trial.trial_id,
-                    trial,
-                    producer="recorded-runner",
-                    sensitivity=trial.sensitivity,
-                    parent_artifact_ids=(declaration.run_id,),
-                )
+    for scenario in config["scenarios"]:
+        question = await gateway.text(
+            model=config["models"]["questioner"],
+            instructions=config["questioner_prompt"],
+            input_text=scenario_for_questioner(scenario),
+        )
+        answer = await gateway.text(
+            model=config["models"]["answerer"],
+            instructions=candidate_prompt,
+            input_text=question,
+        )
+        grade = await gateway.grade(
+            model=config["models"]["evaluator"],
+            instructions=config["evaluator_prompt"],
+            input_text=evaluator_input(scenario, config["metrics"], question, answer),
+        )
+        standard_results = match_results_to_standards(
+            grade,
+            scenario["response_standard"],
+        )
+        trials.append(
+            {
+                "scenario_id": scenario["id"],
+                "question": question,
+                "answer": answer,
+                "standard_results": standard_results,
+            }
+        )
 
-                integrity = integrity_grader.grade(trial)
-                store.put(
-                    "observations",
-                    integrity.observation_id,
-                    integrity,
-                    producer=integrity.grader_id,
-                    sensitivity=trial.sensitivity,
-                    parent_artifact_ids=(trial.trial_id,),
-                )
-
-                case = cases[(candidate.candidate_id, scenario.scenario_id, repetition)]
-                for criterion_id, rating in case.ratings.items():
-                    criterion = criteria[criterion_id]
-                    response = trial.projected_response or ""
-                    observation_id = (
-                        "obs-"
-                        + digest_json(
-                            {
-                                "trial_id": trial.trial_id,
-                                "criterion_id": criterion_id,
-                                "grader_id": "manual-fixture",
-                            }
-                        )[:24]
-                    )
-                    observation = Observation(
-                        observation_id=observation_id,
-                        run_id=declaration.run_id,
-                        trial_id=trial.trial_id,
-                        candidate_id=candidate.candidate_id,
-                        scenario_id=scenario.scenario_id,
-                        source_family_id=scenario.source_family_id,
-                        repetition=repetition,
-                        criterion_id=criterion_id,
-                        grader_id="manual-fixture",
-                        grader_version="1",
-                        value_type=criterion.value_type,
-                        value=rating,
-                        status=ObservationStatus.OBSERVED,
-                        evidence=(
-                            EvidenceReference(
-                                artifact_id=trial.trial_id,
-                                field_path="projected_response",
-                                start=0,
-                                end=len(response),
-                                quoted_text=response,
-                                content_digest=digest_text(response),
-                            ),
-                        ),
-                        rationale="Development-only synthetic fixture label.",
-                    )
-                    comparison_observations.append(observation)
-                    store.put(
-                        "observations",
-                        observation.observation_id,
-                        observation,
-                        producer=observation.grader_id,
-                        sensitivity=trial.sensitivity,
-                        parent_artifact_ids=(trial.trial_id,),
-                    )
-
-    summary = compare_candidates(
-        declaration,
-        comparison_observations,
-        trials=trials,
-    )
-    store.put(
-        "comparisons",
-        declaration.run_id,
-        summary,
-        producer="paired-comparison",
-        parent_artifact_ids=tuple(trial.trial_id for trial in trials),
-    )
-    return write_reports(summary, run_root / "reports")
+    result = {
+        "candidate_prompt": candidate_prompt,
+        "candidate_prompt_sha256": hashlib.sha256(candidate_prompt.encode()).hexdigest(),
+        "models": config["models"],
+        "trials": trials,
+    }
+    result.update(summarize(trials, config["metrics"]))
+    return result
 
 
-def build_parser() -> argparse.ArgumentParser:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    offline = subparsers.add_parser(
-        "offline",
-        help="run a strict JSON fixture without model or Discord access",
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("--prompt", type=Path, help="Prompt file to evaluate instead of the YAML candidate_prompt")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    return parser.parse_args()
+
+
+async def main() -> None:
+    load_dotenv()
+    args = parse_args()
+    config = load_config(args.config)
+    candidate_prompt = (
+        args.prompt.read_text(encoding="utf-8")
+        if args.prompt
+        else config["candidate_prompt"]
     )
-    offline.add_argument("--fixture", type=Path, required=True)
-    offline.add_argument("--output", type=Path, required=True)
-    return parser
+    result = await evaluate(config, candidate_prompt, OpenAIModel())
+    args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
-
-def main() -> int:
-    args = build_parser().parse_args()
-    if args.command == "offline":
-        fixture = load_fixture(args.fixture)
-        json_path, markdown_path = run_offline_fixture(fixture, args.output)
-        print(f"JSON report: {json_path}")
-        print(f"Markdown report: {markdown_path}")
-        return 0
-    raise AssertionError(f"unhandled command: {args.command}")
+    print(f"Prompt passed: {result['prompt_passed']}")
+    for name, metric in result["metrics"].items():
+        print(
+            f"{name}: pass_rate={metric['pass_rate']:.0%}, "
+            f"passed={metric['passed']}"
+        )
+    print(f"Full evidence: {args.output}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    asyncio.run(main())

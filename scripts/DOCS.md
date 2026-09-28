@@ -2,20 +2,21 @@
 
 Scripts available are as follows:
   - generate_metadata.py: for downloading datasets from S3
-  - prompt_eval.py: for running the no-network prompt evaluator prototype
+  - prompt_eval.py: for automatically evaluating one prompt with a questioner, answerer, and evaluator model
   - rubricize.py: for generating debugging-practice-duck rubrics from code
 
 ## prompt_eval.py Usage
 
-Run a strict, development-only recorded-response fixture without Discord or model calls:
+`evaluation_assets/prompt_eval.yaml` contains every prompt, scenario, metric, and
+threshold used by the evaluator. Run it with `OPENAI_API_KEY` set:
 
 ```bash
-poetry run python scripts/prompt_eval.py offline \
-  --fixture evaluation_assets/examples/offline-smoke.json \
-  --output data/evaluations
+poetry run python scripts/prompt_eval.py
 ```
 
-The command validates treatment isolation and provenance, writes immutable evidence envelopes, and generates aggregate JSON and Markdown reports. Recorded fixtures test evaluator mechanics; they do not establish that the prompt text caused the recorded behavior.
+Pass `--prompt path/to/prompt.md` to evaluate another prompt. The JSON output contains
+every generated question, answer, declared response standard, evaluator judgment,
+supporting evidence, and calculated standard pass rate.
 
 ## generate_metadata.py Usage
 

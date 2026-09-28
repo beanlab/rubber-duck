@@ -30,3 +30,4 @@ nic2.yaml
 .codex
 /research/papers/
 /data/
+/prompt_eval_results.json
