@@ -2,21 +2,23 @@
 
 Scripts available are as follows:
   - generate_metadata.py: for downloading datasets from S3
-  - prompt_eval.py: for automatically evaluating one prompt with a questioner, answerer, and evaluator model
+  - prompt_eval.py: for automatically evaluating one tutoring prompt through simulated conversations
   - rubricize.py: for generating debugging-practice-duck rubrics from code
 
 ## prompt_eval.py Usage
 
-`evaluation_assets/prompt_eval.yaml` contains every prompt, scenario, metric, and
-threshold used by the evaluator. Run it with `OPENAI_API_KEY` set:
+`evaluation_assets/prompt_eval.yaml` points to the production tutor prompt and contains
+the student simulator prompt, evaluator prompt, scenarios, and visible conversation
+standards. Run it with `OPENAI_API_KEY` set:
 
 ```bash
 poetry run python scripts/prompt_eval.py
 ```
 
-Pass `--prompt path/to/prompt.md` to evaluate another prompt. The JSON output contains
-every generated question, answer, declared response standard, evaluator judgment,
-supporting evidence, and calculated standard pass rate.
+Use `--scenario beginner-variables` to run one scenario or pass
+`--prompt path/to/prompt.md` to evaluate another tutor prompt. The JSON output contains
+each full transcript, declared conversation standards, evaluator judgments, cited
+turns, supporting quotes, and calculated standard pass rates.
 
 ## generate_metadata.py Usage
 
