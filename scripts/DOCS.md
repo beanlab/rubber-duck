@@ -7,18 +7,16 @@ Scripts available are as follows:
 
 ## prompt_eval.py Usage
 
-`evaluation_assets/prompt_eval.yaml` points to the production tutor prompt and contains
-the student simulator prompt, evaluator prompt, scenarios, and visible conversation
-standards. Run it with `OPENAI_API_KEY` set:
+`evaluation_assets/prompt_eval.yaml` contains the tutor prompt path, one student
+conversation, and the definitions of correctness, guidance, and disclosure. Run it
+with `OPENAI_API_KEY` set:
 
 ```bash
 poetry run python scripts/prompt_eval.py
 ```
 
-Use `--scenario beginner-variables` to run one scenario or pass
-`--prompt path/to/prompt.md` to evaluate another tutor prompt. The JSON output contains
-each full transcript, declared conversation standards, evaluator judgments, cited
-turns, supporting quotes, and calculated standard pass rates.
+The JSON output contains the transcript and a pass/fail result with a reason for each
+of the three metrics.
 
 ## generate_metadata.py Usage
 
