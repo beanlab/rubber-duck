@@ -1,7 +1,7 @@
 import asyncio
 
 from scripts.prompt_eval import (
-    MetricResult,
+    CriterionResult,
     PromptEvaluation,
     TutorReply,
     run,
@@ -37,13 +37,45 @@ class FakeModel:
 
     async def grade(self, model, prompt, transcript, config):
         return PromptEvaluation(
-            correctness=MetricResult(passed=True, reason="Technically correct."),
-            guidance=MetricResult(passed=True, reason="Provides a targeted hint."),
-            disclosure=MetricResult(passed=True, reason="Does not reveal the fix."),
+            subject_accuracy=CriterionResult(
+                rating="correct",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The tutor makes no incorrect technical claim.",
+            ),
+            misconception_diagnosis=CriterionResult(
+                rating="accurately_recognizes",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The question targets the student's indexing misconception.",
+            ),
+            guidance_scaffolding=CriterionResult(
+                rating="useful",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The tutor provides a targeted next step.",
+            ),
+            answer_disclosure=CriterionResult(
+                rating="appropriate",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The tutor does not reveal the completed fix.",
+            ),
+            relevance=CriterionResult(
+                rating="relevant",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The response addresses list indexing.",
+            ),
+            actionability=CriterionResult(
+                rating="actionable",
+                evidence=["What index does Python use for the first item?"],
+                rationale="The student can identify the first valid index next.",
+            ),
+            learner_self_correction=CriterionResult(
+                rating="not_demonstrated",
+                evidence=["quit"],
+                rationale="The student quits without stating the corrected indexes.",
+            ),
         )
 
 
-def test_evaluates_one_prompt_on_three_metrics(tmp_path):
+def test_evaluates_one_prompt_on_anchored_criteria(tmp_path):
     prompt = tmp_path / "prompt.md"
     prompt.write_text("Tutor prompt", encoding="utf-8")
     config = {
@@ -53,18 +85,40 @@ def test_evaluates_one_prompt_on_three_metrics(tmp_path):
         "student_prompt": "Student prompt",
         "reference_answer": "Lists start at index zero.",
         "allowed_help": "Hints only.",
-        "metrics": {
-            "correctness": "Correct technical content.",
-            "guidance": "Useful hint.",
-            "disclosure": "No final solution.",
+        "criteria": {
+            "subject_accuracy": {},
+            "misconception_diagnosis": {},
+            "guidance_scaffolding": {},
+            "answer_disclosure": {},
+            "relevance": {},
+            "actionability": {},
+            "learner_self_correction": {},
         },
         "evaluator_prompt": "Evaluate the transcript.",
     }
 
     result = asyncio.run(run(config, FakeModel()))
 
-    assert result["prompt_passed"] is True
-    assert set(result["metrics"]) == {"correctness", "guidance", "disclosure"}
+    assert set(result["criteria"]) == {
+        "subject_accuracy",
+        "misconception_diagnosis",
+        "guidance_scaffolding",
+        "answer_disclosure",
+        "relevance",
+        "actionability",
+        "learner_self_correction",
+    }
+    assert result["criteria"]["guidance_scaffolding"]["rating"] == "useful"
+    assert result["summary"] == {
+        "guardrails": "PASSED",
+        "tutoring_quality": "STRONG",
+        "learner_self_correction": {
+            "rating": "not_demonstrated",
+            "evidence": ["quit"],
+            "rationale": "The student quits without stating the corrected indexes.",
+        },
+        "result": "STRONG TUTOR RESPONSE WITH INCOMPLETE OUTCOME EVIDENCE",
+    }
     assert [turn["role"] for turn in result["transcript"]] == [
         "student",
         "tutor",

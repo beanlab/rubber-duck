@@ -8,15 +8,18 @@ Scripts available are as follows:
 ## prompt_eval.py Usage
 
 `evaluation_assets/prompt_eval.yaml` contains the tutor prompt path, one student
-conversation, and the definitions of correctness, guidance, and disclosure. Run it
-with `OPENAI_API_KEY` set:
+conversation, and anchored definitions for subject accuracy, misconception
+diagnosis, guidance/scaffolding, answer disclosure, relevance, actionability, and
+learner self-correction. Run it with `OPENAI_API_KEY` set:
 
 ```bash
 poetry run python scripts/prompt_eval.py
 ```
 
-The JSON output contains the transcript and a pass/fail result with a reason for each
-of the three metrics.
+The JSON output contains the transcript and a rating, supporting transcript
+evidence, and rationale for each criterion. The criteria remain separate; the
+script does not calculate a numeric composite score. It concludes with separate
+guardrail, tutoring-quality, and learner-outcome summaries.
 
 ## generate_metadata.py Usage
 

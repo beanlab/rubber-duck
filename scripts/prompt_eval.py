@@ -1,11 +1,11 @@
-"""Evaluate one tutoring prompt against three defined metrics."""
+"""Evaluate one tutoring prompt against defined tutoring-quality criteria."""
 
 import argparse
 import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Generic, Literal, TypeVar
 
 import yaml
 from dotenv import load_dotenv
@@ -45,19 +45,102 @@ TUTOR_TOOLS = [
 ]
 
 
-class MetricResult(BaseModel):
+Rating = TypeVar("Rating", bound=str)
+
+SubjectAccuracy = Literal[
+    "incorrect", "partially_correct", "correct", "insufficient_evidence"
+]
+MisconceptionDiagnosis = Literal[
+    "misses",
+    "partially_recognizes",
+    "accurately_recognizes",
+    "not_applicable",
+    "insufficient_evidence",
+]
+GuidanceScaffolding = Literal[
+    "harmful_or_absent", "weak", "useful", "especially_effective", "insufficient_evidence"
+]
+AnswerDisclosure = Literal[
+    "prohibited", "excessive", "appropriate", "not_applicable", "insufficient_evidence"
+]
+Relevance = Literal["irrelevant", "partly_relevant", "relevant", "insufficient_evidence"]
+Actionability = Literal[
+    "no_next_step", "vague", "actionable", "not_applicable", "insufficient_evidence"
+]
+LearnerSelfCorrection = Literal[
+    "not_demonstrated",
+    "partially_demonstrated",
+    "demonstrated",
+    "insufficient_evidence",
+]
+
+
+class CriterionResult(BaseModel, Generic[Rating]):
     model_config = ConfigDict(extra="forbid")
 
-    passed: bool
-    reason: str
+    rating: Rating
+    evidence: list[str]
+    rationale: str
 
 
 class PromptEvaluation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    correctness: MetricResult
-    guidance: MetricResult
-    disclosure: MetricResult
+    subject_accuracy: CriterionResult[SubjectAccuracy]
+    misconception_diagnosis: CriterionResult[MisconceptionDiagnosis]
+    guidance_scaffolding: CriterionResult[GuidanceScaffolding]
+    answer_disclosure: CriterionResult[AnswerDisclosure]
+    relevance: CriterionResult[Relevance]
+    actionability: CriterionResult[Actionability]
+    learner_self_correction: CriterionResult[LearnerSelfCorrection]
+
+
+def summarize_evaluation(criteria: dict) -> dict:
+    accuracy = criteria["subject_accuracy"]["rating"]
+    disclosure = criteria["answer_disclosure"]["rating"]
+
+    if accuracy == "incorrect" or disclosure == "prohibited":
+        guardrails = "FAILED"
+    elif accuracy == "partially_correct" or disclosure == "excessive":
+        guardrails = "NEEDS REVIEW"
+    elif "insufficient_evidence" in {accuracy, disclosure}:
+        guardrails = "INCONCLUSIVE"
+    else:
+        guardrails = "PASSED"
+
+    quality_ratings = {
+        criteria["misconception_diagnosis"]["rating"],
+        criteria["guidance_scaffolding"]["rating"],
+        criteria["relevance"]["rating"],
+        criteria["actionability"]["rating"],
+    }
+    if quality_ratings & {"misses", "harmful_or_absent", "irrelevant", "no_next_step"}:
+        tutoring_quality = "WEAK"
+    elif quality_ratings & {"partially_recognizes", "weak", "partly_relevant", "vague"}:
+        tutoring_quality = "NEEDS REVIEW"
+    elif "insufficient_evidence" in quality_ratings:
+        tutoring_quality = "INCONCLUSIVE"
+    else:
+        tutoring_quality = "STRONG"
+
+    learner_outcome = criteria["learner_self_correction"]
+    if guardrails == "FAILED":
+        result = "GUARDRAIL FAILURE"
+    elif "NEEDS REVIEW" in {guardrails, tutoring_quality} or tutoring_quality == "WEAK":
+        result = "TUTOR RESPONSE NEEDS REVIEW"
+    elif "INCONCLUSIVE" in {guardrails, tutoring_quality}:
+        result = "INCONCLUSIVE TUTOR EVALUATION"
+    elif learner_outcome["rating"] == "demonstrated":
+        result = "STRONG TUTOR RESPONSE WITH DEMONSTRATED LEARNER PROGRESS"
+    else:
+        result = "STRONG TUTOR RESPONSE WITH INCOMPLETE OUTCOME EVIDENCE"
+
+    return {
+        "guardrails": guardrails,
+        "tutoring_quality": tutoring_quality,
+        "learner_self_correction": learner_outcome,
+        "result": result,
+    }
 
 
 @dataclass
@@ -125,7 +208,7 @@ class OpenAIModel:
             "transcript": transcript,
             "reference_answer": config["reference_answer"],
             "allowed_help": config["allowed_help"],
-            "metrics": config["metrics"],
+            "criteria": config["criteria"],
         }
         response = await self.client.responses.parse(
             model=model,
@@ -192,12 +275,12 @@ async def run(config: dict, model_client: Any) -> dict:
         transcript,
         config,
     )
-    metrics = evaluation.model_dump()
+    criteria = evaluation.model_dump()
 
     return {
         "transcript": transcript,
-        "metrics": metrics,
-        "prompt_passed": all(result["passed"] for result in metrics.values()),
+        "criteria": criteria,
+        "summary": summarize_evaluation(criteria),
     }
 
 
@@ -215,10 +298,20 @@ async def main():
     result = await run(config, OpenAIModel())
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
-    print("\nEvaluation:")
-    print(f"Prompt passed: {result['prompt_passed']}")
-    for metric, value in result["metrics"].items():
-        print(f"{metric}: passed={value['passed']} — {value['reason']}")
+    print("\nEvaluation profile:")
+    for criterion, value in result["criteria"].items():
+        print(f"{criterion}: {value['rating']} — {value['rationale']}")
+
+    summary = result["summary"]
+    learner_outcome = summary["learner_self_correction"]
+    print("\nOverall evaluation:")
+    print(f"Guardrails: {summary['guardrails']}")
+    print(f"Tutoring quality: {summary['tutoring_quality']}")
+    print(
+        "Learner self-correction: "
+        f"{learner_outcome['rating']} — {learner_outcome['rationale']}"
+    )
+    print(f"Result: {summary['result']}")
     print(f"Transcript and results: {args.output}")
 
 
