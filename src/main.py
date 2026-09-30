@@ -30,6 +30,10 @@ from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator, DuckConversation
 from .gen_ai.build import build_agent
 from .gen_ai.gen_ai import AIClient
+from .gen_ai.ai_responses import ResponsesAPI
+from .workflows.ai_response_workflows import StandardDuckWorkflow, StatsDuckWorkflow
+from .workflows.ai_response_workflows.standard_duck_workflow import build_standard_agent
+from .workflows.ai_response_workflows.stats_duck_workflow import build_stats_agent
 from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
 from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
 from .metrics.reporter import Reporter
@@ -159,6 +163,9 @@ def build_ducks(
         duck_type = duck_config['duck_type']
         settings = duck_config['settings']
 
+        if duck_type == 'stats_ai_response_conversation':
+            continue
+
         if duck_type == 'agent_led_conversation':
             starting_agent = build_agent(settings["agent"])
             ducks[name] = AgentLedConversation(name, starting_agent, ai_client)
@@ -232,6 +239,45 @@ def build_ducks(
     return ducks
 
 
+def build_ai_response_ducks(
+        config: Config,
+        bot: DiscordBot,
+        metrics_handler,
+        armory,
+        talk_tool,
+) -> dict[DUCK_NAME, DuckConversation]:
+    ducks = {}
+    for name, duck_config in _iterate_duck_configs(config):
+        duck_type = duck_config['duck_type']
+        if duck_type not in {'agent_led_conversation', 'stats_ai_response_conversation'}:
+            continue
+
+        settings = duck_config['settings']
+        responses_api = ResponsesAPI(armory, config['ai_completion_retry_protocol'])
+        workflow_args = dict(
+            name=name,
+            responses_api=responses_api,
+            talk_tool=talk_tool,
+            typing=bot.typing,
+            record_message=metrics_handler.record_message,
+            record_usage=metrics_handler.record_usage,
+            send_message=bot.send_message,
+        )
+        if duck_type == 'agent_led_conversation':
+            ducks[name] = StandardDuckWorkflow(
+                agent=build_standard_agent(settings['agent'], armory),
+                **workflow_args,
+            )
+        elif duck_type == 'stats_ai_response_conversation':
+            ducks[name] = StatsDuckWorkflow(
+                introduction=settings['introduction'],
+                agent=build_stats_agent(settings['agent'], armory),
+                **workflow_args,
+            )
+
+    return ducks
+
+
 def _setup_ducks(
         config: Config,
         bot: DiscordBot,
@@ -244,7 +290,9 @@ def _setup_ducks(
     """
     Return a dictionary of channel ID to DuckConversation
     """
-    all_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
+    legacy_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
+    ai_response_ducks = build_ai_response_ducks(config, bot, metrics_handler, armory, talk_tool)
+    all_ducks = {**legacy_ducks, **ai_response_ducks}
 
     channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
 

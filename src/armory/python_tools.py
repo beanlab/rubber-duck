@@ -158,6 +158,42 @@ class PythonTools:
                 filename: description
             }
         """
+        collector = getattr(ctx, "_stats_output_collector", None)
+        if collector is not None:
+            key = None
+            if self._tool_cache and self._cache_key_builder:
+                cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
+                key = self._tool_cache.get_key(cache_key)
+                duck_logger.debug(f"Cache key: {key}")
+                if self._tool_cache.check_if_cached(key):
+                    duck_logger.debug(f" Cache HIT ".center(20, '-'))
+                    return await self._tool_cache.send_from_cache(
+                        key,
+                        collector.capture,
+                        ctx.thread_id,
+                    )
+                duck_logger.debug(f" Cache MISS ".center(19, '-'))
+
+            results = await self._container.run_code_deferred(code)
+            files = results.get("files", {})
+            stdout = _clean_stdout(results.get("stdout", "").strip(), files)
+            stderr = _remove_scientific_notation(results.get("stderr", "").strip())
+            collector.add_execution(
+                self._container,
+                results,
+                stdout,
+                self._tool_cache,
+                key,
+            )
+            return {
+                "stdout": stdout,
+                "stderr": stderr,
+                "files": {
+                    filename: file["description"]
+                    for filename, file in files.items()
+                },
+            }
+
         key = None
         if self._tool_cache and self._cache_key_builder:
             cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
@@ -255,19 +291,25 @@ class DatasetTools:
                 lines.append(f"\nFilepath: {dataset['path']}")
         return "\n".join(lines)
 
-    async def send_datasets_to_user(self, ctx: DuckContext) -> ConcludesResponse:
+    async def send_datasets_to_user(self, ctx: DuckContext) -> ConcludesResponse | str:
         """
         Sends the full canonical dataset-name list directly to the user.
         """
         dataset_names = self._get_sorted_dataset_names()
         if not dataset_names:
             message = "No datasets are currently available."
-            await self._send_message(ctx.thread_id, message)
-            return ConcludesResponse(message)
+        else:
+            message = "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
 
-        message = "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
+        collector = getattr(ctx, "_stats_output_collector", None)
+        if collector is not None:
+            collector.add_text(message)
+            return f"Prepared {len(dataset_names)} dataset names for delivery."
+
         await self._send_message(ctx.thread_id, message)
-        return ConcludesResponse(f"Sent {len(dataset_names)} dataset names.")
+        if dataset_names:
+            return ConcludesResponse(f"Sent {len(dataset_names)} dataset names.")
+        return ConcludesResponse(message)
 
     async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
         """
