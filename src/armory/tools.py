@@ -88,3 +88,13 @@ def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
         },
         "strict": True
     }
+
+
+class ToolBox:
+    def get_tool_schemas(self) -> list[...]:
+        ...
+    
+    def get_tool(self, tool_name: str) -> Callable:
+        ...
+    
+    

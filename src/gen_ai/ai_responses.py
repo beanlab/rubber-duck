@@ -42,10 +42,9 @@ class Usage(TypedDict):
 class Agent:
     name: str
     model: str
-    armory: Armory
     prompt: Optional[str] = None
-    tools: dict[str, Callable] = field(default_factory=dict)
     reasoning: Optional[str] = None
+    tools: Optional[ToolBox] = None
     tool_settings: ToolChoiceTypes = "auto"
     output_format: Optional[Type[BaseModel]] = None
 
@@ -154,13 +153,14 @@ class ResponsesAPI:
             while True:
                 outputs, usage = await self._get_completion(
                     agent.model, agent.prompt, agent.reasoning,
-                    [agent.armory.get_tool_schema(tool_name) for tool_name in agent.tools],
+                    agent.tools.get_tool_schemas(),
                     agent.tool_settings,
                     agent.output_format,
                     history + turn_outputs,
                     notify_retry=notify_retry,
                 )
                 total_usage = self._add_usage(total_usage, usage)
+                turn_outputs += outputs
 
                 tool_results = []
                 for output in outputs:
@@ -169,7 +169,7 @@ class ResponsesAPI:
 
                     tool_name = output["name"]
                     tool_args = json.loads(output["arguments"])
-                    tool = agent.tools[tool_name]
+                    tool = agent.tools.get_tool(tool_name)
                     result = await self._run_tool(tool, tool_args)
 
                     function_item = format_function_call_history_items(
@@ -178,8 +178,7 @@ class ResponsesAPI:
                     )
                     tool_results.append(function_item)
 
-                outputs += tool_results
-                turn_outputs += outputs
+                turn_outputs += tool_results
 
                 message = self._message_text(outputs)
                 if message is not None:
@@ -201,6 +200,7 @@ class ResponsesAPI:
         except Exception as e:
             raise GenAIException(e, f"An error occurred while processing query for {agent.name}") from e
 
+    @step
     async def _get_completion(
             self,
             model: str,
