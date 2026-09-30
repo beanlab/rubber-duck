@@ -95,54 +95,6 @@ class PromptEvaluation(BaseModel):
     learner_self_correction: CriterionResult[LearnerSelfCorrection]
 
 
-def summarize_evaluation(criteria: dict) -> dict:
-    accuracy = criteria["subject_accuracy"]["rating"]
-    disclosure = criteria["answer_disclosure"]["rating"]
-
-    if accuracy == "incorrect" or disclosure == "prohibited":
-        guardrails = "FAILED"
-    elif accuracy == "partially_correct" or disclosure == "excessive":
-        guardrails = "NEEDS REVIEW"
-    elif "insufficient_evidence" in {accuracy, disclosure}:
-        guardrails = "INCONCLUSIVE"
-    else:
-        guardrails = "PASSED"
-
-    quality_ratings = {
-        criteria["misconception_diagnosis"]["rating"],
-        criteria["guidance_scaffolding"]["rating"],
-        criteria["relevance"]["rating"],
-        criteria["actionability"]["rating"],
-    }
-    if quality_ratings & {"misses", "harmful_or_absent", "irrelevant", "no_next_step"}:
-        tutoring_quality = "WEAK"
-    elif quality_ratings & {"partially_recognizes", "weak", "partly_relevant", "vague"}:
-        tutoring_quality = "NEEDS REVIEW"
-    elif "insufficient_evidence" in quality_ratings:
-        tutoring_quality = "INCONCLUSIVE"
-    else:
-        tutoring_quality = "STRONG"
-
-    learner_outcome = criteria["learner_self_correction"]
-    if guardrails == "FAILED":
-        result = "GUARDRAIL FAILURE"
-    elif "NEEDS REVIEW" in {guardrails, tutoring_quality} or tutoring_quality == "WEAK":
-        result = "TUTOR RESPONSE NEEDS REVIEW"
-    elif "INCONCLUSIVE" in {guardrails, tutoring_quality}:
-        result = "INCONCLUSIVE TUTOR EVALUATION"
-    elif learner_outcome["rating"] == "demonstrated":
-        result = "STRONG TUTOR RESPONSE WITH DEMONSTRATED LEARNER PROGRESS"
-    else:
-        result = "STRONG TUTOR RESPONSE WITH INCOMPLETE OUTCOME EVIDENCE"
-
-    return {
-        "guardrails": guardrails,
-        "tutoring_quality": tutoring_quality,
-        "learner_self_correction": learner_outcome,
-        "result": result,
-    }
-
-
 @dataclass
 class TutorReply:
     action: Literal["message", "conclude"]
@@ -202,14 +154,16 @@ class OpenAIModel:
         model: str,
         prompt: str,
         transcript: list[dict],
+        tutor_prompt: str,
         config: dict,
     ) -> PromptEvaluation:
         evidence = {
             "transcript": transcript,
-            "reference_answer": config["reference_answer"],
-            "allowed_help": config["allowed_help"],
+            "tutor_prompt": tutor_prompt,
             "criteria": config["criteria"],
         }
+        if config.get("use_reference_answer", True):
+            evidence["reference_answer"] = config["reference_answer"]
         response = await self.client.responses.parse(
             model=model,
             instructions=prompt,
@@ -224,6 +178,7 @@ class OpenAIModel:
 
 async def run(config: dict, model_client: Any) -> dict:
     model = config["model"]
+    evaluator_model = config.get("evaluator_model", model)
     tutor_prompt = (ROOT / config["prompt_path"]).read_text(encoding="utf-8")
     transcript = []
     tutor_history = []
@@ -270,9 +225,10 @@ async def run(config: dict, model_client: Any) -> dict:
         pending_tutor_call = tutor_reply.call_id
 
     evaluation = await model_client.grade(
-        model,
+        evaluator_model,
         config["evaluator_prompt"],
         transcript,
+        tutor_prompt,
         config,
     )
     criteria = evaluation.model_dump()
@@ -280,7 +236,7 @@ async def run(config: dict, model_client: Any) -> dict:
     return {
         "transcript": transcript,
         "criteria": criteria,
-        "summary": summarize_evaluation(criteria),
+        "reference_answer_used": config.get("use_reference_answer", True),
     }
 
 
@@ -288,30 +244,66 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--prompts",
+        nargs="+",
+        default=["1"],
+        help="Student prompt numbers to run, or 'all'",
+    )
+    parser.add_argument(
+        "--no-reference-answer",
+        action="store_true",
+        help="Evaluate without giving the evaluator the reference answer",
+    )
     return parser.parse_args()
+
+
+def select_prompts(catalog: dict, requested: list[str]) -> list[tuple[str, dict]]:
+    if requested == ["all"]:
+        return list(catalog.items())
+    if "all" in requested:
+        raise ValueError("Use 'all' by itself")
+
+    unknown = [prompt_id for prompt_id in requested if prompt_id not in catalog]
+    if unknown:
+        raise ValueError(f"Unknown student prompt(s): {', '.join(unknown)}")
+    return [(prompt_id, catalog[prompt_id]) for prompt_id in requested]
+
+
+def print_evaluation(result: dict):
+    print("\nEvaluation:")
+    for criterion, value in result["criteria"].items():
+        name = criterion.replace("_", " ").title()
+        grade = value["rating"].replace("_", " ").upper()
+        print(f"\n{name}: {grade}")
+        print(f"  Explanation: {value['rationale']}")
 
 
 async def main():
     load_dotenv()
     args = parse_args()
     config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
-    result = await run(config, OpenAIModel())
-    args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    config["use_reference_answer"] = not args.no_reference_answer
+    catalog_path = ROOT / config["student_prompts_path"]
+    catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))["prompts"]
+    selected = select_prompts(catalog, args.prompts)
 
-    print("\nEvaluation profile:")
-    for criterion, value in result["criteria"].items():
-        print(f"{criterion}: {value['rating']} — {value['rationale']}")
+    results = []
+    model_client = OpenAIModel()
+    for prompt_id, student_config in selected:
+        print(f"\n=== Student prompt {prompt_id}: {student_config['name']} ===")
+        result = await run({**config, **student_config}, model_client)
+        result["student_prompt"] = {
+            "id": prompt_id,
+            "name": student_config["name"],
+        }
+        results.append(result)
+        print_evaluation(result)
 
-    summary = result["summary"]
-    learner_outcome = summary["learner_self_correction"]
-    print("\nOverall evaluation:")
-    print(f"Guardrails: {summary['guardrails']}")
-    print(f"Tutoring quality: {summary['tutoring_quality']}")
-    print(
-        "Learner self-correction: "
-        f"{learner_outcome['rating']} — {learner_outcome['rationale']}"
+    args.output.write_text(
+        json.dumps({"results": results}, indent=2) + "\n",
+        encoding="utf-8",
     )
-    print(f"Result: {summary['result']}")
     print(f"Transcript and results: {args.output}")
 
 

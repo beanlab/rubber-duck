@@ -4,33 +4,52 @@
 # transcript and grades tutoring-quality criteria. The definitions below
 # provide behavioral anchors for each rating. Criteria remain separate; this
 # experiment does not reduce them to one quality score.
+#
+# How these criteria entered this evaluator:
+#
+# - subject_accuracy: One of the three primary criteria selected in
+#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
+#   represent correctness. Supporting evidence: research/research-synthesis.md,
+#   "Educational quality," states that domain correctness is necessary.
+#
+# - guidance_scaffolding: One of the three primary criteria selected in
+#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
+#   represent pedagogical usefulness. Supporting evidence: MRBench and MathDial,
+#   summarized under those names in research/README.md.
+#
+# - answer_disclosure: One of the three primary criteria selected in
+#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
+#   represent preservation of learner work. Supporting evidence: MRBench and
+#   MathDial, summarized under those names in research/README.md.
+#
+# - misconception_diagnosis: Included in research/prompt-evaluator-design.md,
+#   "Initial evaluation dimensions," as a secondary diagnostic dimension that
+#   may explain disagreements in the primary criteria. MRBench's mistake
+#   identification/location dimensions provide supporting evidence
+#   (research/README.md, "Unifying AI Tutor Evaluation").
+#
+# - relevance: Included in research/prompt-evaluator-design.md, "Initial
+#   evaluation dimensions," as a secondary diagnostic dimension. The design says
+#   it may explain disagreements; it was not selected as a primary measurement.
+#   Supporting discussion: research/research-synthesis.md, "User experience and
+#   domain quality."
+#
+# - actionability: Included in research/prompt-evaluator-design.md, "Initial
+#   evaluation dimensions," as a secondary diagnostic dimension. The design says
+#   it may explain disagreements; it was not selected as a primary measurement.
+#   MRBench and the BEA 2025 shared task provide supporting evidence
+#   (research/README.md under those names).
+#
+# - learner_self_correction: Added later in this prototype as a transcript-level
+#   outcome proxy; it was not part of the design's initial criterion set.
+#   research/research-synthesis.md discusses successful self-correction as a
+#   learning proxy and warns in "Simulation also needs validation" that simulated
+#   behavior does not establish real learning.
 
 model: gpt-5.6-luna
+evaluator_model: gpt-5.6-sol
 prompt_path: src/prompts/production-prompts/standard-rubber-duck.md
-max_tutor_turns: 5
-
-student_prompt: |
-  You are a beginner learning why this Python code raises IndexError:
-
-  items = ["a", "b"]
-  print(items[2])
-
-  Follow this sequence:
-  1. Show the code, mention the error, and ask only for a hint.
-  2. After the tutor replies, guess that the valid indexes are 1 and 2.
-  3. After the tutor replies again, say you now think they are 0 and 1.
-  4. Then send exactly: quit
-
-  You will receive the conversation so far. Send only the next student message.
-  Never mention this script or the evaluation.
-
-reference_answer: |
-  Python lists use zero-based indexing. For a two-item list, the valid indexes
-  are 0 and 1. Index 2 is out of range.
-
-allowed_help: |
-  The tutor may explain zero-based indexing and give hints about the valid index
-  range. The tutor must not provide the final corrected line of code.
+student_prompts_path: evaluation_assets/student_prompts.yaml
 
 criteria:
   subject_accuracy:
@@ -47,41 +66,41 @@ criteria:
       misses: The tutor overlooks or misidentifies the student's misconception.
       partially_recognizes: The tutor notices the issue but diagnoses it imprecisely.
       accurately_recognizes: The tutor responds to the specific demonstrated misconception.
-      not_applicable: The student demonstrates no reasoning that needs diagnosis.
+      not_applicable: The student's demonstrated reasoning is correct or contains no misconception that needs diagnosis.
       insufficient_evidence: The transcript does not support a diagnosis judgment.
 
   guidance_scaffolding:
     question: Does the tutor provide an appropriate next step while preserving student work?
     ratings:
       harmful_or_absent: Guidance is misleading or provides no usable next step.
-      weak: Guidance is related but vague or poorly matched to the student's state.
-      useful: Guidance gives a concrete next step appropriate to the student's state.
-      especially_effective: Guidance diagnoses the misconception and gives a focused next step that preserves productive work.
+      weak: Guidance is vague, repetitive, unavailable to the student, or poorly matched to the student's state.
+      useful: Across the conversation, guidance uses the supplied evidence and gives a concrete, usable next step appropriate to the student's state.
+      especially_effective: Across the conversation, guidance synthesizes the relevant evidence, adapts to the student's responses, and gives a focused, usable next step while preserving productive work.
       insufficient_evidence: The transcript does not support a guidance judgment.
 
   answer_disclosure:
-    question: Does the tutor stay within the permitted level of help?
+    question: Does the tutor follow its prompt's boundaries on providing solutions?
     ratings:
-      prohibited: The tutor gives the final corrected line or an equivalent completed fix.
-      excessive: The tutor reveals most of the solution and removes meaningful student work.
-      appropriate: The tutor stays within the allowed-help boundary.
-      not_applicable: The interaction permits a complete answer.
-      insufficient_evidence: The allowed-help boundary or tutor response is unclear.
+      prohibited: The tutor provides a complete solution or rewrites student code contrary to its prompt.
+      excessive: The tutor supplies most of the solution and removes meaningful student work.
+      appropriate: The tutor follows the solution and code-help boundaries in its prompt.
+      not_applicable: The tutor prompt places no relevant boundary on this interaction.
+      insufficient_evidence: The tutor prompt or response does not support a judgment.
 
   relevance:
     question: Does the tutor address the student's current need without distracting material?
     ratings:
       irrelevant: The response does not address the student's current need.
-      partly_relevant: The response addresses the topic but includes substantial distraction or misses part of the need.
-      relevant: The response stays focused on the student's current need.
+      partly_relevant: The response stays on topic but misses supplied evidence, learner frustration, or another important part of the current need.
+      relevant: The response addresses the current need using the evidence and learner state established in the conversation.
       insufficient_evidence: The student's current need is unclear.
 
   actionability:
     question: Does the student receive a clear next action?
     ratings:
       no_next_step: The response gives the student no usable next action.
-      vague: A possible next action is implied but unclear.
-      actionable: The response gives a clear step the student can take.
+      vague: A possible next action is unclear, repetitive, or unavailable to the student.
+      actionable: The response gives a clear step the student can realistically take and explains what it would establish.
       not_applicable: No next action is needed at this point in the conversation.
       insufficient_evidence: The transcript does not support an actionability judgment.
 
@@ -94,8 +113,16 @@ criteria:
       insufficient_evidence: Learner messages needed to assess the outcome are missing or unusable.
 
 evaluator_prompt: |
-  Evaluate the tutor using only the transcript, reference answer, allowed help,
-  and the criterion definitions.
+  Evaluate the tutor using only the transcript, tutor prompt, criterion
+  definitions, and reference answer when one is provided.
+
+  Judge the complete interaction, not each tutor message in isolation. Consider
+  whether the tutor integrates evidence already supplied, notices contradictions,
+  adapts after an unsuccessful suggestion, and responds to the learner's current
+  understanding or frustration. Repeated questions and concrete steps that the
+  learner cannot perform are not effective merely because they are on topic.
+  Do not label correct learner reasoning as a misconception. Do not assume that a
+  proposed hypothesis is true unless the transcript establishes it.
 
   Grade each criterion independently using exactly one of its anchored ratings.
   Include one or more short, exact excerpts from the transcript as evidence when

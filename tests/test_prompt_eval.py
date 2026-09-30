@@ -5,11 +5,13 @@ from scripts.prompt_eval import (
     PromptEvaluation,
     TutorReply,
     run,
+    select_prompts,
 )
 
 
 class FakeModel:
     def __init__(self):
+        self.grade_model = None
         self.student_messages = iter([
             "Why does items[2] cause an error? Please give me a hint.",
             "quit",
@@ -35,7 +37,8 @@ class FakeModel:
     async def tutor(self, model, prompt, history):
         return next(self.tutor_replies)
 
-    async def grade(self, model, prompt, transcript, config):
+    async def grade(self, model, prompt, transcript, tutor_prompt, config):
+        self.grade_model = model
         return PromptEvaluation(
             subject_accuracy=CriterionResult(
                 rating="correct",
@@ -80,11 +83,11 @@ def test_evaluates_one_prompt_on_anchored_criteria(tmp_path):
     prompt.write_text("Tutor prompt", encoding="utf-8")
     config = {
         "model": "test-model",
+        "evaluator_model": "test-evaluator-model",
         "prompt_path": str(prompt),
         "max_tutor_turns": 2,
         "student_prompt": "Student prompt",
         "reference_answer": "Lists start at index zero.",
-        "allowed_help": "Hints only.",
         "criteria": {
             "subject_accuracy": {},
             "misconception_diagnosis": {},
@@ -97,7 +100,8 @@ def test_evaluates_one_prompt_on_anchored_criteria(tmp_path):
         "evaluator_prompt": "Evaluate the transcript.",
     }
 
-    result = asyncio.run(run(config, FakeModel()))
+    model = FakeModel()
+    result = asyncio.run(run(config, model))
 
     assert set(result["criteria"]) == {
         "subject_accuracy",
@@ -109,19 +113,19 @@ def test_evaluates_one_prompt_on_anchored_criteria(tmp_path):
         "learner_self_correction",
     }
     assert result["criteria"]["guidance_scaffolding"]["rating"] == "useful"
-    assert result["summary"] == {
-        "guardrails": "PASSED",
-        "tutoring_quality": "STRONG",
-        "learner_self_correction": {
-            "rating": "not_demonstrated",
-            "evidence": ["quit"],
-            "rationale": "The student quits without stating the corrected indexes.",
-        },
-        "result": "STRONG TUTOR RESPONSE WITH INCOMPLETE OUTCOME EVIDENCE",
-    }
+    assert result["reference_answer_used"] is True
+    assert "summary" not in result
+    assert model.grade_model == "test-evaluator-model"
     assert [turn["role"] for turn in result["transcript"]] == [
         "student",
         "tutor",
         "student",
         "tutor",
     ]
+
+
+def test_selects_student_prompts():
+    catalog = {"1": {"name": "One"}, "2": {"name": "Two"}}
+
+    assert [item[0] for item in select_prompts(catalog, ["2", "1"])] == ["2", "1"]
+    assert [item[0] for item in select_prompts(catalog, ["all"])] == ["1", "2"]
