@@ -4,15 +4,17 @@ from dataclasses import dataclass, field
 from typing import TypedDict, Callable, Literal, Optional, Type
 
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, BadRequestError, \
-    AuthenticationError, ConflictError, NotFoundError, RateLimitError
+    AuthenticationError, ConflictError, NotFoundError, RateLimitError, AsyncOpenAI
+from openai.lib._parsing._responses import type_to_text_format_param
 from openai.types.responses import ToolChoiceTypesParam, ToolChoiceFunctionParam, FunctionToolParam, Response, \
     ResponseInputItemParam
 from openai.types.responses.response_input_item import FunctionCallOutput
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from quest import step
 
 from ..armory.armory import Armory
-from ..utils.retry import retry_async
+from ..utils.config_types import RetryProtocol
+from ..utils.retry import retry_async, retry_delay_seconds, is_retryable_discord_server_error
 
 
 class GenAIException(Exception):
@@ -50,7 +52,8 @@ class Agent:
 
 class AIResponse(TypedDict):
     outputs: list[HistoryType]
-    usage: Usage
+    usage: Usage | None
+    result: str | BaseModel | None
 
 
 def format_function_call_history_items(result: str, call_id) -> FunctionCallOutput:
@@ -61,44 +64,130 @@ def format_function_call_history_items(result: str, call_id) -> FunctionCallOutp
     ).model_dump(exclude_none=True)
 
 
+async def _ignore_retry(_seconds: int):
+    return None
+
+
 class ResponsesAPI:
+    def __init__(
+            self,
+            armory: Armory,
+            retry_protocol: RetryProtocol,
+            client: AsyncOpenAI | None = None,
+    ):
+        self._armory = armory
+        self._retry_protocol = retry_protocol
+        self._client = client or AsyncOpenAI()
+
+    @staticmethod
+    def _is_retryable_server_overload(error: InternalServerError) -> bool:
+        if getattr(error, "status_code", None) != 503:
+            return False
+        body = getattr(error, "body", None)
+        if not isinstance(body, dict):
+            return True
+        payload = body.get("error")
+        if not isinstance(payload, dict):
+            return True
+        return payload.get("code") == "server_is_overloaded"
+
+    def _should_retry(self, error: Exception) -> bool:
+        if isinstance(error, InternalServerError):
+            return self._is_retryable_server_overload(error)
+        return is_retryable_discord_server_error(error)
+
+    def _retry_delay_seconds(self, attempt: int) -> int:
+        return retry_delay_seconds(self._retry_protocol, attempt)
+
+    @staticmethod
+    def _validate_output(
+            agent_name: str,
+            message: str | None,
+            output_format: Type[BaseModel] | None,
+    ) -> str | BaseModel | None:
+        if output_format is None:
+            return message
+
+        try:
+            return output_format.model_validate_json(message)
+        except ValidationError as error:
+            raise GenAIException(
+                error,
+                f"{agent_name} returned invalid structured output, expected {output_format.__name__}",
+            ) from error
+
+    @staticmethod
+    def _message_text(outputs: list[HistoryType]) -> str | None:
+        for output in outputs:
+            if output.get("type") != "message":
+                continue
+            for content in output.get("content", []):
+                if content.get("type") == "output_text":
+                    return content.get("text")
+        return None
+
+    @staticmethod
+    def _add_usage(total: Usage | None, current: Usage | None) -> Usage | None:
+        if current is None:
+            return total
+        if total is None:
+            return current.copy()
+        for key in ("input_tokens", "cached_tokens", "output_tokens", "reasoning_tokens"):
+            total[key] += current[key]
+        return total
+
+    @staticmethod
+    def _tool_value(result):
+        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], bool):
+            return result[0]
+        return result
+
     @step
     async def run_agent_turn(
             self, agent: Agent, history: list[HistoryType],
-            notify_retry: Callable = lambda seconds: None
+            notify_retry: Callable = _ignore_retry
     ) -> AIResponse:
         try:
-            outputs, usage = await self._get_completion(
-                agent.model, agent.reasoning,
-                agent.armory.get_tool_schemas(),
-                agent.armory.get_tool_settings(),
-                agent.output_format,
-                history,
-                notify_retry=notify_retry
-            )
+            turn_outputs: list[HistoryType] = []
+            total_usage = None
 
-            tool_results = []
-            for output in outputs:
-                if output['type'] == "function_call":
+            while True:
+                outputs, usage = await self._get_completion(
+                    agent.model, agent.prompt, agent.reasoning,
+                    [agent.armory.get_tool_schema(tool_name) for tool_name in agent.tools],
+                    agent.tool_settings,
+                    agent.output_format,
+                    history + turn_outputs,
+                    notify_retry=notify_retry,
+                )
+                total_usage = self._add_usage(total_usage, usage)
+
+                tool_results = []
+                for output in outputs:
+                    if output["type"] != "function_call":
+                        continue
+
                     tool_name = output["name"]
                     tool_args = json.loads(output["arguments"])
-
-                    tool = agent.armory.get_specific_tool(tool_name)
+                    tool = agent.tools[tool_name]
                     result = await self._run_tool(tool, tool_args)
 
-                    function_item = format_function_call_history_items(result, output['call_id'])
+                    function_item = format_function_call_history_items(
+                        self._tool_value(result),
+                        output["call_id"],
+                    )
                     tool_results.append(function_item)
 
-                    # await self._record_message(
-                    #     ctx.guild_id, ctx.thread_id, ctx.author_id,
-                    #     "function_call_output", str(function_item)
-                    # )
-            outputs += tool_results
-            
-            return AIResponse(
-                outputs=outputs,
-                usage=usage
-            )
+                outputs += tool_results
+                turn_outputs += outputs
+
+                message = self._message_text(outputs)
+                if message is not None:
+                    return AIResponse(
+                        outputs=turn_outputs,
+                        usage=total_usage,
+                        result=self._validate_output(agent.name, message, agent.output_format),
+                    )
 
         except (
                 APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError,
@@ -115,6 +204,7 @@ class ResponsesAPI:
     async def _get_completion(
             self,
             model: str,
+            prompt: str | None,
             reasoning: str | None,
             tools: list[FunctionToolParam],
             tool_settings: ToolChoiceTypes,
@@ -127,12 +217,13 @@ class ResponsesAPI:
             model=model,
             input=history,
             tools=tools,
-            tool_choice=tool_settings
+            tool_choice=tool_settings,
         )
+        if prompt:
+            params["instructions"] = prompt
 
         if output_format:
-            # noinspection PyTypeChecker
-            params["text"] = output_format
+            params["text"] = type_to_text_format_param(output_format)
 
         if reasoning:
             # noinspection PyTypeChecker
@@ -153,13 +244,15 @@ class ResponsesAPI:
 
         usage = None
         if response.usage:
+            input_token_details = getattr(response.usage, "input_token_details", None)
+            output_token_details = getattr(response.usage, "output_tokens_details", None)
             usage = Usage(
                 model=model,
                 reasoning=reasoning,
                 input_tokens=response.usage.input_tokens,
-                cached_tokens=response.usage.input_token_details.cached_tokens,
+                cached_tokens=getattr(input_token_details, "cached_tokens", 0) or 0,
                 output_tokens=response.usage.output_tokens,
-                reasoning_tokens=response.usage.output_tokens_details.reasoning_tokens
+                reasoning_tokens=getattr(output_token_details, "reasoning_tokens", 0) or 0,
             )
 
         return [
