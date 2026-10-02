@@ -7,11 +7,14 @@ from scripts.prompt_eval import (
     run,
     select_prompts,
 )
+from src.testing.prompt_evaluation import build_tutor_history, evaluate_next_response
 
 
 class FakeModel:
     def __init__(self):
         self.grade_model = None
+        self.grade_config = None
+        self.tutor_history = None
         self.student_messages = iter([
             "Why does items[2] cause an error? Please give me a hint.",
             "quit",
@@ -35,10 +38,12 @@ class FakeModel:
         return next(self.student_messages)
 
     async def tutor(self, model, prompt, history):
+        self.tutor_history = history
         return next(self.tutor_replies)
 
     async def grade(self, model, prompt, transcript, tutor_prompt, config):
         self.grade_model = model
+        self.grade_config = config
         return PromptEvaluation(
             subject_accuracy=CriterionResult(
                 rating="correct",
@@ -129,3 +134,43 @@ def test_selects_student_prompts():
 
     assert [item[0] for item in select_prompts(catalog, ["2", "1"])] == ["2", "1"]
     assert [item[0] for item in select_prompts(catalog, ["all"])] == ["1", "2"]
+
+
+def test_evaluates_exactly_one_response_after_a_prefix():
+    prefix = [
+        {"role": "student", "message": "I need help."},
+        {"role": "tutor", "message": "What have you tried?"},
+        {"role": "student", "message": "I do not know where to start."},
+    ]
+    config = {
+        "model": "test-model",
+        "evaluator_model": "test-evaluator-model",
+        "reference_answer": "Start by identifying the required output.",
+        "criteria": {
+            "subject_accuracy": {},
+            "misconception_diagnosis": {},
+            "guidance_scaffolding": {},
+            "answer_disclosure": {},
+            "relevance": {},
+            "actionability": {},
+            "learner_self_correction": {},
+        },
+        "evaluator_prompt": "Evaluate the response.",
+    }
+
+    model = FakeModel()
+    result = asyncio.run(
+        evaluate_next_response(
+            config=config,
+            model_client=model,
+            transcript=prefix,
+            tutor_prompt="Tutor prompt",
+        )
+    )
+
+    assert result["transcript"][-1] == {
+        "role": "tutor",
+        "message": "What index does Python use for the first item?",
+    }
+    assert model.grade_config["evaluation_scope"] == "response"
+    assert model.tutor_history == build_tutor_history(prefix)

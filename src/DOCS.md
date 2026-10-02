@@ -22,6 +22,8 @@ Each subdirectory owns a subsystem with a focused responsibility.
 - `gen_ai/` owns model/tool loop execution.
 - `storage/` and `metrics/` own persistence and analytics.
 - `utils/` owns cross-cutting infrastructure helpers.
+- `testing/prompt_evaluation.py` owns the shared one-response tutor call and
+  anchored criterion evaluator used by offline prefix cases and the live dry run.
 
 ## Failure Modes and Guardrails
 
