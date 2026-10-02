@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import NotRequired, Literal, Union
+from typing import NotRequired, Literal
 
 from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
@@ -111,21 +110,9 @@ class AgentConversationSettings(TypedDict):
     file_type_ext: list[str]
 
 
-@dataclass
-class DuckContext:
-    guild_id: int
-    parent_channel_id: int
-    author_id: int
-    author_mention: str
-    content: str
-    message_id: int
-    thread_id: int
-    timeout: int
-
-
 class DuckConfig(TypedDict):
-    duck_type: str  # validated in build_ducks
-    settings: dict  # could specify further
+    builder: str  # path to build_duck function, e.g. ducks/standard_duck.py:build_standard_duck
+    settings: dict  # specific settings for the duck
 
 
 class ChannelConfig(TypedDict):
@@ -210,14 +197,15 @@ class ContainerTool(TypedDict):
 
 ToolConfig = ContainerTool
 
+
 class Config(TypedDict):
-    sql: SQLConfig
-    containers: dict[str, ContainerConfig]
-    tools: dict[str, ToolConfig]
-    cache_cleanup_settings: NotRequired[CacheCleanupSettings]
     ducks: dict[DUCK_NAME, DuckConfig]
-    agents_as_tools: dict[str, AgentAsToolSettings]
     servers: dict[str, ServerConfig]
+    sql: SQLConfig
+    # containers: dict[str, ContainerConfig]
+    # tools: dict[str, ToolConfig]
+    cache_cleanup_settings: NotRequired[CacheCleanupSettings]
+    agents_as_tools: dict[str, AgentAsToolSettings]
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]

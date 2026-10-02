@@ -15,11 +15,6 @@ class SetupThread(Protocol):
     async def __call__(self, parent_channel_id: int, author_mention: str, title: str) -> int: ...
 
 
-class DuckConversation(Protocol):
-    name: str
-
-    async def __call__(self, context: DuckContext): ...
-
 
 def generate_error_message(thread_id, ex):
     error_code = str(uuid.uuid4()).split('-')[0].upper()

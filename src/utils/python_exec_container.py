@@ -27,6 +27,18 @@ class ExecutionResult(TypedDict):
     files: dict[str, FileResult]
 
 
+class ArtifactResult(TypedDict):
+    description: str
+
+
+class DeferredExecutionResult(TypedDict):
+    exit_code: int
+    stdout: str
+    stderr: str
+    execution_dir: str | None
+    files: dict[str, ArtifactResult]
+
+
 class PythonExecContainer:
     def __init__(self, image: str, name: str, resource_data: list[ResourceConfig], settings: ContainerSettings):
         self._image = image
@@ -245,42 +257,29 @@ class PythonExecContainer:
 
         raise FileNotFoundError(f"File not found in container: {path}")
 
-    def _read_files(self, path: str) -> dict[str, dict[str, str] | bytes]:
-        """
-        Reads all files inside a directory given by `path`, e.g. "/out/<uuid>"
-        Returns:
-            {
-                "path/filename": {
-                    "description": str,
-                    "data": bytes
-                }
-            }
-        """
-        out_files = {}
-
-        # run ls inside container to list directory contents
-        exit_code, dirs = self._container.exec_run(f"ls -1 {path}")
-
+    def _describe_files(self, path: str) -> dict[str, ArtifactResult]:
+        exit_code, dirs = self._container.exec_run(["ls", "-1", path])
         if exit_code != 0:
             raise FileNotFoundError(f"Directory not found in container: {path}")
 
         filenames = dirs.decode().splitlines()
-        json_files = {f for f in filenames if f.endswith(".json")}
-
-        for filename in filenames:
-            # skip json files
-            if filename.endswith(".json"):
-                continue
-
-            full_path = os.path.join(path, filename)
-            file_data = self._read_file(full_path)
-            description = self._get_file_description(path, filename, json_files)
-
-            out_files[filename] = {
-                "description": description,
-                "bytes": file_data
+        json_files = {filename for filename in filenames if filename.endswith(".json")}
+        return {
+            filename: {
+                "description": self._get_file_description(path, filename, json_files),
             }
-        return out_files
+            for filename in filenames
+            if not filename.endswith(".json")
+        }
+
+    def _read_files(self, path: str) -> dict[str, FileResult]:
+        return {
+            filename: {
+                "description": artifact["description"],
+                "bytes": self._read_file(os.path.join(path, filename)),
+            }
+            for filename, artifact in self._describe_files(path).items()
+        }
 
     def _wrap_code(self, path: str, code: str) -> str:
         wrapped_code = dedent(f"""\
@@ -385,43 +384,51 @@ class PythonExecContainer:
         stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
         return result.exit_code, stdout, stderr
 
+    def _execution_dir(self) -> str:
+        return f"{self._working_dir}/{uuid.uuid4()}"
+
     def _run_code(self, code: str) -> ExecutionResult:
-        unique_id = str(uuid.uuid4())
-        dir_path = self._mkdir(f'{self._working_dir}/{unique_id}')
-        duck_logger.debug(f'Running code in {self._container.name}:\n{code}')
-
-        exit_code, stdout, stderr = self._wrap_and_execute(code, dir_path)
-
-        duck_logger.debug(f'Exit code: {exit_code}')
-        duck_logger.debug(' stdout '.center(20, '-')+f"\n{stdout}")
-        duck_logger.debug(' stderr '.center(20, '-')+f"\n{stderr}")
-
-        files = self._read_files(dir_path)
-
-        output = {
-            'exit_code': exit_code,
-            'stdout': stdout,
-            'stderr': stderr,
-            'files': files
+        dir_path = self._mkdir(self._execution_dir())
+        exit_code, stdout, stderr = self._execute(code, dir_path)
+        return {
+            "exit_code": exit_code,
+            "stdout": stdout,
+            "stderr": stderr,
+            "files": self._read_files(dir_path),
         }
-        return output
+
+    def _run_code_deferred(self, code: str, dir_path: str) -> DeferredExecutionResult:
+        self._mkdir(dir_path)
+        exit_code, stdout, stderr = self._execute(code, dir_path)
+        return {
+            "exit_code": exit_code,
+            "stdout": stdout,
+            "stderr": stderr,
+            "execution_dir": dir_path,
+            "files": self._describe_files(dir_path),
+        }
+
+    def _execute(self, code: str, dir_path: str) -> tuple[int, str, str]:
+        duck_logger.debug(f'Running code in {self._container.name}:\n{code}')
+        exit_code, stdout, stderr = self._wrap_and_execute(code, dir_path)
+        duck_logger.debug(f'Exit code: {exit_code}')
+        duck_logger.debug(' stdout '.center(20, '-') + f"\n{stdout}")
+        duck_logger.debug(' stderr '.center(20, '-') + f"\n{stderr}")
+        return exit_code, stdout, stderr
 
     async def run_code(self, code: str) -> ExecutionResult:
         """Takes python code to execute and an optional dict of files to reference"""
         timeout = self._settings.get("timeout")
 
-        # If no timeout, fallback to normal call
         if not timeout:
             return await asyncio.to_thread(self._run_code, code)
 
         try:
-            # run _run_code in a thread with timeout
             return await asyncio.wait_for(
                 asyncio.to_thread(self._run_code, code),
                 timeout=timeout
             )
         except asyncio.TimeoutError:
-            # kill any processes inside the container
             if self._container:
                 self._container.exec_run("pkill -u sandbox", demux=True)
 
@@ -431,6 +438,50 @@ class PythonExecContainer:
                 "stderr": f"Execution timed out after {timeout} seconds",
                 "files": {}
             }
+
+    async def run_code_deferred(self, code: str) -> DeferredExecutionResult:
+        """Run code while leaving generated artifacts in its Docker execution directory."""
+        dir_path = self._execution_dir()
+        timeout = self._settings.get("timeout")
+        try:
+            execution = asyncio.to_thread(self._run_code_deferred, code, dir_path)
+            if timeout:
+                return await asyncio.wait_for(execution, timeout=timeout)
+            return await execution
+        except asyncio.TimeoutError:
+            if self._container:
+                self._container.exec_run("pkill -u sandbox", demux=True)
+            await self.cleanup_execution(dir_path)
+            return {
+                "exit_code": -1,
+                "stdout": "",
+                "stderr": f"Execution timed out after {timeout} seconds",
+                "execution_dir": None,
+                "files": {},
+            }
+        except Exception:
+            await self.cleanup_execution(dir_path)
+            raise
+
+    def _validate_execution_path(self, execution_dir: str, filename: str | None = None) -> str:
+        working_dir = os.path.normpath(self._working_dir)
+        execution_dir = os.path.normpath(execution_dir)
+        if execution_dir == working_dir or os.path.commonpath([working_dir, execution_dir]) != working_dir:
+            raise ValueError("Execution directory is outside the configured working directory")
+        if filename is None:
+            return execution_dir
+        if os.path.basename(filename) != filename:
+            raise ValueError("Artifact filename must not contain a path")
+        return os.path.join(execution_dir, filename)
+
+    async def read_artifact(self, execution_dir: str, filename: str) -> bytes:
+        path = self._validate_execution_path(execution_dir, filename)
+        return await asyncio.to_thread(self._read_file, path)
+
+    async def cleanup_execution(self, execution_dir: str):
+        path = self._validate_execution_path(execution_dir)
+        if self._container:
+            await asyncio.to_thread(self._container.exec_run, ["rm", "-rf", "--", path])
 
     def describe_dataset(self, dataset_name: str) -> str | None:
         """Return full metadata for a dataset matched by exact staged filename."""
