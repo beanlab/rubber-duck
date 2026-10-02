@@ -243,8 +243,9 @@ def build_ai_response_ducks(
         config: Config,
         bot: DiscordBot,
         metrics_handler,
-        armory,
-        talk_tool,
+        containers: dict[str, PythonExecContainer],
+        sql_session,
+        tool_caches: list[ToolCache],
 ) -> dict[DUCK_NAME, DuckConversation]:
     ducks = {}
     for name, duck_config in _iterate_duck_configs(config):
@@ -253,11 +254,10 @@ def build_ai_response_ducks(
             continue
 
         settings = duck_config['settings']
-        responses_api = ResponsesAPI(armory, config['ai_completion_retry_protocol'])
+        responses_api = ResponsesAPI(config['ai_completion_retry_protocol'])
         workflow_args = dict(
             name=name,
             responses_api=responses_api,
-            talk_tool=talk_tool,
             typing=bot.typing,
             record_message=metrics_handler.record_message,
             record_usage=metrics_handler.record_usage,
@@ -265,15 +265,21 @@ def build_ai_response_ducks(
         )
         if duck_type == 'agent_led_conversation':
             ducks[name] = StandardDuckWorkflow(
-                agent=build_standard_agent(settings['agent'], armory),
+                agent=build_standard_agent(settings['agent']),
                 **workflow_args,
             )
         elif duck_type == 'stats_ai_response_conversation':
-            ducks[name] = StatsDuckWorkflow(
+            workflow = StatsDuckWorkflow(
                 introduction=settings['introduction'],
-                agent=build_stats_agent(settings['agent'], armory),
+                agent=build_stats_agent(settings['agent']),
+                tool_names=settings['agent'].get('tools', []),
+                tool_configs=config.get('tools', {}),
+                containers=containers,
+                sql_session=sql_session,
                 **workflow_args,
             )
+            tool_caches.extend(workflow.tool_caches)
+            ducks[name] = workflow
 
     return ducks
 
@@ -285,13 +291,23 @@ def _setup_ducks(
         feedback_manager,
         ai_client,
         armory,
-        talk_tool
+        talk_tool,
+        containers: dict[str, PythonExecContainer],
+        sql_session,
+        tool_caches: list[ToolCache],
 ) -> dict[CHANNEL_ID, DuckConversation]:
     """
     Return a dictionary of channel ID to DuckConversation
     """
     legacy_ducks = build_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
-    ai_response_ducks = build_ai_response_ducks(config, bot, metrics_handler, armory, talk_tool)
+    ai_response_ducks = build_ai_response_ducks(
+        config,
+        bot,
+        metrics_handler,
+        containers,
+        sql_session,
+        tool_caches,
+    )
     all_ducks = {**legacy_ducks, **ai_response_ducks}
 
     channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
@@ -513,7 +529,18 @@ async def _main(config: Config, log_dir: Path):
                 )
                 add_agent_tools_to_armory(config, armory, ai_client)
 
-                ducks = _setup_ducks(config, bot, metrics_handler, feedback_manager, ai_client, armory, talk_tool)
+                ducks = _setup_ducks(
+                    config,
+                    bot,
+                    metrics_handler,
+                    feedback_manager,
+                    ai_client,
+                    armory,
+                    talk_tool,
+                    containers,
+                    sql_session,
+                    tool_caches,
+                )
 
                 duck_orchestrator = DuckOrchestrator(
                     setup_thread,

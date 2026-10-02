@@ -1,6 +1,6 @@
 import inspect
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TypedDict, Callable, Literal, Optional, Type
 
 from openai import APITimeoutError, InternalServerError, UnprocessableEntityError, APIConnectionError, BadRequestError, \
@@ -12,7 +12,7 @@ from openai.types.responses.response_input_item import FunctionCallOutput
 from pydantic import BaseModel, ValidationError
 from quest import step
 
-from ..armory.armory import Armory
+from ..armory.tools import ToolBox
 from ..utils.config_types import RetryProtocol
 from ..utils.retry import retry_async, retry_delay_seconds, is_retryable_discord_server_error
 
@@ -70,11 +70,9 @@ async def _ignore_retry(_seconds: int):
 class ResponsesAPI:
     def __init__(
             self,
-            armory: Armory,
             retry_protocol: RetryProtocol,
             client: AsyncOpenAI | None = None,
     ):
-        self._armory = armory
         self._retry_protocol = retry_protocol
         self._client = client or AsyncOpenAI()
 
@@ -135,12 +133,6 @@ class ResponsesAPI:
             total[key] += current[key]
         return total
 
-    @staticmethod
-    def _tool_value(result):
-        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], bool):
-            return result[0]
-        return result
-
     @step
     async def run_agent_turn(
             self, agent: Agent, history: list[HistoryType],
@@ -153,7 +145,7 @@ class ResponsesAPI:
             while True:
                 outputs, usage = await self._get_completion(
                     agent.model, agent.prompt, agent.reasoning,
-                    agent.tools.get_tool_schemas(),
+                    agent.tools.get_tool_schemas() if agent.tools else [],
                     agent.tool_settings,
                     agent.output_format,
                     history + turn_outputs,
@@ -173,7 +165,7 @@ class ResponsesAPI:
                     result = await self._run_tool(tool, tool_args)
 
                     function_item = format_function_call_history_items(
-                        self._tool_value(result),
+                        result,
                         output["call_id"],
                     )
                     tool_results.append(function_item)
@@ -270,6 +262,6 @@ class ResponsesAPI:
         except Exception as error:
             if isinstance(error, GenAIException):
                 raise
-            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}.", False
+            result = f"An error occurred while running the tool. Please try again. Error: {str(error)}."
 
         return result
