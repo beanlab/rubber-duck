@@ -2,7 +2,7 @@ import inspect
 import io
 import re
 from decimal import Decimal, InvalidOperation
-from functools import partial, wraps
+from functools import wraps
 from pathlib import Path
 from types import UnionType
 from typing import Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
@@ -12,6 +12,7 @@ from openai import OpenAI
 from openai.types.responses import FunctionToolParam
 from pandas.api.types import is_numeric_dtype
 
+from .tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from ..storage.stats_output_types import ExecutionOutput, TextOutput
 from ..utils.config_types import DuckContext
 from ..utils.logger import duck_logger
@@ -27,7 +28,6 @@ from ..utils.python_exec_container import (
     is_image,
     is_table,
 )
-from .tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 
 
 def register_tool(func):
@@ -120,9 +120,40 @@ class ToolBox:
         self._tools: dict[str, Callable] = {}
         self._schemas: dict[str, FunctionToolParam] = {}
 
+    def tool(
+            self,
+            tool_function: Callable[..., Any] | None = None,
+            *,
+            name: str | None = None,
+            description: str | None = None,
+    ):
+        """Register a function with this toolbox as a decorator.
+
+        Both bare and configured decorator forms are supported::
+
+            @toolbox.tool
+            def foo(value: str) -> str:
+                ...
+
+            @toolbox.tool(name="custom_name", description="...")
+            def foo(value: str) -> str:
+                ...
+        """
+        if tool_function is not None:
+            if not callable(tool_function):
+                raise TypeError("Tool decorator expected a callable")
+            self.add_tool(tool_function, name=name, description=description)
+            return tool_function
+
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            self.add_tool(func, name=name, description=description)
+            return func
+
+        return decorator
+
     def add_tool(self, tool_function: Callable, name=None, description=None):
         name = name or tool_function.__name__
-        description = description if description is not None else tool_function.__doc__
+        description = description or tool_function.__doc__
 
         @wraps(tool_function)
         async def tool(*args, **kwargs):
@@ -135,13 +166,6 @@ class ToolBox:
         tool.__doc__ = description
         self._tools[name] = tool
         self._schemas[name] = generate_function_schema(tool)
-
-    def bind_context(self, context) -> "ToolBox":
-        toolbox = ToolBox()
-        for name, tool in self._tools.items():
-            toolbox._tools[name] = partial(tool, context)
-            toolbox._schemas[name] = self._schemas[name]
-        return toolbox
 
     def get_tool_schemas(self) -> list[FunctionToolParam]:
         return list(self._schemas.values())
@@ -260,7 +284,7 @@ async def send_table(
 
     for i in range(0, table.shape[1], col_chunk):
         md_table = table.iloc[:, i:i +
-                              col_chunk].to_markdown(disable_numparse=True)
+                                   col_chunk].to_markdown(disable_numparse=True)
         table_chunk = f"```\n{md_table}\n```"
         table_chunks.append(table_chunk)
         await send_message(channel_id, table_chunk)
@@ -559,10 +583,10 @@ def build_stats_toolbox(
             list(dataset_containers.values()), send_message)
         if "describe_dataset" in dataset_tool_names:
             description = (
-                "Returns the full description for a dataset by filename.\n"
-                "Accepts either a filename or a path that ends in that filename.\n"
-                "Use this when you need full column-level metadata."
-                + dataset_tools.get_resource_metadata()
+                    "Returns the full description for a dataset by filename.\n"
+                    "Accepts either a filename or a path that ends in that filename.\n"
+                    "Use this when you need full column-level metadata."
+                    + dataset_tools.get_resource_metadata()
             )
             toolbox.add_tool(
                 dataset_tools.describe_dataset,

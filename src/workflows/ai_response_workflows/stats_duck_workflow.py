@@ -1,6 +1,6 @@
 import io
 import json
-from dataclasses import replace
+from dataclasses import replace, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -10,10 +10,30 @@ from quest import step
 
 from ...armory.tools import build_stats_toolbox, send_table
 from ...gen_ai.ai_responses import Agent, ResponsesAPI
-from ...storage.stats_output_types import ExecutionOutput, FileOutput, TextOutput
 from ...utils.config_types import DuckContext, HistoryType
 from ...utils.message_utils import wait_for_message
-from ...utils.python_exec_container import is_image, is_table
+from ...utils.protocols import ToolCache
+from ...utils.python_exec_container import is_image, is_table, PythonExecContainer, DeferredExecutionResult
+
+
+@dataclass
+class TextOutput:
+    text: str
+
+
+@dataclass
+class FileOutput:
+    filename: str
+    data: bytes
+
+
+@dataclass
+class ExecutionOutput:
+    container: PythonExecContainer
+    result: DeferredExecutionResult
+    stdout: str
+    tool_cache: ToolCache | None
+    cache_key: str | None
 
 
 class StatsOutputCollector:
@@ -277,14 +297,10 @@ class StatsDuckWorkflow:
                         type="message",
                     ).model_dump()
                 )
-
-                agent = replace(
-                    self._agent,
-                    tools=self._agent.tools.bind_context(context),
-                )
+                
                 async with self._typing(context.thread_id):
                     response = await self._responses_api.run_agent_turn(
-                        agent,
+                        self._agent,
                         history,
                         notify_retry,
                     )

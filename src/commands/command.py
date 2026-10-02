@@ -17,6 +17,7 @@ from ..utils.zip_utils import zip_data_file
 
 
 class Command:
+    namespace = ""
     name = ""
     help_msg = ""
 
@@ -507,7 +508,13 @@ class CacheCommand(Command):
         await self.send_message(channel_id, file=csv_file_data)
 
 
-def create_commands(send_message, metrics_handler, reporter, log_dir, tool_caches: list[ToolCache]) -> list[Command]:
+def create_commands(
+        send_message, 
+        metrics_handler, 
+        reporter, 
+        log_dir, 
+        # tool_caches: list[ToolCache]
+) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():
         return find_workflow_manager().get_workflow_metrics()
