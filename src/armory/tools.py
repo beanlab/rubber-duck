@@ -1,11 +1,33 @@
 import inspect
+import io
+import re
+from decimal import Decimal, InvalidOperation
 from functools import partial, wraps
+from pathlib import Path
 from types import UnionType
-from typing import Any, Callable, get_type_hints, Literal, get_origin, get_args, Union
+from typing import Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
 
+import pandas as pd
+from openai import OpenAI
 from openai.types.responses import FunctionToolParam
+from pandas.api.types import is_numeric_dtype
 
-_tools: dict[str, Callable] = {}
+from ..storage.stats_output_types import ExecutionOutput, TextOutput
+from ..utils.config_types import DuckContext
+from ..utils.logger import duck_logger
+from ..utils.protocols import (
+    CacheKeyBuilder,
+    ConcludesResponse,
+    SendMessage,
+    ToolCache,
+)
+from ..utils.python_exec_container import (
+    FileResult,
+    PythonExecContainer,
+    is_image,
+    is_table,
+)
+from .tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 
 
 def register_tool(func):
@@ -33,7 +55,8 @@ def get_strict_json_schema_type(annotation) -> dict:
         non_none_args = [arg for arg in args if arg is not type(None)]
         if len(non_none_args) == 1:
             return get_strict_json_schema_type(non_none_args[0])
-        raise TypeError(f"Unsupported Union with multiple non-None values: {annotation}")
+        raise TypeError(
+            f"Unsupported Union with multiple non-None values: {annotation}")
 
     type_map = {
         str: "string",
@@ -70,7 +93,8 @@ def generate_function_schema(func: Callable[..., Any]) -> FunctionToolParam:
 
         ann = type_hints.get(name, param.annotation)
         if ann is inspect._empty:
-            raise TypeError(f"On func {func.__name__}: missing type annotation for parameter: {name}")
+            raise TypeError(
+                f"On func {func.__name__}: missing type annotation for parameter: {name}")
 
         schema_entry = get_strict_json_schema_type(ann)
 
@@ -128,24 +152,6 @@ class ToolBox:
         raise KeyError(f"Tool '{tool_name}' not found in toolbox.")
 
 
-# Statistical tools shared by legacy and AI Responses workflows.
-import io
-import re
-from pathlib import Path
-from decimal import Decimal, InvalidOperation
-import pandas as pd
-from pandas.api.types import is_numeric_dtype
-
-from ..storage.stats_output_types import ExecutionOutput, TextOutput
-from ..utils.protocols import ToolCache, CacheKeyBuilder
-from ..utils.config_types import DuckContext
-from ..utils.logger import duck_logger
-from ..utils.protocols import SendMessage, ConcludesResponse
-from ..utils.python_exec_container import PythonExecContainer, is_image, is_table, FileResult
-from .tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
-from openai import OpenAI
-
-
 _SCI_NOTATION_PATTERN = re.compile(
     r"(?<![\w.])([+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+)(?![\w.])"
 )
@@ -184,7 +190,8 @@ def _format_table_values(table: pd.DataFrame) -> pd.DataFrame:
         if not is_numeric_dtype(formatted_table[col]):
             continue
         formatted_table[col] = formatted_table[col].map(
-            lambda value: _format_rounded_decimal(value, 4) if pd.notna(value) else ""
+            lambda value: _format_rounded_decimal(
+                value, 4) if pd.notna(value) else ""
         )
     return formatted_table
 
@@ -211,7 +218,6 @@ def _determine_col_chunk(df, max_table_width=90):
     current_chunk = 0
 
     for width in col_widths.values():
-        # +3 accounts for markdown separators and padding
         projected = current_width + width + 4
 
         if projected > max_table_width and current_chunk > 0:
@@ -220,7 +226,6 @@ def _determine_col_chunk(df, max_table_width=90):
         current_width = projected
         current_chunk += 1
 
-    # ensure it's between 2 and 6
     return max(2, min(current_chunk, 6))
 
 
@@ -231,11 +236,9 @@ def _clean_stdout(stdout: str, files: dict[str, FileResult]) -> str:
     for line in stdout.splitlines():
         stripped = line.strip()
 
-        # drop filename echoes
         if stripped in file_names:
             continue
 
-        # drop lines mentioning filenames
         if any(name in stripped for name in file_names):
             continue
 
@@ -256,7 +259,8 @@ async def send_table(
     table_chunks = []
 
     for i in range(0, table.shape[1], col_chunk):
-        md_table = table.iloc[:, i:i + col_chunk].to_markdown(disable_numparse=True)
+        md_table = table.iloc[:, i:i +
+                              col_chunk].to_markdown(disable_numparse=True)
         table_chunk = f"```\n{md_table}\n```"
         table_chunks.append(table_chunk)
         await send_message(channel_id, table_chunk)
@@ -296,7 +300,8 @@ class PythonTools:
         if collector is not None:
             key = None
             if self._tool_cache and self._cache_key_builder:
-                cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
+                cache_key = self._cache_key_builder.build_cache_key(
+                    user_intent, code)
                 key = self._tool_cache.get_key(cache_key)
                 duck_logger.debug(f"Cache key: {key}")
                 if self._tool_cache.check_if_cached(key):
@@ -311,7 +316,8 @@ class PythonTools:
             results = await self._container.run_code_deferred(code)
             files = results.get("files", {})
             stdout = _clean_stdout(results.get("stdout", "").strip(), files)
-            stderr = _remove_scientific_notation(results.get("stderr", "").strip())
+            stderr = _remove_scientific_notation(
+                results.get("stderr", "").strip())
             collector.items.append(
                 ExecutionOutput(
                     self._container,
@@ -332,7 +338,8 @@ class PythonTools:
 
         key = None
         if self._tool_cache and self._cache_key_builder:
-            cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
+            cache_key = self._cache_key_builder.build_cache_key(
+                user_intent, code)
             key = self._tool_cache.get_key(cache_key)
             duck_logger.debug(f"Cache key: {key}")
 
@@ -354,13 +361,11 @@ class PythonTools:
         stderr = _remove_scientific_notation(results.get('stderr').strip())
         files = results.get('files', {})
 
-        # log created files
         if files:
             duck_logger.debug(" files ".center(20, '-'))
             for filename, file in files.items():
                 duck_logger.debug(f" {filename}: {file['description']}")
 
-        # send files directly
         for filename, file in files.items():
             if is_image(filename):
                 if self._tool_cache and key is not None:
@@ -380,9 +385,9 @@ class PythonTools:
                     table,
                 )
                 if self._tool_cache and key is not None:
-                    self._tool_cache.cache_table(key, filename, table_chunks, file.get("description", ""))
+                    self._tool_cache.cache_table(
+                        key, filename, table_chunks, file.get("description", ""))
 
-        # send cleaned stdout directly
         stdout = _clean_stdout(stdout, files)
         if stdout:
             if self._tool_cache and key is not None:
@@ -411,7 +416,8 @@ class DatasetTools:
         dataset_names: list[str] = []
         for container in self._containers:
             for dataset in container.get_dataset_inventory():
-                display_name = dataset.get("dataset_name") or dataset.get("filename")
+                display_name = dataset.get(
+                    "dataset_name") or dataset.get("filename")
                 if not display_name or display_name in seen:
                     continue
                 seen.add(display_name)
@@ -435,7 +441,8 @@ class DatasetTools:
         if not dataset_names:
             message = "No datasets are currently available."
         else:
-            message = "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
+            message = "\n".join(["Available datasets:"] +
+                                [f"- {name}" for name in dataset_names])
 
         collector = getattr(ctx, "_stats_output_collector", None)
         if collector is not None:
@@ -453,7 +460,8 @@ class DatasetTools:
         Accepts either the exact staged filename or any path ending in that filename.
         Do not use Dataset Name values.
         """
-        duck_logger.debug(f"describe_dataset called with dataset_name={dataset_filename!r}")
+        duck_logger.debug(
+            f"describe_dataset called with dataset_name={dataset_filename!r}")
         normalized_filename = Path(dataset_filename).name
         for container in self._containers:
             description = container.describe_dataset(normalized_filename)
@@ -467,14 +475,16 @@ class DatasetTools:
             for filename in container.get_dataset_filenames()
         })
         if not available:
-            duck_logger.debug(f"describe_dataset no datasets available for dataset_name={dataset_filename!r}")
+            duck_logger.debug(
+                f"describe_dataset no datasets available for dataset_name={dataset_filename!r}")
             return "No datasets are currently available."
 
         message = (
             f"Dataset '{dataset_filename}' not found. "
             f"Available dataset filenames: {', '.join(available)}"
         )
-        duck_logger.debug(f"describe_dataset no match for dataset_name={dataset_filename!r}; {message}")
+        duck_logger.debug(
+            f"describe_dataset no match for dataset_name={dataset_filename!r}; {message}")
         return message
 
 
@@ -494,7 +504,8 @@ def build_stats_toolbox(
         if not tool_config:
             continue
         if tool_config["type"] != "container_exec":
-            raise NotImplementedError(f"Unsupported tool type: {tool_config['type']}")
+            raise NotImplementedError(
+                f"Unsupported tool type: {tool_config['type']}")
 
         container = containers[tool_config["container"]]
         dataset_containers[tool_config["container"]] = container
@@ -508,7 +519,8 @@ def build_stats_toolbox(
             elif backend == "database":
                 tool_cache = SqlToolCache(sql_session)
             else:
-                raise NotImplementedError(f"Unsupported cache backend: {backend}")
+                raise NotImplementedError(
+                    f"Unsupported cache backend: {backend}")
 
             prompt_path = cache_settings.get("prompt")
             if not prompt_path:
@@ -534,7 +546,8 @@ def build_stats_toolbox(
         toolbox.add_tool(
             python_tools.run_code,
             name=tool_name,
-            description=tool_config.get("description", python_tools.run_code.__doc__),
+            description=tool_config.get(
+                "description", python_tools.run_code.__doc__),
         )
 
     dataset_tool_names = {
@@ -542,7 +555,8 @@ def build_stats_toolbox(
         "send_datasets_to_user",
     }.intersection(tool_names)
     if dataset_tool_names:
-        dataset_tools = DatasetTools(list(dataset_containers.values()), send_message)
+        dataset_tools = DatasetTools(
+            list(dataset_containers.values()), send_message)
         if "describe_dataset" in dataset_tool_names:
             description = (
                 "Returns the full description for a dataset by filename.\n"
@@ -563,7 +577,7 @@ def build_stats_toolbox(
 
     missing = set(tool_names).difference(toolbox._tools)
     if missing:
-        raise KeyError(f"Tools unavailable to stats workflow: {', '.join(sorted(missing))}")
+        raise KeyError(
+            f"Tools unavailable to stats workflow: {', '.join(sorted(missing))}")
 
     return toolbox, tool_caches
-
