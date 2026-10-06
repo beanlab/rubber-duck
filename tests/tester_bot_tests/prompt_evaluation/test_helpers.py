@@ -1,4 +1,10 @@
-"""Unit tests for fixed-prefix tutor-response evaluation helpers."""
+"""Test the fixed-prefix evaluation plumbing without live model calls.
+
+The fake client verifies conversation-history conversion, one-response
+generation, evaluator input boundaries, reference-answer isolation, model
+selection, and structured criterion output. It does not test whether a real
+evaluator's tutoring-quality judgments are valid.
+"""
 
 import asyncio
 import json

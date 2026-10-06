@@ -7,38 +7,35 @@
 #
 # How these criteria entered this evaluator:
 #
-# - subject_accuracy: One of the three primary criteria selected in
-#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
-#   represent correctness. Supporting evidence: research/research-synthesis.md,
-#   "Educational quality," states that domain correctness is necessary.
+# - subject_accuracy: A primary criterion representing correctness.
+#   research/research-synthesis.md, "Educational quality," identifies domain
+#   correctness as necessary even when the response is pedagogically useful.
 #
-# - guidance_scaffolding: One of the three primary criteria selected in
-#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
-#   represent pedagogical usefulness. Supporting evidence: MRBench and MathDial,
-#   summarized under those names in research/README.md.
+# - guidance_scaffolding: A primary criterion representing pedagogical
+#   usefulness. MRBench and MathDial support evaluating whether guidance is
+#   appropriate to the learner's current state while preserving productive work;
+#   both are summarized in research/README.md.
 #
-# - answer_disclosure: One of the three primary criteria selected in
-#   research/prompt-evaluator-design.md, "Initial evaluation dimensions," to
-#   represent preservation of learner work. Supporting evidence: MRBench and
-#   MathDial, summarized under those names in research/README.md.
+# - answer_disclosure: A primary criterion representing preservation of learner
+#   work. MRBench and MathDial identify premature answer revealing as distinct
+#   from correctness or general helpfulness; both are summarized in
+#   research/README.md.
 #
-# - misconception_diagnosis: Included in research/prompt-evaluator-design.md,
-#   "Initial evaluation dimensions," as a secondary diagnostic dimension that
-#   may explain disagreements in the primary criteria. MRBench's mistake
-#   identification/location dimensions provide supporting evidence
-#   (research/README.md, "Unifying AI Tutor Evaluation").
+# - misconception_diagnosis: A secondary diagnostic criterion that can explain
+#   weak guidance. MRBench's mistake-identification and mistake-location
+#   dimensions support checking whether the tutor recognizes the learner's
+#   demonstrated reasoning; see research/README.md, "Unifying AI Tutor
+#   Evaluation."
 #
-# - relevance: Included in research/prompt-evaluator-design.md, "Initial
-#   evaluation dimensions," as a secondary diagnostic dimension. The design says
-#   it may explain disagreements; it was not selected as a primary measurement.
-#   Supporting discussion: research/research-synthesis.md, "User experience and
-#   domain quality."
+# - relevance: A secondary diagnostic criterion that can distinguish an
+#   on-topic response from one that addresses the learner's actual current need.
+#   Supporting discussion appears in research/research-synthesis.md, "User
+#   experience and domain quality."
 #
-# - actionability: Included in research/prompt-evaluator-design.md, "Initial
-#   evaluation dimensions," as a secondary diagnostic dimension. The design says
-#   it may explain disagreements; it was not selected as a primary measurement.
-#   MRBench and the BEA 2025 shared task provide supporting evidence
-#   (research/README.md under those names).
+# - actionability: A secondary diagnostic criterion that checks whether the
+#   learner receives a realistic next step, rather than vague or unavailable
+#   advice. MRBench and the BEA 2025 shared task provide supporting evidence;
+#   both are summarized in research/README.md.
 #
 model: gpt-5.6-luna
 evaluator_model: gpt-5.6-sol

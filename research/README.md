@@ -4,10 +4,7 @@ Research snapshot: 2026-09-22. This index separates peer-reviewed evidence from 
 
 ## Current design documents
 
-- [Current system and experimental design](current-system-evaluation-design.md) maps the Rubber Duck runtime, evaluation layers, current tests, and staged experiments.
-- [Prompt evaluator experimental design](prompt-evaluator-design.md) defines the response-level evaluator, historical-conversation seed process, semantic-grader validation, and path to multi-turn evaluation.
-- [Prompt evaluator specification](prompt-evaluator-specification.md) defines the capability, evidence, boundaries, and acceptance criteria that an experimental implementation must satisfy.
-- [Prompt evaluator adversarial review](prompt-evaluator-adversarial-review.md) records attacks against the specification, historical-data and refactor audits, corrections, and remaining blockers.
+- [Rubber Duck evaluation strategy](rubber-duck-evaluation-strategy.md) maps the runtime, evaluation layers, current tests, and possible staged experiments.
 - [Pytest frustration case study](pytest_frustration_conversation.md) preserves the redacted source conversation used to derive the contradictory-evidence response checkpoint.
 
 ## Working definition

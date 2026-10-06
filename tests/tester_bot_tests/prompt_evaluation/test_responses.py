@@ -1,4 +1,16 @@
-"""Evaluate one Rubber Duck response after each fixed conversation prefix."""
+"""Run the live fixed-prefix tutor-response experiment.
+
+Each YAML case supplies a model-visible conversation prefix and an
+evaluator-only reference answer. The test makes one model call to generate the
+next tutor response and another to grade that response using the criteria in
+``config.yaml``. It prints the response, ratings, and rationales when pytest is
+run with ``-s``.
+
+This is diagnostic evaluation, not a quality gate: the assertion checks that
+all configured criteria were returned, not that their ratings are acceptable.
+It also evaluates only the next response conditional on the supplied prefix;
+it does not establish how the prompt would conduct the complete conversation.
+"""
 
 import os
 from pathlib import Path

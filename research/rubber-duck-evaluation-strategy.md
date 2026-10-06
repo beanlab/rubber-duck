@@ -1,13 +1,12 @@
-# Rubber Duck evaluation system: current system and experimental design
+# Rubber Duck evaluation strategy: system map and experimental directions
 
 ## Document status
 
 - Status: Draft for discussion
-- Purpose: Describe the current Rubber Duck system, identify what can be evaluated at each layer, assess the current testing approach, and define experiments that should precede framework implementation.
+- Purpose: Describe the Rubber Duck system, identify what can be evaluated at each layer, assess the current testing approach, and define experiments that should precede framework implementation.
 - Scope: Design and experiments only. This document does not authorize implementation or production experiments.
 - Related documents:
   - [Research synthesis](research-synthesis.md)
-  - [Prompt evaluator design](prompt-evaluator-design.md)
 
 ## 1. Problem statement
 
