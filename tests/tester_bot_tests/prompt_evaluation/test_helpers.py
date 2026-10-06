@@ -1,8 +1,10 @@
+"""Unit tests for fixed-prefix tutor-response evaluation helpers."""
+
 import asyncio
 import json
 from types import SimpleNamespace
 
-from src.testing.prompt_evaluation import (
+from src.testing.tutor_response_evaluation import (
     CriterionResult,
     PromptEvaluation,
     build_tutor_history,

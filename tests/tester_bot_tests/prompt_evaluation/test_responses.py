@@ -8,16 +8,16 @@ import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from src.testing.prompt_evaluation import (
+from src.testing.tutor_response_evaluation import (
     evaluate_next_response,
     print_evaluation,
 )
 
 
-ROOT = Path(__file__).resolve().parents[2]
 TEST_ROOT = Path(__file__).resolve().parent
-EVALUATION_CONFIG = ROOT / "evaluation_assets" / "prompt_eval.yaml"
-CASES_CONFIG = TEST_ROOT / "prompt_cases.yaml"
+ROOT = TEST_ROOT.parents[2]
+EVALUATION_CONFIG = TEST_ROOT / "config.yaml"
+CASES_CONFIG = TEST_ROOT / "cases.yaml"
 
 
 def load_yaml(path: Path) -> dict:

@@ -1,4 +1,4 @@
-# This file defines response-level evaluation for one tutoring prompt.
+# Shared configuration for response-level evaluation of one tutoring prompt.
 #
 # The tutor receives a fixed conversation prefix and generates one response.
 # The evaluator grades only that response, using the prefix as context. The

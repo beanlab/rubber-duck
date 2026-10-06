@@ -1,6 +1,6 @@
-# Each case is a redacted checkpoint derived from a complete conversation in
-# data/raw/datasets/messages/data.csv. The prefix is model-visible; the
-# reference answer is evaluator-only.
+# Each response case is a redacted checkpoint derived from a complete
+# conversation in data/raw/datasets/messages/data.csv. The prefix is
+# model-visible; the reference answer is evaluator-only.
 cases:
   - id: image-flip-clarification
     name: Clarify an ambiguous vertical image flip
@@ -101,4 +101,3 @@ cases:
       A list or tuple can contain it, although the expected container must also
       match the return contract of stat_analysis. The tutor should explain the
       concept and give the learner a concrete way to inspect that contract.
-
