@@ -1,168 +1,99 @@
 import asyncio
+import json
+from types import SimpleNamespace
 
-from scripts.prompt_eval import (
+from src.testing.prompt_evaluation import (
     CriterionResult,
     PromptEvaluation,
-    TutorReply,
-    run,
-    select_prompts,
+    build_tutor_history,
+    evaluate_next_response,
 )
-from src.testing.prompt_evaluation import build_tutor_history, evaluate_next_response
 
 
-class FakeModel:
+class FakeOpenAIClient:
     def __init__(self):
-        self.grade_model = None
-        self.grade_config = None
-        self.tutor_history = None
-        self.student_messages = iter([
-            "Why does items[2] cause an error? Please give me a hint.",
-            "quit",
-        ])
-        self.tutor_replies = iter([
-            TutorReply(
-                action="message",
-                message="What index does Python use for the first item?",
-                api_items=[{"type": "function_call", "call_id": "call-1"}],
-                call_id="call-1",
+        self.responses = self
+        self.create_params = None
+        self.parse_params = None
+
+    async def create(self, **params):
+        self.create_params = params
+        call = SimpleNamespace(
+            type="function_call",
+            name="talk_to_user",
+            arguments=json.dumps(
+                {"message_to_user": "What output does the assignment require?"}
             ),
-            TutorReply(
-                action="conclude",
-                message=None,
-                api_items=[{"type": "function_call", "call_id": "call-2"}],
-                call_id="call-2",
-            ),
-        ])
+        )
+        return SimpleNamespace(output=[call], output_text="")
 
-    async def student(self, model, prompt, transcript):
-        return next(self.student_messages)
-
-    async def tutor(self, model, prompt, history):
-        self.tutor_history = history
-        return next(self.tutor_replies)
-
-    async def grade(self, model, prompt, transcript, tutor_prompt, config):
-        self.grade_model = model
-        self.grade_config = config
-        return PromptEvaluation(
+    async def parse(self, **params):
+        self.parse_params = params
+        evaluation = PromptEvaluation(
             subject_accuracy=CriterionResult(
                 rating="correct",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The tutor makes no incorrect technical claim.",
+                evidence=["What output does the assignment require?"],
+                rationale="The response makes no incorrect technical claim.",
             ),
             misconception_diagnosis=CriterionResult(
-                rating="accurately_recognizes",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The question targets the student's indexing misconception.",
+                rating="insufficient_evidence",
+                evidence=[],
+                rationale="The prefix does not establish a misconception.",
             ),
             guidance_scaffolding=CriterionResult(
                 rating="useful",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The tutor provides a targeted next step.",
+                evidence=["What output does the assignment require?"],
+                rationale="The response asks for necessary task information.",
             ),
             answer_disclosure=CriterionResult(
                 rating="appropriate",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The tutor does not reveal the completed fix.",
+                evidence=["What output does the assignment require?"],
+                rationale="The response does not disclose a solution.",
             ),
             relevance=CriterionResult(
                 rating="relevant",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The response addresses list indexing.",
+                evidence=["What output does the assignment require?"],
+                rationale="The response addresses the learner's request.",
             ),
             actionability=CriterionResult(
                 rating="actionable",
-                evidence=["What index does Python use for the first item?"],
-                rationale="The student can identify the first valid index next.",
-            ),
-            learner_self_correction=CriterionResult(
-                rating="not_demonstrated",
-                evidence=["quit"],
-                rationale="The student quits without stating the corrected indexes.",
+                evidence=["What output does the assignment require?"],
+                rationale="The learner can provide the requested information.",
             ),
         )
+        return SimpleNamespace(output_parsed=evaluation)
 
 
-def test_evaluates_one_prompt_on_anchored_criteria(tmp_path):
-    prompt = tmp_path / "prompt.md"
-    prompt.write_text("Tutor prompt", encoding="utf-8")
-    config = {
-        "model": "test-model",
-        "evaluator_model": "test-evaluator-model",
-        "prompt_path": str(prompt),
-        "max_tutor_turns": 2,
-        "student_prompt": "Student prompt",
-        "reference_answer": "Lists start at index zero.",
-        "criteria": {
-            "subject_accuracy": {},
-            "misconception_diagnosis": {},
-            "guidance_scaffolding": {},
-            "answer_disclosure": {},
-            "relevance": {},
-            "actionability": {},
-            "learner_self_correction": {},
-        },
-        "evaluator_prompt": "Evaluate the transcript.",
-    }
-
-    model = FakeModel()
-    result = asyncio.run(run(config, model))
-
-    assert set(result["criteria"]) == {
-        "subject_accuracy",
-        "misconception_diagnosis",
-        "guidance_scaffolding",
-        "answer_disclosure",
-        "relevance",
-        "actionability",
-        "learner_self_correction",
-    }
-    assert result["criteria"]["guidance_scaffolding"]["rating"] == "useful"
-    assert result["reference_answer_used"] is True
-    assert "summary" not in result
-    assert model.grade_model == "test-evaluator-model"
-    assert [turn["role"] for turn in result["transcript"]] == [
-        "student",
-        "tutor",
-        "student",
-        "tutor",
-    ]
-
-
-def test_selects_student_prompts():
-    catalog = {"1": {"name": "One"}, "2": {"name": "Two"}}
-
-    assert [item[0] for item in select_prompts(catalog, ["2", "1"])] == ["2", "1"]
-    assert [item[0] for item in select_prompts(catalog, ["all"])] == ["1", "2"]
-
-
-def test_evaluates_exactly_one_response_after_a_prefix():
+def test_evaluates_exactly_one_response_after_a_fixed_prefix():
     prefix = [
         {"role": "student", "message": "I need help."},
         {"role": "tutor", "message": "What have you tried?"},
         {"role": "student", "message": "I do not know where to start."},
     ]
+    criteria = {
+        name: {}
+        for name in (
+            "subject_accuracy",
+            "misconception_diagnosis",
+            "guidance_scaffolding",
+            "answer_disclosure",
+            "relevance",
+            "actionability",
+        )
+    }
     config = {
         "model": "test-model",
         "evaluator_model": "test-evaluator-model",
-        "reference_answer": "Start by identifying the required output.",
-        "criteria": {
-            "subject_accuracy": {},
-            "misconception_diagnosis": {},
-            "guidance_scaffolding": {},
-            "answer_disclosure": {},
-            "relevance": {},
-            "actionability": {},
-            "learner_self_correction": {},
-        },
+        "reference_answer": "Identify the required output first.",
+        "criteria": criteria,
         "evaluator_prompt": "Evaluate the response.",
     }
+    client = FakeOpenAIClient()
 
-    model = FakeModel()
     result = asyncio.run(
         evaluate_next_response(
+            client=client,
             config=config,
-            model_client=model,
             transcript=prefix,
             tutor_prompt="Tutor prompt",
         )
@@ -170,7 +101,14 @@ def test_evaluates_exactly_one_response_after_a_prefix():
 
     assert result["transcript"][-1] == {
         "role": "tutor",
-        "message": "What index does Python use for the first item?",
+        "message": "What output does the assignment require?",
     }
-    assert model.grade_config["evaluation_scope"] == "response"
-    assert model.tutor_history == build_tutor_history(prefix)
+    assert result["reference_answer_used"] is True
+    assert set(result["criteria"]) == set(criteria)
+    assert client.create_params["input"] == build_tutor_history(prefix)
+    assert client.parse_params["model"] == "test-evaluator-model"
+
+    evaluator_input = json.loads(client.parse_params["input"])
+    assert evaluator_input["conversation_prefix"] == prefix
+    assert evaluator_input["candidate_response"] == result["transcript"][-1]
+    assert evaluator_input["reference_answer"] == config["reference_answer"]

@@ -15,6 +15,10 @@ from src.gen_ai.gen_ai import Agent
 from src.utils.config_loader import load_configuration
 from src.storage.sql_connection import create_sql_session
 from src.storage.sql_metrics import UsageModel
+from src.testing.tester_bot_scaffold.assessments import (
+    PostConversationAssessment,
+    assess_conversation,
+)
 from src.testing.tester_bot_scaffold.model_pricing import calculate_token_cost
 from src.testing.tester_bot_scaffold.testerbot import TesterBot
 
@@ -401,3 +405,34 @@ async def testerbot(rubber_duck_run, rubber_duck_config):
                 await bot_task
             except asyncio.CancelledError:
                 pass
+
+
+async def create_assessment(
+    testerbot: TesterBot,
+    *,
+    channel_id: int,
+    thread_opener: str,
+    base_prompt: str,
+    progress_assessor: Agent | None = None,
+    conversation_timeout: float,
+    post_conversation_assessor: Agent,
+) -> PostConversationAssessment:
+    conversation = await asyncio.wait_for(
+        testerbot.run_conversation(
+            channel_id=channel_id,
+            thread_opener=thread_opener,
+            base_prompt=base_prompt,
+            progress_assessor=progress_assessor,
+        ),
+        timeout=conversation_timeout,
+    )
+
+    if testerbot.last_context is None:
+        raise RuntimeError("TesterBot did not create a DuckContext for the conversation.")
+
+    return await assess_conversation(
+        ai_client=testerbot.ai_client,
+        ctx=testerbot.last_context,
+        history=conversation,
+        assessor=post_conversation_assessor,
+    )

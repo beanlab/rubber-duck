@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 import yaml
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 from src.testing.prompt_evaluation import (
-    OpenAIModel,
     evaluate_next_response,
     print_evaluation,
 )
@@ -38,8 +38,8 @@ async def test_prompt_response(case):
     config = {**load_yaml(EVALUATION_CONFIG), **case}
     tutor_prompt = (ROOT / config["prompt_path"]).read_text(encoding="utf-8")
     result = await evaluate_next_response(
+        client=AsyncOpenAI(),
         config=config,
-        model_client=OpenAIModel(),
         transcript=case["transcript"],
         tutor_prompt=tutor_prompt,
     )
@@ -47,4 +47,3 @@ async def test_prompt_response(case):
     print(f"\nTutor response: {result['transcript'][-1]['message']}")
     print_evaluation(result)
     assert set(result["criteria"]) == set(config["criteria"])
-

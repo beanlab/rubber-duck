@@ -1,4 +1,4 @@
-# Pytest failure and learner frustration
+# Case study: pytest failure and learner frustration
 
 ## Status
 
