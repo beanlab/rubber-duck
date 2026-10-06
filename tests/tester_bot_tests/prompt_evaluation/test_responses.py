@@ -1,61 +1,100 @@
 """Run the live fixed-prefix tutor-response experiment.
 
 Each YAML case supplies a model-visible conversation prefix and an
-evaluator-only reference answer. The test makes one model call to generate the
-next tutor response and another to grade that response using the criteria in
-``config.yaml``. It prints the response, ratings, and rationales when pytest is
-run with ``-s``.
+evaluator-only reference answer. The test generates one tutor response, then
+runs every independent evaluation test configured in ``config.yaml`` against
+that same response. It prints case and prompt-level measurements with ``-s``.
 
-This is diagnostic evaluation, not a quality gate: the assertion checks that
-all configured criteria were returned, not that their ratings are acceptable.
-It also evaluates only the next response conditional on the supplied prefix;
-it does not establish how the prompt would conduct the complete conversation.
+Configured metric outcomes determine whether each case passes. The experiment
+still evaluates only the next response conditional on the supplied prefix; it
+does not establish how the prompt would conduct the complete conversation.
 """
 
 import os
+from collections.abc import Generator
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-from src.testing.tutor_response_evaluation import (
-    evaluate_next_response,
-    print_evaluation,
+from src.testing.prompt_evaluation.evaluation import evaluate_next_response
+from src.testing.prompt_evaluation.reporting import (
+    evaluation_failure_message,
+    print_case_evaluation,
+    print_prompt_summary,
+)
+from src.testing.prompt_evaluation.types import (
+    EvaluationCase,
+    EvaluationConfig,
+    EvaluationRun,
 )
 
 
 TEST_ROOT = Path(__file__).resolve().parent
 ROOT = TEST_ROOT.parents[2]
-EVALUATION_CONFIG = TEST_ROOT / "config.yaml"
+EVALUATION_CONFIG_PATH = TEST_ROOT / "config.yaml"
 CASES_CONFIG = TEST_ROOT / "cases.yaml"
 
 
-def load_yaml(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+def load_yaml(path: Path) -> object:
+    return cast(object, yaml.safe_load(path.read_text(encoding="utf-8")))
 
 
-CASES = load_yaml(CASES_CONFIG)["cases"]
+config_data = load_yaml(EVALUATION_CONFIG_PATH)
+cases_data = load_yaml(CASES_CONFIG)
+if not isinstance(config_data, dict) or not isinstance(cases_data, dict):
+    raise TypeError("Evaluation configuration files must contain YAML mappings")
+
+SHARED_CONFIG = cast(EvaluationConfig, config_data)
+CASES = cast(list[EvaluationCase], cases_data["cases"])
+PROMPT_RESULTS: list[EvaluationRun] = []
+
+
+@pytest.fixture(scope="module", autouse=True)
+def report_prompt_summary() -> Generator[None, None, None]:
+    """Print aggregate measurements after all configured cases finish."""
+    PROMPT_RESULTS.clear()
+    yield
+    if PROMPT_RESULTS:
+        print_prompt_summary(PROMPT_RESULTS)
+
+
+def case_id(case: EvaluationCase) -> str:
+    return case["id"]
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
-async def test_prompt_response(case):
-    """Generate one response and report only the configured criterion ratings."""
+@pytest.mark.parametrize("case", CASES, ids=case_id)
+async def test_prompt_response(case: EvaluationCase) -> None:
+    """Generate one response and apply every configured evaluation test."""
     load_dotenv()
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("OPENAI_API_KEY is required for prompt response evaluations.")
 
-    config = {**load_yaml(EVALUATION_CONFIG), **case}
-    tutor_prompt = (ROOT / config["prompt_path"]).read_text(encoding="utf-8")
-    result = await evaluate_next_response(
-        client=AsyncOpenAI(),
-        config=config,
-        transcript=case["transcript"],
-        tutor_prompt=tutor_prompt,
-    )
+    config: EvaluationConfig = {
+        **SHARED_CONFIG,
+        "reference_answer": case["reference_answer"],
+    }
+    prompt_path = config.get("prompt_path")
+    if prompt_path is None:
+        raise ValueError("Evaluation config must define prompt_path")
+    tutor_prompt = (ROOT / prompt_path).read_text(encoding="utf-8")
+    async with AsyncOpenAI() as client:
+        result = await evaluate_next_response(
+            client=client,
+            config=config,
+            transcript=case["transcript"],
+            tutor_prompt=tutor_prompt,
+        )
 
-    print(f"\nTutor response: {result['transcript'][-1]['message']}")
-    print_evaluation(result)
-    assert set(result["criteria"]) == set(config["criteria"])
+    PROMPT_RESULTS.append(result)
+    print_case_evaluation(case, result)
+
+    if not result["summary"]["passed"]:
+        pytest.fail(
+            evaluation_failure_message(result),
+            pytrace=False,
+        )
