@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from typing_extensions import NotRequired, Protocol, TypedDict
 
 
-TestOutcome = Literal["pass", "fail", "inconclusive"]
+TestOutcome = Literal["pass", "fail"]
 
 
 class EvaluationResult(BaseModel):
@@ -14,7 +14,7 @@ class EvaluationResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    rating: str
+    rating: TestOutcome
     evidence: list[str]
     rationale: str
 
@@ -48,8 +48,6 @@ class TranscriptTurn(TypedDict):
 
 class MetricLevel(TypedDict):
     definition: str
-    score: NotRequired[float | None]
-    outcome: NotRequired[TestOutcome | None]
 
 
 class EvaluationTestConfig(TypedDict):
@@ -71,6 +69,7 @@ class EvaluationCase(TypedDict):
     name: str
     transcript: list[TranscriptTurn]
     reference_answer: str
+    tests: NotRequired[dict[str, EvaluationTestConfig]]
 
 
 class EvaluatorContext(TypedDict):
@@ -91,16 +90,14 @@ class EvaluatorRequest(EvaluatorContext):
 
 
 class TestResult(TypedDict):
-    rating: str
+    rating: TestOutcome
     evidence: list[str]
     rationale: str
-    score: float | None
-    outcome: TestOutcome | None
 
 
 class EvaluationSummary(TypedDict):
     passed: bool
-    score: float | None
+    score: float
     blocking_tests: list[str]
 
 

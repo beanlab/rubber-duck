@@ -16,19 +16,16 @@ def print_case_evaluation(case: EvaluationCase, result: EvaluationRun) -> None:
 def _print_evaluation(result: EvaluationRun) -> None:
     """Print one case's ratings and rationales."""
     print("\nEvaluation tests:")
-    print(f"  {'Test':<28} {'Rating':<24} {'Outcome':<14} Score")
-    print(f"  {'-' * 28} {'-' * 24} {'-' * 14} -----")
+    print(f"  {'Test':<32} Result")
+    print(f"  {'-' * 32} ------")
     for test_name, value in result["tests"].items():
         name = test_name.replace("_", " ").title()
         rating = value["rating"].replace("_", " ").upper()
-        outcome = (value["outcome"] or "measurement").upper()
-        score = "—" if value["score"] is None else f"{value['score']:.2f}"
-        print(f"  {name:<28} {rating:<24} {outcome:<14} {score}")
+        print(f"  {name:<32} {rating}")
 
     summary = result["summary"]
-    score = "—" if summary["score"] is None else f"{summary['score']:.0%}"
     print(f"\nCase result: {'PASS' if summary['passed'] else 'FAIL'}")
-    print(f"Quality score: {score}")
+    print(f"Quality score: {summary['score']:.0%}")
     print("\nEvaluator rationales:")
     for test_name, value in result["tests"].items():
         name = test_name.replace("_", " ").title()
@@ -39,8 +36,7 @@ def _print_evaluation(result: EvaluationRun) -> None:
 def evaluation_failure_message(result: EvaluationRun) -> str:
     """Describe the configured tests that blocked a case from passing."""
     blocking_results = [
-        f"{name}={result['tests'][name]['rating']} "
-        f"({result['tests'][name]['outcome']})"
+        f"{name}={result['tests'][name]['rating']}"
         for name in result["summary"]["blocking_tests"]
     ]
     return (
@@ -51,15 +47,10 @@ def evaluation_failure_message(result: EvaluationRun) -> str:
 
 def print_prompt_summary(results: list[EvaluationRun]) -> None:
     """Print aggregate measurements for the evaluated prompt."""
-    scores = [
-        result["summary"]["score"]
-        for result in results
-        if result["summary"]["score"] is not None
-    ]
     passed = sum(result["summary"]["passed"] for result in results)
-    average = sum(scores) / len(scores) if scores else None
+    average = sum(result["summary"]["score"] for result in results) / len(results)
     print(f"\n{'=' * 79}")
     print("Prompt evaluation summary")
     print(f"Cases passed: {passed}/{len(results)}")
-    print(f"Average quality score: {'—' if average is None else f'{average:.0%}'}")
+    print(f"Average quality score: {average:.0%}")
     print("=" * 79)

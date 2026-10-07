@@ -23,14 +23,8 @@ from src.testing.prompt_evaluation.types import (
     EvaluationTestConfig,
     EvaluatorContext,
     EvaluatorRequest,
-    TestOutcome,
     TestResult,
     TranscriptTurn,
-)
-
-
-TEST_OUTCOMES: frozenset[TestOutcome] = frozenset(
-    {"pass", "fail", "inconclusive"}
 )
 
 
@@ -91,16 +85,11 @@ def _evaluation_tests(
             raise ValueError(f"Evaluation test {name!r} needs a definition and metric")
         if not test.get("evaluator_prompt") and not config.get("evaluator_prompt"):
             raise ValueError(f"Evaluation test {name!r} needs an evaluator prompt")
+        if set(test["metric"]) != {"pass", "fail"}:
+            raise ValueError(f"Evaluation test {name!r} needs pass and fail metrics")
         for rating, level in test["metric"].items():
             if not level.get("definition"):
                 raise ValueError(f"Metric rating {name}.{rating} needs a definition")
-            if level.get("outcome") not in TEST_OUTCOMES | {None}:
-                raise ValueError(
-                    f"Metric rating {name}.{rating} has an invalid outcome"
-                )
-            score = level.get("score")
-            if score is not None and not 0 <= score <= 1:
-                raise ValueError(f"Metric rating {name}.{rating} has an invalid score")
     return tests
 
 
@@ -180,13 +169,10 @@ async def _evaluate_test(
         raise RuntimeError(
             f"Evaluator returned unknown rating {rating!r} for {test_name}"
         )
-    level = test["metric"][rating]
     return {
         "rating": rating,
         "evidence": judgment.evidence,
         "rationale": judgment.rationale,
-        "score": level.get("score"),
-        "outcome": level.get("outcome"),
     }
 
 
@@ -195,16 +181,11 @@ def summarize_evaluation(tests: dict[str, TestResult]) -> EvaluationSummary:
     blocking_tests = [
         name
         for name, result in tests.items()
-        if result["outcome"] in {"fail", "inconclusive"}
-    ]
-    scores = [
-        result["score"]
-        for result in tests.values()
-        if result["score"] is not None
+        if result["rating"] == "fail"
     ]
     return {
         "passed": not blocking_tests,
-        "score": sum(scores) / len(scores) if scores else None,
+        "score": 1 - len(blocking_tests) / len(tests),
         "blocking_tests": blocking_tests,
     }
 

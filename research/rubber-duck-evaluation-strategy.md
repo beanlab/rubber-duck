@@ -241,7 +241,7 @@ The first observation may indicate a prompt or model-behavior problem. The remai
 The repository currently contains:
 
 1. **Unit and regression tests** for SQL metrics, dataset tools, Python output formatting, rubric generation, response/tool completion behavior, structured output validation, and retry paths.
-2. **A fixed-prefix Standard Duck response evaluator** with four YAML cases, the resolved production agent and tool schemas, anchored semantic criteria, structured evaluator output, and fake-client plumbing tests.
+2. **A fixed-prefix Standard Duck response evaluator** with four YAML cases, standard and case-specific binary criteria, the resolved production agent and tool schemas, structured evaluator output, and fake-client plumbing tests.
 3. **TesterBot end-to-end tests** that start the Rubber Duck application, connect through Discord, use a model-driven tester as the user, collect a visible conversation history and selected usage/cost, and run post-conversation model assessors.
 4. **Four current Discord dry runs** covering the Standard Duck, general statistics duck, CS statistics duck, and debugging-practice workflow.
 5. **A debugging assessor battery** that applies several criteria independently rather than relying only on one broad prompt.
@@ -250,7 +250,7 @@ The repository currently contains:
 
 - Important local contracts work for the specifically tested cases.
 - A Standard Duck response can be generated after a fixed prefix and graded independently on subject accuracy, misconception diagnosis, scaffolding, answer disclosure, relevance, and actionability.
-- Configured semantic ratings map deterministically to pass, fail, or inconclusive outcomes, although the validity of the selected rating remains unproven.
+- Each configured semantic criterion has explicit pass and fail definitions, although the validity of the selected result remains unproven.
 - The deployed-style application can start and interact through Discord.
 - A model-driven test conversation can reach the application's close message without the orchestrator error marker.
 - Existing transcript assessors can return structured pass/fail results.

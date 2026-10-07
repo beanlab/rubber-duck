@@ -29,8 +29,8 @@ poetry run pytest -s tests/tester_bot_tests/prompt_evaluation/test_responses.py
 ```
 
 Use `-k <case-id>` to run one case. Add or remove cases in
-`tests/tester_bot_tests/prompt_evaluation/cases.yaml`; no Python registration is
-required.
+`tests/tester_bot_tests/prompt_evaluation/cases.yaml`. A case's optional `tests`
+mapping adds binary criteria to the standard tests in `config.yaml`.
 
 Run the standard-duck Discord end-to-end test with two bot tokens in `.env`:
 

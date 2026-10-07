@@ -5,9 +5,10 @@ evaluator-only reference answer. The test generates one tutor response, then
 runs every independent evaluation test configured in ``config.yaml`` against
 that same response. It prints case and prompt-level measurements with ``-s``.
 
-Configured metric outcomes determine whether each case passes. The experiment
-still evaluates only the next response conditional on the supplied prefix; it
-does not establish how the prompt would conduct the complete conversation.
+Every standard and case-specific criterion must pass for a case to pass. The
+experiment still evaluates only the next response conditional on the supplied
+prefix; it does not establish how the prompt would conduct the complete
+conversation.
 """
 
 import os
@@ -93,6 +94,7 @@ async def test_prompt_response(case: EvaluationCase) -> None:
     config: EvaluationConfig = {
         **SHARED_CONFIG,
         "reference_answer": case["reference_answer"],
+        "tests": {**SHARED_CONFIG["tests"], **case.get("tests", {})},
     }
     async with AsyncOpenAI() as client:
         result = await evaluate_next_response(

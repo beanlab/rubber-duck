@@ -66,8 +66,8 @@ class FakeOpenAIClient:
         self.create_calls: int = 0
         self.parse_params: list[ParseCall] = []
         self.ratings: dict[str, str] = {
-            "subject_accuracy": "correct",
-            "actionability": "vague",
+            "subject_accuracy": "pass",
+            "actionability": "fail",
         }
 
     async def create(
@@ -186,11 +186,11 @@ def test_generates_once_and_runs_each_configured_test() -> None:
         "reasoning": {"effort": "low"},
     }
     assert set(result["tests"]) == set(config["tests"])
-    assert result["tests"]["subject_accuracy"]["outcome"] == "pass"
-    assert result["tests"]["actionability"]["outcome"] == "fail"
+    assert result["tests"]["subject_accuracy"]["rating"] == "pass"
+    assert result["tests"]["actionability"]["rating"] == "fail"
     assert result["summary"] == {
         "passed": False,
-        "score": 0.75,
+        "score": 0.5,
         "blocking_tests": ["actionability"],
     }
     assert client.create_input == build_tutor_history(prefix)
