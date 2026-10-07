@@ -38,9 +38,7 @@
 #   advice. MRBench and the BEA 2025 shared task provide supporting evidence;
 #   both are summarized in research/README.md.
 #
-model: gpt-5.6-luna
 evaluator_model: gpt-5.6-sol
-prompt_path: src/prompts/production-prompts/standard-rubber-duck.md
 
 tests:
   subject_accuracy:

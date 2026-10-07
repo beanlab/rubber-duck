@@ -10,16 +10,18 @@ import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, cast
 
 import yaml
 from openai.types.responses import (
     FunctionToolParam,
     ResponseFunctionToolCall,
-    ResponseIncludable,
     ResponseInputParam,
 )
 
+from src.armory.armory import Armory
+from src.armory.talk_tool import TalkTool
+from src.gen_ai.gen_ai import Agent
 from src.testing.prompt_evaluation.evaluation import (
     build_tutor_history,
     evaluate_next_response,
@@ -38,6 +40,7 @@ TEST_ROOT = Path(__file__).resolve().parent
 @dataclass(frozen=True)
 class FakeTutorResponse:
     output: list[ResponseFunctionToolCall]
+    usage: None = None
     output_text: str = ""
 
 
@@ -59,6 +62,7 @@ class FakeOpenAIClient:
     def __init__(self) -> None:
         self.responses: FakeOpenAIClient = self
         self.create_input: ResponseInputParam | None = None
+        self.create_params: dict[str, Any] = {}
         self.create_calls: int = 0
         self.parse_params: list[ParseCall] = []
         self.ratings: dict[str, str] = {
@@ -73,13 +77,18 @@ class FakeOpenAIClient:
         instructions: str,
         input: ResponseInputParam,
         tools: list[FunctionToolParam],
-        tool_choice: Literal["auto"],
-        include: list[ResponseIncludable],
-        store: bool,
+        tool_choice: Any,
+        reasoning: dict[str, str] | None = None,
     ) -> FakeTutorResponse:
-        del model, instructions, tools, tool_choice, include, store
         self.create_calls += 1
         self.create_input = input
+        self.create_params = {
+            "model": model,
+            "instructions": instructions,
+            "tools": tools,
+            "tool_choice": tool_choice,
+            "reasoning": reasoning,
+        }
         call = ResponseFunctionToolCall(
             type="function_call",
             name="talk_to_user",
@@ -125,7 +134,6 @@ def test_generates_once_and_runs_each_configured_test() -> None:
     configured_tests = shared_config["tests"]
     config: EvaluationConfig = {
         **shared_config,
-        "model": "test-model",
         "evaluator_model": "test-evaluator-model",
         "reference_answer": "Identify the required output first.",
         "tests": {
@@ -138,12 +146,26 @@ def test_generates_once_and_runs_each_configured_test() -> None:
     }
     client = FakeOpenAIClient()
 
+    async def send_message(*_args: Any, **_kwargs: Any) -> int:
+        return 1
+
+    armory = Armory(send_message)
+    armory.scrub_tools(TalkTool(send_message))
+    agent = Agent(
+        name="RubberDuck",
+        prompt="Tutor prompt",
+        model="test-model",
+        tools=["talk_to_user", "conclude_conversation"],
+        reasoning="low",
+    )
+
     result = asyncio.run(
         evaluate_next_response(
             client=client,
             config=config,
             transcript=prefix,
-            tutor_prompt="Tutor prompt",
+            agent=agent,
+            armory=armory,
         )
     )
 
@@ -153,6 +175,16 @@ def test_generates_once_and_runs_each_configured_test() -> None:
     }
     assert result["reference_answer_used"] is True
     assert client.create_calls == 1
+    assert client.create_params == {
+        "model": "test-model",
+        "instructions": "Tutor prompt",
+        "tools": [
+            armory.get_tool_schema("talk_to_user"),
+            armory.get_tool_schema("conclude_conversation"),
+        ],
+        "tool_choice": "auto",
+        "reasoning": {"effort": "low"},
+    }
     assert set(result["tests"]) == set(config["tests"])
     assert result["tests"]["subject_accuracy"]["outcome"] == "pass"
     assert result["tests"]["actionability"]["outcome"] == "fail"

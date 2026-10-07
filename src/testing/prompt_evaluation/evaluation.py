@@ -5,14 +5,15 @@ import json
 
 from openai.types.responses import (
     EasyInputMessageParam,
-    FunctionToolParam,
-    ResponseFunctionToolCall,
     ResponseFunctionToolCallParam,
     ResponseInputParam,
 )
 from openai.types.responses.response_input_param import FunctionCallOutput
 from pydantic import BaseModel
 
+from src.armory.armory import Armory
+from src.gen_ai.completion import CompletionRequest, ResponsesCompletionAdapter
+from src.gen_ai.gen_ai import Agent
 from src.testing.prompt_evaluation.types import (
     EvaluationClient,
     EvaluationConfig,
@@ -25,39 +26,12 @@ from src.testing.prompt_evaluation.types import (
     TestOutcome,
     TestResult,
     TranscriptTurn,
-    TutorResponse,
 )
 
 
 TEST_OUTCOMES: frozenset[TestOutcome] = frozenset(
     {"pass", "fail", "inconclusive"}
 )
-TUTOR_TOOLS: list[FunctionToolParam] = [
-    {
-        "type": "function",
-        "name": "talk_to_user",
-        "description": "Send a message to the student and wait for a reply.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {"message_to_user": {"type": "string"}},
-            "required": ["message_to_user"],
-            "additionalProperties": False,
-        },
-    },
-    {
-        "type": "function",
-        "name": "conclude_conversation",
-        "description": "End the conversation.",
-        "strict": True,
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": [],
-            "additionalProperties": False,
-        },
-    },
-]
 
 
 class TutorMessageArguments(BaseModel):
@@ -130,26 +104,35 @@ def _evaluation_tests(
     return tests
 
 
-def _response_message(response: TutorResponse) -> str:
+def _response_message(outputs: list[dict]) -> str:
     calls = [
         item
-        for item in response.output
-        if isinstance(item, ResponseFunctionToolCall)
+        for item in outputs
+        if item.get("type") == "function_call"
     ]
     if len(calls) > 1:
         raise RuntimeError("Tutor returned more than one action")
 
     if calls:
         call = calls[0]
-        if call.name == "conclude_conversation":
+        if call["name"] == "conclude_conversation":
             return "[conversation concluded]"
-        if call.name != "talk_to_user":
-            raise RuntimeError(f"Unsupported tutor tool: {call.name}")
+        if call["name"] != "talk_to_user":
+            raise RuntimeError(f"Unsupported tutor tool: {call['name']}")
         message = TutorMessageArguments.model_validate_json(
-            call.arguments
+            call["arguments"]
         ).message_to_user.strip()
     else:
-        message = response.output_text.strip()
+        message = next(
+            (
+                content["text"].strip()
+                for item in outputs
+                if item.get("type") == "message"
+                for content in item.get("content", [])
+                if content.get("type") == "output_text"
+            ),
+            "",
+        )
 
     if not message:
         raise RuntimeError("Tutor returned an empty message")
@@ -182,7 +165,7 @@ async def _evaluate_test(
     if evaluator_prompt is None:
         raise ValueError(f"Evaluation test {test_name!r} needs an evaluator prompt")
     response = await client.responses.parse(
-        model=config.get("evaluator_model", config["model"]),
+        model=config["evaluator_model"],
         instructions=evaluator_prompt,
         input=json.dumps(test_input, indent=2),
         text_format=EvaluationResult,
@@ -231,27 +214,33 @@ async def evaluate_next_response(
     client: EvaluationClient,
     config: EvaluationConfig,
     transcript: list[TranscriptTurn],
-    tutor_prompt: str,
+    agent: Agent,
+    armory: Armory,
+    completion_adapter: ResponsesCompletionAdapter | None = None,
 ) -> EvaluationRun:
     """Generate one response, then run every configured test against it."""
     configured_tests = _evaluation_tests(config)
-    tutor_response = await client.responses.create(
-        model=config["model"],
-        instructions=tutor_prompt,
-        input=build_tutor_history(transcript),
-        tools=TUTOR_TOOLS,
-        tool_choice="auto",
-        include=["reasoning.encrypted_content"],
-        store=False,
+    adapter = completion_adapter or ResponsesCompletionAdapter()
+    completion = await adapter.complete(
+        client,
+        CompletionRequest(
+            model=agent.model,
+            instructions=agent.prompt,
+            input=build_tutor_history(transcript),
+            tools=[armory.get_tool_schema(name) for name in agent.tools],
+            tool_choice=agent.tool_settings,
+            output_format=agent.output_format,
+            reasoning=agent.reasoning,
+        ),
     )
     candidate_response: TranscriptTurn = {
         "role": "tutor",
-        "message": _response_message(tutor_response),
+        "message": _response_message(completion.output),
     }
     evaluator_input: EvaluatorContext = {
         "conversation_prefix": transcript,
         "candidate_response": candidate_response,
-        "tutor_prompt": tutor_prompt,
+        "tutor_prompt": agent.prompt,
     }
     reference_answer = config.get("reference_answer")
     if config.get("use_reference_answer", True) and reference_answer:

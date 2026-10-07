@@ -20,6 +20,9 @@ import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
+from src.armory.armory import Armory
+from src.armory.talk_tool import TalkTool
+from src.gen_ai.build import build_agent
 from src.testing.prompt_evaluation.evaluation import evaluate_next_response
 from src.testing.prompt_evaluation.reporting import (
     evaluation_failure_message,
@@ -31,6 +34,7 @@ from src.testing.prompt_evaluation.types import (
     EvaluationConfig,
     EvaluationRun,
 )
+from src.utils.config_loader import load_configuration
 
 
 TEST_ROOT = Path(__file__).resolve().parent
@@ -51,6 +55,18 @@ if not isinstance(config_data, dict) or not isinstance(cases_data, dict):
 SHARED_CONFIG = cast(EvaluationConfig, config_data)
 CASES = cast(list[EvaluationCase], cases_data["cases"])
 PROMPT_RESULTS: list[EvaluationRun] = []
+
+
+async def _send_message(*_args: object, **_kwargs: object) -> int:
+    return 1
+
+
+application_config = load_configuration(str(ROOT / "production-config.yaml"))
+STANDARD_AGENT = build_agent(
+    application_config["ducks"]["standard-rubber-duck"]["settings"]["agent"]
+)
+STANDARD_ARMORY = Armory(_send_message)
+STANDARD_ARMORY.scrub_tools(TalkTool(_send_message))
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -78,16 +94,13 @@ async def test_prompt_response(case: EvaluationCase) -> None:
         **SHARED_CONFIG,
         "reference_answer": case["reference_answer"],
     }
-    prompt_path = config.get("prompt_path")
-    if prompt_path is None:
-        raise ValueError("Evaluation config must define prompt_path")
-    tutor_prompt = (ROOT / prompt_path).read_text(encoding="utf-8")
     async with AsyncOpenAI() as client:
         result = await evaluate_next_response(
             client=client,
             config=config,
             transcript=case["transcript"],
-            tutor_prompt=tutor_prompt,
+            agent=STANDARD_AGENT,
+            armory=STANDARD_ARMORY,
         )
 
     PROMPT_RESULTS.append(result)

@@ -2,9 +2,10 @@
 
 ## Document status
 
-- Status: Draft for discussion
-- Purpose: Describe the Rubber Duck system, identify what can be evaluated at each layer, assess the current testing approach, and define experiments that should precede framework implementation.
-- Scope: Design and experiments only. This document does not authorize implementation or production experiments.
+- Status: Working strategy, updated for the current evaluation prototypes
+- Purpose: Describe the Rubber Duck system, identify what can be evaluated at each layer, assess the current testing approach, and guide incremental framework implementation.
+- Current implementation focus: Standard Rubber Duck prompt quality, first for one response and then for complete conversations. Other workflows remain in the system map so the contracts do not prevent later reuse.
+- Scope: Architecture and experiment direction. Production experiments still require an explicit decision and appropriate review.
 - Related documents:
   - [Research synthesis](research-synthesis.md)
 
@@ -83,9 +84,9 @@ The current code uses related terms for different data:
 
 The design should use explicit names for these concepts. Candidate names are `DiscordContext`, `ConversationHistory`, `WorkflowState`, and `TrialContext`. Exact names can follow the application refactor, but these values should not share one unqualified `context` abstraction.
 
-### 2.4 Planned completion-layer refactor
+### 2.4 Completion-layer refactor status
 
-The coworker's described `ai_responses` refactor separates standalone agent completions from Discord concerns. This is a useful boundary for evaluation because judges and local trials should be able to invoke a model without manufacturing a dummy Discord thread.
+The `origin/bean-ai-refactor` work separates standalone agent completions from Discord concerns. This is a useful boundary for evaluation because local trials and judges should be able to invoke a model without manufacturing a dummy Discord thread.
 
 The intended responsibility split is:
 
@@ -103,7 +104,16 @@ flowchart LR
 
 The completion layer should accept model-visible inputs and return model-visible outputs and provider metadata. The driver should own conversation history, decisions about when to call the model again, message delivery, and termination. Tools may still require environment-specific services, but Discord identity should not be required by a tool that has no Discord behavior.
 
-The refactor is available on `origin/bean-ai-refactor`, but it currently expresses an intended boundary rather than a runnable equivalent of current behavior. Its `Agent.prompt` is not sent to the provider, required client/retry initialization is absent, Armory method names and context-wrapped tools do not align, and the current tool loop is not completed. It must pass a completion-adapter conformance and parity experiment before an evaluation can claim that it is testing deployed prompt behavior.
+The current branch head now forwards the agent prompt, initializes its client and retry protocol, uses current Armory lookup methods, and executes ordinary tool calls. The earlier list of missing basics is therefore obsolete. It is still not established as a production-equivalent adapter: it has no conformance or parity suite, its termination behavior differs from the current `AIClient` path, and the tentative workflows have not demonstrated equivalent histories, tool effects, usage, errors, or close behavior. It must pass completion-adapter conformance and Standard Duck parity experiments before an evaluation can claim that it is testing deployed behavior.
+
+### 2.5 Current Standard Duck evaluation paths
+
+Standard Rubber Duck currently has two separate evaluation paths:
+
+1. **Fixed-prefix, single-response evaluation.** `src/testing/prompt_evaluation/` resolves the production Standard Duck agent, converts a transcript prefix into Responses API history, calls the shared completion adapter with Armory-generated tool schemas, and applies independently configured semantic criteria.
+2. **TesterBot Discord evaluation.** `tests/tester_bot_tests/test_dry_run.py` starts the application, uses a second Discord bot and model as the student, follows a complete conversation scenario, checks visible closure/error strings, reports selected cost, and applies a post-conversation model assessor.
+
+These paths now share the provider-call boundary and resolved Standard Duck candidate, but they are not yet one evaluation system. They still use different history, result, grader, and reporting contracts. The standalone path does not use the production retry, typing, metrics, or tool loop. The Discord path exercises deployed composition but returns only TesterBot history and loses internal application events. Integration should make them two runners over common trial contracts rather than make either path depend on the other.
 
 ## 3. What must be evaluated
 
@@ -231,13 +241,16 @@ The first observation may indicate a prompt or model-behavior problem. The remai
 The repository currently contains:
 
 1. **Unit and regression tests** for SQL metrics, dataset tools, Python output formatting, rubric generation, response/tool completion behavior, structured output validation, and retry paths.
-2. **TesterBot end-to-end tests** that start the Rubber Duck application, connect through Discord, use a model-driven tester as the user, collect a conversation history and cost, and run post-conversation model assessors.
-3. **Four current dry runs** covering the standard duck, general statistics duck, CS statistics duck, and debugging-practice workflow.
-4. **A debugging assessor battery** that applies several criteria independently rather than relying only on one broad prompt.
+2. **A fixed-prefix Standard Duck response evaluator** with four YAML cases, the resolved production agent and tool schemas, anchored semantic criteria, structured evaluator output, and fake-client plumbing tests.
+3. **TesterBot end-to-end tests** that start the Rubber Duck application, connect through Discord, use a model-driven tester as the user, collect a visible conversation history and selected usage/cost, and run post-conversation model assessors.
+4. **Four current Discord dry runs** covering the Standard Duck, general statistics duck, CS statistics duck, and debugging-practice workflow.
+5. **A debugging assessor battery** that applies several criteria independently rather than relying only on one broad prompt.
 
 ### 5.2 What the current tests establish
 
 - Important local contracts work for the specifically tested cases.
+- A Standard Duck response can be generated after a fixed prefix and graded independently on subject accuracy, misconception diagnosis, scaffolding, answer disclosure, relevance, and actionability.
+- Configured semantic ratings map deterministically to pass, fail, or inconclusive outcomes, although the validity of the selected rating remains unproven.
 - The deployed-style application can start and interact through Discord.
 - A model-driven test conversation can reach the application's close message without the orchestrator error marker.
 - Existing transcript assessors can return structured pass/fail results.
@@ -245,22 +258,28 @@ The repository currently contains:
 
 ### 5.3 What the current tests do not establish
 
-- Whether one prompt is better than another under a controlled treatment.
+- Whether one prompt is better than another under a controlled treatment; the fixed-prefix evaluator currently executes one prompt candidate at a time.
 - Reliability across repeated stochastic trials.
 - Whether the scenario suite represents actual or intended use.
 - Whether the simulated student behaves like a real learner.
 - Whether the model assessor agrees with expert humans or is sensitive to order, verbosity, self-preference, or prompt injection.
+- A blinded common-policy comparison. The fixed-prefix judge currently receives the candidate's full tutor prompt, and at least one criterion grades compliance with that prompt's own boundaries; prompt variants could therefore be judged against different goalposts.
 - Which component caused a failure visible in the transcript.
 - Tool and workflow trace correctness when the transcript omits internal events.
 - Confidence intervals, practical effect size, or an inconclusive comparison.
 - Candidate, scenario, grader, and environment version provenance sufficient for reproduction.
+- Complete production parity for the fixed-prefix response call. It now shares the candidate request adapter, but does not use the production retry/metrics wrapper or deployed initial history, and it collapses raw response actions into one transcript message.
+- A durable result artifact. Fixed-prefix results print to the terminal; Discord transcripts normally require inspection in Discord.
+- A distinct Discord trial status for normal completion, timeout, maximum turns, driver cancellation, provider error, and workflow error.
 - Complete reconstruction of current standard-tutor conversations from the downloaded metrics export; the tutor's visible `talk_to_user` arguments are absent.
 
 ### 5.4 Recommended role for TesterBot
 
-TesterBot should be retained as a high-fidelity Discord runner and one possible simulated-user driver. It should implement the same trial and trace contracts as local or sandbox runners.
+TesterBot should be retained as a high-fidelity Discord runner and one possible simulated-user driver. It should implement the same candidate, scenario, trial, trace, outcome, and observation contracts as local runners.
 
 It should not define the framework's data model or be required for component evaluations. Live Discord adds useful coverage for routing, message queues, permissions, thread lifecycle, and deployed composition, while also adding latency, credentials, side effects, flakiness, and simulator dependence.
+
+For Standard Duck specifically, the current runner also needs stricter correlation between the opener, thread notification, and collected messages; an explicit termination reason; a readable persisted transcript; close-event handling that does not wait through a full idle timeout; and cost accounting that states whether grading calls are included.
 
 ## 6. Proposed evaluation architecture
 
@@ -300,9 +319,35 @@ flowchart LR
     OBS --> CMP[Comparison and report]
 ```
 
-Local drivers, TesterBot, Discord, the planned completion module, model judges, and deterministic graders can change independently if they implement explicit contracts.
+Local drivers, TesterBot, Discord, the shared completion adapter, model judges, and deterministic graders can change independently if they implement explicit contracts.
 
-### 6.3 State machines
+### 6.3 Standard Duck vertical slice and completion hook
+
+The first integrated framework slice should support the same resolved Standard Duck candidate at three fidelity levels:
+
+1. **Single response:** Generate one action after a fixed model-visible history.
+2. **In-memory conversation:** Run multiple turns with a scripted, branching, or model-driven learner and no Discord dependency.
+3. **Discord conversation:** Run the same candidate and compatible scenario through TesterBot and the deployed application composition.
+
+The integration point should be the model completion boundary, not Discord and not the evaluator. A minimal boundary is:
+
+- **Completion request:** resolved candidate identity, instructions, model-visible history, actual tool schemas, tool choice, reasoning/output settings, and request metadata.
+- **Completion result:** raw response items, usage, provider/model metadata, timing, retry/error information, and no evaluator verdict.
+- **Completion observer:** an optional hook that records requests and results as trial events without changing application behavior.
+
+The production `AIClient` and standalone evaluator now use the same completion adapter. The single-response runner calls it once without invoking the blocking Discord implementation of `talk_to_user`. It still needs to preserve whether the result requested `talk_to_user`, requested `conclude_conversation`, returned a direct message, or produced an invalid/unsupported action instead of immediately collapsing that evidence into transcript text.
+
+This is being introduced incrementally; steps 1 and 3 are implemented:
+
+1. Extract or adapt the provider-request portion of `AIClient._get_completion` behind the completion contract while leaving the current production tool loop intact.
+2. Add conformance tests for exact instructions, history, tool schemas, reasoning settings, raw response preservation, usage, retries, and errors.
+3. Migrate the fixed-prefix evaluator to this adapter and to the actual resolved Standard Duck agent/tool configuration.
+4. Add the optional observer to the existing Standard Duck path so Discord trials emit the same completion events.
+5. Move `talk_to_user` action handling into a reusable conversation driver only after request/response parity is established. The driver can then deliver through an in-memory or Discord transport and append the learner reply as the tool result.
+
+The evaluator must remain outside the completion hook. Graders consume the completed `Trial`; they do not run inside the application call path. This keeps standalone generation, deployed behavior, and grading replaceable.
+
+### 6.4 State machines
 
 State machines have three useful roles:
 
@@ -312,31 +357,77 @@ State machines have three useful roles:
 
 Open-ended tutoring quality should not be reduced to a large rigid state graph. The state machine can monitor observable milestones and prohibited transitions while semantic or human graders assess whether a hint or explanation was pedagogically appropriate.
 
-## 7. Experiments before framework implementation
+## 7. Incremental validation experiments
 
-### Experiment 1: prompt-evaluator feasibility
+### Experiment 1: completion conformance and Standard Duck parity
 
-**Question:** Can two prompts be compared on fixed scenarios while holding the rest of the candidate configuration constant and preserving the evidence needed to explain the result?
-
-**Method:**
-
-- Select one narrow behavior with clear positive, negative, and borderline examples.
-- Define a baseline prompt and a purposeful variant with one declared change.
-- Run both through the planned Discord-free completion interface on the same versioned inputs.
-- Verify that the exact resolved prompt and model-visible history are present in the outbound request; the current refactor branch does not yet satisfy this check.
-- Preserve resolved prompt/model/tool configuration, raw outputs, usage, errors, timing, and grader evidence.
-- Apply deterministic guardrails plus provisional human and semantic ratings without collapsing them into one score.
-
-**Success evidence:** The completion adapter passes its request/response conformance checks; the system can identify exactly what changed, reproduce analysis from saved outputs, expose disagreement among graders, and return an inconclusive result when the evidence is weak.
-
-**Design decision informed:** Minimal prompt-evaluation data model, completion interface, scenario format, observation types, and result report.
-
-### Experiment 2: semantic-grader validation
-
-**Question:** Can a model grader reliably measure the narrow behavior selected for Experiment 1?
+**Question:** Can one completion adapter reproduce the request and response evidence required by both the production Standard Duck and standalone trials?
 
 **Method:**
 
+- Resolve the production Standard Duck prompt, model, reasoning setting, tool choice, and actual Armory schemas.
+- Exercise messages, `talk_to_user`, `conclude_conversation`, malformed arguments, multiple output items, structured/provider errors, retries, and usage through fake provider fixtures.
+- Compare outbound requests and returned response items between the current `AIClient` path and the candidate adapter.
+- Verify termination behavior separately; do not treat ordinary tool errors and conversation completion as the same event.
+
+**Success evidence:** The adapter preserves exact instructions, history, settings, response items, usage, errors, and termination-relevant actions for the declared cases.
+
+**Design decision informed:** Completion contract and whether `origin/bean-ai-refactor` can supply it directly or needs revision.
+
+### Experiment 2: make single-response trials durable
+
+**Question:** Can the migrated fixed-prefix cases produce durable, inspectable trials that can be regraded without another candidate call?
+
+**Method:**
+
+- Represent the production prompt and any prompt variant as resolved candidates.
+- Represent each fixed prefix as a versioned scenario with raw model-visible history.
+- Call the common completion adapter once per trial.
+- Preserve candidate/scenario provenance, raw outputs, action type, usage, errors, timing, and grader evidence.
+- Keep deterministic action-policy checks separate from provisional semantic ratings.
+
+**Success evidence:** Saved trials contain the resolved candidate, scenario, raw response action, usage, errors, timing, and grader evidence and can be regraded without regenerating responses.
+
+**Design decision informed:** Minimal candidate, scenario, trial, trace, observation, and artifact contracts.
+
+### Experiment 3: Standard Duck Discord runner hardening
+
+**Question:** Can TesterBot produce a reliable trial instead of only a history list?
+
+**Method:**
+
+- Strictly correlate the opener, thread notification, and every collected message.
+- Record visible messages plus observed completion requests/results, termination reason, timing, errors, and usage.
+- Stop promptly after the declared post-close behavior rather than waiting through a full idle timeout.
+- Persist and print a readable transcript on failure.
+- Distinguish application, driver, Discord, provider, timeout, and grader failures.
+
+**Success evidence:** A Standard Duck dry run returns one structured trial with an explicit terminal status and enough evidence to diagnose failures without opening Discord.
+
+**Design decision informed:** Discord runner and transport-event contracts.
+
+### Experiment 4: in-memory Standard Duck conversation
+
+**Question:** Can the same candidate and compatible scenarios run through a multi-turn driver without Discord?
+
+**Method:**
+
+- Use the common completion adapter and a driver that owns history.
+- Interpret conversation actions, deliver tutor messages to a scripted or branching learner, and append learner replies as tool results.
+- Record the same logical completion and conversation events produced by the Discord runner while keeping transport-specific events distinct.
+- Apply deterministic termination/pacing checks and provisional semantic graders.
+
+**Success evidence:** The report distinguishes response quality, conversation behavior, deterministic violations, and driver/infrastructure failures, and equivalent cases can be compared with Discord runs.
+
+**Design decision informed:** Conversation-driver, user-driver, trace, and local-runner contracts.
+
+### Experiment 5: semantic-grader validation
+
+**Question:** Can a model grader reliably measure one narrow Standard Duck behavior?
+
+**Method:**
+
+- Select one behavior such as adapting after a learner is stuck without revealing the complete solution.
 - Create an independently human-labeled set containing clear positive, clear negative, borderline, paraphrased, verbose, order-swapped, and injection-bearing examples.
 - Blind the judge to prompt identity and expected results.
 - Repeat judge calls and measure agreement, class-level errors, abstention, and systematic bias.
@@ -345,84 +436,39 @@ Open-ended tutoring quality should not be reduced to a large rigid state graph. 
 
 **Design decision informed:** Whether semantic grading can influence prompt decisions and under what review policy.
 
-### Experiment 3: multi-turn prompt evaluation
+### Experiment 6: first controlled Standard Duck prompt comparison
 
-**Question:** Can the prompt evaluator measure behavior that emerges over a conversation rather than from one isolated response?
+**Question:** Does one purposeful prompt change improve the selected tutoring behavior without violating correctness, disclosure, termination, cost, or latency guardrails?
 
-**Method:**
+**Method:** Run baseline and variant candidates on the same versioned scenarios, repeat and interleave stochastic trials, blind semantic/human graders, preserve separate measures, and allow an inconclusive result.
 
-- Use an in-memory scripted or branching learner driver that owns conversation history.
-- Compare prompt candidates on the same learner states, misconceptions, and direct-answer requests.
-- Record history updates, completion requests/results, tool activity, delivered messages, state transitions, and outcomes.
-- Combine semantic ratings with deterministic checks for observable policies and workflow events.
-
-**Success evidence:** The report distinguishes response quality, conversation-level behavior, deterministic violations, and driver/infrastructure failures.
-
-**Design decision informed:** Conversation-driver, user-policy, trace, repetition, and multi-turn grading contracts.
-
-### Experiment 4: objective framework-sensitivity pilot
-
-**Question:** Can the evaluation method reliably detect a known behavior difference without relying primarily on a model judge?
-
-**Candidate workflow:** Statistics or registration.
-
-**Method:**
-
-- Create a baseline and a candidate with one known bounded defect.
-- Run both on the same success, malformed-input, edge, and recovery scenarios.
-- Repeat stochastic trials and interleave candidate order.
-- Apply executable outcome checks, trace checks, and operational measurements.
-
-**Success evidence:** The declared grader detects the defect on the intended scenarios, does not invent differences on unaffected scenarios, and attributes infrastructure failures separately.
-
-**Design decision informed:** Minimal experiment core, repetition policy, artifact layout, and comparison report.
-
-### Experiment 5: Discord fidelity
-
-**Question:** Which failures appear only when the same scenario runs through Discord?
-
-**Method:**
-
-- Select a few scenarios already validated in memory or a sandbox.
-- Run them through the TesterBot/Discord path.
-- Compare business outcomes and event categories, while expecting Discord-specific events to differ.
-- Measure additional latency, failures, setup cost, and missing observability.
-
-**Success evidence:** The team can name the risks covered uniquely by Discord and decide how frequently this suite should run.
-
-**Design decision informed:** Boundary between routine local evaluation and selective end-to-end evaluation.
-
-### Experiment 6: first real prompt comparison
-
-**Question:** Does a purposeful prompt change improve one declared tutoring behavior without violating correctness, disclosure, termination, safety, cost, or latency guardrails?
-
-This experiment should begin only after the runner, trace, comparison, and semantic-grader assumptions used by it have passed the relevant earlier experiments.
+This experiment should begin only after the completion adapter, trial artifacts, relevant runner, and grader assumptions have passed the earlier experiments.
 
 ## 8. Recommended sequence
 
-1. Review and correct the current-system map with the application and refactor owners.
-2. Select one narrow, important prompt behavior and create a small human-reviewed example set.
-3. Run the prompt-evaluator feasibility experiment through the Discord-free completion boundary.
-4. Validate the semantic grader used for that behavior.
-5. Extend the experiment to controlled multi-turn scenarios and observable traces.
-6. Run the objective sensitivity pilot using synthetic fixtures.
-7. Decide the routine role of local, sandbox, and Discord execution from measured evidence.
-8. Freeze a scenario set and run the first controlled prompt comparison.
+1. Confirm the completion contract and run conformance/parity tests against the current Standard Duck call path.
+2. Define the minimal candidate, scenario, trial, trace-event, observation, and artifact contracts.
+3. Preserve raw completion results and write durable fixed-prefix trial artifacts.
+4. Make TesterBot return the common trial type and harden correlation, termination, transcript, and failure reporting.
+5. Add the Discord-free multi-turn Standard Duck driver.
+6. Select one narrow tutoring behavior and validate its semantic grader against a small human-reviewed set.
+7. Compare equivalent local and Discord scenarios to measure the fidelity/cost boundary.
+8. Freeze development and confirmation scenario sets and run the first controlled prompt comparison.
 
 This order produces architectural evidence before a large framework is built. Each experiment should end in a recorded decision, including an inconclusive or rejected approach.
 
 ## 9. Open questions
 
+- Can `origin/bean-ai-refactor` satisfy the completion contract and current Standard Duck termination semantics, or should its useful pieces be adapted into the current path?
+- What is the smallest event vocabulary that faithfully represents completion requests/results, conversation actions, delivered messages, learner replies, retries, errors, and termination?
+- During the incremental migration, which tool execution remains in `AIClient`, and which conversation actions move to the reusable driver?
 - Which prompt behavior is important, narrow, and clear enough for the first human-reviewed calibration set?
-- Does the completion refactor expose raw response items, usage, errors, tool requests, and model/provider identifiers needed for trial traces?
-- Which layer will own tool execution after the refactor: the completion layer or a conversation/workflow driver?
-- Should the first objective pilot use statistics calculations or registration state transitions?
 - Who can label a small tutoring calibration set, and what property can they judge consistently?
 - Which production conversations may be used for scenario discovery, under what redaction and retention rules?
 - What practical improvement would justify adopting a new prompt, and which regressions are unacceptable?
 
 ## 10. Current recommendation
 
-Use the planned completion refactor as a replaceable low-level adapter after it passes conformance and application-parity checks. Start with a focused prompt evaluator built around candidates, scenarios, trials, typed observations, and paired comparisons. Add conversation traces as prompt evaluation expands into multi-turn and tool-using behavior. Keep TesterBot as a selective Discord end-to-end adapter.
+Keep the shared completion adapter as the hook for Standard Duck generation and expand its conformance and parity checks. Next, preserve durable fixed-prefix trials, make both fixed and conversation runners emit common trials and typed observations, and keep evaluator logic outside the application. Add the in-memory conversation driver after single-response parity, and retain TesterBot as the selective high-fidelity Discord runner.
 
-The first design proof should compare two prompts on a narrow behavior and preserve enough evidence to inspect the result. The first measurement proof should test its semantic grader against human labels. The broader agent-evaluation framework can then reuse the resulting experiment, trace, and observation contracts for objective workflows and complete-system evaluation.
+The first design proof is not yet a prompt winner. It is the ability to run the same resolved Standard Duck candidate through the standalone single-response path and the application path while preserving comparable request, response, action, usage, and provenance evidence. The first measurement proof should then validate one semantic grader against human labels. A controlled paired prompt comparison follows those proofs.

@@ -1,14 +1,7 @@
 """Shared data contracts for fixed-prefix tutor response evaluation."""
 
-from collections.abc import Sequence
 from typing import Literal
 
-from openai.types.responses import (
-    FunctionToolParam,
-    ResponseIncludable,
-    ResponseInputParam,
-    ResponseOutputItem,
-)
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import NotRequired, Protocol, TypedDict
 
@@ -26,32 +19,12 @@ class EvaluationResult(BaseModel):
     rationale: str
 
 
-class TutorResponse(Protocol):
-    @property
-    def output(self) -> Sequence[ResponseOutputItem]: ...
-
-    @property
-    def output_text(self) -> str: ...
-
-
 class ParsedEvaluationResponse(Protocol):
     @property
     def output_parsed(self) -> EvaluationResult | None: ...
 
 
 class ResponsesAPI(Protocol):
-    async def create(
-        self,
-        *,
-        model: str,
-        instructions: str,
-        input: ResponseInputParam,
-        tools: list[FunctionToolParam],
-        tool_choice: Literal["auto"],
-        include: list[ResponseIncludable],
-        store: bool,
-    ) -> TutorResponse: ...
-
     async def parse(
         self,
         *,
@@ -86,11 +59,9 @@ class EvaluationTestConfig(TypedDict):
 
 
 class EvaluationConfig(TypedDict):
-    model: str
+    evaluator_model: str
     tests: dict[str, EvaluationTestConfig]
-    evaluator_model: NotRequired[str]
     evaluator_prompt: NotRequired[str]
-    prompt_path: NotRequired[str]
     reference_answer: NotRequired[str]
     use_reference_answer: NotRequired[bool]
 
