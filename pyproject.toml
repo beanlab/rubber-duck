@@ -41,3 +41,8 @@ dev = [
     "myteam (>=0.2.4,<0.3.0)",
     "pytest (>=8.3,<9.0)"
 ]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:'audioop' is deprecated and slated for removal in Python 3\\.13:DeprecationWarning:discord\\.player",
+]

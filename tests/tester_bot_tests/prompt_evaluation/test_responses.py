@@ -1,11 +1,12 @@
 """Run the live fixed-prefix tutor-response experiment.
 
 Each YAML case supplies a model-visible conversation prefix and an
-evaluator-only reference answer. The test generates one tutor response, then
-runs every independent evaluation test configured in ``config.yaml`` against
-that same response. It prints case and prompt-level measurements with ``-s``.
+evaluator-only reference answer. The test generates one tutor response, uses
+JEV to select applicable Standard Duck criteria, and evaluates the selected
+criteria against that response. It prints case and prompt-level measurements
+with ``-s``.
 
-Every standard and case-specific criterion must pass for a case to pass. The
+Every selected, standard, and case-specific criterion must pass for a case to pass. The
 experiment still evaluates only the next response conditional on the supplied
 prefix; it does not establish how the prompt would conduct the complete
 conversation.
@@ -14,12 +15,12 @@ conversation.
 import os
 from collections.abc import Generator
 from pathlib import Path
-from typing import cast
 
 import pytest
 import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
+from pydantic import TypeAdapter
 
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
@@ -33,8 +34,10 @@ from src.testing.prompt_evaluation.reporting import (
 )
 from src.testing.prompt_evaluation.types import (
     EvaluationCase,
+    EvaluationCasesFile,
     EvaluationConfig,
     EvaluationRun,
+    RubberDuckTestsConfig,
 )
 from src.utils.config_loader import load_configuration
 
@@ -43,19 +46,23 @@ TEST_ROOT = Path(__file__).resolve().parent
 ROOT = TEST_ROOT.parents[2]
 EVALUATION_CONFIG_PATH = TEST_ROOT / "config.yaml"
 CASES_CONFIG = TEST_ROOT / "cases.yaml"
+RUBBER_DUCK_TESTS_CONFIG = TEST_ROOT / "rubber_duck_tests.yaml"
 
 
 def load_yaml(path: Path) -> object:
-    return cast(object, yaml.safe_load(path.read_text(encoding="utf-8")))
+    data: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data
 
 
-config_data = load_yaml(EVALUATION_CONFIG_PATH)
-cases_data = load_yaml(CASES_CONFIG)
-if not isinstance(config_data, dict) or not isinstance(cases_data, dict):
-    raise TypeError("Evaluation configuration files must contain YAML mappings")
-
-SHARED_CONFIG = cast(EvaluationConfig, config_data)
-CASES = cast(list[EvaluationCase], cases_data["cases"])
+SHARED_CONFIG = TypeAdapter(EvaluationConfig).validate_python(
+    load_yaml(EVALUATION_CONFIG_PATH)
+)
+CASES = TypeAdapter(EvaluationCasesFile).validate_python(load_yaml(CASES_CONFIG))[
+    "cases"
+]
+RUBBER_DUCK_TESTS = TypeAdapter(RubberDuckTestsConfig).validate_python(
+    load_yaml(RUBBER_DUCK_TESTS_CONFIG)
+)["rubber_duck_tests"]
 PROMPT_RESULTS: list[EvaluationRun] = []
 
 
@@ -92,11 +99,9 @@ async def test_prompt_response(case: EvaluationCase) -> None:
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("OPENAI_API_KEY is required for prompt response evaluations.")
 
-    config: EvaluationConfig = {
-        **SHARED_CONFIG,
-        "reference_answer": case["reference_answer"],
-        "tests": {**SHARED_CONFIG["tests"], **case.get("tests", {})},
-    }
+    config = SHARED_CONFIG.copy()
+    config["reference_answer"] = case["reference_answer"]
+    config["case_tests"] = case.get("tests", {})
     async with AsyncOpenAI() as client:
         jev_key = os.getenv("JEV_API_KEY")
         result = await evaluate_next_response(
@@ -113,6 +118,7 @@ async def test_prompt_response(case: EvaluationCase) -> None:
                 if jev_key
                 else None
             ),
+            rubber_duck_tests=RUBBER_DUCK_TESTS,
         )
 
     PROMPT_RESULTS.append(result)

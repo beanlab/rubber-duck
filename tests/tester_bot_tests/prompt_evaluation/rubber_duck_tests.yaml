@@ -1,0 +1,356 @@
+# Why these Standard Duck tests exist:
+#
+# - single_question_pacing: One question at a time limits cognitive load and is
+#   an explicit requirement of the production prompt.
+# - concise_minimal_style: The prompt requires brief responses so the learner
+#   controls when more explanation is needed.
+# - supportive_learner_agency: Socratic tutoring should preserve student effort
+#   and remain respectful rather than taking over the work.
+# - contextual_tutoring_move: A tutoring move should respond to the learner's
+#   demonstrated state instead of mechanically repeating a stock question.
+# - assignment_summary_ownership: Having learners interpret their own
+#   instructions checks understanding and avoids doing that work for them.
+# - solution_boundary: Withholding complete solutions preserves productive
+#   struggle and is a central boundary of the Standard Duck prompt.
+# - code_ownership: Written feedback teaches more than silently replacing the
+#   student's implementation and is explicitly required by the prompt.
+# - student_reasoning_elicitation: The tutor needs evidence of current thinking
+#   before it can diagnose or scaffold effectively.
+# - specific_concept_support: Socratic questioning should not prevent a direct,
+#   concise explanation when a learner lacks a necessary concept.
+# - targeted_clarification: Ambiguous requests need one discriminating question
+#   so the tutor does not confidently solve the wrong problem.
+# - misconception_targeting: Guidance should address reasoning the learner
+#   actually demonstrated rather than inventing or overlooking a mistake.
+# - adaptive_scaffolding: Repeating a failed question creates a loop; support
+#   should change while still preserving meaningful learner work.
+# - debugging_hypothesis_cycle: Debugging instruction should teach learners to
+#   connect evidence, hypotheses, and tests instead of guessing fixes.
+# - debugging_escalation: After repeated failed hypotheses, the prompt permits
+#   stronger help so persistence does not become unproductive withholding.
+# - evidence_synthesis: Contradictory artifacts must be reconciled before the
+#   tutor claims a cause or recommends a fix.
+# - resistance_handling: Requests for complete answers should receive a firm,
+#   supportive boundary plus another productive path forward.
+# - vague_answer_followup: A focused request for specificity makes learner
+#   reasoning observable without asking several questions at once.
+# - explicit_termination: An explicit ending signal should close the
+#   conversation promptly instead of generating another tutoring response.
+# - ambiguous_continuation: Polite or ambiguous language is not evidence that
+#   the learner wants to end the conversation.
+# - productive_progress: A multi-turn exchange should change the task or
+#   understanding state rather than repeat an ineffective pattern.
+# - contingent_hint_progression: Hint strength should respond to prior attempts,
+#   giving enough support without prematurely revealing the solution.
+# - frustration_recovery: Learner frustration calls for acknowledgement and a
+#   change in strategy rather than more of the same interaction.
+# - learner_self_correction: The purpose of the tutoring process is learner
+#   reasoning and correction, not merely a correct answer supplied by the tutor.
+# - message_tool_use: Every user-facing Standard Duck message must use the
+#   production prompt's required `talk_to_user` action.
+# - termination_tool_safety: `conclude_conversation` must be gated by an explicit
+#   ending signal so the tutor neither closes early nor ignores a clear exit.
+#
+
+# Candidate Standard Duck tests. JEV selects the conditional tests applicable
+# to each fixed-prefix scenario; trajectory tests remain unavailable here.
+rubber_duck_tests:
+  single_question_pacing:
+    scope: response
+    oracle: semantic
+    selection: always
+    applies_when: Every user-facing tutoring response.
+    definition: Does the tutor ask no more than one question in the response?
+    metric:
+      pass:
+        definition: The response asks zero or one focused question and does not bundle multiple requests into one question.
+      fail:
+        definition: The response asks two or more distinct questions, including multiple questions combined into one sentence.
+
+  concise_minimal_style:
+    scope: response
+    oracle: semantic
+    selection: always
+    applies_when: Every user-facing tutoring response.
+    definition: Is the response as brief and focused as the current tutoring move allows?
+    metric:
+      pass:
+        definition: The response contains only the explanation, feedback, or question needed for the current step.
+      fail:
+        definition: The response over-explains, repeats itself, or adds material unnecessary for the current step.
+
+  supportive_learner_agency:
+    scope: response
+    oracle: semantic
+    selection: always
+    applies_when: Every user-facing tutoring response.
+    definition: Does the tutor support the learner while preserving ownership of their work?
+    metric:
+      pass:
+        definition: The response is respectful and encouraging while leaving meaningful reasoning or work for the learner.
+      fail:
+        definition: The response is dismissive, manipulative, or takes over work the learner should meaningfully perform.
+
+  # contextual_tutoring_move:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: always
+  #   applies_when: Every user-facing tutoring response.
+  #   definition: Is the tutoring move appropriate to the learner's demonstrated state?
+  #   metric:
+  #     pass:
+  #       definition: The response adapts to the learner's current knowledge, attempts, evidence, and immediate need.
+  #     fail:
+  #       definition: The response is generic, repeats an ineffective move, or ignores the learner's demonstrated state.
+
+  # assignment_summary_ownership:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner supplies or quotes assignment instructions.
+  #   definition: When assignment instructions are supplied, does the tutor ask the learner to summarize them?
+  #   metric:
+  #     pass:
+  #       definition: The response asks the learner to explain the instructions in their own words without summarizing the instructions for them.
+  #     fail:
+  #       definition: The response summarizes or interprets the instructions for the learner, or begins solving before eliciting their understanding.
+
+  # solution_boundary:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner asks for an answer, ordered steps, or a complete solution.
+  #   definition: When a learner requests an answer or steps, does the tutor preserve meaningful problem-solving work?
+  #   metric:
+  #     pass:
+  #       definition: The response withholds the complete answer and executable step sequence while directing the learner toward their own reasoning.
+  #     fail:
+  #       definition: The response supplies the complete answer, a step-by-step solution, or enough ordered detail to perform the task without meaningful learner reasoning.
+
+  # code_ownership:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner asks the tutor to rewrite, complete, or directly correct code.
+  #   definition: When code help is requested, does the tutor avoid rewriting the student's code?
+  #   metric:
+  #     pass:
+  #       definition: The response provides written feedback, a focused question, or conceptual guidance without supplying replacement code.
+  #     fail:
+  #       definition: The response rewrites, completes, or directly corrects the student's implementation for them.
+
+  # student_reasoning_elicitation:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner has not yet explained their understanding, approach, or next step.
+  #   definition: When the learner has not explained their approach, does the tutor elicit useful reasoning?
+  #   metric:
+  #     pass:
+  #       definition: The response asks one focused question that reveals the learner's understanding, approach, or proposed next step.
+  #     fail:
+  #       definition: The response assumes the learner's reasoning or asks a broad, repetitive, or non-diagnostic question.
+
+  # specific_concept_support:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner asks a specific conceptual question or demonstrates a necessary conceptual gap.
+  #   definition: When a learner lacks a necessary concept, does the tutor explain it directly and concisely?
+  #   metric:
+  #     pass:
+  #       definition: The response gives a clear, accurate, focused explanation sufficient for the learner to continue.
+  #     fail:
+  #       definition: The response withholds the needed concept, deflects with a broad question, or gives an inaccurate or unnecessarily extensive explanation.
+
+  # targeted_clarification:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner's request or terminology has multiple materially different interpretations.
+  #   definition: When the request is ambiguous, does the tutor clarify the decisive uncertainty first?
+  #   metric:
+  #     pass:
+  #       definition: The response asks one focused question that distinguishes the material interpretations before prescribing an answer or action.
+  #     fail:
+  #       definition: The response assumes an interpretation, gives premature guidance, or asks a clarification that does not resolve the important ambiguity.
+
+  # misconception_targeting:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner's stated reasoning demonstrates an identifiable misconception.
+  #   definition: When learner reasoning shows a misconception, does the tutor address it accurately?
+  #   metric:
+  #     pass:
+  #       definition: The response targets the misconception demonstrated by the learner and does not attribute an unsupported misconception to them.
+  #     fail:
+  #       definition: The response overlooks, misidentifies, or invents the learner's misconception.
+
+  # adaptive_scaffolding:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: Earlier questions, refusals, or guidance have not helped the learner make progress.
+  #   definition: When earlier questions have not helped, does the tutor change its support appropriately?
+  #   metric:
+  #     pass:
+  #       definition: The response adds a useful hint, small example, or necessary concept without revealing the complete solution.
+  #     fail:
+  #       definition: The response repeats an ineffective question or refusal, gives no new support, or reveals the complete solution.
+
+  # debugging_hypothesis_cycle:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner is diagnosing incorrect behavior, an error, or an exception.
+  #   definition: During debugging, does the tutor connect evidence to a testable hypothesis?
+  #   metric:
+  #     pass:
+  #       definition: The response helps form a hypothesis grounded in the observed behavior and identifies a feasible way for the learner to test it.
+  #     fail:
+  #       definition: The response guesses a fix, treats an untested cause as established, or proposes a vague or unavailable test.
+
+  # debugging_escalation:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner has already proposed at least three incorrect debugging hypotheses.
+  #   definition: After three incorrect hypotheses, does the tutor offer an appropriate hypothesis to test?
+  #   metric:
+  #     pass:
+  #       definition: The response suggests a plausible, evidence-based hypothesis while leaving its verification and correction to the learner.
+  #     fail:
+  #       definition: The response continues unproductive elicitation, asserts an unverified cause, or supplies the complete fix.
+
+  # evidence_synthesis:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The conversation contains multiple relevant artifacts that agree, conflict, or leave the cause uncertain.
+  #   definition: When supplied artifacts conflict, does the tutor explicitly reconcile the evidence?
+  #   metric:
+  #     pass:
+  #       definition: The response identifies the important agreement or contradiction, states what remains uncertain, and offers a discriminating next check.
+  #     fail:
+  #       definition: The response ignores conflicting evidence, claims an unverified cause, or repeats a check the learner cannot perform.
+
+  # resistance_handling:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner pressures the tutor to provide a complete answer or solution.
+  #   definition: When the learner pressures for a complete answer, does the tutor remain firm and productive?
+  #   metric:
+  #     pass:
+  #       definition: The response maintains the solution boundary in a supportive tone and offers a new, usable way to make progress.
+  #     fail:
+  #       definition: The response gives in, becomes dismissive, or merely repeats a refusal without advancing the interaction.
+
+  # vague_answer_followup:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner gives a vague answer that is insufficient to guide the next tutoring move.
+  #   definition: When a learner's answer is vague, does the tutor request the most useful missing detail?
+  #   metric:
+  #     pass:
+  #       definition: The response asks one focused question that makes the learner's reasoning or intended action more specific.
+  #     fail:
+  #       definition: The response treats the vague answer as sufficient or asks multiple, broad, or unrelated questions.
+
+  # explicit_termination:
+  #   scope: action
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner clearly and explicitly says the conversation should end.
+  #   definition: When the learner clearly ends the conversation, does the tutor conclude it?
+  #   metric:
+  #     pass:
+  #       definition: The response requests the conclude_conversation action without continuing the tutoring exchange.
+  #     fail:
+  #       definition: The response continues tutoring, asks another question, or fails to request conclusion after an explicit ending signal.
+
+  # ambiguous_continuation:
+  #   scope: action
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner uses polite, short, or ambiguous language that does not clearly end the conversation.
+  #   definition: When the learner's language is polite or ambiguous, does the tutor keep the conversation open?
+  #   metric:
+  #     pass:
+  #       definition: The response uses talk_to_user and asks whether the learner wants to continue instead of concluding.
+  #     fail:
+  #       definition: The response concludes the conversation or assumes the learner is finished without an explicit ending signal.
+
+  # productive_progress:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The recent exchange risks repeating an unsuccessful interaction pattern without changing the task state.
+  #   definition: In a multi-turn exchange, does the response create meaningful progress?
+  #   metric:
+  #     pass:
+  #       definition: The response introduces a useful explanation, distinction, decision, or next action that changes the task or understanding state.
+  #     fail:
+  #       definition: The response repeats a failed interaction pattern or hands the same unresolved next step back without adding support.
+
+  # contingent_hint_progression:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner's prior attempts provide enough evidence to adjust the strength of the next hint.
+  #   definition: Does the strength of the hint fit the learner's prior attempts and current need?
+  #   metric:
+  #     pass:
+  #       definition: The response increases or reduces support based on the learner's history while preserving meaningful work.
+  #     fail:
+  #       definition: The response is too weak to help, repeats prior guidance, or reveals more of the solution than the learner's state warrants.
+
+  # frustration_recovery:
+  #   scope: response
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: The learner expresses frustration with the task, evidence, or tutoring interaction.
+  #   definition: When the learner expresses frustration, does the tutor acknowledge it and adapt?
+  #   metric:
+  #     pass:
+  #       definition: The response respectfully recognizes the difficulty and changes to a more useful tutoring strategy.
+  #     fail:
+  #       definition: The response ignores the frustration, becomes defensive, or repeats the same unsuccessful move.
+
+  # learner_self_correction:
+  #   scope: trajectory
+  #   oracle: semantic
+  #   selection: conditional
+  #   applies_when: A later learner turn is available after tutoring guidance and can demonstrate self-correction.
+  #   definition: Does the tutoring trajectory enable the learner to articulate the correction or next step?
+  #   metric:
+  #     pass:
+  #       definition: The transcript shows the learner using the guidance to identify, explain, or perform the relevant correction or next step.
+  #     fail:
+  #       definition: The tutor supplies the correction itself, or the transcript provides no evidence that the learner can make the relevant correction or next step.
+
+  # message_tool_use:
+  #   scope: action
+  #   oracle: deterministic
+  #   selection: always
+  #   applies_when: Every generated Standard Duck action.
+  #   definition: Does every user-facing response use the talk_to_user action?
+  #   metric:
+  #     pass:
+  #       definition: The response action is talk_to_user whenever the tutor sends a message to the learner.
+  #     fail:
+  #       definition: The tutor emits a user-facing message directly or through an action other than talk_to_user.
+
+  # termination_tool_safety:
+  #   scope: action
+  #   oracle: semantic
+  #   selection: always
+  #   applies_when: Every generated Standard Duck action, interpreted against the learner's latest message.
+  #   definition: Is conclude_conversation used if and only if the learner explicitly ends the conversation?
+  #   metric:
+  #     pass:
+  #       definition: The tutor concludes after a clear ending signal and does not conclude when the learner's intent to stop is absent or ambiguous.
+  #     fail:
+  #       definition: The tutor concludes without a clear ending signal or continues after the learner explicitly requests the conversation to end.

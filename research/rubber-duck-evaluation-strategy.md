@@ -110,7 +110,7 @@ The current branch head now forwards the agent prompt, initializes its client an
 
 Standard Rubber Duck currently has two separate evaluation paths:
 
-1. **Fixed-prefix, single-response evaluation.** `src/testing/prompt_evaluation/` resolves the production Standard Duck agent, converts a transcript prefix into Responses API history, calls the shared completion adapter with Armory-generated tool schemas, and applies the same binary criteria through OpenAI and, when configured, JEV. JEV returns pass/fail probabilities and confidence for every criterion in one request.
+1. **Fixed-prefix, single-response evaluation.** `src/testing/prompt_evaluation/` resolves the production Standard Duck agent, converts a transcript prefix into Responses API history, calls the shared completion adapter with Armory-generated tool schemas, and applies binary criteria through OpenAI and JEV. JEV first selects applicable Standard Duck criteria; JEV and OpenAI then grade that exact selected semantic set. Full suites can prepare cases with bounded concurrency and submit the selected OpenAI judgments through the asynchronous Batch API without reusing prior responses.
 2. **TesterBot Discord evaluation.** `tests/tester_bot_tests/test_dry_run.py` starts the application, uses a second Discord bot and model as the student, follows a complete conversation scenario, checks visible closure/error strings, reports selected cost, and applies a post-conversation model assessor.
 
 These paths now share the provider-call boundary and resolved Standard Duck candidate, but they are not yet one evaluation system. They still use different history, result, grader, and reporting contracts. The standalone path does not use the production retry, typing, metrics, or tool loop. The Discord path exercises deployed composition but returns only TesterBot history and loses internal application events. Integration should make them two runners over common trial contracts rather than make either path depend on the other.
@@ -241,7 +241,7 @@ The first observation may indicate a prompt or model-behavior problem. The remai
 The repository currently contains:
 
 1. **Unit and regression tests** for SQL metrics, dataset tools, Python output formatting, rubric generation, response/tool completion behavior, structured output validation, and retry paths.
-2. **A fixed-prefix Standard Duck response evaluator** with four YAML cases, standard and case-specific binary criteria, the resolved production agent and tool schemas, OpenAI judgments, optional JEV judgments with confidence, and fake-client plumbing tests.
+2. **A fixed-prefix Standard Duck response evaluator** with four YAML cases, standard, case-specific, and dynamically selected Standard Duck criteria, the resolved production agent and tool schemas, combined OpenAI judgments, optional JEV judgments with confidence, and fake-client plumbing tests.
 3. **TesterBot end-to-end tests** that start the Rubber Duck application, connect through Discord, use a model-driven tester as the user, collect a visible conversation history and selected usage/cost, and run post-conversation model assessors.
 4. **Four current Discord dry runs** covering the Standard Duck, general statistics duck, CS statistics duck, and debugging-practice workflow.
 5. **A debugging assessor battery** that applies several criteria independently rather than relying only on one broad prompt.
@@ -249,7 +249,7 @@ The repository currently contains:
 ### 5.2 What the current tests establish
 
 - Important local contracts work for the specifically tested cases.
-- A Standard Duck response can be generated after a fixed prefix and graded independently on subject accuracy, misconception diagnosis, scaffolding, answer disclosure, relevance, and actionability.
+- A Standard Duck response can be generated after a fixed prefix and graded on the prompt-agnostic `standard_tests` in `config.yaml` plus any scenario-specific tests in `cases.yaml`.
 - Each configured semantic criterion has explicit pass and fail definitions, although the validity of the selected result remains unproven.
 - OpenAI and JEV can independently apply the same criteria to the same generated response; their agreement and calibration on tutoring judgments remain unproven.
 - The deployed-style application can start and interact through Discord.

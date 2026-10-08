@@ -31,7 +31,31 @@ poetry run pytest -s tests/tester_bot_tests/prompt_evaluation/test_responses.py
 
 Use `-k <case-id>` to run one case. Add or remove cases in
 `tests/tester_bot_tests/prompt_evaluation/cases.yaml`. A case's optional `tests`
-mapping adds binary criteria to the standard tests in `config.yaml`.
+mapping adds case-specific criteria. General criteria are `standard_tests` in
+`config.yaml`; Standard Duck behavior criteria are in `rubber_duck_tests.yaml`.
+The report labels all three suites and the actual generator, OpenAI evaluator,
+and JEV evaluator models. JEV first selects applicable response/action criteria;
+JEV and OpenAI then evaluate the same selected model-judged criteria. Trajectory
+criteria are skipped by the fixed-prefix runner.
+
+Run the full suite concurrently, with a maximum of three active cases:
+
+```bash
+poetry run dotenv run -- python -m src.testing.prompt_evaluation.run_suite \
+  live --concurrency 3
+```
+
+For a full or nightly run, prepare candidates and JEV selections concurrently,
+then submit only the selected model-evaluated tests through OpenAI Batch:
+
+```bash
+poetry run dotenv run -- python -m src.testing.prompt_evaluation.run_suite \
+  batch --concurrency 3
+```
+
+Each invocation generates and judges new responses. It does not cache or reuse
+results. The Batch command waits for the asynchronous OpenAI job to finish. Add
+`--case <case-id>` to either suite command to run one case.
 
 Run the standard-duck Discord end-to-end test with two bot tokens in `.env`:
 
