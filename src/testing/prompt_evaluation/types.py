@@ -58,6 +58,7 @@ class EvaluationTestConfig(TypedDict):
 
 class EvaluationConfig(TypedDict):
     evaluator_model: str
+    jev_model: NotRequired[str]
     tests: dict[str, EvaluationTestConfig]
     evaluator_prompt: NotRequired[str]
     reference_answer: NotRequired[str]
@@ -101,8 +102,21 @@ class EvaluationSummary(TypedDict):
     blocking_tests: list[str]
 
 
+class JevTestResult(TypedDict):
+    rating: TestOutcome
+    confidence: float
+    probabilities: dict[str, float]
+
+
+class JevEvaluation(TypedDict):
+    model: str
+    tests: dict[str, JevTestResult]
+    summary: EvaluationSummary
+
+
 class EvaluationRun(TypedDict):
     transcript: list[TranscriptTurn]
     tests: dict[str, TestResult]
     summary: EvaluationSummary
     reference_answer_used: bool
+    jev: NotRequired[JevEvaluation]

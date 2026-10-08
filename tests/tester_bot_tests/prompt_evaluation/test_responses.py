@@ -25,6 +25,7 @@ from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
 from src.testing.prompt_evaluation.evaluation import evaluate_next_response
+from src.testing.prompt_evaluation.jev import JevEvaluator
 from src.testing.prompt_evaluation.reporting import (
     evaluation_failure_message,
     print_case_evaluation,
@@ -97,12 +98,21 @@ async def test_prompt_response(case: EvaluationCase) -> None:
         "tests": {**SHARED_CONFIG["tests"], **case.get("tests", {})},
     }
     async with AsyncOpenAI() as client:
+        jev_key = os.getenv("JEV_API_KEY")
         result = await evaluate_next_response(
             client=client,
             config=config,
             transcript=case["transcript"],
             agent=STANDARD_AGENT,
             armory=STANDARD_ARMORY,
+            jev_evaluator=(
+                JevEvaluator(
+                    api_key=jev_key,
+                    model=config.get("jev_model", "jev-latest"),
+                )
+                if jev_key
+                else None
+            ),
         )
 
     PROMPT_RESULTS.append(result)

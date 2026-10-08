@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from src.armory.armory import Armory
 from src.gen_ai.completion import CompletionRequest, ResponsesCompletionAdapter
 from src.gen_ai.gen_ai import Agent
+from src.testing.prompt_evaluation.jev import JevEvaluator
 from src.testing.prompt_evaluation.types import (
     EvaluationClient,
     EvaluationConfig,
@@ -198,6 +199,7 @@ async def evaluate_next_response(
     agent: Agent,
     armory: Armory,
     completion_adapter: ResponsesCompletionAdapter | None = None,
+    jev_evaluator: JevEvaluator | None = None,
 ) -> EvaluationRun:
     """Generate one response, then run every configured test against it."""
     configured_tests = _evaluation_tests(config)
@@ -241,9 +243,16 @@ async def evaluate_next_response(
     )
     tests: dict[str, TestResult] = dict(zip(configured_tests, test_results))
 
-    return {
+    result: EvaluationRun = {
         "transcript": [*transcript, candidate_response],
         "tests": tests,
         "summary": summarize_evaluation(tests),
         "reference_answer_used": "reference_answer" in evaluator_input,
     }
+    if jev_evaluator is not None:
+        result["jev"] = await jev_evaluator.evaluate(
+            evaluator_input,
+            config,
+            configured_tests,
+        )
+    return result

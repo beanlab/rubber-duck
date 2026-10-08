@@ -22,7 +22,8 @@
 - Test coverage is intentionally narrow; most runtime subsystems are currently untested in this directory.
 - Formatting tests assert string-level output contracts, so prompt/runtime formatting changes may require coordinated test updates.
 
-Run the response-level prompt cases with `OPENAI_API_KEY` set:
+Run the response-level prompt cases with `OPENAI_API_KEY` set. When
+`JEV_API_KEY` is also set, the same responses are evaluated by OpenAI and JEV:
 
 ```bash
 poetry run pytest -s tests/tester_bot_tests/prompt_evaluation/test_responses.py

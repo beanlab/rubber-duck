@@ -38,6 +38,7 @@
 #   both are summarized in research/README.md.
 #
 evaluator_model: gpt-5.6-sol
+jev_model: jev-latest
 
 tests:
   subject_accuracy:
