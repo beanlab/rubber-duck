@@ -57,6 +57,22 @@ Each invocation generates and judges new responses. It does not cache or reuse
 results. The Batch command waits for the asynchronous OpenAI job to finish. Add
 `--case <case-id>` to either suite command to run one case.
 
+Ordinary pytest and suite runs do not persist evaluation artifacts. To run an
+explicit experiment with fresh repetitions and immutable JSON evidence, provide
+a new output directory:
+
+```bash
+poetry run dotenv run -- python -m src.testing.prompt_evaluation.run_experiment \
+  --output /tmp/rubber-duck-experiment \
+  --repetitions 3 \
+  --concurrency 3
+```
+
+The experiment runner writes one `experiment.json` manifest and one file per
+trial under `trials/`. The output directory must not already exist. Use
+`--case <case-id>` to limit the experiment to one configured case. Recording is
+enabled only through this runner; regular tests retain their existing behavior.
+
 Run the standard-duck Discord end-to-end test with two bot tokens in `.env`:
 
 ```dotenv

@@ -29,6 +29,7 @@ from src.testing.prompt_evaluation.evaluation import (
     build_tutor_history,
     evaluate_next_response,
 )
+from src.testing.prompt_evaluation.observation import TrialCapture
 from src.testing.prompt_evaluation.reporting import print_prompt_summary
 from src.testing.prompt_evaluation.types import (
     EvaluationConfig,
@@ -171,6 +172,7 @@ def test_generates_once_and_runs_each_configured_test(
         },
     }
     client = FakeOpenAIClient()
+    capture = TrialCapture()
 
     async def send_message(
         channel_id: int,
@@ -197,6 +199,7 @@ def test_generates_once_and_runs_each_configured_test(
             transcript=prefix,
             agent=agent,
             armory=armory,
+            observer=capture,
         )
     )
 
@@ -231,6 +234,12 @@ def test_generates_once_and_runs_each_configured_test(
     }
     assert client.create_input == build_tutor_history(prefix)
     assert len(client.parse_params) == 1
+    assert capture.generation is not None
+    assert capture.generation.request.model == "test-model"
+    assert capture.generation.result.response_id is None
+    assert capture.selection is None
+    assert capture.evaluation is not None
+    assert capture.evaluation.result is result
 
     call = client.parse_params[0]
     evaluator_input = TypeAdapter(EvaluatorRequest).validate_json(call.input)

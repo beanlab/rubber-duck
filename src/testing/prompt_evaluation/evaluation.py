@@ -16,6 +16,12 @@ from src.armory.armory import Armory
 from src.gen_ai.completion import CompletionRequest, ResponsesCompletionAdapter
 from src.gen_ai.gen_ai import Agent
 from src.testing.prompt_evaluation.jev import JevEvaluator
+from src.testing.prompt_evaluation.observation import (
+    EvaluationCompleted,
+    EvaluationObserver,
+    GenerationCompleted,
+    SelectionCompleted,
+)
 from src.testing.prompt_evaluation.types import (
     EvaluationClient,
     CombinedEvaluationResult,
@@ -303,6 +309,7 @@ async def prepare_next_response(
     completion_adapter: ResponsesCompletionAdapter | None = None,
     jev_evaluator: JevEvaluator | None = None,
     rubber_duck_tests: dict[str, RubberDuckTestConfig] | None = None,
+    observer: EvaluationObserver | None = None,
 ) -> PreparedEvaluation:
     """Generate one response and let JEV select its applicable tests."""
     configured_tests = _evaluation_tests(config)
@@ -317,18 +324,23 @@ async def prepare_next_response(
             f"Rubber Duck tests duplicate configured tests: {sorted(duplicate_names)}"
         )
     adapter = completion_adapter or ResponsesCompletionAdapter()
+    completion_request = CompletionRequest(
+        model=agent.model,
+        instructions=agent.prompt,
+        input=build_tutor_history(transcript),
+        tools=[armory.get_tool_schema(name) for name in agent.tools],
+        tool_choice=agent.tool_settings,
+        output_format=agent.output_format,
+        reasoning=agent.reasoning,
+    )
     completion = await adapter.complete(
         client,
-        CompletionRequest(
-            model=agent.model,
-            instructions=agent.prompt,
-            input=build_tutor_history(transcript),
-            tools=[armory.get_tool_schema(name) for name in agent.tools],
-            tool_choice=agent.tool_settings,
-            output_format=agent.output_format,
-            reasoning=agent.reasoning,
-        ),
+        completion_request,
     )
+    if observer is not None:
+        observer.observe(
+            GenerationCompleted(request=completion_request, result=completion)
+        )
     message, candidate_action = _response_message(completion.output)
     candidate_response: TranscriptTurn = {
         "role": "tutor",
@@ -362,6 +374,8 @@ async def prepare_next_response(
             name: duck_tests[name]
             for name in jev_result["selection"]["selected"]
         }
+        if observer is not None:
+            observer.observe(SelectionCompleted(result=jev_result))
 
     semantic_duck_tests = {
         name: test
@@ -430,13 +444,17 @@ async def evaluate_prepared_response(
     *,
     client: EvaluationClient,
     prepared: PreparedEvaluation,
+    observer: EvaluationObserver | None = None,
 ) -> EvaluationRun:
     """Grade one prepared response synchronously with OpenAI."""
     semantic_results, evaluator_model = await _evaluate_tests(
         client=client,
         prepared=prepared,
     )
-    return complete_evaluation(prepared, semantic_results, evaluator_model)
+    result = complete_evaluation(prepared, semantic_results, evaluator_model)
+    if observer is not None:
+        observer.observe(EvaluationCompleted(result=result))
+    return result
 
 
 async def evaluate_next_response(
@@ -449,6 +467,7 @@ async def evaluate_next_response(
     completion_adapter: ResponsesCompletionAdapter | None = None,
     jev_evaluator: JevEvaluator | None = None,
     rubber_duck_tests: dict[str, RubberDuckTestConfig] | None = None,
+    observer: EvaluationObserver | None = None,
 ) -> EvaluationRun:
     """Generate, select tests with JEV, and grade one tutor response."""
     prepared = await prepare_next_response(
@@ -460,5 +479,10 @@ async def evaluate_next_response(
         completion_adapter=completion_adapter,
         jev_evaluator=jev_evaluator,
         rubber_duck_tests=rubber_duck_tests,
+        observer=observer,
     )
-    return await evaluate_prepared_response(client=client, prepared=prepared)
+    return await evaluate_prepared_response(
+        client=client,
+        prepared=prepared,
+        observer=observer,
+    )
