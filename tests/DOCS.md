@@ -57,21 +57,40 @@ Each invocation generates and judges new responses. It does not cache or reuse
 results. The Batch command waits for the asynchronous OpenAI job to finish. Add
 `--case <case-id>` to either suite command to run one case.
 
-Ordinary pytest and suite runs do not persist evaluation artifacts. To run an
-explicit experiment with fresh repetitions and immutable JSON evidence, provide
-a new output directory:
+Ordinary pytest and suite runs do not persist evaluation artifacts. Named
+experiments are configured in `experiments/configs/` and run with the short
+repository command:
 
 ```bash
-poetry run dotenv run -- python -m src.testing.prompt_evaluation.run_experiment \
-  --output /tmp/rubber-duck-experiment \
-  --repetitions 3 \
-  --concurrency 3
+./experiment experiments/configs/standard-duck-baseline.yaml
 ```
 
-The experiment runner writes one `experiment.json` manifest and one file per
-trial under `trials/`. The output directory must not already exist. Use
-`--case <case-id>` to limit the experiment to one configured case. Recording is
-enabled only through this runner; regular tests retain their existing behavior.
+The YAML currently configures the experiment name, case IDs (or `all`), fresh
+repetitions, concurrency, optional output directory, and console detail. Runs
+default to a timestamped, gitignored directory under `experiments/runs/`, so
+they are visible in the repository workspace without being committed.
+
+The runner prints start/completion progress as each concurrent trial runs. It
+writes a readable `report.md`, a machine-readable `summary.json`, one immutable
+`experiment.json` manifest, and one raw JSON file per trial under `trials/`.
+The Markdown report contains per-scenario criterion heatmaps, every candidate
+response/action, OpenAI evidence and rationale for each test, JEV ratings and
+probabilities, applicability decisions, and links to raw trial evidence.
+It also embeds SVG criterion heatmaps and an evaluator agreement matrix.
+The heatmaps compare only OpenAI and JEV; exact programmatic checks appear in a
+separate, small table. Derived statistics remain in `summary.json` rather than
+being presented as a large table in the human-readable report.
+Recording is enabled only through this runner; regular tests retain their
+existing behavior.
+
+For a one-off run, the earlier command-line options remain available:
+
+```bash
+./experiment --output experiments/runs/manual-check \
+  --repetitions 1 \
+  --concurrency 1 \
+  --case image-flip-clarification
+```
 
 Run the standard-duck Discord end-to-end test with two bot tokens in `.env`:
 

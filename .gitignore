@@ -31,3 +31,4 @@ nic2.yaml
 /.vscode/
 /research/papers/
 /data/
+/experiments/runs/

@@ -20,7 +20,7 @@ from src.testing.prompt_evaluation.types import (
 )
 
 
-SCHEMA_VERSION: Literal["1"] = "1"
+SCHEMA_VERSION: Literal["2"] = "2"
 
 _JSON_VALUE = TypeAdapter(JSONValue)
 _JSON_OBJECT = TypeAdapter(JSONContent)
@@ -54,8 +54,9 @@ class CandidateSnapshot(ArtifactModel):
 
 
 class ExperimentManifest(ArtifactModel):
-    schema_version: Literal["1"] = SCHEMA_VERSION
+    schema_version: Literal["2"] = SCHEMA_VERSION
     experiment_id: str
+    name: str
     created_at: datetime
     source_commit: str | None
     repetitions: int
@@ -81,7 +82,7 @@ class TrialError(ArtifactModel):
 
 
 class TrialArtifact(ArtifactModel):
-    schema_version: Literal["1"] = SCHEMA_VERSION
+    schema_version: Literal["2"] = SCHEMA_VERSION
     experiment_id: str
     trial_id: str
     scenario_id: str
@@ -160,10 +161,12 @@ class ExperimentArtifactWriter:
     def __init__(self, output_directory: Path) -> None:
         self.output_directory = output_directory
         self.trials_directory = output_directory / "trials"
+        self.charts_directory = output_directory / "charts"
 
     def initialize(self, manifest: ExperimentManifest) -> None:
         self.output_directory.mkdir(parents=True, exist_ok=False)
         self.trials_directory.mkdir()
+        self.charts_directory.mkdir()
         self._write_new(self.output_directory / "experiment.json", manifest)
 
     def write_trial(self, artifact: TrialArtifact) -> Path:
@@ -171,8 +174,34 @@ class ExperimentArtifactWriter:
         self._write_new(path, artifact)
         return path
 
+    def write_report(self, report: str) -> Path:
+        path = self.output_directory / "report.md"
+        self._write_text_new(path, report)
+        return path
+
+    def write_summary(self, summary: BaseModel) -> Path:
+        path = self.output_directory / "summary.json"
+        self._write_new(path, summary)
+        return path
+
+    def write_charts(self, charts: dict[str, str]) -> list[Path]:
+        paths: list[Path] = []
+        for name, chart in charts.items():
+            if Path(name).name != name or not name.endswith(".svg"):
+                raise ValueError(f"Invalid chart name: {name}")
+            path = self.charts_directory / name
+            self._write_text_new(path, chart)
+            paths.append(path)
+        return paths
+
     @staticmethod
-    def _write_new(path: Path, artifact: ArtifactModel) -> None:
+    def _write_new(path: Path, artifact: BaseModel) -> None:
+        ExperimentArtifactWriter._write_text_new(
+            path,
+            artifact.model_dump_json(indent=2) + "\n",
+        )
+
+    @staticmethod
+    def _write_text_new(path: Path, content: str) -> None:
         with path.open("x", encoding="utf-8") as artifact_file:
-            artifact_file.write(artifact.model_dump_json(indent=2))
-            artifact_file.write("\n")
+            artifact_file.write(content)
