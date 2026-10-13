@@ -509,11 +509,11 @@ class CacheCommand(Command):
 
 
 def create_commands(
-        send_message, 
-        metrics_handler, 
-        reporter, 
-        log_dir, 
-        # tool_caches: list[ToolCache]
+        send_message,
+        metrics_handler,
+        reporter,
+        log_dir,
+        tool_caches: list[ToolCache],
 ) -> list[Command]:
     # Create and return the list of commands
     def get_workflow_metrics():

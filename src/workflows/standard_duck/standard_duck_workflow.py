@@ -1,13 +1,19 @@
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from openai.types.responses import EasyInputMessage
 from quest import step
 
 from ...gen_ai.ai_responses import Agent, ResponsesAPI
-from ...utils.config_types import DuckContext, HistoryType
+from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
+from ...utils.config_types import HistoryType
 from ...utils.message_utils import wait_for_message
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from ...utils.python_exec_container import PythonExecContainer
 
 
 def build_standard_agent(settings: dict[str, Any]) -> Agent:
@@ -23,7 +29,31 @@ def build_standard_agent(settings: dict[str, Any]) -> Agent:
     )
 
 
+def build(
+        name: str,
+        settings: dict,
+        *,
+        message_handler: MessageHandler,
+        metrics_handler: MetricsHandler,
+        responses_api: ResponsesAPI,
+        containers: dict[str, "PythonExecContainer"],
+        sql_session: "Session",
+        tool_configs: dict,
+) -> DuckConversation:
+    return StandardDuckWorkflow(
+        name=name,
+        agent=build_standard_agent(settings["agent"]),
+        responses_api=responses_api,
+        typing=message_handler.typing,
+        record_message=metrics_handler.record_message,
+        record_usage=metrics_handler.record_usage,
+        send_message=message_handler.send_message,
+    )
+
+
 class StandardDuckWorkflow:
+    commands = []
+
     def __init__(
             self,
             name: str,
@@ -36,6 +66,7 @@ class StandardDuckWorkflow:
             wait_message: Callable = wait_for_message,
     ):
         self.name = name
+        self.tool_caches = []
         self._agent = agent
         self._responses_api = responses_api
         self._wait_message = step(wait_message)

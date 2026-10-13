@@ -2,29 +2,20 @@ import argparse
 import asyncio
 import logging
 import os
+from importlib import import_module
 from pathlib import Path
-from typing import Iterable
 
-from openai import OpenAI
 from quest import these
-from quest.extras.sql import SqlBlobStorage
 from quest.utils import quest_logger
 
-from src.duck_protocols import MessageHandler, MetricsHandler, DuckBuilder, DuckConversation
-from .armory.armory import Armory
-from .armory.python_tools import PythonTools, DatasetTools
-from .armory.talk_tool import TalkTool
-from .armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
 from .conversation.threads import SetupPrivateThread
 from .duck_orchestrator import DuckOrchestrator
+from .duck_protocols import DuckBuilder, DuckConversation, MessageHandler, MetricsHandler
 from .gen_ai.ai_responses import ResponsesAPI
-from .gen_ai.build import build_agent
-from .gen_ai.gen_ai import AIClient
-from .metrics.feedback import HaveTAGradingConversation, ConversationReviewSettings
-from .metrics.feedback_manager import FeedbackManager, CHANNEL_ID
+from .metrics.feedback_manager import FeedbackManager
 from .metrics.reporter import Reporter
 from .rubber_duck_app import RubberDuckApp
 from .storage.serializer import workflow_serializer
@@ -33,480 +24,204 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.cache_cleaner import CacheCleaner
 from .utils.config_loader import load_configuration
-from .utils.config_types import CacheCleanupSettings, CacheSettings, Config, RegistrationSettings, DUCK_NAME, \
-    DuckConfig, ToolConfig
-from .utils.feedback_notifier import FeedbackNotifier
-from .utils.logger import duck_logger, filter_logs, add_console_handler
-from .utils.persistent_queue import PersistentQueue
-from .utils.protocols import ToolCache, CacheKeyBuilder
-from .utils.python_exec_container import PythonExecContainer
-from .utils.send_email import EmailSender
-from .workflows.registration import Registration
-from .workflows.registration_workflow import RegistrationWorkflow
+from .utils.config_types import CHANNEL_ID, Config
+from .utils.logger import add_console_handler, add_file_handler, duck_logger, filter_logs
+from .utils.protocols import ToolCache
+from .utils.python_exec_container import build_containers
 
 
-def setup_workflow_manager(
-        sql_session,
-        workflows
-):
-    def create_workflow(wtype: str):
-        if wtype in workflows:
-            return workflows[wtype]
-
-        raise NotImplementedError(f'No workflow of type {wtype}')
-
-    namespace = 'rubber-duck'  # TODO - move to config.
-
-    workflow_manager = create_sql_manager(
-        namespace,
-        create_workflow,
-        sql_session,
-        serializer=workflow_serializer,
-    )
-
-    return workflow_manager
-
-
-def build_conversation_review_duck(
-        name: str,
-        settings: ConversationReviewSettings,
-        bot: DiscordBot, record_feedback, feedback_manager
-) -> DuckConversation:
-    have_ta_conversation = HaveTAGradingConversation(
-        name,
-        settings,
-        feedback_manager,
-        record_feedback,
-        bot.send_message,
-        bot.add_reaction,
-    )
-    return have_ta_conversation
-
-
-def build_registration_duck(
-        name: str, bot: DiscordBot, config: Config, settings: RegistrationSettings, armory
-):
-    registration_bot = armory.get_specific_tool(settings['registration_bot'])
-
-    email_confirmation = EmailSender(config['sender_email'])
-
-    registration = Registration(
-        bot.send_message,
-        bot.get_channel,
-        bot.fetch_guild,
-        email_confirmation,
-        settings,
-        config["ai_completion_retry_protocol"]
-    )
-    armory.scrub_tools(registration)
-    registration_workflow = RegistrationWorkflow(name, registration, registration_bot)
-
-    return registration_workflow
-
-
-def _iterate_duck_configs(config: Config) -> Iterable[tuple[DUCK_NAME, DuckConfig]]:
-    # Global ducks
-    for name, duck_cfg in config["ducks"].items():
-        yield name, duck_cfg
-
-    # Inline channel ducks
+def iter_channels(config: Config):
     for server in config["servers"].values():
-        for channel in server["channels"].values():
-            duck = channel.get("duck")
-
-            # Reference to global duck
-            if isinstance(duck, DUCK_NAME):
-                continue
-
-            # Inline definition(s)
-            if isinstance(duck, dict):
-                for name, duck_cfg in duck.items():
-                    if isinstance(duck_cfg, dict) and "duck_type" in duck_cfg:
-                        yield name, duck_cfg
+        yield from server["channels"].values()
 
 
 def build_ducks(
         config: Config,
-        bot: MessageHandler,
+        *,
+        message_handler: MessageHandler,
         metrics_handler: MetricsHandler,
-        feedback_manager: FeedbackManager,
-        responses_api: ResponsesAPI
+        responses_api: ResponsesAPI,
+        containers: dict,
+        sql_session,
 ) -> dict[CHANNEL_ID, DuckConversation]:
-    ducks = {}
+    ducks: dict[str, DuckConversation] = {}
 
-    for name, duck_config in _iterate_duck_configs(config):
-        duck_builder_info = duck_config['builder']
-        settings = duck_config['settings']
+    for name, duck_config in config["ducks"].items():
+        builder_path = duck_config["builder"]
+        try:
+            module_name, builder_name = builder_path.rsplit(":", 1)
+        except ValueError as error:
+            raise ValueError(
+                f"Invalid duck builder '{builder_path}'; expected 'module:function'"
+            ) from error
 
-        module_file, builder_name = duck_builder_info.split(':')
-        from importlib import import_module
-        module = import_module(module_file)
-        build_duck: DuckBuilder = getattr(module, builder_name)
-        # TODO - if duck_build_info is bad, raise
+        try:
+            module = import_module(module_name)
+            builder: DuckBuilder = getattr(module, builder_name)
+        except (ImportError, AttributeError) as error:
+            raise ImportError(f"Could not load duck builder '{builder_path}'") from error
 
-        duck = build_duck(settings, bot, metrics_handler, feedback_manager, responses_api)
-        ducks[duck.name] = duck
+        if not callable(builder):
+            raise TypeError(f"Duck builder is not callable: {builder_path}")
+
+        duck = builder(
+            name,
+            duck_config["settings"],
+            message_handler=message_handler,
+            metrics_handler=metrics_handler,
+            responses_api=responses_api,
+            containers=containers,
+            sql_session=sql_session,
+            tool_configs=config.get("tools", {}),
+        )
+        if duck.name != name:
+            raise ValueError(
+                f"Duck builder for '{name}' returned a duck named '{duck.name}'"
+            )
+        ducks[name] = duck
 
     if not ducks:
-        raise ValueError('No ducks were requested in the config')
+        raise ValueError("No ducks configured")
 
     channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
+    for channel in iter_channels(config):
+        duck_name = channel.get("duck")
+        if duck_name is None:
+            continue
+        if not isinstance(duck_name, str):
+            raise TypeError(
+                f"Channel {channel['channel_id']} must reference a named duck"
+            )
+        try:
+            channel_ducks[channel["channel_id"]] = ducks[duck_name]
+        except KeyError as error:
+            raise KeyError(
+                f"Duck '{duck_name}' referenced by channel "
+                f"{channel['channel_id']} was not built"
+            ) from error
 
-    for server_config in config["servers"].values():
-        for channel_name, channel_config in server_config["channels"].items():
-            channel_id = channel_config["channel_id"]
-
-            duck_cfg = channel_config.get("duck")
-            if duck_cfg is None:
-                continue
-
-            if isinstance(duck_cfg, str):
-                duck_name = duck_cfg
-
-            elif isinstance(duck_cfg, dict):
-                duck_name, duck_cfg = next(iter(duck_cfg.items()))
-
-            else:
-                raise ValueError(
-                    f"Invalid duck config for channel {channel_id}: {duck_cfg}"
-                )
-
-            try:
-                channel_ducks[channel_id] = ducks[duck_name]
-            except KeyError:
-                raise KeyError(
-                    f"Duck '{duck_name}' referenced in channel {channel_id} was not built"
-                )
     return channel_ducks
 
-    # if duck_type == 'stats_ai_response_conversation':
-    #     continue
-    # 
-    # if duck_type == 'agent_led_conversation':
-    #     starting_agent = build_agent(settings["agent"])
-    #     ducks[name] = AgentLedConversation(name, starting_agent, ai_client)
-    # 
-    # elif duck_type == 'user_led_conversation':
-    #     starting_agent = build_agent(settings["agent"])
-    #     ducks[name] = UserLedConversation(name, starting_agent, ai_client, talk_tool, settings['introduction'])
-    # 
-    # elif duck_type == 'conversation_review':
-    #     ducks[name] = build_conversation_review_duck(
-    #         name, settings, bot, metrics_handler.record_feedback, feedback_manager
-    #     )
-    # 
-    # elif duck_type == 'registration':
-    #     ducks[name] = build_registration_duck(name, bot, config, settings, armory)
-    # 
-    # 
-    # elif duck_type == 'assignment_feedback':
-    #     single_rubric_item_grader = build_agent(settings["single_rubric_item_grader"])
-    #     project_scanner_agent = build_agent(settings["project_scanner_agent"])
-    #     ducks[name] = AssignmentFeedbackWorkflow(
-    #         name,
-    #         bot.send_message,
-    #         settings,
-    #         single_rubric_item_grader,
-    #         project_scanner_agent,
-    #         ai_client,
-    #         bot.read_url
-    #     )
-    # 
-    # elif duck_type == 'debugging_practice_duck':
-    #     loaded_rubric = load_rubric_files(settings)
-    #     rubric = build_rubric_state(loaded_rubric)
-    #     assessor_agents = {
-    #         assessor_name: build_agent(assessor_settings)
-    #         for assessor_name, assessor_settings in settings["assessors"].items()
-    #     }
-    #     incomplete_subprocess = (
-    #         build_agent(settings["incomplete_subprocess"])
-    #         if "incomplete_subprocess" in settings
-    #         else None
-    #     )
-    #     incorrect_subprocess = (
-    #         build_agent(settings["incorrect_subprocess"])
-    #         if "incorrect_subprocess" in settings
-    #         else None
-    #     )
-    #     unrelated_subprocess = (
-    #         build_agent(settings["unrelated_subprocess"])
-    #         if "unrelated_subprocess" in settings
-    #         else None
-    #     )
-    #     ducks[name] = DebuggingPracticeDuckWorkflow(
-    #         name=name,
-    #         send_message=bot.send_message,
-    #         settings=settings,
-    #         rubric=rubric,
-    #         ai_client=ai_client,
-    #         assessor_agents=assessor_agents,
-    #         incomplete_subprocess=incomplete_subprocess,
-    #         incorrect_subprocess=incorrect_subprocess,
-    #         unrelated_subprocess=unrelated_subprocess,
-    #     )
-    # 
-    # else:
-    #     raise NotImplementedError(f'Duck of type {duck_type} not implemented')
 
-
-def _build_feedback_queues(config: Config, sql_session):
-    queue_blob_storage = SqlBlobStorage('conversation-queues', sql_session)
-
-    convo_review_ducks = (
-        duck
-        for _, duck in _iterate_duck_configs(config)
-        if duck['duck_type'] == 'conversation_review'
-    )
-
-    target_channel_ids = (
-        target_id
-        for duck in convo_review_ducks
-        for target_id in duck['settings']['target_channel_ids']
-    )
-
-    return these({
-        target_id: PersistentQueue(str(target_id), queue_blob_storage)
-        for target_id in target_channel_ids
-    })
-
-
-def _build_cache_key_builder(cache_settings: CacheSettings, tool_name: str) -> CacheKeyBuilder:
-    prompt = cache_settings.get("prompt")
-    if not prompt:
-        raise ValueError(
-            f"Missing cache prompt for container_exec tool '{tool_name}'. "
-            f"Set tools.{tool_name}.cache.prompt."
-        )
-
-    return SemanticCacheKeyBuilder(
-        client=OpenAI(),
-        prompt=Path(prompt).read_text(),
-        model=cache_settings.get("engine", "gpt-5.6-luna"),
-        reasoning_effort=cache_settings.get("reasoning", "none"),
+def create_workflow_manager(sql_session, workflows):
+    return create_sql_manager(
+        "rubber-duck",
+        workflows.__getitem__,
+        sql_session,
+        serializer=workflow_serializer,
     )
 
 
-def _build_tool_cache(cache_settings: CacheSettings, sql_session) -> ToolCache:
-    backend = cache_settings.get("backend", "memory")
-
-    if backend == "memory":
-        return InMemoryToolCache()
-
-    if backend == "database":
-        return SqlToolCache(sql_session)
-
-    raise NotImplementedError(f"Unsupported cache backend: {backend}")
-
-
-def _get_tool_cache_settings(tool_config: ToolConfig) -> CacheSettings | None:
-    if "cache" not in tool_config:
-        return None
-    return dict(tool_config.get("cache", {}))
-
-
-def build_armory(
-        config: Config,
-        send_message,
-        containers: dict[str, PythonExecContainer],
-        sql_session
-) -> tuple[Armory, TalkTool, list[ToolCache]]:
-    armory = Armory(send_message)
-    tool_caches: list[ToolCache] = []
-    container_names_for_python_tools: set[str] = set()
-
-    # setup tools
-    config_tools = config.get("tools", [])
-    for tool_name, tool_config in config_tools.items():
-        if tool_config['type'] == 'container_exec':
-            container_name = tool_config['container']
-            container_names_for_python_tools.add(container_name)
-            cache_settings = _get_tool_cache_settings(tool_config)
-            tool_cache = None
-            cache_key_builder = None
-            if cache_settings is not None:
-                tool_cache = _build_tool_cache(cache_settings, sql_session)
-                setattr(tool_cache, "_cache_source", tool_name)
-                tool_caches.append(tool_cache)
-                cache_key_builder = _build_cache_key_builder(cache_settings, tool_name)
-            python_tools = PythonTools(
-                containers[container_name],
-                send_message,
-                tool_cache,
-                cache_key_builder
-            )
-            amended_description = tool_config.get('description', python_tools.run_code.__doc__)
-            armory.add_tool(python_tools.run_code, name=tool_name, description=amended_description)
-        else:
-            duck_logger.warning(f"Unsupported tool type: {tool_config['type']}")
-
-    dataset_containers = [containers[name] for name in sorted(container_names_for_python_tools)]
-    if dataset_containers:
-        dataset_tools = DatasetTools(dataset_containers, send_message)
-        describe_dataset_description = (
-                "Returns the full description for a dataset by filename.\n"
-                "Accepts either a filename or a path that ends in that filename.\n"
-                "Use this when you need full column-level metadata."
-                + dataset_tools.get_resource_metadata()
-        )
-        armory.add_tool(
-            dataset_tools.describe_dataset,
-            name="describe_dataset",
-            description=describe_dataset_description
-        )
-        armory.add_tool(
-            dataset_tools.send_datasets_to_user,
-            name="send_datasets_to_user"
-        )
-
-    talk_tool = TalkTool(send_message)
-    armory.scrub_tools(talk_tool)
-
-    return armory, talk_tool, tool_caches
-
-
-def _setup_cache_cleaner(
+def build_cache_cleaner(
         tool_caches: list[ToolCache],
-        cache_cleanup_settings: CacheCleanupSettings | None = None
-) -> CacheCleaner:
-    unique_tool_caches: list[ToolCache] = []
-    seen_cache_ids: set[int] = set()
-    for tool_cache in tool_caches:
-        cache_id = id(tool_cache)
-        if cache_id not in seen_cache_ids:
-            seen_cache_ids.add(cache_id)
-            unique_tool_caches.append(tool_cache)
-    cc = None
-    if unique_tool_caches:
-        cache_cleanup_settings = cache_cleanup_settings or {}
-        cleanup_hour = cache_cleanup_settings.get("cleanup_hour", 3)
-        cleanup_minute = cache_cleanup_settings.get("cleanup_minute", 0)
-        cc = CacheCleaner(
-            unique_tool_caches,
-            cleanup_hour,
-            cleanup_minute
-        )
-    return cc
+        config: Config,
+) -> CacheCleaner | None:
+    unique_caches = list({id(cache): cache for cache in tool_caches}.values())
+    if not unique_caches:
+        return None
+
+    settings = config.get("cache_cleanup_settings", {})
+    return CacheCleaner(
+        unique_caches,
+        settings.get("cleanup_hour", 3),
+        settings.get("cleanup_minute", 0),
+    )
 
 
-def add_agent_tools_to_armory(config: Config, armory: Armory, ai_client: AIClient):
-    for name, settings in config.get("agents_as_tools", {}).items():
-        agent = build_agent(settings["agent"])
-        tool = ai_client.build_agent_tool(
-            agent, name, settings["doc_string"]
-        )
-        armory.add_tool(tool)
-
-
-async def main(config: Config, log_dir: Path):
-    try:
-        await _main(config, log_dir)
-    except Exception as ex:
-        duck_logger.exception('ERROR in MAIN')
-        print(ex)
-
-
-async def _main(config: Config, log_dir: Path):
-    sql_session = create_sql_session(config['sql'])
+async def main(config: Config, log_path: Path | None):
+    sql_session = create_sql_session(config["sql"])
+    responses_api = ResponsesAPI(config["ai_completion_retry_protocol"])
 
     async with DiscordBot(bot_friend_ids=set(config.get("bot-friends", []))) as bot:
-        setup_thread = SetupPrivateThread(
-            bot.create_thread,
-            bot.send_message
-        )
+        filter_logs(bot.send_message, config["admin_settings"])
+        metrics = SQLMetricsHandler(sql_session)
+        feedback_manager = FeedbackManager({})
 
-        filter_logs(bot.send_message, config['admin_settings'])
+        with these(build_containers(config)) as containers:
+            channel_ducks = build_ducks(
+                config,
+                message_handler=bot,
+                metrics_handler=metrics,
+                responses_api=responses_api,
+                containers=containers,
+                sql_session=sql_session,
+            )
+            ducks = {id(duck): duck for duck in channel_ducks.values()}.values()
+            tool_caches = [
+                cache
+                for duck in ducks
+                for cache in getattr(duck, "tool_caches", [])
+            ]
+            duck_commands = [
+                command
+                for duck in ducks
+                for command in duck.commands
+            ]
 
-        with _build_feedback_queues(config, sql_session) as persistent_queues:
-            feedback_manager = FeedbackManager(persistent_queues)
-            metrics_handler = SQLMetricsHandler(sql_session)
-
-            responses_api = _setup_responses_api(...)
-
-            ducks = build_ducks(config, bot, metrics_handler, feedback_manager, responses_api)
-
-            duck_commands = []
-            for duck in ducks.values():
-                duck_commands += duck.commands
-
-            duck_orchestrator = DuckOrchestrator(
-                setup_thread,
+            orchestrator = DuckOrchestrator(
+                SetupPrivateThread(bot.create_thread, bot.send_message),
                 bot.send_message,
                 bot.add_reaction,
-                ducks,
-                feedback_manager.remember_conversation
+                channel_ducks,
+                feedback_manager.remember_conversation,
             )
-
-            channel_configs = {
-                channel_config['channel_id']: channel_config
-                for server_config in config['servers'].values()
-                for channel_config in server_config['channels'].values()
-            }
-
-            reporter = Reporter(metrics_handler, config['servers'], config['reporter_settings'], True)
-
-            commands = create_commands(bot.send_message, metrics_handler, reporter, log_dir)
-            commands_workflow = BotCommands(commands + duck_commands, bot.send_message)
-
+            reporter = Reporter(
+                metrics,
+                config["servers"],
+                config["reporter_settings"],
+                True,
+            )
+            commands = create_commands(
+                bot.send_message,
+                metrics,
+                reporter,
+                log_path,
+                tool_caches,
+            )
             workflows = {
-                'duck-orchestrator': duck_orchestrator,
-                'command': commands_workflow
+                "duck-orchestrator": orchestrator,
+                "command": BotCommands(commands + duck_commands, bot.send_message),
+            }
+            channel_configs = {
+                channel["channel_id"]: channel
+                for channel in iter_channels(config)
+                if channel["channel_id"] in channel_ducks
             }
 
-            async with setup_workflow_manager(
-                    sql_session,
-                    workflows
-            ) as workflow_manager:
-                tasks = []
+            async with create_workflow_manager(sql_session, workflows) as workflow_manager:
+                admin_channel = config["admin_settings"]["admin_channel_id"]
+                app = RubberDuckApp(admin_channel, channel_configs, workflow_manager)
+                bot.set_duck_app(app, admin_channel)
 
-                admin_channel_id = config['admin_settings']['admin_channel_id']
-                rubber_duck = RubberDuckApp(
-                    admin_channel_id,
-                    channel_configs,
-                    workflow_manager
-                )
-                bot.set_duck_app(rubber_duck, admin_channel_id)
-                tasks.append(bot.start(os.environ['DISCORD_TOKEN']))
-
-                if 'feedback_notifier_settings' in config:
-                    # Set up the notifier thread.
-                    notifier = FeedbackNotifier(feedback_manager, bot.send_message, config['servers'].values(),
-                                                config['feedback_notifier_settings'])
-                    tasks.append(notifier.start())
-
+                tasks = [bot.start(os.environ["DISCORD_TOKEN"])]
+                cache_cleaner = build_cache_cleaner(tool_caches, config)
+                if cache_cleaner:
+                    tasks.append(cache_cleaner.start())
                 await asyncio.gather(*tasks)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, help='Path to config file (.json or .yaml, or s3://...)')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    parser.add_argument('--log-path', type=Path, help='Set the log path for the duck logger')
-
+    parser.add_argument(
+        "--config",
+        help="Path to config file (.json, .yaml, or s3://...)",
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--log-path", type=Path, help="Set the duck logger path")
     args = parser.parse_args()
 
-    # Set debug environment variable if debug flag is set
     if args.debug:
         duck_logger.setLevel(logging.DEBUG)
-        # quest_logger.setLevel(logging.DEBUG)
     else:
         duck_logger.setLevel(logging.INFO)
         quest_logger.setLevel(logging.INFO)
 
     if args.log_path:
-        # Add a file handler to the duck logger if log path is provided
-        from .utils.logger import add_file_handler
-
-        log_dir = add_file_handler(args.log_path)
+        add_file_handler(args.log_path)
     else:
         duck_logger.warning("No log path provided. Logging to console only.")
-
-    # Add console handler to the duck logger
     add_console_handler()
 
-    if args.config is None:
-        args.config = os.getenv('CONFIG_FILE_S3_PATH')
-
-    config: Config = load_configuration(args.config)
-
+    config_path = args.config or os.getenv("CONFIG_FILE_S3_PATH")
+    config: Config = load_configuration(config_path)
     asyncio.run(main(config, args.log_path))

@@ -202,8 +202,8 @@ class Config(TypedDict):
     ducks: dict[DUCK_NAME, DuckConfig]
     servers: dict[str, ServerConfig]
     sql: SQLConfig
-    # containers: dict[str, ContainerConfig]
-    # tools: dict[str, ToolConfig]
+    containers: dict[str, ContainerConfig]
+    tools: dict[str, ToolConfig]
     cache_cleanup_settings: NotRequired[CacheCleanupSettings]
     agents_as_tools: dict[str, AgentAsToolSettings]
     admin_settings: AdminSettings

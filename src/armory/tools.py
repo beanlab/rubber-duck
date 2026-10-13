@@ -1,5 +1,4 @@
 import inspect
-import io
 import re
 from decimal import Decimal, InvalidOperation
 from functools import wraps
@@ -8,26 +7,12 @@ from types import UnionType
 from typing import Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
 
 import pandas as pd
-from openai import OpenAI
 from openai.types.responses import FunctionToolParam
 from pandas.api.types import is_numeric_dtype
 
-from .tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
-from ..storage.stats_output_types import ExecutionOutput, TextOutput
-from ..utils.config_types import DuckContext
+from ..utils.protocols import CacheKeyBuilder, SendMessage, ToolCache
 from ..utils.logger import duck_logger
-from ..utils.protocols import (
-    CacheKeyBuilder,
-    ConcludesResponse,
-    SendMessage,
-    ToolCache,
-)
-from ..utils.python_exec_container import (
-    FileResult,
-    PythonExecContainer,
-    is_image,
-    is_table,
-)
+from ..utils.python_exec_container import FileResult, PythonExecContainer
 
 
 def register_tool(func):
@@ -296,152 +281,67 @@ class PythonTools:
     def __init__(
             self,
             container: PythonExecContainer,
-            send_message: SendMessage,
             tool_cache: ToolCache | None,
-            cache_key_builder: CacheKeyBuilder | None
+            cache_key_builder: CacheKeyBuilder | None,
     ):
         self._container = container
-        self._send_message = send_message
         self._tool_cache = tool_cache
         self._cache_key_builder = cache_key_builder
 
-    async def run_code(self, ctx: DuckContext, code: str, user_intent: str) -> dict[str, str | dict[str, str]]:
+    async def run_code(
+            self,
+            code: str,
+            user_intent: str,
+            output,
+    ) -> dict[str, str | dict[str, str]]:
         """
         Takes python code and the user's intent, executes it, and returns stdout/stderr/files.
-
-        :param ctx: DuckContext
-        :param code: Python code to execute
-        :param user_intent: Short description of what the user is trying to do.
-        :return:
-            'code': str,
-            'stdout': str,
-            'stderr': str,
-            'files': {
-                filename: description
-            }
         """
-        collector = getattr(ctx, "_stats_output_collector", None)
-        if collector is not None:
-            key = None
-            if self._tool_cache and self._cache_key_builder:
-                cache_key = self._cache_key_builder.build_cache_key(
-                    user_intent, code)
-                key = self._tool_cache.get_key(cache_key)
-                duck_logger.debug(f"Cache key: {key}")
-                if self._tool_cache.check_if_cached(key):
-                    duck_logger.debug(f" Cache HIT ".center(20, '-'))
-                    return await self._tool_cache.send_from_cache(
-                        key,
-                        collector.capture,
-                        ctx.thread_id,
-                    )
-                duck_logger.debug(f" Cache MISS ".center(19, '-'))
-
-            results = await self._container.run_code_deferred(code)
-            files = results.get("files", {})
-            stdout = _clean_stdout(results.get("stdout", "").strip(), files)
-            stderr = _remove_scientific_notation(
-                results.get("stderr", "").strip())
-            collector.items.append(
-                ExecutionOutput(
-                    self._container,
-                    results,
-                    stdout,
-                    self._tool_cache,
-                    key,
-                )
-            )
-            return {
-                "stdout": stdout,
-                "stderr": stderr,
-                "files": {
-                    filename: file["description"]
-                    for filename, file in files.items()
-                },
-            }
-
         key = None
         if self._tool_cache and self._cache_key_builder:
-            cache_key = self._cache_key_builder.build_cache_key(
-                user_intent, code)
+            cache_key = self._cache_key_builder.build_cache_key(user_intent, code)
             key = self._tool_cache.get_key(cache_key)
             duck_logger.debug(f"Cache key: {key}")
-
             if self._tool_cache.check_if_cached(key):
                 duck_logger.debug(f" Cache HIT ".center(20, '-'))
-                output = await self._tool_cache.send_from_cache(
+                return await self._tool_cache.send_from_cache(
                     key,
-                    self._send_message,
-                    ctx.thread_id
+                    output.capture,
+                    0,
                 )
-                return ConcludesResponse(output)
-
             duck_logger.debug(f" Cache MISS ".center(19, '-'))
-        else:
-            duck_logger.debug(f" Cache DISABLED ".center(21, '-'))
-        results = await self._container.run_code(code)
 
-        stdout = results.get('stdout').strip()
-        stderr = _remove_scientific_notation(results.get('stderr').strip())
-        files = results.get('files', {})
-
-        if files:
-            duck_logger.debug(" files ".center(20, '-'))
-            for filename, file in files.items():
-                duck_logger.debug(f" {filename}: {file['description']}")
-
-        for filename, file in files.items():
-            if is_image(filename):
-                if self._tool_cache and key is not None:
-                    self._tool_cache.cache_file(key, filename, file)
-                await self._send_message(
-                    ctx.thread_id,
-                    file={
-                        "filename": filename,
-                        "bytes": file["bytes"],
-                    }
-                )
-            elif is_table(filename):
-                table = pd.read_csv(io.StringIO(file['bytes'].decode()))
-                table_chunks = await send_table(
-                    self._send_message,
-                    ctx.thread_id,
-                    table,
-                )
-                if self._tool_cache and key is not None:
-                    self._tool_cache.cache_table(
-                        key, filename, table_chunks, file.get("description", ""))
-
-        stdout = _clean_stdout(stdout, files)
-        if stdout:
-            if self._tool_cache and key is not None:
-                self._tool_cache.cache_msg(key, stdout)
-            await self._send_message(ctx.thread_id, stdout)
-
-        output = {
-            'stdout': stdout,
-            'stderr': stderr,
-            'files': {filename: file['description'] for filename, file in files.items()},
+        results = await self._container.run_code_deferred(code)
+        files = results.get("files", {})
+        stdout = _clean_stdout(results.get("stdout", "").strip(), files)
+        stderr = _remove_scientific_notation(results.get("stderr", "").strip())
+        output.capture_execution(
+            self._container,
+            results,
+            stdout,
+            self._tool_cache,
+            key,
+        )
+        return {
+            "stdout": stdout,
+            "stderr": stderr,
+            "files": {
+                filename: file["description"]
+                for filename, file in files.items()
+            },
         }
-
-        if results['exit_code'] == 0:
-            output = ConcludesResponse(output)
-
-        return output
 
 
 class DatasetTools:
-    def __init__(self, containers: list[PythonExecContainer], send_message: SendMessage):
+    def __init__(self, containers: list[PythonExecContainer]):
         self._containers = containers
-        self._send_message = send_message
 
     def _get_sorted_dataset_names(self) -> list[str]:
         seen: set[str] = set()
         dataset_names: list[str] = []
         for container in self._containers:
             for dataset in container.get_dataset_inventory():
-                display_name = dataset.get(
-                    "dataset_name") or dataset.get("filename")
+                display_name = dataset.get("dataset_name") or dataset.get("filename")
                 if not display_name or display_name in seen:
                     continue
                 seen.add(display_name)
@@ -457,28 +357,18 @@ class DatasetTools:
                 lines.append(f"\nFilepath: {dataset['path']}")
         return "\n".join(lines)
 
-    async def send_datasets_to_user(self, ctx: DuckContext) -> ConcludesResponse | str:
-        """
-        Sends the full canonical dataset-name list directly to the user.
-        """
+    async def send_datasets_to_user(self, output) -> str:
+        """Sends the full canonical dataset-name list directly to the user."""
         dataset_names = self._get_sorted_dataset_names()
-        if not dataset_names:
-            message = "No datasets are currently available."
-        else:
-            message = "\n".join(["Available datasets:"] +
-                                [f"- {name}" for name in dataset_names])
+        message = (
+            "\n".join(["Available datasets:"] + [f"- {name}" for name in dataset_names])
+            if dataset_names
+            else "No datasets are currently available."
+        )
+        output.capture_text(message)
+        return f"Prepared {len(dataset_names)} dataset names for delivery."
 
-        collector = getattr(ctx, "_stats_output_collector", None)
-        if collector is not None:
-            collector.items.append(TextOutput(message))
-            return f"Prepared {len(dataset_names)} dataset names for delivery."
-
-        await self._send_message(ctx.thread_id, message)
-        if dataset_names:
-            return ConcludesResponse(f"Sent {len(dataset_names)} dataset names.")
-        return ConcludesResponse(message)
-
-    async def describe_dataset(self, ctx: DuckContext, dataset_filename: str) -> str:
+    async def describe_dataset(self, dataset_filename: str) -> str:
         """
         Returns the full dataset description for a dataset filename.
         Accepts either the exact staged filename or any path ending in that filename.
@@ -510,98 +400,3 @@ class DatasetTools:
         duck_logger.debug(
             f"describe_dataset no match for dataset_name={dataset_filename!r}; {message}")
         return message
-
-
-def build_stats_toolbox(
-        tool_names: list[str],
-        tool_configs: dict,
-        containers: dict[str, PythonExecContainer],
-        send_message: SendMessage,
-        sql_session,
-) -> tuple[ToolBox, list[ToolCache]]:
-    toolbox = ToolBox()
-    tool_caches: list[ToolCache] = []
-    dataset_containers: dict[str, PythonExecContainer] = {}
-
-    for tool_name in tool_names:
-        tool_config = tool_configs.get(tool_name)
-        if not tool_config:
-            continue
-        if tool_config["type"] != "container_exec":
-            raise NotImplementedError(
-                f"Unsupported tool type: {tool_config['type']}")
-
-        container = containers[tool_config["container"]]
-        dataset_containers[tool_config["container"]] = container
-        cache_settings = tool_config.get("cache")
-        tool_cache = None
-        cache_key_builder = None
-        if cache_settings is not None:
-            backend = cache_settings.get("backend", "memory")
-            if backend == "memory":
-                tool_cache = InMemoryToolCache()
-            elif backend == "database":
-                tool_cache = SqlToolCache(sql_session)
-            else:
-                raise NotImplementedError(
-                    f"Unsupported cache backend: {backend}")
-
-            prompt_path = cache_settings.get("prompt")
-            if not prompt_path:
-                raise ValueError(
-                    f"Missing cache prompt for container_exec tool '{tool_name}'. "
-                    f"Set tools.{tool_name}.cache.prompt."
-                )
-            cache_key_builder = SemanticCacheKeyBuilder(
-                client=OpenAI(),
-                prompt=Path(prompt_path).read_text(),
-                model=cache_settings.get("engine", "gpt-5.6-luna"),
-                reasoning_effort=cache_settings.get("reasoning", "none"),
-            )
-            setattr(tool_cache, "_cache_source", tool_name)
-            tool_caches.append(tool_cache)
-
-        python_tools = PythonTools(
-            container,
-            send_message,
-            tool_cache,
-            cache_key_builder,
-        )
-        toolbox.add_tool(
-            python_tools.run_code,
-            name=tool_name,
-            description=tool_config.get(
-                "description", python_tools.run_code.__doc__),
-        )
-
-    dataset_tool_names = {
-        "describe_dataset",
-        "send_datasets_to_user",
-    }.intersection(tool_names)
-    if dataset_tool_names:
-        dataset_tools = DatasetTools(
-            list(dataset_containers.values()), send_message)
-        if "describe_dataset" in dataset_tool_names:
-            description = (
-                    "Returns the full description for a dataset by filename.\n"
-                    "Accepts either a filename or a path that ends in that filename.\n"
-                    "Use this when you need full column-level metadata."
-                    + dataset_tools.get_resource_metadata()
-            )
-            toolbox.add_tool(
-                dataset_tools.describe_dataset,
-                name="describe_dataset",
-                description=description,
-            )
-        if "send_datasets_to_user" in dataset_tool_names:
-            toolbox.add_tool(
-                dataset_tools.send_datasets_to_user,
-                name="send_datasets_to_user",
-            )
-
-    missing = set(tool_names).difference(toolbox._tools)
-    if missing:
-        raise KeyError(
-            f"Tools unavailable to stats workflow: {', '.join(sorted(missing))}")
-
-    return toolbox, tool_caches

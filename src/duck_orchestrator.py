@@ -1,19 +1,16 @@
-import random
 import traceback as tb
 import uuid
-from typing import Protocol, Callable
+from collections.abc import Awaitable, Callable
 
 from quest import step, alias
 
+from .duck_protocols import DuckContext, DuckConversation
 from .metrics.feedback_manager import FeedbackData
-from .utils.config_types import ChannelConfig, DuckContext, CHANNEL_ID, DUCK_WEIGHT
+from .utils.config_types import ChannelConfig, CHANNEL_ID
 from .utils.logger import duck_logger, thread_id_context
 from .utils.protocols import Message
 
-
-class SetupThread(Protocol):
-    async def __call__(self, parent_channel_id: int, author_mention: str, title: str) -> int: ...
-
+SetupThread = Callable[[int, str, str], Awaitable[int]]
 
 
 def generate_error_message(thread_id, ex):
@@ -34,7 +31,7 @@ class DuckOrchestrator:
                  send_message,
                  add_reaction,
                  ducks: dict[CHANNEL_ID, DuckConversation],
-                 remember_conversation: Callable[[FeedbackData], None]
+                 remember_conversation: Callable[[FeedbackData], None],
                  ):
 
         self._setup_thread: SetupThread = step(setup_thread)
@@ -85,11 +82,10 @@ class DuckOrchestrator:
 
         await self._send_message(thread_id, '*This conversation has been closed.*')
 
-        # Remember the conversation
         self._remember_conversation(FeedbackData(
             duck_type=duck.name,
             guild_id=initial_message['guild_id'],
             parent_channel_id=channel_config['channel_id'],
             user_id=initial_message['author_id'],
-            conversation_thread_id=thread_id
+            conversation_thread_id=thread_id,
         ))
