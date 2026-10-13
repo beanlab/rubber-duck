@@ -12,10 +12,10 @@ from quest import step
 from ...armory.tool_cache import InMemoryToolCache, SemanticCacheKeyBuilder, SqlToolCache
 from ...armory.tools import DatasetTools, PythonTools, ToolBox, send_table
 from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
-from ...utils.protocols import ToolCache
 from ...gen_ai.ai_responses import Agent, ResponsesAPI
 from ...utils.config_types import HistoryType
 from ...utils.message_utils import wait_for_message
+from ...utils.protocols import ToolCache
 from ...utils.python_exec_container import (
     DeferredExecutionResult,
     PythonExecContainer,
@@ -291,6 +291,7 @@ def build_stats_tools(
             def bind_python_tool(python_tool: PythonTools):
                 async def run_code(code: str, user_intent: str):
                     return await python_tool.run_code(code, user_intent, output)
+
                 return run_code
 
             toolbox.add_tool(
@@ -304,10 +305,10 @@ def build_stats_tools(
                 dataset_tools.describe_dataset,
                 name="describe_dataset",
                 description=(
-                    "Returns the full description for a dataset by filename.\n"
-                    "Accepts either a filename or a path that ends in that filename.\n"
-                    "Use this when you need full column-level metadata."
-                    + dataset_tools.get_resource_metadata()
+                        "Returns the full description for a dataset by filename.\n"
+                        "Accepts either a filename or a path that ends in that filename.\n"
+                        "Use this when you need full column-level metadata."
+                        + dataset_tools.get_resource_metadata()
                 ),
             )
 
@@ -406,18 +407,17 @@ class StatsDuckWorkflow:
 
         return notify
 
-
     async def __call__(self, context: DuckContext):
         history: list[HistoryType] = []
         await self._send_message(context.thread_id, self._introduction)
         notify_retry = self._retry_notifier(context)
 
         while True:
-            collector = StatsOutputCollector()
-            try:
+            with StatsOutputCollector() as collector:
                 message = await self._wait_message(context.timeout)
                 if message is None:
                     return history
+
                 user_message = message["content"]
                 await self._record_message(
                     context.guild_id,
@@ -434,6 +434,14 @@ class StatsDuckWorkflow:
                     ).model_dump()
                 )
                 
+                # Run semantic agent to convert current history 
+                # into semantic request (e.g. plot: hist, dataset: penguins, etc.)
+                
+                # If no result for that semantic request, create a result
+                # -> An agent writes code, code is run, result is post-processed, result is stored
+                
+                # Send the result
+
                 agent = replace(
                     self._agent,
                     tools=self._build_toolbox(collector),
@@ -453,8 +461,8 @@ class StatsDuckWorkflow:
                 result = response["result"]
                 if result:
                     await self._send_message(context.thread_id, str(result))
-            finally:
-                await collector.cleanup()
+
+                # await collector.cleanup() # goes in __aexit__
 
 
 def build(

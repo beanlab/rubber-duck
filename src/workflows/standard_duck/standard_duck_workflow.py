@@ -106,16 +106,44 @@ class StandardDuckWorkflow:
         return notify
 
     async def __call__(self, context: DuckContext):
+        greeting = "Hello! How can I help you today?"
+        await self._send_message(context.thread_id, greeting)
+        
         history: list[HistoryType] = [
             EasyInputMessage(
                 role="user",
                 content="Hi",
+                type="message",
+            ).model_dump(),
+            EasyInputMessage(
+                role="assistant",
+                content=greeting,
                 type="message",
             ).model_dump()
         ]
 
         notify_retry = self._retry_notifier(context)
         while True:
+            message = await self._wait_message(context.timeout)
+            if message is None:
+                return history
+
+            user_message = message["content"]
+            await self._record_message(
+                context.guild_id,
+                context.thread_id,
+                context.author_id,
+                "message",
+                json.dumps(user_message),
+            )
+            history.append(
+                EasyInputMessage(
+                    role="user",
+                    content=user_message,
+                    type="message",
+                ).model_dump()
+            )
+            
             async with self._typing(context.thread_id):
                 response = await self._responses_api.run_agent_turn(
                     self._agent,
@@ -143,21 +171,4 @@ class StandardDuckWorkflow:
             if result:
                 await self._send_message(context.thread_id, str(result))
 
-            message = await self._wait_message(context.timeout)
-            if message is None:
-                return history
-            user_message = message["content"]
-            await self._record_message(
-                context.guild_id,
-                context.thread_id,
-                context.author_id,
-                "message",
-                json.dumps(user_message),
-            )
-            history.append(
-                EasyInputMessage(
-                    role="user",
-                    content=user_message,
-                    type="message",
-                ).model_dump()
-            )
+            

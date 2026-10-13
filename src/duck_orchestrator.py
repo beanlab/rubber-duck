@@ -59,6 +59,7 @@ class DuckOrchestrator:
             initial_message['content']
         )
 
+        # Set context var for logs to include thread_id automatically
         thread_id_context.set(thread_id)
 
         context = DuckContext(
