@@ -25,12 +25,12 @@ from typing_extensions import TypedDict
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.gen_ai import Agent, ToolChoiceTypes
-from tests.prompt_evaluation.evaluation import (
+from experiments.evaluation.engine import (
     build_tutor_history,
     evaluate_next_response,
 )
-from tests.prompt_evaluation.reporting import print_prompt_summary
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.console import print_prompt_summary
+from experiments.evaluation.types import (
     EvaluationConfig,
     CombinedEvaluationResult,
     EvaluatorRequest,

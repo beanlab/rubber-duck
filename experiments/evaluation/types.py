@@ -5,7 +5,7 @@ from typing import Generic, Literal, TypeVar
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import NotRequired, Protocol, TypedDict
 
-from tests.prompt_evaluation.completion import (
+from experiments.evaluation.completion import (
     CompletionClient,
     ResponsesCompletionAPI,
 )

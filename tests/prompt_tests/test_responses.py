@@ -24,15 +24,15 @@ from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
 from src.gen_ai.decision import JevDecisionService
-from tests.prompt_evaluation.config import case_configuration, load_evaluation_suite
-from tests.prompt_evaluation.evaluation import evaluate_next_response
-from tests.prompt_evaluation.reporting import (
+from experiments.evaluation.config import case_configuration, load_evaluation_suite
+from experiments.evaluation.engine import evaluate_next_response
+from experiments.evaluation.console import (
     evaluation_failure_message,
     print_case_evaluation,
     print_prompt_summary,
 )
-from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.selection import CriterionDecisionEvaluator
+from experiments.evaluation.types import (
     EvaluationCase,
     EvaluationRun,
 )

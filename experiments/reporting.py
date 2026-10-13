@@ -1,0 +1,231 @@
+"""Human-readable Markdown reporting for prompt experiments."""
+
+from pathlib import Path
+
+from experiments.charts import heatmap_filename, render_charts
+from experiments.results import ExperimentResults, TrialResult, trial_filename
+from experiments.summary import ExperimentSummary, build_summary
+from experiments.evaluation.types import EvaluationRun, TestResult
+
+
+def write_report(directory: Path, results: ExperimentResults) -> Path:
+    """Write the report, summary, and SVG charts for an experiment."""
+    summary = build_summary(results)
+    (directory / "summary.json").write_text(
+        summary.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+    charts_directory = directory / "charts"
+    charts_directory.mkdir(exist_ok=True)
+    for name, chart in render_charts(results, summary).items():
+        (charts_directory / name).write_text(chart, encoding="utf-8")
+    path = directory / "report.md"
+    path.write_text(render_report(results, summary), encoding="utf-8")
+    return path
+
+
+def render_report(
+    results: ExperimentResults,
+    summary: ExperimentSummary | None = None,
+) -> str:
+    """Render experiment results as a self-contained Markdown report."""
+    report_summary = summary or build_summary(results)
+    lines = [
+        f"# Experiment: {results.name}",
+        "",
+        "> This report shows model responses, evaluator ratings, confidence, and "
+        "OpenAI rationales. Additional evidence and probabilities remain in the "
+        "linked trial JSON.",
+        "",
+        "## Overview",
+        "",
+        f"- Created: `{results.created_at.isoformat()}`",
+        f"- Source commit: `{results.source_commit or 'unavailable'}`",
+        f"- Candidate: `{results.candidate.name}`",
+        f"- Candidate model: `{results.candidate.model}`",
+        f"- Repetitions: {results.repetitions}",
+        f"- Trials passing every check: {report_summary.fully_passed}/{report_summary.trials}",
+        f"- Trial errors: {report_summary.errors}",
+        "- Artifacts: [combined JSON](results.json), [manifest](experiment.json), "
+        "[machine summary](summary.json)",
+        "",
+        "A trial passes only when every selected OpenAI criterion and exact code check passes.",
+        "",
+        "## Outcome measures",
+        "",
+        "| Measure | Result |",
+        "|---|---:|",
+        f"| OpenAI ratings passed | {_fraction(report_summary.openai_passed, report_summary.openai_total)} |",
+        f"| JEV ratings passed | {_fraction(report_summary.jev_passed, report_summary.jev_total)} |",
+        f"| Evaluator agreement | {_fraction(report_summary.agreement, report_summary.agreement_total)} |",
+        f"| Exact checks passed | {_fraction(report_summary.exact_passed, report_summary.exact_total)} |",
+        "",
+        "## Evaluator agreement",
+        "",
+        "![OpenAI and JEV agreement matrix](charts/evaluator-agreement.svg)",
+        "",
+        "## Results by scenario",
+        "",
+        "| Scenario | Trials | Full passes | OpenAI ratings | JEV ratings | Agreement |",
+        "|---|---:|---:|---:|---:|---:|",
+        *_scenario_summary_rows(report_summary),
+    ]
+    indexed_trials = list(enumerate(results.trials, start=1))
+    for scenario_index, scenario in enumerate(report_summary.scenarios, start=1):
+        lines.extend(
+            [
+                "",
+                f"## {scenario.name}",
+                "",
+                f"Scenario ID: `{scenario.case_id}`",
+                "",
+                f"![Criterion results by repetition](charts/{heatmap_filename(scenario.case_id, scenario_index)})",
+                "",
+                "### Trial results",
+                "",
+            ]
+        )
+        for trial_index, trial in indexed_trials:
+            if trial.case_id == scenario.case_id:
+                lines.extend(_trial_details(trial, trial_index))
+    return "\n".join(lines)
+
+
+def _scenario_summary_rows(summary: ExperimentSummary) -> list[str]:
+    return [
+        f"| {_table_text(scenario.name)} (`{_table_text(scenario.case_id)}`) "
+        f"| {scenario.completed}/{scenario.trials} "
+        f"| {scenario.fully_passed}/{scenario.trials} "
+        f"| {_fraction(scenario.openai_passed, scenario.openai_total)} "
+        f"| {_fraction(scenario.jev_passed, scenario.jev_total)} "
+        f"| {_fraction(scenario.agreement, scenario.agreement_total)} |"
+        for scenario in summary.scenarios
+    ]
+
+
+def _trial_details(trial: TrialResult, index: int) -> list[str]:
+    result = (
+        "PASS"
+        if trial.evaluation is not None and trial.evaluation["summary"]["passed"]
+        else "ERROR"
+        if trial.evaluation is None
+        else "FAIL"
+    )
+    lines = [
+        "<details>",
+        f"<summary>Repetition {trial.repetition} — {result}</summary>",
+        "",
+        f"[Raw trial JSON](trials/{trial_filename(index, trial)})",
+        "",
+    ]
+    if trial.error is not None:
+        lines.extend(
+            [
+                f"**ERROR — `{trial.error.type}`**",
+                "",
+                trial.error.message,
+                "",
+                "</details>",
+                "",
+            ]
+        )
+        return lines
+    if trial.evaluation is None:
+        lines.extend(
+            [
+                "**ERROR — no evaluation was recorded.**",
+                "",
+                "</details>",
+                "",
+            ]
+        )
+        return lines
+
+    evaluation = trial.evaluation
+    lines.extend(
+        [
+            f"**{result}** — score: {evaluation['summary']['score']:.0%}; "
+            f"duration: {trial.duration_seconds:.1f}s",
+            "",
+            f"- Response model: `{evaluation['candidate_model']}`",
+            f"- OpenAI evaluator: `{evaluation['openai_evaluator_model']}`",
+            f"- Candidate action: `{evaluation['candidate_action']}`",
+        ]
+    )
+    if "jev" in evaluation:
+        lines.append(f"- JEV evaluator: `{evaluation['jev']['model']}`")
+    lines.extend(
+        [
+            "",
+            "#### Tutor response",
+            "",
+            *_blockquote(evaluation["transcript"][-1]["message"]),
+            "",
+            "#### Evaluator results",
+            "",
+            *_evaluation_table(evaluation),
+            "",
+            "#### OpenAI rationales",
+            "",
+            *_rationales(evaluation),
+            "",
+            "</details>",
+            "",
+        ]
+    )
+    return lines
+
+
+def _evaluation_table(evaluation: EvaluationRun) -> list[str]:
+    lines = [
+        "| Criterion | Suite | OpenAI/exact | JEV | JEV confidence | Agreement |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    for name, result in evaluation["tests"].items():
+        jev_result = evaluation["jev"]["tests"].get(name) if "jev" in evaluation else None
+        jev_rating = jev_result["rating"].upper() if jev_result is not None else "—"
+        confidence = f"{jev_result['confidence']:.0%}" if jev_result is not None else "—"
+        agreement = _agreement(result, jev_result["rating"] if jev_result is not None else None)
+        lines.append(
+            f"| {_label(name)} | {_label(result['suite'])} | "
+            f"{result['rating'].upper()} | {jev_rating} | {confidence} | {agreement} |"
+        )
+    return lines
+
+
+def _agreement(result: TestResult, jev_rating: str | None) -> str:
+    if result["evaluator"] != "openai" or jev_rating is None:
+        return "—"
+    return "YES" if result["rating"] == jev_rating else "NO"
+
+
+def _rationales(evaluation: EvaluationRun) -> list[str]:
+    lines: list[str] = []
+    for name, result in evaluation["tests"].items():
+        if result["evaluator"] != "openai":
+            continue
+        lines.extend(
+            [
+                f"- **{_label(name)} — {result['rating'].upper()}**",
+                f"  {result['rationale']}",
+            ]
+        )
+    return lines
+
+
+def _blockquote(value: str) -> list[str]:
+    return [f"> {line}" if line else ">" for line in value.splitlines()]
+
+
+def _table_text(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ")
+
+
+def _label(value: str) -> str:
+    return _table_text(value.replace("_", " ").title())
+
+
+def _fraction(value: int, total: int) -> str:
+    if total == 0:
+        return "0/0"
+    return f"{value}/{total} ({value / total:.0%})"

@@ -9,7 +9,7 @@ from src.gen_ai.decision import (
     JSONValue,
 )
 
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.types import (
     ApplicabilityOutcome,
     EvaluationSummary,
     EvaluationTestConfig,

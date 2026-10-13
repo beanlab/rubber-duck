@@ -6,7 +6,7 @@ Discord end-to-end tests.
 ## Prompt tests
 
 Prompt cases, evaluator criteria, pytest coverage, and the live pytest entry
-point live in `tests/prompt_evaluation/`. Run the paid tests explicitly with:
+point live in `tests/prompt_tests/`. Run the paid tests explicitly with:
 
 ```bash
 ./experiments/test

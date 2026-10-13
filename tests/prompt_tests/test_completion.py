@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from tests.prompt_evaluation.completion import _response_text_config
+from experiments.evaluation.completion import _response_text_config
 
 
 class StructuredAnswer(BaseModel):

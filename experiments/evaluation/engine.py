@@ -14,12 +14,12 @@ from pydantic import BaseModel, Field
 
 from src.armory.armory import Armory
 from src.gen_ai.gen_ai import Agent
-from tests.prompt_evaluation.completion import (
+from experiments.evaluation.completion import (
     CompletionRequest,
     ResponsesCompletionAdapter,
 )
-from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.selection import CriterionDecisionEvaluator
+from experiments.evaluation.types import (
     EvaluationClient,
     CombinedEvaluationResult,
     EvaluationConfig,

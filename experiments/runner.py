@@ -23,23 +23,24 @@ from experiments.results import (
     source_commit,
     write_results,
 )
+from experiments.reporting import write_report
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
 from src.gen_ai.decision import JevDecisionService
 from src.utils.config_loader import load_configuration
-from tests.prompt_evaluation.config import (
+from experiments.evaluation.config import (
     case_configuration,
     load_evaluation_suite,
 )
-from tests.prompt_evaluation.evaluation import evaluate_next_response
-from tests.prompt_evaluation.reporting import print_case_evaluation
-from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
-from tests.prompt_evaluation.types import EvaluationCase
+from experiments.evaluation.engine import evaluate_next_response
+from experiments.evaluation.console import print_case_evaluation
+from experiments.evaluation.selection import CriterionDecisionEvaluator
+from experiments.evaluation.types import EvaluationCase
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SUITE_DIRECTORY = ROOT / "tests/prompt_evaluation"
+SUITE_DIRECTORY = ROOT / "tests/prompt_tests"
 
 
 async def _send_message(*_args: object, **_kwargs: object) -> int:
@@ -100,6 +101,7 @@ async def run_experiment(
                 trials.append(
                     TrialResult(
                         case_id=case["id"],
+                        case_name=case["name"],
                         repetition=repetition,
                         duration_seconds=time.perf_counter() - started,
                         evaluation=evaluation,
@@ -122,7 +124,9 @@ async def run_experiment(
         trials=trials,
     )
     result_path = write_results(_output_directory(specification), results)
-    print(f"\nResults: {result_path}")
+    report_path = write_report(result_path.parent, results)
+    print(f"\nJSON results: {result_path}")
+    print(f"Markdown report: {report_path}")
     return results, result_path
 
 

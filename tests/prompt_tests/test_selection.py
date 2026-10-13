@@ -4,8 +4,8 @@ import pytest
 from typesafe_sdk import JSONContent, Question, SystemOneResponse
 
 from src.gen_ai.decision import JevDecisionService
-from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.selection import CriterionDecisionEvaluator
+from experiments.evaluation.types import (
     EvaluationTestConfig,
     EvaluatorContext,
     RubberDuckTestConfig,

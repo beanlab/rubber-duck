@@ -1,0 +1,108 @@
+"""Regression tests for human-readable experiment artifacts."""
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+from experiments.reporting import render_report, write_report
+from experiments.results import Candidate, ExperimentResults, TrialResult, write_results
+from experiments.evaluation.types import EvaluationRun
+
+
+def _results() -> ExperimentResults:
+    evaluation: EvaluationRun = {
+        "transcript": [
+            {"role": "student", "message": "Why did this fail?"},
+            {"role": "tutor", "message": "What does the function return?"},
+        ],
+        "candidate_action": "talk_to_user",
+        "candidate_model": "candidate-model",
+        "openai_evaluator_model": "evaluator-model",
+        "tests": {
+            "usefulness": {
+                "rating": "pass",
+                "evidence": ["focused question"],
+                "rationale": "The question advances the investigation.",
+                "suite": "standard",
+                "evaluator": "openai",
+            },
+            "message_tool_use": {
+                "rating": "pass",
+                "evidence": ["talk_to_user"],
+                "rationale": "The configured action was used.",
+                "suite": "rubber_duck",
+                "evaluator": "deterministic",
+            },
+        },
+        "summary": {"passed": True, "score": 1.0, "blocking_tests": []},
+        "reference_answer_used": True,
+        "jev": {
+            "model": "jev-model",
+            "tests": {
+                "usefulness": {
+                    "rating": "pass",
+                    "confidence": 0.9,
+                    "probabilities": {"pass": 0.9, "fail": 0.1},
+                    "suite": "standard",
+                }
+            },
+            "selection": {
+                "selected": [],
+                "skipped": [],
+                "uncertain": [],
+                "applicability": {},
+            },
+            "summary": {"passed": True, "score": 1.0, "blocking_tests": []},
+        },
+    }
+    return ExperimentResults(
+        name="baseline",
+        created_at=datetime(2026, 10, 13, tzinfo=timezone.utc),
+        source_commit="abc123",
+        repetitions=1,
+        candidate=Candidate(
+            name="Standard Duck",
+            prompt="Be helpful.",
+            model="candidate-model",
+            tools=["talk_to_user"],
+            reasoning=None,
+        ),
+        trials=[
+            TrialResult(
+                case_id="example-case",
+                repetition=1,
+                duration_seconds=1.25,
+                evaluation=evaluation,
+                error=None,
+            )
+        ],
+    )
+
+
+def test_render_report_includes_results_and_evidence() -> None:
+    report = render_report(_results())
+
+    assert "# Experiment: baseline" in report
+    assert "Trials passing every check: 1/1" in report
+    assert "What does the function return?" in report
+    assert "Usefulness — PASS" in report
+    assert "The question advances the investigation." in report
+    assert "| Usefulness | Standard | PASS | PASS | 90% | YES |" in report
+    assert "<summary>Repetition 1 — PASS</summary>" in report
+    assert "## Candidate prompt" not in report
+    assert "JEV probabilities" not in report
+
+
+def test_write_report_creates_markdown_artifact(tmp_path: Path) -> None:
+    directory = tmp_path / "experiment"
+    results = _results()
+    result_path = write_results(directory, results)
+    path = write_report(directory, results)
+
+    assert result_path == directory / "results.json"
+    assert path == directory / "report.md"
+    assert path.read_text(encoding="utf-8").startswith("# Experiment: baseline\n")
+    assert (directory / "experiment.json").is_file()
+    assert (directory / "summary.json").is_file()
+    assert (directory / "trials/001-example-case-r1.json").is_file()
+    assert (directory / "charts/evaluator-agreement.svg").is_file()
+    assert (directory / "charts/criteria-01-example-case.svg").is_file()

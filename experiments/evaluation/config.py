@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from pydantic import TypeAdapter
 
-from tests.prompt_evaluation.types import (
+from experiments.evaluation.types import (
     EvaluationCase,
     EvaluationCasesFile,
     EvaluationConfig,
