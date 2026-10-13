@@ -1,19 +1,15 @@
-"""JEV selection and evaluation for prompt-quality criteria."""
+"""Select and compare prompt-quality criteria through a decision service."""
 
-import os
 from collections.abc import Mapping
-from typing import Protocol
 
-from typesafe_sdk import (
-    AsyncTypeSafeClient,
-    Choice,
-    JSONContent,
+from src.gen_ai.decision import (
+    ChoiceQuestion,
+    DecisionResponse,
+    DecisionService,
     JSONValue,
-    Question,
-    SystemOneResponse,
 )
 
-from src.testing.prompt_evaluation.types import (
+from tests.prompt_evaluation.types import (
     ApplicabilityOutcome,
     EvaluationSummary,
     EvaluationTestConfig,
@@ -32,28 +28,14 @@ APPLIES_PREFIX = "applies::"
 GRADE_PREFIX = "grade::"
 
 
-class JevClient(Protocol):
-    async def system_one(
-        self,
-        state: JSONContent,
-        questions: Mapping[str, Question],
-        *,
-        model: str | None = None,
-    ) -> SystemOneResponse: ...
+class CriterionDecisionEvaluator:
+    """Use constrained decisions for criterion selection and comparison."""
 
-
-class JevEvaluator:
     def __init__(
         self,
-        api_key: str | None = None,
-        model: str = "jev-latest",
-        client: JevClient | None = None,
+        service: DecisionService,
     ) -> None:
-        self.api_key = api_key or os.getenv("JEV_API_KEY")
-        self.model = model
-        self.client = client
-        if not self.api_key and client is None:
-            raise ValueError("JEV_API_KEY is required for JEV evaluation")
+        self._service = service
 
     async def evaluate(
         self,
@@ -63,53 +45,23 @@ class JevEvaluator:
         rubber_duck_tests: dict[str, RubberDuckTestConfig] | None = None,
         evaluator_prompt: str | None = None,
     ) -> JevEvaluation:
-        if self.client is not None:
-            return await self._evaluate(
-                self.client,
-                context,
-                tests,
-                test_suites,
-                rubber_duck_tests or {},
-                evaluator_prompt,
-            )
-        async with AsyncTypeSafeClient(api_key=self.api_key) as client:
-            return await self._evaluate(
-                client,
-                context,
-                tests,
-                test_suites,
-                rubber_duck_tests or {},
-                evaluator_prompt,
-            )
-
-    async def _evaluate(
-        self,
-        client: JevClient,
-        context: EvaluatorContext,
-        tests: dict[str, EvaluationTestConfig],
-        test_suites: Mapping[str, TestSuite],
-        rubber_duck_tests: dict[str, RubberDuckTestConfig],
-        evaluator_prompt: str | None,
-    ) -> JevEvaluation:
+        rubber_duck_tests = rubber_duck_tests or {}
         eligible = {
             name: test
             for name, test in rubber_duck_tests.items()
             if test["scope"] != "trajectory"
         }
-        selection_questions: dict[str, Question] = {
+        selection_questions = {
             f"{APPLIES_PREFIX}{name}": _applicability_question(name, test)
             for name, test in eligible.items()
             if test["selection"] == "conditional"
         }
         selection_response = None
         if selection_questions:
-            selection_response = await client.system_one(
+            selection_response = await self._service.decide(
                 state=_jev_state(context, evaluator_prompt),
                 questions=selection_questions,
-                model=self.model,
             )
-            if set(selection_response.choices) != set(selection_questions):
-                raise RuntimeError("JEV did not return every applicability decision")
 
         selection = _select_tests(
             selection_response,
@@ -126,17 +78,14 @@ class JevEvaluator:
             **test_suites,
             **{name: "rubber_duck" for name in selected_semantic_tests},
         }
-        grade_questions: dict[str, Question] = {
+        grade_questions = {
             f"{GRADE_PREFIX}{name}": _grade_question(test)
             for name, test in evaluated_tests.items()
         }
-        grade_response = await client.system_one(
+        grade_response = await self._service.decide(
             state=_jev_state(context, evaluator_prompt),
             questions=grade_questions,
-            model=self.model,
         )
-        if set(grade_response.choices) != set(grade_questions):
-            raise RuntimeError("JEV did not return every selected test result")
 
         results = {
             name: _test_result(
@@ -157,8 +106,8 @@ class JevEvaluator:
 def _jev_state(
     context: EvaluatorContext,
     evaluator_prompt: str | None,
-) -> dict[str, JSONValue | None]:
-    state: dict[str, JSONValue | None] = {
+) -> dict[str, JSONValue]:
+    state: dict[str, JSONValue] = {
         "conversation_prefix": [
             {"role": turn["role"], "message": turn["message"]}
             for turn in context["conversation_prefix"]
@@ -179,8 +128,8 @@ def _jev_state(
 def _applicability_question(
     name: str,
     test: RubberDuckTestConfig,
-) -> Choice:
-    return Choice(
+) -> ChoiceQuestion:
+    return ChoiceQuestion(
         instructions={
             "question": f"Does the scenario make the {name!r} test applicable?",
             "test": test["definition"],
@@ -197,8 +146,8 @@ def _applicability_question(
 
 def _grade_question(
     test: EvaluationTestConfig,
-) -> Choice:
-    return Choice(
+) -> ChoiceQuestion:
+    return ChoiceQuestion(
         instructions={
             "test": test["definition"],
             "rules": test.get(
@@ -215,7 +164,7 @@ def _grade_question(
 
 
 def _select_tests(
-    response: SystemOneResponse | None,
+    response: DecisionResponse | None,
     eligible: dict[str, RubberDuckTestConfig],
     all_tests: dict[str, RubberDuckTestConfig],
 ) -> TestSelection:
@@ -233,7 +182,7 @@ def _select_tests(
 
         if response is None:
             raise RuntimeError("JEV applicability response is missing")
-        answer = response.choices[f"{APPLIES_PREFIX}{name}"]
+        answer = response.decisions[f"{APPLIES_PREFIX}{name}"]
         outcome = _applicability_outcome(answer.choice)
         applicability[name] = {
             "outcome": outcome,
@@ -266,11 +215,11 @@ def _applicability_outcome(choice: str) -> ApplicabilityOutcome:
 
 
 def _test_result(
-    response: SystemOneResponse,
+    response: DecisionResponse,
     question_name: str,
     suite: TestSuite,
 ) -> JevTestResult:
-    answer = response.choices[question_name]
+    answer = response.decisions[question_name]
     rating = _test_outcome(answer.choice)
     return {
         "rating": rating,

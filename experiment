@@ -1,4 +1,0 @@
-#!/bin/sh
-set -eu
-
-exec poetry run python -m src.testing.prompt_evaluation.run_experiment "$@"

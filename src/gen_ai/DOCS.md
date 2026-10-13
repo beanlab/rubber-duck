@@ -5,7 +5,9 @@
 ## Operational Flow
 
 - `build_agent(...)` builds `Agent` objects from inline prompts or `prompt_files`.
-- `AIClient._get_completion(...)` uses the shared completion adapter with instructions, history, tool schemas, tool settings, and optional reasoning/output format.
+- `AIClient._get_completion(...)` calls `AsyncOpenAI.responses.create(...)` with instructions, history, tool schemas, tool settings, and optional reasoning/output format.
+- `decision.py` exposes provider-neutral constrained decisions and the JEV
+  implementation used by the application and local experiments.
 - `AIClient._run_agent(...)` handles response items:
   - `function_call`: execute tool through armory, append `function_call_output`, continue loop.
   - `message`: return assistant text.

@@ -25,17 +25,17 @@ from typing_extensions import TypedDict
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.gen_ai import Agent, ToolChoiceTypes
-from src.testing.prompt_evaluation.evaluation import (
+from tests.prompt_evaluation.evaluation import (
     build_tutor_history,
     evaluate_next_response,
 )
-from src.testing.prompt_evaluation.observation import TrialCapture
-from src.testing.prompt_evaluation.reporting import print_prompt_summary
-from src.testing.prompt_evaluation.types import (
+from tests.prompt_evaluation.reporting import print_prompt_summary
+from tests.prompt_evaluation.types import (
     EvaluationConfig,
     CombinedEvaluationResult,
     EvaluatorRequest,
     ResponseModel,
+    RubberDuckTestConfig,
     TestOutcome,
     TranscriptTurn,
 )
@@ -49,6 +49,8 @@ class FakeTutorResponse:
     output: list[ResponseFunctionToolCall]
     usage: None = None
     output_text: str = ""
+    id: str = "test-response-id"
+    model: str = "test-model-version"
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,7 @@ class FakeOpenAIClient:
         self.ratings: dict[str, TestOutcome] = {
             "factual_correctness": "pass",
             "case_actionability": "fail",
+            "concise_response": "pass",
         }
 
     async def create(
@@ -172,8 +175,6 @@ def test_generates_once_and_runs_each_configured_test(
         },
     }
     client = FakeOpenAIClient()
-    capture = TrialCapture()
-
     async def send_message(
         channel_id: int,
         message: str | None = None,
@@ -191,6 +192,30 @@ def test_generates_once_and_runs_each_configured_test(
         tools=["talk_to_user", "conclude_conversation"],
         reasoning="low",
     )
+    rubber_duck_tests: dict[str, RubberDuckTestConfig] = {
+        "concise_response": {
+            "scope": "response",
+            "oracle": "semantic",
+            "selection": "always",
+            "applies_when": "Every response.",
+            "definition": "Is the response concise?",
+            "metric": {
+                "pass": {"definition": "Concise"},
+                "fail": {"definition": "Verbose"},
+            },
+        },
+        "message_tool_use": {
+            "scope": "action",
+            "oracle": "deterministic",
+            "selection": "always",
+            "applies_when": "Every response.",
+            "definition": "Did the response use an approved action?",
+            "metric": {
+                "pass": {"definition": "Approved action"},
+                "fail": {"definition": "Direct message"},
+            },
+        },
+    }
 
     result = asyncio.run(
         evaluate_next_response(
@@ -199,7 +224,7 @@ def test_generates_once_and_runs_each_configured_test(
             transcript=prefix,
             agent=agent,
             armory=armory,
-            observer=capture,
+            rubber_duck_tests=rubber_duck_tests,
         )
     )
 
@@ -209,7 +234,7 @@ def test_generates_once_and_runs_each_configured_test(
     }
     assert result["reference_answer_used"] is True
     assert result["candidate_action"] == "talk_to_user"
-    assert result["candidate_model"] == "test-model"
+    assert result["candidate_model"] == "test-model-version"
     assert result["openai_evaluator_model"] == "test-evaluator-model-version"
     assert client.create_calls == 1
     assert client.create_params == {
@@ -222,31 +247,33 @@ def test_generates_once_and_runs_each_configured_test(
         "tool_choice": "auto",
         "reasoning": {"effort": "low"},
     }
-    assert set(result["tests"]) == {"factual_correctness", "case_actionability"}
+    assert set(result["tests"]) == {
+        "factual_correctness",
+        "case_actionability",
+        "concise_response",
+        "message_tool_use",
+    }
     assert result["tests"]["factual_correctness"]["rating"] == "pass"
     assert result["tests"]["factual_correctness"]["suite"] == "standard"
     assert result["tests"]["case_actionability"]["rating"] == "fail"
     assert result["tests"]["case_actionability"]["suite"] == "case"
+    assert result["tests"]["concise_response"]["suite"] == "rubber_duck"
+    assert result["tests"]["message_tool_use"]["rating"] == "pass"
+    assert result["tests"]["message_tool_use"]["evaluator"] == "deterministic"
     assert result["summary"] == {
         "passed": False,
-        "score": 0.5,
+        "score": 0.75,
         "blocking_tests": ["case_actionability"],
     }
     assert client.create_input == build_tutor_history(prefix)
     assert len(client.parse_params) == 1
-    assert capture.generation is not None
-    assert capture.generation.request.model == "test-model"
-    assert capture.generation.result.response_id is None
-    assert capture.selection is None
-    assert capture.evaluation is not None
-    assert capture.evaluation.result is result
-
     call = client.parse_params[0]
     evaluator_input = TypeAdapter(EvaluatorRequest).validate_json(call.input)
     assert call.instructions == config.get("evaluator_prompt")
     configured_tests = {
         **config["standard_tests"],
         **config.get("case_tests", {}),
+        "concise_response": rubber_duck_tests["concise_response"],
     }
     assert call.model == "test-evaluator-model"
     assert evaluator_input["conversation_prefix"] == prefix

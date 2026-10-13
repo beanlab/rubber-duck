@@ -3,8 +3,9 @@ from collections.abc import Mapping
 import pytest
 from typesafe_sdk import JSONContent, Question, SystemOneResponse
 
-from src.testing.prompt_evaluation.jev import JevEvaluator
-from src.testing.prompt_evaluation.types import (
+from src.gen_ai.decision import JevDecisionService
+from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
+from tests.prompt_evaluation.types import (
     EvaluationTestConfig,
     EvaluatorContext,
     RubberDuckTestConfig,
@@ -108,7 +109,8 @@ async def test_jev_selects_then_evaluates_only_selected_tests() -> None:
     }
     client = FakeJevClient()
 
-    result = await JevEvaluator(client=client).evaluate(
+    evaluator = CriterionDecisionEvaluator(JevDecisionService(client=client))
+    result = await evaluator.evaluate(
         context,
         tests,
         {"accuracy": "standard", "guidance": "case"},

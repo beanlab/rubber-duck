@@ -13,7 +13,6 @@ from quest import step
 
 from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
-from .completion import CompletionRequest, ResponsesCompletionAdapter
 from ..utils.config_types import DuckContext, HistoryType, RetryProtocol
 from ..utils.logger import duck_logger
 from ..utils.retry import retry_async, retry_delay_seconds, is_retryable_discord_server_error
@@ -81,7 +80,6 @@ class AIClient:
         self._retry_protocol = retry_protocol
         self._send_message = step(send_message) if send_message else None
         self._client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self._completion_adapter = ResponsesCompletionAdapter()
 
     @staticmethod
     def _is_retryable_server_overload(error: InternalServerError) -> bool:
@@ -128,41 +126,45 @@ class AIClient:
             output_format: Type[BaseModel] | None,
             reasoning: str | None = None
     ) -> list[Response]:
-        request = CompletionRequest(
+        params = dict(
             model=model,
             instructions=prompt,
             input=(context + local_history),
             tools=tools,
-            tool_choice=tool_settings,
-            output_format=output_format,
-            reasoning=reasoning,
+            tool_choice=tool_settings
         )
+
+        if output_format:
+            params["text"] = output_format
+
+        if reasoning:
+            params["reasoning"] = {"effort": reasoning}
 
         async def create_completion():
             async with self._typing(ctx.thread_id):
-                return await self._completion_adapter.complete(
-                    self._client,
-                    request,
-                )
+                return await self._client.responses.create(**params)
 
         async def on_retry(_error: Exception, attempt: int, _delay_seconds: int):
             await self._notify_retry(ctx, self._retry_delay_seconds(attempt))
 
-        completion = await retry_async(
+        response = await retry_async(
             create_completion,
             self._retry_protocol,
             self._should_retry,
             on_retry
         )
 
-        if completion.usage:
-            usage = completion.usage
+        if response.usage:
+            usage = response.usage
             await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
                                      usage.input_tokens, usage.output_tokens,
                                      usage.input_tokens_details.cached_tokens,
                                      usage.output_tokens_details.reasoning_tokens)
 
-        return completion.output
+        return [
+            resp.model_dump(exclude_none=True)
+            for resp in response.output
+        ]
 
     @step
     async def _run_tool(self, tool, ctx, tool_args) -> tuple[str | None, bool]:

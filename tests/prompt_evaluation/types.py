@@ -1,9 +1,14 @@
-"""Shared data contracts for fixed-prefix tutor response evaluation."""
+"""Data contracts for pytest-based prompt evaluation."""
 
 from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import NotRequired, Protocol, TypedDict
+
+from tests.prompt_evaluation.completion import (
+    CompletionClient,
+    ResponsesCompletionAPI,
+)
 
 
 TestOutcome = Literal["pass", "fail"]
@@ -59,7 +64,7 @@ class ParsedEvaluationResponse(Protocol, Generic[ResponseModel]):
     def output_parsed(self) -> ResponseModel | None: ...
 
 
-class ResponsesAPI(Protocol):
+class ResponsesAPI(ResponsesCompletionAPI, Protocol):
     async def parse(
         self,
         *,
@@ -71,7 +76,7 @@ class ResponsesAPI(Protocol):
     ) -> ParsedEvaluationResponse[ResponseModel]: ...
 
 
-class EvaluationClient(Protocol):
+class EvaluationClient(CompletionClient, Protocol):
     @property
     def responses(self) -> ResponsesAPI: ...
 

@@ -23,6 +23,8 @@ class _FakeOutput:
 
 class _FakeResponse:
     def __init__(self):
+        self.id = "response-test"
+        self.model = "gpt-test"
         self.output = [_FakeOutput()]
         self.usage = None
 

@@ -17,52 +17,31 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
-from pydantic import TypeAdapter
 
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
-from src.testing.prompt_evaluation.evaluation import evaluate_next_response
-from src.testing.prompt_evaluation.jev import JevEvaluator
-from src.testing.prompt_evaluation.reporting import (
+from src.gen_ai.decision import JevDecisionService
+from tests.prompt_evaluation.config import case_configuration, load_evaluation_suite
+from tests.prompt_evaluation.evaluation import evaluate_next_response
+from tests.prompt_evaluation.reporting import (
     evaluation_failure_message,
     print_case_evaluation,
     print_prompt_summary,
 )
-from src.testing.prompt_evaluation.types import (
+from tests.prompt_evaluation.selection import CriterionDecisionEvaluator
+from tests.prompt_evaluation.types import (
     EvaluationCase,
-    EvaluationCasesFile,
-    EvaluationConfig,
     EvaluationRun,
-    RubberDuckTestsConfig,
 )
 from src.utils.config_loader import load_configuration
 
 
 TEST_ROOT = Path(__file__).resolve().parent
-ROOT = TEST_ROOT.parents[2]
-EVALUATION_CONFIG_PATH = TEST_ROOT / "config.yaml"
-CASES_CONFIG = TEST_ROOT / "cases.yaml"
-RUBBER_DUCK_TESTS_CONFIG = TEST_ROOT / "rubber_duck_tests.yaml"
-
-
-def load_yaml(path: Path) -> object:
-    data: object = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return data
-
-
-SHARED_CONFIG = TypeAdapter(EvaluationConfig).validate_python(
-    load_yaml(EVALUATION_CONFIG_PATH)
-)
-CASES = TypeAdapter(EvaluationCasesFile).validate_python(load_yaml(CASES_CONFIG))[
-    "cases"
-]
-RUBBER_DUCK_TESTS = TypeAdapter(RubberDuckTestsConfig).validate_python(
-    load_yaml(RUBBER_DUCK_TESTS_CONFIG)
-)["rubber_duck_tests"]
+ROOT = TEST_ROOT.parents[1]
+SUITE = load_evaluation_suite(TEST_ROOT)
 PROMPT_RESULTS: list[EvaluationRun] = []
 
 
@@ -92,33 +71,32 @@ def case_id(case: EvaluationCase) -> str:
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("case", CASES, ids=case_id)
+@pytest.mark.prompt_eval
+@pytest.mark.parametrize("case", SUITE.cases, ids=case_id)
 async def test_prompt_response(case: EvaluationCase) -> None:
     """Generate one response and apply every configured evaluation test."""
     load_dotenv()
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY is required for prompt response evaluations.")
+    if not os.getenv("OPENAI_API_KEY") or not os.getenv("JEV_API_KEY"):
+        pytest.fail(
+            "OPENAI_API_KEY and JEV_API_KEY are required for prompt evaluations.",
+            pytrace=False,
+        )
 
-    config = SHARED_CONFIG.copy()
-    config["reference_answer"] = case["reference_answer"]
-    config["case_tests"] = case.get("tests", {})
+    config = case_configuration(SUITE.config, case)
     async with AsyncOpenAI() as client:
-        jev_key = os.getenv("JEV_API_KEY")
         result = await evaluate_next_response(
             client=client,
             config=config,
             transcript=case["transcript"],
             agent=STANDARD_AGENT,
             armory=STANDARD_ARMORY,
-            jev_evaluator=(
-                JevEvaluator(
-                    api_key=jev_key,
+            jev_evaluator=CriterionDecisionEvaluator(
+                JevDecisionService(
+                    api_key=os.getenv("JEV_API_KEY"),
                     model=config.get("jev_model", "jev-latest"),
                 )
-                if jev_key
-                else None
             ),
-            rubber_duck_tests=RUBBER_DUCK_TESTS,
+            rubber_duck_tests=SUITE.rubber_duck_tests,
         )
 
     PROMPT_RESULTS.append(result)

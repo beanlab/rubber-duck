@@ -331,17 +331,17 @@ rubber_duck_tests:
   #     fail:
   #       definition: The tutor supplies the correction itself, or the transcript provides no evidence that the learner can make the relevant correction or next step.
 
-  # message_tool_use:
-  #   scope: action
-  #   oracle: deterministic
-  #   selection: always
-  #   applies_when: Every generated Standard Duck action.
-  #   definition: Does every user-facing response use the talk_to_user action?
-  #   metric:
-  #     pass:
-  #       definition: The response action is talk_to_user whenever the tutor sends a message to the learner.
-  #     fail:
-  #       definition: The tutor emits a user-facing message directly or through an action other than talk_to_user.
+  message_tool_use:
+    scope: action
+    oracle: deterministic
+    selection: always
+    applies_when: Every generated Standard Duck action.
+    definition: Does every user-facing response use the talk_to_user action?
+    metric:
+      pass:
+        definition: The response action is talk_to_user whenever the tutor sends a message to the learner.
+      fail:
+        definition: The tutor emits a user-facing message directly or through an action other than talk_to_user.
 
   # termination_tool_safety:
   #   scope: action

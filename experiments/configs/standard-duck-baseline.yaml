@@ -2,7 +2,3 @@ name: standard-duck-baseline
 
 cases: all
 repetitions: 3
-concurrency: 3
-
-reporting:
-  console: concise

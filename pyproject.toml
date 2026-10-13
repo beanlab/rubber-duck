@@ -43,6 +43,9 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+markers = [
+    "prompt_eval: live, paid prompt-response evaluation",
+]
 filterwarnings = [
     "ignore:'audioop' is deprecated and slated for removal in Python 3\\.13:DeprecationWarning:discord\\.player",
 ]
