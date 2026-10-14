@@ -293,6 +293,22 @@ The `scripts/rubricize.py` operator utility supports source-Python generation fo
 - when the source reaches a no-error step, the utility records `correct code` with the same deterministic line-number format
 - traceback path concealment applies only inside `traceback` fields and does not rewrite rubric explanations or required fixes
 
+## Production Deployment Contract
+
+Production deployment is automated from the `master` branch.
+
+Operator-visible guarantees:
+
+- GitHub Actions authenticates to AWS through OIDC and deploys only the explicitly mapped `production` environment.
+- The deployed Docker image is identified by the full source commit SHA and run by immutable ECR digest.
+- The EC2 host has no public IP, inbound security-group rules, SSH key, or static AWS credentials; administration uses AWS Systems Manager.
+- Runtime secrets come from AWS Secrets Manager, while application configuration comes from `s3://rubber-duck-config/environments/production/config.yaml`.
+- Routine deployments update the host before replacing the application container and verify that the replacement remains running during a bounded startup window.
+- SQLite data resides on a persistent EBS data volume that survives EC2 replacement.
+- Replacing the existing manually managed production host and migrating its SQLite database are deliberate cutover operations, not automatic deployment behavior.
+
+These deployment changes do not alter the Discord, command, workflow, or configuration behavior documented above.
+
 ## Out of Scope
 
 This interface document does not define:
