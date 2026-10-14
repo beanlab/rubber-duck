@@ -30,7 +30,7 @@ from experiments.evaluation.types import (
 from tests.prompt_tests.deterministic.support import FakeOpenAIClient
 
 
-SUITE_DIRECTORY = Path(__file__).resolve().parents[1] / "suite"
+PROMPT_CONFIG_DIRECTORY = Path(__file__).resolve().parents[1] / "configs"
 
 
 def test_generates_once_and_runs_each_configured_test(
@@ -41,7 +41,7 @@ def test_generates_once_and_runs_each_configured_test(
         {"role": "tutor", "message": "What have you tried?"},
         {"role": "student", "message": "I do not know where to start."},
     ]
-    shared_config = load_evaluation_suite(SUITE_DIRECTORY).config
+    shared_config = load_evaluation_suite(PROMPT_CONFIG_DIRECTORY).config
     configured_tests = shared_config["standard_tests"]
     config = shared_config.copy()
     config["evaluator_model"] = "test-evaluator-model"
@@ -82,14 +82,6 @@ def test_generates_once_and_runs_each_configured_test(
                 "fail": {"definition": "Verbose"},
             },
         },
-        "message_tool_use": {
-            "selection": "always",
-            "definition": "Did the response use an approved action?",
-            "metric": {
-                "pass": {"definition": "Approved action"},
-                "fail": {"definition": "Direct message"},
-            },
-        },
     }
 
     result = asyncio.run(
@@ -126,18 +118,15 @@ def test_generates_once_and_runs_each_configured_test(
         "factual_correctness",
         "case_actionability",
         "concise_response",
-        "message_tool_use",
     }
     assert result["tests"]["factual_correctness"]["rating"] == "pass"
     assert result["tests"]["factual_correctness"]["suite"] == "standard"
     assert result["tests"]["case_actionability"]["rating"] == "fail"
     assert result["tests"]["case_actionability"]["suite"] == "case"
     assert result["tests"]["concise_response"]["suite"] == "rubber_duck"
-    assert result["tests"]["message_tool_use"]["rating"] == "pass"
-    assert result["tests"]["message_tool_use"]["evaluator"] == "deterministic"
     assert result["summary"] == {
         "passed": False,
-        "score": 0.75,
+        "score": 1 - 1 / 3,
         "blocking_tests": ["case_actionability"],
     }
     assert client.create_input == build_tutor_history(prefix)

@@ -249,7 +249,7 @@ The repository currently contains:
 ### 5.2 What the current tests establish
 
 - Important local contracts work for the specifically tested cases.
-- A Standard Duck response can be generated after a fixed prefix and graded on the prompt-agnostic `standard_tests` in `tests/prompt_tests/suite/config.yaml` plus any scenario-specific tests in `tests/prompt_tests/suite/cases.yaml`.
+- A Standard Duck response can be generated after a fixed prefix and graded on the prompt-agnostic `standard_tests` in `tests/prompt_tests/configs/config.yaml` plus any scenario-specific tests in `tests/prompt_tests/configs/cases.yaml`.
 - Each configured semantic criterion has explicit pass and fail definitions, although the validity of the selected result remains unproven.
 - OpenAI and JEV can independently apply the same criteria to the same generated response; their agreement and calibration on tutoring judgments remain unproven.
 - The deployed-style application can start and interact through Discord.

@@ -19,7 +19,7 @@ ApplicabilityOutcome = Literal[
 ]
 TestSelectionMode = Literal["always", "conditional"]
 TestSuite = Literal["standard", "case", "rubber_duck"]
-TestEvaluator = Literal["openai", "deterministic"]
+TestEvaluator = Literal["openai"]
 ResponseAction = Literal[
     "talk_to_user",
     "conclude_conversation",

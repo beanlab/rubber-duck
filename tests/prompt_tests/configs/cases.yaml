@@ -1,3 +1,5 @@
+# Complete field reference: tests/prompt_tests/configs/README.md
+
 # Each response case is a redacted checkpoint derived from a complete
 # conversation in data/raw/datasets/messages/data.csv. The prefix is
 # model-visible; the reference answer is evaluator-only.

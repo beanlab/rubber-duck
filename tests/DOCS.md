@@ -28,7 +28,8 @@ poetry run pytest \
 `OPENAI_API_KEY` and `JEV_API_KEY` are required for live evaluations. Use
 standard pytest options such as `-k contradictory` to select individual cases.
 
-The YAML evaluation definitions are under `tests/prompt_tests/suite/`.
+The YAML evaluation definitions and their complete field reference are under
+`tests/prompt_tests/configs/`.
 
 ## Discord end-to-end tests
 

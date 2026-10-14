@@ -1,9 +1,0 @@
-#!/bin/sh
-set -eu
-
-exec poetry run pytest \
-  --run-prompt-evals \
-  -m prompt_eval \
-  -s \
-  tests/prompt_tests/test_responses.py \
-  "$@"

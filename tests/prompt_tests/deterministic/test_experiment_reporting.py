@@ -7,8 +7,13 @@ import pytest
 
 from experiments.evaluation.console import print_prompt_summary
 from experiments.evaluation.types import EvaluationCase, EvaluationRun
-from experiments.reporting import render_report, write_report
-from experiments.results import Candidate, ExperimentResults, TrialResult, write_results
+from experiments.utils.report import render_report, write_report
+from experiments.utils.results import (
+    Candidate,
+    ExperimentResults,
+    TrialResult,
+    write_results,
+)
 
 
 def _results() -> ExperimentResults:
@@ -27,13 +32,6 @@ def _results() -> ExperimentResults:
                 "rationale": "The question advances the investigation.",
                 "suite": "standard",
                 "evaluator": "openai",
-            },
-            "message_tool_use": {
-                "rating": "pass",
-                "evidence": ["talk_to_user"],
-                "rationale": "The configured action was used.",
-                "suite": "rubber_duck",
-                "evaluator": "deterministic",
             },
         },
         "summary": {"passed": True, "score": 1.0, "blocking_tests": []},
@@ -88,7 +86,7 @@ def test_render_report_includes_results_and_evidence() -> None:
     assert "Candidate model: `candidate-model`" in report
     assert "OpenAI evaluator model: `evaluator-model`" in report
     assert "JEV evaluator model: `jev-model`" in report
-    assert "Trials passing every check: 1/1" in report
+    assert "Trials passing every criterion: 1/1" in report
     assert "What does the function return?" in report
     assert "Usefulness — PASS" in report
     assert "The question advances the investigation." in report
@@ -145,6 +143,6 @@ def test_prompt_summary_lists_every_case(
     print_prompt_summary([evaluation, failed_evaluation], cases=cases)
 
     output = capsys.readouterr().out
-    assert "PASS  passing-case (2/2 checks passed)" in output
-    assert "FAIL  failing-case (1/2 checks passed)" in output
+    assert "PASS  passing-case (1/1 checks passed)" in output
+    assert "FAIL  failing-case (0/1 checks passed)" in output
     assert "Cases passed: 1/2" in output

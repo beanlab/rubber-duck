@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from experiments.results import ExperimentResults, TrialResult
+from experiments.utils.results import ExperimentResults, TrialResult
 
 
 class SummaryModel(BaseModel):
@@ -23,8 +23,6 @@ class ScenarioSummary(SummaryModel):
     openai_total: int
     jev_passed: int
     jev_total: int
-    exact_passed: int
-    exact_total: int
     agreement: int
     agreement_total: int
     average_duration_seconds: float
@@ -41,8 +39,6 @@ class ExperimentSummary(SummaryModel):
     openai_total: int
     jev_passed: int
     jev_total: int
-    exact_passed: int
-    exact_total: int
     agreement: int
     agreement_total: int
     openai_pass_jev_pass: int
@@ -61,8 +57,6 @@ class _Counts:
     openai_total: int = 0
     jev_passed: int = 0
     jev_total: int = 0
-    exact_passed: int = 0
-    exact_total: int = 0
     agreement: int = 0
     agreement_total: int = 0
     openai_pass_jev_pass: int = 0
@@ -78,10 +72,6 @@ class _Counts:
         self.completed += 1
         self.fully_passed += trial.evaluation["summary"]["passed"]
         for name, result in trial.evaluation["tests"].items():
-            if result["evaluator"] == "deterministic":
-                self.exact_total += 1
-                self.exact_passed += result["rating"] == "pass"
-                continue
             self.openai_total += 1
             self.openai_passed += result["rating"] == "pass"
             if "jev" not in trial.evaluation:
@@ -122,8 +112,6 @@ def build_summary(results: ExperimentResults) -> ExperimentSummary:
         openai_total=overall.openai_total,
         jev_passed=overall.jev_passed,
         jev_total=overall.jev_total,
-        exact_passed=overall.exact_passed,
-        exact_total=overall.exact_total,
         agreement=overall.agreement,
         agreement_total=overall.agreement_total,
         openai_pass_jev_pass=overall.openai_pass_jev_pass,
@@ -153,8 +141,6 @@ def _scenario_summary(case_id: str, trials: list[TrialResult]) -> ScenarioSummar
         openai_total=counts.openai_total,
         jev_passed=counts.jev_passed,
         jev_total=counts.jev_total,
-        exact_passed=counts.exact_passed,
-        exact_total=counts.exact_total,
         agreement=counts.agreement,
         agreement_total=counts.agreement_total,
         average_duration_seconds=(sum(durations) / len(durations) if durations else 0),

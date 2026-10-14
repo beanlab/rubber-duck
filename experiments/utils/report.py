@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from experiments.charts import heatmap_filename, render_charts
-from experiments.results import ExperimentResults, TrialResult, trial_filename
-from experiments.summary import ExperimentSummary, build_summary
+from experiments.utils.charts import heatmap_filename, render_charts
+from experiments.utils.results import ExperimentResults, TrialResult, trial_filename
+from experiments.utils.summary import ExperimentSummary, build_summary
 from experiments.evaluation.types import EvaluationRun, TestResult
 
 
@@ -49,12 +49,12 @@ def render_report(
         f"- OpenAI evaluator model: {_format_models(openai_evaluator_models)}",
         f"- JEV evaluator model: {_format_models(jev_evaluator_models)}",
         f"- Repetitions: {results.repetitions}",
-        f"- Trials passing every check: {report_summary.fully_passed}/{report_summary.trials}",
+        f"- Trials passing every criterion: {report_summary.fully_passed}/{report_summary.trials}",
         f"- Trial errors: {report_summary.errors}",
         "- Artifacts: [combined JSON](results.json), [manifest](experiment.json), "
         "[machine summary](summary.json)",
         "",
-        "A trial passes only when every selected OpenAI criterion and exact code check passes.",
+        "A trial passes only when every selected OpenAI criterion passes.",
         "",
         "## Outcome measures",
         "",
@@ -63,7 +63,6 @@ def render_report(
         f"| OpenAI ratings passed | {_fraction(report_summary.openai_passed, report_summary.openai_total)} |",
         f"| JEV ratings passed | {_fraction(report_summary.jev_passed, report_summary.jev_total)} |",
         f"| Evaluator agreement | {_fraction(report_summary.agreement, report_summary.agreement_total)} |",
-        f"| Exact checks passed | {_fraction(report_summary.exact_passed, report_summary.exact_total)} |",
         "",
         "## Evaluator agreement",
         "",
@@ -212,7 +211,7 @@ def _trial_details(trial: TrialResult, index: int) -> list[str]:
 
 def _evaluation_table(evaluation: EvaluationRun) -> list[str]:
     lines = [
-        "| Criterion | Suite | OpenAI/exact | JEV | JEV confidence | Agreement |",
+        "| Criterion | Suite | OpenAI | JEV | JEV confidence | Agreement |",
         "|---|---|---:|---:|---:|---:|",
     ]
     for name, result in evaluation["tests"].items():
@@ -228,7 +227,7 @@ def _evaluation_table(evaluation: EvaluationRun) -> list[str]:
 
 
 def _agreement(result: TestResult, jev_rating: str | None) -> str:
-    if result["evaluator"] != "openai" or jev_rating is None:
+    if jev_rating is None:
         return "—"
     return "YES" if result["rating"] == jev_rating else "NO"
 
@@ -236,8 +235,6 @@ def _agreement(result: TestResult, jev_rating: str | None) -> str:
 def _rationales(evaluation: EvaluationRun) -> list[str]:
     lines: list[str] = []
     for name, result in evaluation["tests"].items():
-        if result["evaluator"] != "openai":
-            continue
         lines.extend(
             [
                 f"- **{_label(name)} — {result['rating'].upper()}**",

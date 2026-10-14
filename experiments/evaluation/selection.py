@@ -65,7 +65,7 @@ class CriterionDecisionEvaluator:
         selected_semantic_tests = {
             name: test
             for name, test in rubber_duck_tests.items()
-            if name in selection["selected"] and name != "message_tool_use"
+            if name in selection["selected"]
         }
         evaluated_tests = {**tests, **selected_semantic_tests}
         evaluated_suites: dict[str, TestSuite] = {

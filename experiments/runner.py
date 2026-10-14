@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import time
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from experiments.config import (
     ExperimentSpecification,
     load_experiment_specification,
 )
-from experiments.results import (
+from experiments.utils.results import (
     Candidate,
     ExperimentResults,
     TrialError,
@@ -23,7 +24,7 @@ from experiments.results import (
     source_commit,
     write_results,
 )
-from experiments.reporting import write_report
+from experiments.utils.report import write_report
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
@@ -37,14 +38,36 @@ from experiments.evaluation.engine import evaluate_next_response
 from experiments.evaluation.console import print_case_evaluation
 from experiments.evaluation.selection import CriterionDecisionEvaluator
 from experiments.evaluation.types import EvaluationCase
+from experiments.evaluation.types import EvaluationConfig
+from src.gen_ai.gen_ai import Agent
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SUITE_DIRECTORY = ROOT / "tests/prompt_tests/suite"
+PROMPT_CONFIG_DIRECTORY = ROOT / "tests/prompt_tests/configs"
+USAGE = """Usage: ./experiments/run <experiment-name-or-path>
+
+Each YAML file defines one experiment. Run a config by name:
+  ./experiments/run standard-duck-baseline
+
+Complete config reference:
+  experiments/configs/README.md
+"""
 
 
 async def _send_message(*_args: object, **_kwargs: object) -> int:
     return 1
+
+
+def _configure_models(
+    specification: ExperimentSpecification,
+    agent: Agent,
+    evaluation_config: EvaluationConfig,
+) -> tuple[Agent, EvaluationConfig, str]:
+    configured_evaluation = evaluation_config.copy()
+    configured_evaluation["evaluator_model"] = specification.models.evaluator
+    configured_evaluation["jev_model"] = specification.models.jev
+    configured_agent = replace(agent, model=specification.models.response)
+    return configured_agent, configured_evaluation, specification.models.jev
 
 
 async def run_experiment(
@@ -56,21 +79,25 @@ async def run_experiment(
     if not openai_key or not jev_key:
         raise RuntimeError("OPENAI_API_KEY and JEV_API_KEY are required")
 
-    suite = load_evaluation_suite(SUITE_DIRECTORY)
+    suite = load_evaluation_suite(PROMPT_CONFIG_DIRECTORY)
     cases = _select_cases(
         suite.cases,
         None if specification.cases == "all" else specification.cases,
     )
     application_config = load_configuration(str(ROOT / "production-config.yaml"))
-    agent = build_agent(
-        application_config["ducks"]["standard-rubber-duck"]["settings"]["agent"]
+    agent, evaluation_config, jev_model = _configure_models(
+        specification,
+        build_agent(
+            application_config["ducks"]["standard-rubber-duck"]["settings"]["agent"]
+        ),
+        suite.config,
     )
     armory = Armory(_send_message)
     armory.scrub_tools(TalkTool(_send_message))
     selector = CriterionDecisionEvaluator(
         JevDecisionService(
             api_key=jev_key,
-            model=suite.config.get("jev_model", "jev-latest"),
+            model=jev_model,
         )
     )
     trials: list[TrialResult] = []
@@ -84,7 +111,7 @@ async def run_experiment(
                 try:
                     evaluation = await evaluate_next_response(
                         client=client,
-                        config=case_configuration(suite.config, case),
+                        config=case_configuration(evaluation_config, case),
                         transcript=case["transcript"],
                         agent=agent,
                         armory=armory,
@@ -152,12 +179,22 @@ def _output_directory(specification: ExperimentSpecification) -> Path:
     return ROOT / "experiments/results" / f"{timestamp}-{safe_name or 'experiment'}"
 
 
+def _specification_path(value: str) -> Path:
+    path = Path(value)
+    if path.suffix or path.parent != Path("."):
+        return path
+    return ROOT / "experiments/configs" / f"{value}.yaml"
+
+
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] in {"-h", "--help"}:
+        print(USAGE)
+        return 0
     if len(sys.argv) != 2:
-        print("Usage: ./experiments/run <experiment.yaml>", file=sys.stderr)
+        print(USAGE, file=sys.stderr)
         return 2
     try:
-        specification = load_experiment_specification(Path(sys.argv[1]))
+        specification = load_experiment_specification(_specification_path(sys.argv[1]))
         results, _ = asyncio.run(run_experiment(specification))
     except (OSError, RuntimeError, ValueError) as exception:
         print(f"Experiment error: {exception}", file=sys.stderr)

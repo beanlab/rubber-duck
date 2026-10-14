@@ -3,8 +3,8 @@
 from html import escape
 from typing import Literal
 
-from experiments.results import ExperimentResults, TrialResult
-from experiments.summary import ExperimentSummary
+from experiments.utils.results import ExperimentResults, TrialResult
+from experiments.utils.summary import ExperimentSummary
 from experiments.evaluation.types import TestOutcome
 
 

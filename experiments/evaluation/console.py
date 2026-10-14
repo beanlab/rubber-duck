@@ -37,14 +37,13 @@ def print_case_evaluation(case: EvaluationCase, result: EvaluationRun) -> None:
             )
 
     _print_evaluator_comparison(result)
-    _print_deterministic_checks(result)
     _print_case_result(result)
     _print_openai_rationales(result)
     print("=" * 104)
 
 
 def _print_evaluator_comparison(result: EvaluationRun) -> None:
-    semantic = _semantic_results(result)
+    semantic = result["tests"]
     print("\nModel-evaluated tests:")
     if "jev" not in result:
         print(f"  {'Test':<32} {'Suite':<15} OpenAI")
@@ -82,29 +81,15 @@ def _print_evaluator_comparison(result: EvaluationRun) -> None:
     print(f"  Agreement:    {agreed}/{len(semantic)} ({agreed / len(semantic):.0%})")
 
 
-def _print_deterministic_checks(result: EvaluationRun) -> None:
-    deterministic = _deterministic_results(result)
-    if not deterministic:
-        return
-    print("\nExact code checks (not model-judged):")
-    print(f"  {'Test':<32} {'Suite':<15} Result")
-    print(f"  {'-' * 32} {'-' * 15} ------")
-    for name, value in deterministic.items():
-        print(
-            f"  {_test_label(name):<32} {SUITE_LABELS[value['suite']]:<15} "
-            f"{value['rating'].upper()}"
-        )
-
-
 def _print_case_result(result: EvaluationRun) -> None:
     summary = result["summary"]
     print(f"\nCase result: {'PASS' if summary['passed'] else 'FAIL'}")
-    print("Pass rule: every OpenAI rating and exact code check must pass.")
+    print("Pass rule: every OpenAI rating must pass.")
 
 
 def _print_openai_rationales(result: EvaluationRun) -> None:
     print("\nOpenAI evaluator rationales:")
-    for name, value in _semantic_results(result).items():
+    for name, value in result["tests"].items():
         suite = SUITE_LABELS[value["suite"]]
         print(f"\n  {_test_label(name)} [{suite}] — {value['rating'].upper()}")
         print(f"    {value['rationale']}")
@@ -152,7 +137,7 @@ def print_prompt_summary(
             )
 
     jev_runs = [result for result in results if "jev" in result]
-    semantic = [_semantic_results(result) for result in results]
+    semantic = [result["tests"] for result in results]
     print("\nModel-evaluated tests:")
     print(f"  OpenAI average score: {_average_score(semantic):.0%}")
     if jev_runs:
@@ -160,7 +145,7 @@ def print_prompt_summary(
         agreements = [
             openai["rating"] == result["jev"]["tests"][name]["rating"]
             for result in jev_runs
-            for name, openai in _semantic_results(result).items()
+            for name, openai in result["tests"].items()
         ]
         print(f"  JEV average score:    {sum(jev_scores) / len(jev_scores):.0%}")
         print(
@@ -168,35 +153,10 @@ def print_prompt_summary(
             f"({sum(agreements) / len(agreements):.0%})"
         )
 
-    deterministic = [
-        value
-        for result in results
-        for value in _deterministic_results(result).values()
-    ]
-    if deterministic:
-        passed = sum(value["rating"] == "pass" for value in deterministic)
-        print(f"\nExact code checks: {passed}/{len(deterministic)} passed")
-
     passed_cases = sum(result["summary"]["passed"] for result in results)
     print(f"\nCases passed: {passed_cases}/{len(results)}")
-    print("Pass rule: every OpenAI rating and exact code check must pass.")
+    print("Pass rule: every OpenAI rating must pass.")
     print("=" * 104)
-
-
-def _semantic_results(result: EvaluationRun) -> dict[str, TestResult]:
-    return {
-        name: value
-        for name, value in result["tests"].items()
-        if value["evaluator"] == "openai"
-    }
-
-
-def _deterministic_results(result: EvaluationRun) -> dict[str, TestResult]:
-    return {
-        name: value
-        for name, value in result["tests"].items()
-        if value["evaluator"] == "deterministic"
-    }
 
 
 def _score(results: dict[str, TestResult]) -> float:

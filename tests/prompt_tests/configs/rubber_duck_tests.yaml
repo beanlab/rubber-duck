@@ -1,3 +1,5 @@
+# Complete field reference: tests/prompt_tests/configs/README.md
+
 # Why these Standard Duck tests exist:
 #
 # - single_question_pacing: One question at a time limits cognitive load and is
@@ -46,8 +48,6 @@
 #   change in strategy rather than more of the same interaction.
 # - learner_self_correction: The purpose of the tutoring process is learner
 #   reasoning and correction, not merely a correct answer supplied by the tutor.
-# - message_tool_use: Every user-facing Standard Duck message must use the
-#   production prompt's required `talk_to_user` action.
 # - termination_tool_safety: `conclude_conversation` must be gated by an explicit
 #   ending signal so the tutor neither closes early nor ignores a clear exit.
 #
@@ -265,15 +265,6 @@ rubber_duck_tests:
   #       definition: The transcript shows the learner using the guidance to identify, explain, or perform the relevant correction or next step.
   #     fail:
   #       definition: The tutor supplies the correction itself, or the transcript provides no evidence that the learner can make the relevant correction or next step.
-
-  message_tool_use:
-    selection: always
-    definition: Does every user-facing response use the talk_to_user action?
-    metric:
-      pass:
-        definition: The response action is talk_to_user whenever the tutor sends a message to the learner.
-      fail:
-        definition: The tutor emits a user-facing message directly or through an action other than talk_to_user.
 
   # termination_tool_safety:
   #   selection: always

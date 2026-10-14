@@ -7,10 +7,19 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class ExperimentModels(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    response: str = Field(min_length=1)
+    evaluator: str = Field(min_length=1)
+    jev: str = Field(min_length=1)
+
+
 class ExperimentSpecification(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(min_length=1)
+    models: ExperimentModels
     cases: Literal["all"] | list[str] = "all"
     repetitions: int = Field(default=1, ge=1)
     output_directory: Path | None = None

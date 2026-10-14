@@ -39,7 +39,7 @@ from src.utils.config_loader import load_configuration
 
 TEST_ROOT = Path(__file__).resolve().parent
 ROOT = TEST_ROOT.parents[1]
-SUITE = load_evaluation_suite(TEST_ROOT / "suite")
+SUITE = load_evaluation_suite(TEST_ROOT / "configs")
 
 
 async def _send_message(*_args: object, **_kwargs: object) -> int:

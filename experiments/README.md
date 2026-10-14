@@ -1,17 +1,22 @@
 # Experiments
 
-This directory contains repeated-experiment orchestration, runnable experiment
-specifications, scripts, and generated results. The prompt-test suite it executes
-lives under `tests/prompt_tests/suite/`; reusable OpenAI and JEV services remain
-under `src/gen_ai/`.
+This directory contains repeated-experiment orchestration, experiment
+specifications, and generated artifacts. The evaluation cases and criteria it
+uses live under `tests/prompt_tests/configs/`.
 
-Run the live YAML cases as pytest tests:
+Each YAML file under `configs/` defines one experiment. It declares the response,
+OpenAI evaluator, and JEV models; selects cases; and sets the repetition count.
+`cases` accepts `all` or a list of exact IDs from
+`tests/prompt_tests/configs/cases.yaml`. The complete list of supported config
+fields is documented in `configs/README.md`.
+
+Run an experiment by name:
 
 ```bash
-./experiments/test
+./experiments/run standard-duck-baseline
 ```
 
-Run a repeated experiment:
+An explicit YAML path also works:
 
 ```bash
 ./experiments/run experiments/configs/standard-duck-baseline.yaml
@@ -27,6 +32,5 @@ directory under `experiments/results/` containing:
 - `experiment.json` with the experiment manifest
 - `trials/` with one JSON artifact per trial
 
-Add prompt cases and criteria under `tests/prompt_tests/suite/`. The live,
-model-backed pytest entry point remains at `tests/prompt_tests/test_responses.py`;
-offline framework tests live under `tests/prompt_tests/deterministic/`.
+Result, summary, report, and chart helpers live under `utils/`; the shared
+response-evaluation pipeline lives under `evaluation/`.

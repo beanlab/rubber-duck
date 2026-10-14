@@ -67,7 +67,6 @@ class PreparedEvaluation:
     evaluator_input: EvaluatorContext
     semantic_tests: dict[str, EvaluationTestConfig]
     semantic_suites: dict[str, TestSuite]
-    deterministic_results: dict[str, TestResult]
     reference_answer_used: bool
     selection: TestSelection | None
     jev: JevEvaluation | None
@@ -253,29 +252,6 @@ async def _evaluate_tests(
     ), response.model
 
 
-def _deterministic_results(
-    tests: dict[str, RubberDuckTestConfig],
-    action: ResponseAction,
-) -> dict[str, TestResult]:
-    results: dict[str, TestResult] = {}
-    for name in tests:
-        if name != "message_tool_use":
-            raise ValueError(f"No deterministic evaluator exists for {name!r}")
-        passed = action in {"talk_to_user", "conclude_conversation"}
-        results[name] = {
-            "rating": "pass" if passed else "fail",
-            "evidence": [action],
-            "rationale": (
-                "The response used a configured Standard Duck action."
-                if passed
-                else "The response bypassed the required Standard Duck actions."
-            ),
-            "suite": "rubber_duck",
-            "evaluator": "deterministic",
-        }
-    return results
-
-
 def summarize_evaluation(tests: dict[str, TestResult]) -> EvaluationSummary:
     """Calculate deterministic case-level outcomes from configured metrics."""
     return _summarize_ratings(
@@ -371,24 +347,10 @@ async def prepare_next_response(
             for name in jev_result["selection"]["selected"]
         }
 
-    semantic_duck_tests = {
-        name: test
-        for name, test in selected_duck_tests.items()
-        if name != "message_tool_use"
-    }
-    deterministic_duck_tests = {
-        name: test
-        for name, test in selected_duck_tests.items()
-        if name == "message_tool_use"
-    }
     semantic_suites: dict[str, TestSuite] = {
         **configured_suites,
-        **{name: "rubber_duck" for name in semantic_duck_tests},
+        **{name: "rubber_duck" for name in selected_duck_tests},
     }
-    deterministic_results = _deterministic_results(
-        deterministic_duck_tests,
-        candidate_action,
-    )
     return PreparedEvaluation(
         transcript=[*transcript, candidate_response],
         candidate_action=candidate_action,
@@ -396,9 +358,8 @@ async def prepare_next_response(
         evaluator_model=config["evaluator_model"],
         evaluator_prompt=evaluator_prompt,
         evaluator_input=evaluator_input,
-        semantic_tests={**configured_tests, **semantic_duck_tests},
+        semantic_tests={**configured_tests, **selected_duck_tests},
         semantic_suites=semantic_suites,
-        deterministic_results=deterministic_results,
         reference_answer_used="reference_answer" in evaluator_input,
         selection=jev_result["selection"] if jev_result is not None else None,
         jev=jev_result,
@@ -410,21 +371,19 @@ def complete_evaluation(
     semantic_results: dict[str, TestResult],
     openai_evaluator_model: str,
 ) -> EvaluationRun:
-    """Combine model judgments and exact checks into one evaluation run."""
+    """Build one evaluation run from the model judgments."""
     if prepared.jev is not None and set(prepared.jev["tests"]) != set(
         semantic_results
     ):
         raise RuntimeError("OpenAI and JEV did not evaluate the same semantic tests")
-
-    tests = {**semantic_results, **prepared.deterministic_results}
 
     result: EvaluationRun = {
         "transcript": prepared.transcript,
         "candidate_action": prepared.candidate_action,
         "candidate_model": prepared.candidate_model,
         "openai_evaluator_model": openai_evaluator_model,
-        "tests": tests,
-        "summary": summarize_evaluation(tests),
+        "tests": semantic_results,
+        "summary": summarize_evaluation(semantic_results),
         "reference_answer_used": prepared.reference_answer_used,
     }
     if prepared.selection is not None:

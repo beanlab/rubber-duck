@@ -1,4 +1,17 @@
+# Complete field reference: experiments/configs/README.md
+
 name: standard-duck-baseline
 
+# Every model used by this experiment is declared here.
+models:
+  response: gpt-5.6-luna
+  evaluator: gpt-5.6-sol
+  jev: jev-latest
+
+# Use `all`, or list exact IDs from tests/prompt_tests/configs/cases.yaml.
 cases: all
 repetitions: 3
+
+# Optional. When omitted or null, a timestamped directory is created under
+# experiments/results/.
+output_directory: null
