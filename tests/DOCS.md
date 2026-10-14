@@ -5,15 +5,30 @@ Discord end-to-end tests.
 
 ## Prompt tests
 
-Prompt cases, evaluator criteria, pytest coverage, and the live pytest entry
-point live in `tests/prompt_tests/`. Run the paid tests explicitly with:
+Prompt tests use the normal pytest infrastructure. Offline framework tests are
+under `tests/prompt_tests/deterministic/`; live model-backed tests are marked
+`prompt_eval` and skipped unless explicitly enabled.
+
+Run the offline prompt-test coverage with:
 
 ```bash
-./experiments/test
+poetry run pytest tests/prompt_tests/deterministic
 ```
 
-Experiment repetition and persisted results are separate concerns owned by
-`experiments/`; see `experiments/README.md`.
+Run the live, paid prompt evaluations with:
+
+```bash
+poetry run pytest \
+  --run-prompt-evals \
+  -m prompt_eval \
+  -s \
+  tests/prompt_tests/test_responses.py
+```
+
+`OPENAI_API_KEY` and `JEV_API_KEY` are required for live evaluations. Use
+standard pytest options such as `-k contradictory` to select individual cases.
+
+The YAML evaluation definitions are under `tests/prompt_tests/suite/`.
 
 ## Discord end-to-end tests
 

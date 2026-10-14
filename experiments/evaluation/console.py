@@ -128,12 +128,28 @@ def evaluation_failure_message(result: EvaluationRun) -> str:
     )
 
 
-def print_prompt_summary(results: list[EvaluationRun]) -> None:
+def print_prompt_summary(
+    results: list[EvaluationRun],
+    cases: list[EvaluationCase] | None = None,
+) -> None:
     """Print aggregate evaluator scores for multi-case runs."""
     if len(results) == 1:
         return
+    if cases is not None and len(cases) != len(results):
+        raise ValueError("Prompt summary cases and results must have equal lengths")
     print(f"\n{'=' * 104}")
     print("Prompt evaluation summary")
+
+    if cases is not None:
+        print("\nCases:")
+        for case, result in zip(cases, results, strict=True):
+            summary = result["summary"]
+            passed = len(result["tests"]) - len(summary["blocking_tests"])
+            status = "PASS" if summary["passed"] else "FAIL"
+            print(
+                f"  {status:<4}  {case['id']} "
+                f"({passed}/{len(result['tests'])} checks passed)"
+            )
 
     jev_runs = [result for result in results if "jev" in result]
     semantic = [_semantic_results(result) for result in results]

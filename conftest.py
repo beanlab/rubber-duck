@@ -21,7 +21,7 @@ def pytest_collection_modifyitems(
 ) -> None:
     if config.getoption("--run-prompt-evals"):
         return
-    skip = pytest.mark.skip(reason="Use ./experiments/test to run live evaluations.")
+    skip = pytest.mark.skip(reason="Pass --run-prompt-evals to run live evaluations.")
     for item in items:
         if "prompt_eval" in item.keywords:
             item.add_marker(skip)

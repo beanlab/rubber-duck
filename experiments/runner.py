@@ -40,7 +40,7 @@ from experiments.evaluation.types import EvaluationCase
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SUITE_DIRECTORY = ROOT / "tests/prompt_tests"
+SUITE_DIRECTORY = ROOT / "tests/prompt_tests/suite"
 
 
 async def _send_message(*_args: object, **_kwargs: object) -> int:

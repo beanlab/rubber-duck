@@ -7,146 +7,30 @@ whether a real evaluator's tutoring-quality judgments are valid.
 """
 
 import asyncio
-import json
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic
 
 import pytest
-import yaml
-from openai.types.responses import (
-    FunctionToolParam,
-    ResponseFunctionToolCall,
-    ResponseInputParam,
-)
-from pydantic import BaseModel, TypeAdapter
-from typing_extensions import TypedDict
+from pydantic import TypeAdapter
 
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
-from src.gen_ai.gen_ai import Agent, ToolChoiceTypes
+from src.gen_ai.gen_ai import Agent
+from experiments.evaluation.config import load_evaluation_suite
 from experiments.evaluation.engine import (
     build_tutor_history,
     evaluate_next_response,
 )
 from experiments.evaluation.console import print_prompt_summary
 from experiments.evaluation.types import (
-    EvaluationConfig,
     CombinedEvaluationResult,
     EvaluatorRequest,
-    ResponseModel,
     RubberDuckTestConfig,
-    TestOutcome,
     TranscriptTurn,
 )
+from tests.prompt_tests.deterministic.support import FakeOpenAIClient
 
 
-TEST_ROOT = Path(__file__).resolve().parent
-
-
-@dataclass(frozen=True)
-class FakeTutorResponse:
-    output: list[ResponseFunctionToolCall]
-    usage: None = None
-    output_text: str = ""
-    id: str = "test-response-id"
-    model: str = "test-model-version"
-
-
-@dataclass(frozen=True)
-class FakeParsedResponse(Generic[ResponseModel]):
-    output_parsed: ResponseModel
-    model: str = "test-evaluator-model-version"
-
-
-@dataclass(frozen=True)
-class ParseCall:
-    model: str
-    instructions: str
-    input: str
-    text_format: type[BaseModel]
-    store: bool
-
-
-class CreateParams(TypedDict):
-    model: str
-    instructions: str
-    tools: list[FunctionToolParam]
-    tool_choice: ToolChoiceTypes
-    reasoning: dict[str, str] | None
-
-
-class FakeOpenAIClient:
-    def __init__(self) -> None:
-        self.responses: FakeOpenAIClient = self
-        self.create_input: ResponseInputParam | None = None
-        self.create_params: CreateParams | None = None
-        self.create_calls: int = 0
-        self.parse_params: list[ParseCall] = []
-        self.ratings: dict[str, TestOutcome] = {
-            "factual_correctness": "pass",
-            "case_actionability": "fail",
-            "concise_response": "pass",
-        }
-
-    async def create(
-        self,
-        *,
-        model: str,
-        instructions: str,
-        input: ResponseInputParam,
-        tools: list[FunctionToolParam],
-        tool_choice: ToolChoiceTypes,
-        reasoning: dict[str, str] | None = None,
-    ) -> FakeTutorResponse:
-        self.create_calls += 1
-        self.create_input = input
-        self.create_params = {
-            "model": model,
-            "instructions": instructions,
-            "tools": tools,
-            "tool_choice": tool_choice,
-            "reasoning": reasoning,
-        }
-        call = ResponseFunctionToolCall(
-            type="function_call",
-            name="talk_to_user",
-            call_id="fake_call",
-            arguments=json.dumps(
-                {"message_to_user": "What output does the assignment require?"}
-            ),
-        )
-        return FakeTutorResponse(output=[call])
-
-    async def parse(
-        self,
-        *,
-        model: str,
-        instructions: str,
-        input: str,
-        text_format: type[ResponseModel],
-        store: bool,
-    ) -> FakeParsedResponse[ResponseModel]:
-        self.parse_params.append(
-            ParseCall(model, instructions, input, text_format, store)
-        )
-        evaluator_input = TypeAdapter(EvaluatorRequest).validate_json(input)
-        evaluation = text_format.model_validate(
-            {
-                "results": [
-                    {
-                        "name": test["name"],
-                        "rating": self.ratings[test["name"]],
-                        "evidence": ["What output does the assignment require?"],
-                        "rationale": (
-                            f"Deterministic rationale for {test['name']}."
-                        ),
-                    }
-                    for test in evaluator_input["tests"]
-                ]
-            }
-        )
-        return FakeParsedResponse(output_parsed=evaluation)
+SUITE_DIRECTORY = Path(__file__).resolve().parents[1] / "suite"
 
 
 def test_generates_once_and_runs_each_configured_test(
@@ -157,10 +41,7 @@ def test_generates_once_and_runs_each_configured_test(
         {"role": "tutor", "message": "What have you tried?"},
         {"role": "student", "message": "I do not know where to start."},
     ]
-    config_data: object = yaml.safe_load(
-        (TEST_ROOT / "config.yaml").read_text(encoding="utf-8")
-    )
-    shared_config = TypeAdapter(EvaluationConfig).validate_python(config_data)
+    shared_config = load_evaluation_suite(SUITE_DIRECTORY).config
     configured_tests = shared_config["standard_tests"]
     config = shared_config.copy()
     config["evaluator_model"] = "test-evaluator-model"
@@ -194,10 +75,7 @@ def test_generates_once_and_runs_each_configured_test(
     )
     rubber_duck_tests: dict[str, RubberDuckTestConfig] = {
         "concise_response": {
-            "scope": "response",
-            "oracle": "semantic",
             "selection": "always",
-            "applies_when": "Every response.",
             "definition": "Is the response concise?",
             "metric": {
                 "pass": {"definition": "Concise"},
@@ -205,10 +83,7 @@ def test_generates_once_and_runs_each_configured_test(
             },
         },
         "message_tool_use": {
-            "scope": "action",
-            "oracle": "deterministic",
             "selection": "always",
-            "applies_when": "Every response.",
             "definition": "Did the response use an approved action?",
             "metric": {
                 "pass": {"definition": "Approved action"},

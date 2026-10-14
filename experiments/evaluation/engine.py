@@ -356,7 +356,7 @@ async def prepare_next_response(
     selected_duck_tests = {
         name: test
         for name, test in duck_tests.items()
-        if test["selection"] == "always" and test["scope"] != "trajectory"
+        if test["selection"] == "always"
     }
     if jev_evaluator is not None:
         jev_result = await jev_evaluator.evaluate(
@@ -374,12 +374,12 @@ async def prepare_next_response(
     semantic_duck_tests = {
         name: test
         for name, test in selected_duck_tests.items()
-        if test["oracle"] == "semantic"
+        if name != "message_tool_use"
     }
     deterministic_duck_tests = {
         name: test
         for name, test in selected_duck_tests.items()
-        if test["oracle"] == "deterministic"
+        if name == "message_tool_use"
     }
     semantic_suites: dict[str, TestSuite] = {
         **configured_suites,

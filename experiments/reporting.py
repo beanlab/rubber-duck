@@ -30,6 +30,9 @@ def render_report(
 ) -> str:
     """Render experiment results as a self-contained Markdown report."""
     report_summary = summary or build_summary(results)
+    candidate_models, openai_evaluator_models, jev_evaluator_models = _models_used(
+        results
+    )
     lines = [
         f"# Experiment: {results.name}",
         "",
@@ -42,7 +45,9 @@ def render_report(
         f"- Created: `{results.created_at.isoformat()}`",
         f"- Source commit: `{results.source_commit or 'unavailable'}`",
         f"- Candidate: `{results.candidate.name}`",
-        f"- Candidate model: `{results.candidate.model}`",
+        f"- Candidate model: {_format_models(candidate_models)}",
+        f"- OpenAI evaluator model: {_format_models(openai_evaluator_models)}",
+        f"- JEV evaluator model: {_format_models(jev_evaluator_models)}",
         f"- Repetitions: {results.repetitions}",
         f"- Trials passing every check: {report_summary.fully_passed}/{report_summary.trials}",
         f"- Trial errors: {report_summary.errors}",
@@ -89,6 +94,35 @@ def render_report(
             if trial.case_id == scenario.case_id:
                 lines.extend(_trial_details(trial, trial_index))
     return "\n".join(lines)
+
+
+def _models_used(results: ExperimentResults) -> tuple[list[str], list[str], list[str]]:
+    candidate_models = [results.candidate.model]
+    openai_evaluator_models: list[str] = []
+    jev_evaluator_models: list[str] = []
+    for trial in results.trials:
+        evaluation = trial.evaluation
+        if evaluation is None:
+            continue
+        _append_unique(candidate_models, evaluation["candidate_model"])
+        _append_unique(
+            openai_evaluator_models,
+            evaluation["openai_evaluator_model"],
+        )
+        if "jev" in evaluation:
+            _append_unique(jev_evaluator_models, evaluation["jev"]["model"])
+    return candidate_models, openai_evaluator_models, jev_evaluator_models
+
+
+def _append_unique(models: list[str], model: str) -> None:
+    if model not in models:
+        models.append(model)
+
+
+def _format_models(models: list[str]) -> str:
+    if not models:
+        return "unavailable"
+    return ", ".join(f"`{model}`" for model in models)
 
 
 def _scenario_summary_rows(summary: ExperimentSummary) -> list[str]:

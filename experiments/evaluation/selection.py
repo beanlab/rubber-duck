@@ -46,14 +46,9 @@ class CriterionDecisionEvaluator:
         evaluator_prompt: str | None = None,
     ) -> JevEvaluation:
         rubber_duck_tests = rubber_duck_tests or {}
-        eligible = {
-            name: test
-            for name, test in rubber_duck_tests.items()
-            if test["scope"] != "trajectory"
-        }
         selection_questions = {
             f"{APPLIES_PREFIX}{name}": _applicability_question(name, test)
-            for name, test in eligible.items()
+            for name, test in rubber_duck_tests.items()
             if test["selection"] == "conditional"
         }
         selection_response = None
@@ -65,13 +60,12 @@ class CriterionDecisionEvaluator:
 
         selection = _select_tests(
             selection_response,
-            eligible,
             rubber_duck_tests,
         )
         selected_semantic_tests = {
             name: test
-            for name, test in eligible.items()
-            if name in selection["selected"] and test["oracle"] == "semantic"
+            for name, test in rubber_duck_tests.items()
+            if name in selection["selected"] and name != "message_tool_use"
         }
         evaluated_tests = {**tests, **selected_semantic_tests}
         evaluated_suites: dict[str, TestSuite] = {
@@ -133,7 +127,6 @@ def _applicability_question(
         instructions={
             "question": f"Does the scenario make the {name!r} test applicable?",
             "test": test["definition"],
-            "applies_when": test["applies_when"],
             "inspect": "Use the conversation prefix only. Do not judge whether the candidate response passed the test.",
         },
         criteria={
@@ -165,17 +158,14 @@ def _grade_question(
 
 def _select_tests(
     response: DecisionResponse | None,
-    eligible: dict[str, RubberDuckTestConfig],
-    all_tests: dict[str, RubberDuckTestConfig],
+    tests: dict[str, RubberDuckTestConfig],
 ) -> TestSelection:
     selected: list[str] = []
-    skipped = [
-        name for name, test in all_tests.items() if test["scope"] == "trajectory"
-    ]
+    skipped: list[str] = []
     uncertain: list[str] = []
     applicability: dict[str, JevApplicabilityResult] = {}
 
-    for name, test in eligible.items():
+    for name, test in tests.items():
         if test["selection"] == "always":
             selected.append(name)
             continue

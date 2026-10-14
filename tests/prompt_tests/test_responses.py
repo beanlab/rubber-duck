@@ -13,7 +13,6 @@ conversation.
 """
 
 import os
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -29,7 +28,6 @@ from experiments.evaluation.engine import evaluate_next_response
 from experiments.evaluation.console import (
     evaluation_failure_message,
     print_case_evaluation,
-    print_prompt_summary,
 )
 from experiments.evaluation.selection import CriterionDecisionEvaluator
 from experiments.evaluation.types import (
@@ -41,8 +39,7 @@ from src.utils.config_loader import load_configuration
 
 TEST_ROOT = Path(__file__).resolve().parent
 ROOT = TEST_ROOT.parents[1]
-SUITE = load_evaluation_suite(TEST_ROOT)
-PROMPT_RESULTS: list[EvaluationRun] = []
+SUITE = load_evaluation_suite(TEST_ROOT / "suite")
 
 
 async def _send_message(*_args: object, **_kwargs: object) -> int:
@@ -57,15 +54,6 @@ STANDARD_ARMORY = Armory(_send_message)
 STANDARD_ARMORY.scrub_tools(TalkTool(_send_message))
 
 
-@pytest.fixture(scope="module", autouse=True)
-def report_prompt_summary() -> Generator[None, None, None]:
-    """Print aggregate measurements after all configured cases finish."""
-    PROMPT_RESULTS.clear()
-    yield
-    if PROMPT_RESULTS:
-        print_prompt_summary(PROMPT_RESULTS)
-
-
 def case_id(case: EvaluationCase) -> str:
     return case["id"]
 
@@ -73,7 +61,10 @@ def case_id(case: EvaluationCase) -> str:
 @pytest.mark.anyio
 @pytest.mark.prompt_eval
 @pytest.mark.parametrize("case", SUITE.cases, ids=case_id)
-async def test_prompt_response(case: EvaluationCase) -> None:
+async def test_prompt_response(
+    case: EvaluationCase,
+    prompt_case_results: list[tuple[EvaluationCase, EvaluationRun]],
+) -> None:
     """Generate one response and apply every configured evaluation test."""
     load_dotenv()
     if not os.getenv("OPENAI_API_KEY") or not os.getenv("JEV_API_KEY"):
@@ -99,7 +90,7 @@ async def test_prompt_response(case: EvaluationCase) -> None:
             rubber_duck_tests=SUITE.rubber_duck_tests,
         )
 
-    PROMPT_RESULTS.append(result)
+    prompt_case_results.append((case, result))
     print_case_evaluation(case, result)
 
     if not result["summary"]["passed"]:

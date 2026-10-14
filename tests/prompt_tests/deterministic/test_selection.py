@@ -1,7 +1,4 @@
-from collections.abc import Mapping
-
 import pytest
-from typesafe_sdk import JSONContent, Question, SystemOneResponse
 
 from src.gen_ai.decision import JevDecisionService
 from experiments.evaluation.selection import CriterionDecisionEvaluator
@@ -10,51 +7,7 @@ from experiments.evaluation.types import (
     EvaluatorContext,
     RubberDuckTestConfig,
 )
-
-
-class FakeJevClient:
-    def __init__(self) -> None:
-        self.states: list[JSONContent] = []
-        self.questions: list[dict[str, Question]] = []
-        self.models: list[str | None] = []
-
-    async def system_one(
-        self,
-        state: JSONContent,
-        questions: Mapping[str, Question],
-        *,
-        model: str | None = None,
-    ) -> SystemOneResponse:
-        self.states.append(state)
-        self.questions.append(dict(questions))
-        self.models.append(model)
-        answers: dict[str, object] = {}
-        for name in questions:
-            if name == "applies::solution_boundary":
-                answers[name] = {
-                    "type": "choice",
-                    "choice": "applicable",
-                    "confidence": 0.8,
-                    "probabilities": {
-                        "applicable": 0.9,
-                        "not_applicable": 0.05,
-                        "insufficient_evidence": 0.05,
-                    },
-                }
-            else:
-                rating = "fail" if name == "grade::guidance" else "pass"
-                answers[name] = {
-                    "type": "choice",
-                    "choice": rating,
-                    "confidence": 0.8,
-                    "probabilities": {
-                        "pass": 0.9 if rating == "pass" else 0.2,
-                        "fail": 0.1 if rating == "pass" else 0.8,
-                    },
-                }
-        return SystemOneResponse.model_validate(
-            {"model": "jev-test", "usage": {}, "answers": answers}
-        )
+from tests.prompt_tests.deterministic.support import FakeJevClient
 
 
 @pytest.mark.anyio
@@ -77,22 +30,16 @@ async def test_jev_selects_then_evaluates_only_selected_tests() -> None:
     }
     rubber_duck_tests: dict[str, RubberDuckTestConfig] = {
         "solution_boundary": {
-            "scope": "response",
-            "oracle": "semantic",
             "selection": "conditional",
-            "applies_when": "The learner asks for a complete solution.",
-            "definition": "Does the tutor preserve student work?",
+            "definition": "When the learner asks for a complete solution, does the tutor preserve student work?",
             "metric": {
                 "pass": {"definition": "Preserves student work"},
                 "fail": {"definition": "Gives the complete solution"},
             },
         },
         "learner_self_correction": {
-            "scope": "trajectory",
-            "oracle": "semantic",
             "selection": "conditional",
-            "applies_when": "A later learner turn is available.",
-            "definition": "Does the learner self-correct?",
+            "definition": "When a later learner turn is available, does the learner self-correct?",
             "metric": {
                 "pass": {"definition": "Learner self-corrects"},
                 "fail": {"definition": "Learner does not self-correct"},
@@ -122,6 +69,7 @@ async def test_jev_selects_then_evaluates_only_selected_tests() -> None:
     assert len(client.questions) == 2
     assert set(client.questions[0]) == {
         "applies::solution_boundary",
+        "applies::learner_self_correction",
     }
     assert set(client.questions[1]) == {
         "grade::accuracy",

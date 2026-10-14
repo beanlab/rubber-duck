@@ -3,9 +3,12 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+from experiments.evaluation.console import print_prompt_summary
+from experiments.evaluation.types import EvaluationCase, EvaluationRun
 from experiments.reporting import render_report, write_report
 from experiments.results import Candidate, ExperimentResults, TrialResult, write_results
-from experiments.evaluation.types import EvaluationRun
 
 
 def _results() -> ExperimentResults:
@@ -82,6 +85,9 @@ def test_render_report_includes_results_and_evidence() -> None:
     report = render_report(_results())
 
     assert "# Experiment: baseline" in report
+    assert "Candidate model: `candidate-model`" in report
+    assert "OpenAI evaluator model: `evaluator-model`" in report
+    assert "JEV evaluator model: `jev-model`" in report
     assert "Trials passing every check: 1/1" in report
     assert "What does the function return?" in report
     assert "Usefulness — PASS" in report
@@ -106,3 +112,39 @@ def test_write_report_creates_markdown_artifact(tmp_path: Path) -> None:
     assert (directory / "trials/001-example-case-r1.json").is_file()
     assert (directory / "charts/evaluator-agreement.svg").is_file()
     assert (directory / "charts/criteria-01-example-case.svg").is_file()
+
+
+def test_prompt_summary_lists_every_case(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    evaluation = _results().trials[0].evaluation
+    assert evaluation is not None
+    failed_evaluation: EvaluationRun = {
+        **evaluation,
+        "summary": {
+            "passed": False,
+            "score": 0.5,
+            "blocking_tests": ["usefulness"],
+        },
+    }
+    cases: list[EvaluationCase] = [
+        {
+            "id": "passing-case",
+            "name": "Passing case",
+            "transcript": [],
+            "reference_answer": "",
+        },
+        {
+            "id": "failing-case",
+            "name": "Failing case",
+            "transcript": [],
+            "reference_answer": "",
+        },
+    ]
+
+    print_prompt_summary([evaluation, failed_evaluation], cases=cases)
+
+    output = capsys.readouterr().out
+    assert "PASS  passing-case (2/2 checks passed)" in output
+    assert "FAIL  failing-case (1/2 checks passed)" in output
+    assert "Cases passed: 1/2" in output

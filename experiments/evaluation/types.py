@@ -17,8 +17,6 @@ ApplicabilityOutcome = Literal[
     "not_applicable",
     "insufficient_evidence",
 ]
-EvaluationScope = Literal["response", "action", "trajectory"]
-EvaluationOracle = Literal["semantic", "deterministic"]
 TestSelectionMode = Literal["always", "conditional"]
 TestSuite = Literal["standard", "case", "rubber_duck"]
 TestEvaluator = Literal["openai", "deterministic"]
@@ -97,10 +95,7 @@ class EvaluationTestConfig(TypedDict):
 
 
 class RubberDuckTestConfig(EvaluationTestConfig):
-    scope: EvaluationScope
-    oracle: EvaluationOracle
     selection: TestSelectionMode
-    applies_when: str
 
 
 class EvaluationConfig(TypedDict):
