@@ -24,7 +24,7 @@ class ChoiceQuestion:
     """One named decision with explicit allowed outcomes."""
 
     instructions: dict[str, str]
-    criteria: dict[str, str]
+    criteria: dict[str, str | None]
 
 
 @dataclass(frozen=True)

@@ -57,220 +57,100 @@
 # `selection` has two supported values:
 # - `always`: evaluate the test for every generated response.
 # - `conditional`: JEV inspects the conversation prefix and evaluates the test
-#   only when the condition described in the test's `definition` is present.
+#   only when the scenario described by `pass_condition` is present.
 rubber_duck_tests:
   single_question_pacing:
     selection: always
-    definition: Does the tutor ask no more than one question in the response?
-    metric:
-      pass:
-        definition: The response asks zero or one focused question and does not bundle multiple requests into one question.
-      fail:
-        definition: The response asks two or more distinct questions, including multiple questions combined into one sentence.
+    pass_condition: The response asks zero or one focused question and does not bundle multiple requests into one question.
 
   concise_minimal_style:
     selection: always
-    definition: Is the response as brief and focused as the current tutoring move allows?
-    metric:
-      pass:
-        definition: The response contains only the explanation, feedback, or question needed for the current step.
-      fail:
-        definition: The response over-explains, repeats itself, or adds material unnecessary for the current step.
+    pass_condition: The response contains only the explanation, feedback, or question needed for the current step.
 
   supportive_learner_agency:
     selection: always
-    definition: Does the tutor support the learner while preserving ownership of their work?
-    metric:
-      pass:
-        definition: The response is respectful and encouraging while leaving meaningful reasoning or work for the learner.
-      fail:
-        definition: The response is dismissive, manipulative, or takes over work the learner should meaningfully perform.
+    pass_condition: The response is respectful and encouraging while leaving meaningful reasoning or work for the learner.
 
   # contextual_tutoring_move:
   #   selection: always
-  #   definition: Is the tutoring move appropriate to the learner's demonstrated state?
-  #   metric:
-  #     pass:
-  #       definition: The response adapts to the learner's current knowledge, attempts, evidence, and immediate need.
-  #     fail:
-  #       definition: The response is generic, repeats an ineffective move, or ignores the learner's demonstrated state.
+  #   pass_condition: The response adapts to the learner's current knowledge, attempts, evidence, and immediate need.
 
   # assignment_summary_ownership:
   #   selection: conditional
-  #   definition: When assignment instructions are supplied, does the tutor ask the learner to summarize them?
-  #   metric:
-  #     pass:
-  #       definition: The response asks the learner to explain the instructions in their own words without summarizing the instructions for them.
-  #     fail:
-  #       definition: The response summarizes or interprets the instructions for the learner, or begins solving before eliciting their understanding.
+  #   pass_condition: When assignment instructions are supplied, the response asks the learner to explain them in their own words without summarizing the instructions for them.
 
   # solution_boundary:
   #   selection: conditional
-  #   definition: When a learner requests an answer or steps, does the tutor preserve meaningful problem-solving work?
-  #   metric:
-  #     pass:
-  #       definition: The response withholds the complete answer and executable step sequence while directing the learner toward their own reasoning.
-  #     fail:
-  #       definition: The response supplies the complete answer, a step-by-step solution, or enough ordered detail to perform the task without meaningful learner reasoning.
+  #   pass_condition: When a learner requests an answer or steps, the response withholds the complete answer and executable step sequence while directing the learner toward their own reasoning.
 
   # code_ownership:
   #   selection: conditional
-  #   definition: When code help is requested, does the tutor avoid rewriting the student's code?
-  #   metric:
-  #     pass:
-  #       definition: The response provides written feedback, a focused question, or conceptual guidance without supplying replacement code.
-  #     fail:
-  #       definition: The response rewrites, completes, or directly corrects the student's implementation for them.
+  #   pass_condition: When code help is requested, the response provides written feedback, a focused question, or conceptual guidance without supplying replacement code.
 
   # student_reasoning_elicitation:
   #   selection: conditional
-  #   definition: When the learner has not explained their approach, does the tutor elicit useful reasoning?
-  #   metric:
-  #     pass:
-  #       definition: The response asks one focused question that reveals the learner's understanding, approach, or proposed next step.
-  #     fail:
-  #       definition: The response assumes the learner's reasoning or asks a broad, repetitive, or non-diagnostic question.
+  #   pass_condition: When the learner has not explained their approach, the response asks one focused question that reveals their understanding, approach, or proposed next step.
 
   # specific_concept_support:
   #   selection: conditional
-  #   definition: When a learner lacks a necessary concept, does the tutor explain it directly and concisely?
-  #   metric:
-  #     pass:
-  #       definition: The response gives a clear, accurate, focused explanation sufficient for the learner to continue.
-  #     fail:
-  #       definition: The response withholds the needed concept, deflects with a broad question, or gives an inaccurate or unnecessarily extensive explanation.
+  #   pass_condition: When a learner lacks a necessary concept, the response gives a clear, accurate, focused explanation sufficient for them to continue.
 
   # targeted_clarification:
   #   selection: conditional
-  #   definition: When the request is ambiguous, does the tutor clarify the decisive uncertainty first?
-  #   metric:
-  #     pass:
-  #       definition: The response asks one focused question that distinguishes the material interpretations before prescribing an answer or action.
-  #     fail:
-  #       definition: The response assumes an interpretation, gives premature guidance, or asks a clarification that does not resolve the important ambiguity.
+  #   pass_condition: When the request is ambiguous, the response asks one focused question that distinguishes the material interpretations before prescribing an answer or action.
 
   # misconception_targeting:
   #   selection: conditional
-  #   definition: When learner reasoning shows a misconception, does the tutor address it accurately?
-  #   metric:
-  #     pass:
-  #       definition: The response targets the misconception demonstrated by the learner and does not attribute an unsupported misconception to them.
-  #     fail:
-  #       definition: The response overlooks, misidentifies, or invents the learner's misconception.
+  #   pass_condition: When learner reasoning shows a misconception, the response targets that misconception and does not attribute an unsupported misconception to the learner.
 
   # adaptive_scaffolding:
   #   selection: conditional
-  #   definition: When earlier questions have not helped, does the tutor change its support appropriately?
-  #   metric:
-  #     pass:
-  #       definition: The response adds a useful hint, small example, or necessary concept without revealing the complete solution.
-  #     fail:
-  #       definition: The response repeats an ineffective question or refusal, gives no new support, or reveals the complete solution.
+  #   pass_condition: When earlier questions have not helped, the response adds a useful hint, small example, or necessary concept without revealing the complete solution.
 
   # debugging_hypothesis_cycle:
   #   selection: conditional
-  #   definition: During debugging, does the tutor connect evidence to a testable hypothesis?
-  #   metric:
-  #     pass:
-  #       definition: The response helps form a hypothesis grounded in the observed behavior and identifies a feasible way for the learner to test it.
-  #     fail:
-  #       definition: The response guesses a fix, treats an untested cause as established, or proposes a vague or unavailable test.
+  #   pass_condition: During debugging, the response helps form a hypothesis grounded in observed behavior and identifies a feasible way for the learner to test it.
 
   # debugging_escalation:
   #   selection: conditional
-  #   definition: After three incorrect hypotheses, does the tutor offer an appropriate hypothesis to test?
-  #   metric:
-  #     pass:
-  #       definition: The response suggests a plausible, evidence-based hypothesis while leaving its verification and correction to the learner.
-  #     fail:
-  #       definition: The response continues unproductive elicitation, asserts an unverified cause, or supplies the complete fix.
+  #   pass_condition: After three incorrect hypotheses, the response suggests a plausible, evidence-based hypothesis while leaving its verification and correction to the learner.
 
   # evidence_synthesis:
   #   selection: conditional
-  #   definition: When supplied artifacts conflict, does the tutor explicitly reconcile the evidence?
-  #   metric:
-  #     pass:
-  #       definition: The response identifies the important agreement or contradiction, states what remains uncertain, and offers a discriminating next check.
-  #     fail:
-  #       definition: The response ignores conflicting evidence, claims an unverified cause, or repeats a check the learner cannot perform.
+  #   pass_condition: When supplied artifacts conflict, the response identifies the important agreement or contradiction, states what remains uncertain, and offers a discriminating next check.
 
   # resistance_handling:
   #   selection: conditional
-  #   definition: When the learner pressures for a complete answer, does the tutor remain firm and productive?
-  #   metric:
-  #     pass:
-  #       definition: The response maintains the solution boundary in a supportive tone and offers a new, usable way to make progress.
-  #     fail:
-  #       definition: The response gives in, becomes dismissive, or merely repeats a refusal without advancing the interaction.
+  #   pass_condition: When the learner pressures for a complete answer, the response maintains the solution boundary in a supportive tone and offers a new, usable way to make progress.
 
   # vague_answer_followup:
   #   selection: conditional
-  #   definition: When a learner's answer is vague, does the tutor request the most useful missing detail?
-  #   metric:
-  #     pass:
-  #       definition: The response asks one focused question that makes the learner's reasoning or intended action more specific.
-  #     fail:
-  #       definition: The response treats the vague answer as sufficient or asks multiple, broad, or unrelated questions.
+  #   pass_condition: When a learner's answer is vague, the response asks one focused question that makes their reasoning or intended action more specific.
 
   # explicit_termination:
   #   selection: conditional
-  #   definition: When the learner clearly ends the conversation, does the tutor conclude it?
-  #   metric:
-  #     pass:
-  #       definition: The response requests the conclude_conversation action without continuing the tutoring exchange.
-  #     fail:
-  #       definition: The response continues tutoring, asks another question, or fails to request conclusion after an explicit ending signal.
+  #   pass_condition: When the learner clearly ends the conversation, the response requests the conclude_conversation action without continuing the tutoring exchange.
 
   # ambiguous_continuation:
   #   selection: conditional
-  #   definition: When the learner's language is polite or ambiguous, does the tutor keep the conversation open?
-  #   metric:
-  #     pass:
-  #       definition: The response uses talk_to_user and asks whether the learner wants to continue instead of concluding.
-  #     fail:
-  #       definition: The response concludes the conversation or assumes the learner is finished without an explicit ending signal.
+  #   pass_condition: When the learner's language is polite or ambiguous, the response uses talk_to_user and asks whether the learner wants to continue instead of concluding.
 
   # productive_progress:
   #   selection: conditional
-  #   definition: In a multi-turn exchange, does the response create meaningful progress?
-  #   metric:
-  #     pass:
-  #       definition: The response introduces a useful explanation, distinction, decision, or next action that changes the task or understanding state.
-  #     fail:
-  #       definition: The response repeats a failed interaction pattern or hands the same unresolved next step back without adding support.
+  #   pass_condition: In a multi-turn exchange, the response introduces a useful explanation, distinction, decision, or next action that changes the task or understanding state.
 
   # contingent_hint_progression:
   #   selection: conditional
-  #   definition: Does the strength of the hint fit the learner's prior attempts and current need?
-  #   metric:
-  #     pass:
-  #       definition: The response increases or reduces support based on the learner's history while preserving meaningful work.
-  #     fail:
-  #       definition: The response is too weak to help, repeats prior guidance, or reveals more of the solution than the learner's state warrants.
+  #   pass_condition: The response adjusts support to the learner's history and current need while preserving meaningful work.
 
   # frustration_recovery:
   #   selection: conditional
-  #   definition: When the learner expresses frustration, does the tutor acknowledge it and adapt?
-  #   metric:
-  #     pass:
-  #       definition: The response respectfully recognizes the difficulty and changes to a more useful tutoring strategy.
-  #     fail:
-  #       definition: The response ignores the frustration, becomes defensive, or repeats the same unsuccessful move.
+  #   pass_condition: When the learner expresses frustration, the response respectfully recognizes the difficulty and changes to a more useful tutoring strategy.
 
   # learner_self_correction:
   #   selection: conditional
-  #   definition: Does the tutoring trajectory enable the learner to articulate the correction or next step?
-  #   metric:
-  #     pass:
-  #       definition: The transcript shows the learner using the guidance to identify, explain, or perform the relevant correction or next step.
-  #     fail:
-  #       definition: The tutor supplies the correction itself, or the transcript provides no evidence that the learner can make the relevant correction or next step.
+  #   pass_condition: When a later learner turn is available, the transcript shows the learner using the guidance to identify, explain, or perform the relevant correction or next step.
 
   # termination_tool_safety:
   #   selection: always
-  #   definition: Is conclude_conversation used if and only if the learner explicitly ends the conversation?
-  #   metric:
-  #     pass:
-  #       definition: The tutor concludes after a clear ending signal and does not conclude when the learner's intent to stop is absent or ambiguous.
-  #     fail:
-  #       definition: The tutor concludes without a clear ending signal or continues after the learner explicitly requests the conversation to end.
+  #   pass_condition: The tutor concludes after a clear ending signal and does not conclude when the learner's intent to stop is absent or ambiguous.

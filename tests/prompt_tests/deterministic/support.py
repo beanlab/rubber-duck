@@ -114,11 +114,11 @@ class FakeOpenAIClient:
                 "results": [
                     {
                         "name": test["name"],
-                        "rating": self.ratings[test["name"]],
                         "evidence": ["What output does the assignment require?"],
                         "rationale": (
                             f"Deterministic rationale for {test['name']}."
                         ),
+                        "rating": self.ratings[test["name"]],
                     }
                     for test in evaluator_input["tests"]
                 ]

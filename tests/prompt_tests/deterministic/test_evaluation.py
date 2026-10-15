@@ -2,7 +2,7 @@
 
 The fake client verifies conversation-history conversion, one-response
 generation, combined evaluation, evaluator input boundaries, prompt selection,
-configured metrics, and deterministic summaries. It does not test
+configured pass conditions, and deterministic summaries. It does not test
 whether a real evaluator's tutoring-quality judgments are valid.
 """
 
@@ -24,6 +24,7 @@ from experiments.evaluation.console import print_prompt_summary
 from experiments.evaluation.types import (
     CombinedEvaluationResult,
     EvaluatorRequest,
+    NamedEvaluationResult,
     RubberDuckTestConfig,
     TranscriptTurn,
 )
@@ -31,6 +32,15 @@ from tests.prompt_tests.deterministic.support import FakeOpenAIClient
 
 
 PROMPT_CONFIG_DIRECTORY = Path(__file__).resolve().parents[1] / "configs"
+
+
+def test_openai_evaluator_reasons_before_returning_its_verdict() -> None:
+    assert list(NamedEvaluationResult.model_fields) == [
+        "name",
+        "evidence",
+        "rationale",
+        "rating",
+    ]
 
 
 def test_generates_once_and_runs_each_configured_test(
@@ -51,8 +61,7 @@ def test_generates_once_and_runs_each_configured_test(
     }
     config["case_tests"] = {
         "case_actionability": {
-            **configured_tests["usefulness"],
-            "evaluator_prompt": "Evaluate actionability only.",
+            "pass_condition": "The response gives the learner a feasible, specific next step.",
         },
     }
     client = FakeOpenAIClient()
@@ -76,11 +85,7 @@ def test_generates_once_and_runs_each_configured_test(
     rubber_duck_tests: dict[str, RubberDuckTestConfig] = {
         "concise_response": {
             "selection": "always",
-            "definition": "Is the response concise?",
-            "metric": {
-                "pass": {"definition": "Concise"},
-                "fail": {"definition": "Verbose"},
-            },
+            "pass_condition": "The response is concise.",
         },
     }
 
@@ -144,10 +149,15 @@ def test_generates_once_and_runs_each_configured_test(
     assert evaluator_input["candidate_response"] == result["transcript"][-1]
     assert evaluator_input["candidate_action"] == "talk_to_user"
     assert evaluator_input.get("reference_answer") == config.get("reference_answer")
+    assert all(
+        set(test) == {"name", "pass_condition"}
+        for test in evaluator_input["tests"]
+    )
     assert {
-        test["name"]: test["definition"] for test in evaluator_input["tests"]
+        test["name"]: test["pass_condition"] for test in evaluator_input["tests"]
     } == {
-        name: test["definition"] for name, test in configured_tests.items()
+        name: test["pass_condition"]
+        for name, test in configured_tests.items()
     }
     assert call.text_format is CombinedEvaluationResult
 

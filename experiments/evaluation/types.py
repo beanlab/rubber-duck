@@ -2,7 +2,7 @@
 
 from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired, Protocol, TypedDict
 
 from experiments.evaluation.completion import (
@@ -27,20 +27,21 @@ ResponseAction = Literal[
 ]
 
 
-class EvaluationResult(BaseModel):
-    """Structured result returned by every configured evaluation test."""
+class NamedEvaluationResult(BaseModel):
+    """One reasoned result in a combined evaluator response."""
 
     model_config = ConfigDict(extra="forbid")
 
-    rating: TestOutcome
-    evidence: list[str]
-    rationale: str
-
-
-class NamedEvaluationResult(EvaluationResult):
-    """One named result in a combined evaluator response."""
-
-    name: str
+    name: str = Field(description="The exact supplied test name.")
+    evidence: list[str] = Field(
+        description="Short, exact excerpts considered before reaching a verdict."
+    )
+    rationale: str = Field(
+        description="Reasoning that applies the pass condition to the evidence."
+    )
+    rating: TestOutcome = Field(
+        description="The final pass/fail verdict, selected after the analysis."
+    )
 
 
 class CombinedEvaluationResult(BaseModel):
@@ -84,14 +85,8 @@ class TranscriptTurn(TypedDict):
     message: str
 
 
-class MetricLevel(TypedDict):
-    definition: str
-
-
 class EvaluationTestConfig(TypedDict):
-    definition: str
-    metric: dict[str, MetricLevel]
-    evaluator_prompt: NotRequired[str]
+    pass_condition: str
 
 
 class RubberDuckTestConfig(EvaluationTestConfig):
@@ -134,9 +129,7 @@ class EvaluatorContext(TypedDict):
 
 class EvaluatorTestPrompt(TypedDict):
     name: str
-    definition: str
-    metric: dict[str, str]
-    rules: str
+    pass_condition: str
 
 
 class EvaluatorRequest(EvaluatorContext):

@@ -128,15 +128,8 @@ def _evaluation_tests(
         )
     tests = {**standard_tests, **case_tests}
     for name, test in tests.items():
-        if not test.get("definition") or not test.get("metric"):
-            raise ValueError(f"Evaluation test {name!r} needs a definition and metric")
-        if not test.get("evaluator_prompt") and not config.get("evaluator_prompt"):
-            raise ValueError(f"Evaluation test {name!r} needs an evaluator prompt")
-        if set(test["metric"]) != {"pass", "fail"}:
-            raise ValueError(f"Evaluation test {name!r} needs pass and fail metrics")
-        for rating, level in test["metric"].items():
-            if not level.get("definition"):
-                raise ValueError(f"Metric rating {name}.{rating} needs a definition")
+        if not test.get("pass_condition"):
+            raise ValueError(f"Evaluation test {name!r} needs a pass condition")
     return tests
 
 
@@ -188,12 +181,7 @@ def build_evaluator_request(
         "tests": [
             {
                 "name": name,
-                "definition": test["definition"],
-                "metric": {
-                    rating: level["definition"]
-                    for rating, level in test["metric"].items()
-                },
-                "rules": test.get("evaluator_prompt", "Apply the metric exactly."),
+                "pass_condition": test["pass_condition"],
             }
             for name, test in tests.items()
         ],
@@ -253,7 +241,7 @@ async def _evaluate_tests(
 
 
 def summarize_evaluation(tests: dict[str, TestResult]) -> EvaluationSummary:
-    """Calculate deterministic case-level outcomes from configured metrics."""
+    """Calculate deterministic case-level outcomes from evaluator ratings."""
     return _summarize_ratings(
         {name: result["rating"] for name, result in tests.items()}
     )

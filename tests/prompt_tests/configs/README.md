@@ -13,21 +13,18 @@ criteria, and cases used by live prompt tests and repeated experiments.
 | `evaluator_prompt` | yes | Instructions shared by the OpenAI and JEV evaluators | — |
 | `use_reference_answer` | no | Boolean controlling whether case reference answers are shown to evaluators | `true` |
 
-Every entry under `standard_tests` has this shape:
+Every entry under `standard_tests` has one field:
 
 ```yaml
 criterion_name:
-  definition: The question the evaluator should answer.
-  evaluator_prompt: Optional criterion-specific instructions.
-  metric:
-    pass:
-      definition: A precise passing condition.
-    fail:
-      definition: A precise failing condition.
+  pass_condition: A precise description of the acceptable response.
 ```
 
-`evaluator_prompt` on an individual criterion is optional and supplements the
-shared evaluator instructions.
+The OpenAI evaluator returns each result in `name`, `evidence`, `rationale`,
+`rating` order so that it analyzes the response before committing to the final
+pass/fail verdict. Both OpenAI and JEV receive the same `pass_condition` and
+apply the same rule: pass when the response satisfies it, and fail otherwise.
+JEV returns a choice, confidence, and probabilities rather than a rationale.
 
 ## `cases.yaml`
 
@@ -52,13 +49,10 @@ criteria. Every criterion has:
 | Field | Required | Accepted value |
 |---|---|---|
 | `selection` | yes | `always` or `conditional` |
-| `definition` | yes | The question the evaluator should answer |
-| `metric.pass.definition` | yes | A precise passing condition |
-| `metric.fail.definition` | yes | A precise failing condition |
-| `evaluator_prompt` | no | Criterion-specific evaluator instructions |
+| `pass_condition` | yes | A precise description of the acceptable response |
 
 `always` evaluates the criterion for every response. `conditional` asks JEV to
-inspect the conversation prefix first; its `definition` must state the condition
-that makes the criterion applicable.
+inspect the conversation prefix first; its `pass_condition` must state the
+scenario that makes the criterion applicable.
 
 All enabled Rubber Duck criteria are evaluated by OpenAI and JEV.
