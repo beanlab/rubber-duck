@@ -1,206 +1,339 @@
-name: Build, Push, and Deploy to AWS Infrastructure
+name: Build, provision, and deploy production
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      local_config:
-        description: "Path to local config file to upload"
-        required: false
-        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: rubber-duck-production
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: "844825014198"
+  AWS_REGION: us-west-2
+  AWS_ROLE_ARN: arn:aws:iam::844825014198:role/rubber-duck-github-deploy
+  ECR_REPOSITORY: beanlab/rubber-duck
+  ECR_REGISTRY: 844825014198.dkr.ecr.us-west-2.amazonaws.com
+  TF_VERSION: "1.15.8"
 
 jobs:
-  Extract_SHA:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
-      Short_SHA: ${{ steps.Extract_SHA.outputs.Short_SHA }}
-      Extract_Branch: ${{ steps.Extract_Branch.outputs.Branch_Name }}
-      Combined: ${{ steps.Short_SHA_and_Branch_Name.outputs.Combined }}
-      Commit_Message: ${{ steps.Extract_Commit_Message.outputs.Commit_Message }}
+      branch: ${{ steps.prepare.outputs.branch }}
+      environment: ${{ steps.prepare.outputs.environment }}
+      commit_sha: ${{ steps.prepare.outputs.commit_sha }}
+      image_tag: ${{ steps.prepare.outputs.image_tag }}
+      image_uri: ${{ steps.prepare.outputs.image_uri }}
+      state_key: ${{ steps.prepare.outputs.state_key }}
+      configuration_uri: ${{ steps.prepare.outputs.configuration_uri }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Extract branch name
-        id: Extract_Branch
+      - name: Validate explicit branch mapping
+        id: prepare
+        shell: bash
         run: |
-          BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' | tr -cd '[:alnum:]-')
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
-          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          set -Eeuo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/master" ]] || {
+            echo "Only refs/heads/master can deploy" >&2
+            exit 1
+          }
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "A full Git commit SHA is required" >&2
+            exit 1
+          }
+          environment=production
+          image_tag="$environment-$GITHUB_SHA"
+          image_uri="$ECR_REGISTRY/$ECR_REPOSITORY:$image_tag"
+          {
+            echo "branch=master"
+            echo "environment=$environment"
+            echo "commit_sha=$GITHUB_SHA"
+            echo "image_tag=$image_tag"
+            echo "image_uri=$image_uri"
+            echo "state_key=rubber-duck/environments/$environment/terraform.tfstate"
+            echo "configuration_uri=s3://rubber-duck-config/environments/$environment/config.yaml"
+          } >>"$GITHUB_OUTPUT"
 
-      - name: Extract short SHA
-        id: Extract_SHA
-        run: |
-          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-5)
-          echo "SHORT_SHA=${SHORT_SHA}" >> $GITHUB_ENV
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Extract Commit Message
-        id: Extract_Commit_Message
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          # Escape newlines and quotes for JSON
-          COMMIT_MSG=$(echo "$COMMIT_MSG" | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
-          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-
-      - name: Combine short SHA and Branch Name
-        id: Short_SHA_and_Branch_Name
-        run: |
-          COMBINED="${BRANCH_NAME}-${SHORT_SHA}"
-          echo "COMBINED=${COMBINED}" >> $GITHUB_ENV
-          echo "combined=${COMBINED}" >> $GITHUB_OUTPUT
-
-  Docker_Build_and_Push:
+  build:
     runs-on: ubuntu-latest
-    environment: pre-production
-    needs: Extract_SHA
+    needs: prepare
     outputs:
-      docker_image_tag: ${{ steps.set_outputs.outputs.docker_image_tag }}
+      image_digest: ${{ steps.digest.outputs.image_digest }}
+      image_digest_uri: ${{ steps.digest.outputs.image_digest_uri }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Run Docker build script
-        run: bash .github/scripts/build_docker.sh
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - uses: actions/checkout@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          ref: ${{ needs.prepare.outputs.commit_sha }}
 
-      - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck
-
-      - name: Tag and Push Docker Image
-        id: set_outputs
-        run: |
-          IMAGE_TAG="${{ needs.Extract_SHA.outputs.combined }}"
-          echo "Tagging image as: $IMAGE_TAG"
-
-          docker tag 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:latest \
-            844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-
-          docker push 844825014198.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/beanlab/rubber-duck:$IMAGE_TAG
-
-          # ✅ Set the output for use in other jobs
-          echo "docker_image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-      - name: Complete Docker push
-        run: echo "Docker image pushed to ECR with tag ${{ needs.Extract_SHA.outputs.combined }}!"
-
-  Notify_Discord_of_Docker_Build_and_Push:
-    runs-on: ubuntu-latest
-    needs: [Extract_SHA, Docker_Build_and_Push]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Send SHA to Discord Webhook
-        run: |
-          COMBINED="${{ needs.Extract_SHA.outputs.combined }}"
-          COMMIT_MSG="${{ needs.Extract_SHA.outputs.Commit_Message }}"
-          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-
-          MESSAGE="✅ Docker Build Updated!\n**Commit Message:**\n$COMMIT_MSG\n**Image Tag:**\n\`\`\`md\n$COMBINED\n\`\`\` "
-          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
-
-  Update_Env_File:
-    runs-on: ubuntu-latest
-    environment: pre-production
-    needs:
-      [
-        Docker_Build_and_Push,
-        Extract_SHA,
-        Notify_Discord_of_Docker_Build_and_Push,
-      ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create secrets file
+      - name: Verify AWS identity
+        shell: bash
         run: |
-          cat > secrets.env << EOL
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          DB_HOST=${{ secrets.DB_HOST }}
-          DB_PORT=${{ secrets.DB_PORT }}
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          ENVIRONMENT=pre-production
-          CONFIG_FILE_S3_PATH=${{ secrets.S3_BUCKET_PRODUCTION_CONFIG_DIRECTORY }}production-config-${{ needs.Extract_SHA.outputs.short_sha }}.yaml
-          EOL
+          set -Eeuo pipefail
+          [[ "$(aws sts get-caller-identity --query Account --output text)" == "$AWS_ACCOUNT_ID" ]]
 
-      - name: Upload secrets to S3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push exact source image
+        env:
+          COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
+          ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+        shell: bash
         run: |
-          SHORT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
-          DEST_FILE="production-secrets-${SHORT_SHA}.env"
-          cp secrets.env "$DEST_FILE"
-          S3_DEST_PATH="${{ secrets.S3_BUCKET_PRODUCTION_SECRETS_DIRECTORY }}production-secrets-${SHORT_SHA}.env"
-          bash .github/scripts/upload-file-s3.sh "$DEST_FILE" "$S3_DEST_PATH"
+          set -Eeuo pipefail
+          created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          repository_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          docker buildx build \
+            --pull \
+            --label "org.opencontainers.image.revision=$COMMIT_SHA" \
+            --label "org.opencontainers.image.source=$repository_url" \
+            --label "org.opencontainers.image.created=$created" \
+            --label "org.opencontainers.image.ref.name=$ENVIRONMENT" \
+            --label "com.byubean.rubber-duck.environment=$ENVIRONMENT" \
+            --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            --push \
+            .
 
-      - name: Send notification to Discord
+      - name: Resolve pushed digest
+        id: digest
+        env:
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+        shell: bash
         run: |
-          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
+          set -Eeuo pipefail
+          digest=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$IMAGE_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "image_digest=$digest" >>"$GITHUB_OUTPUT"
+          echo "image_digest_uri=$ECR_REGISTRY/$ECR_REPOSITORY@$digest" >>"$GITHUB_OUTPUT"
 
-          MESSAGE="✅ Environment File Updated. Commit: \`$COMMIT_SHA\`"
-          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
-
-  Update_Production_Config:
+  provision:
     runs-on: ubuntu-latest
-    needs:
-      [
-        Docker_Build_and_Push,
-        Extract_SHA,
-        Notify_Discord_of_Docker_Build_and_Push,
-      ]
+    needs: [prepare, build]
+    outputs:
+      instance_id: ${{ steps.outputs.outputs.instance_id }}
+      ami_id: ${{ steps.outputs.outputs.ami_id }}
+      volume_id: ${{ steps.outputs.outputs.volume_id }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - uses: actions/checkout@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          ref: ${{ needs.prepare.outputs.commit_sha }}
 
-      - name: Upload Production Config
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity and initialize Terraform
+        working-directory: aws/terraform/environment
+        env:
+          STATE_KEY: ${{ needs.prepare.outputs.state_key }}
+        shell: bash
         run: |
-          SHORT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
-          SRC_PATH="${{ secrets.S3_LOCAL_PRODUCTION_CONFIG_PATH_YAML }}"
-          DEST_FILE="production-config-${SHORT_SHA}.yaml"
-          cp "$SRC_PATH" "$DEST_FILE"
-          S3_DEST_PATH="${{ secrets.S3_BUCKET_PRODUCTION_CONFIG_DIRECTORY }}production-config-${SHORT_SHA}.yaml"
-          bash .github/scripts/upload-file-s3.sh "$DEST_FILE" "$S3_DEST_PATH"
+          set -Eeuo pipefail
+          [[ "$(aws sts get-caller-identity --query Account --output text)" == "$AWS_ACCOUNT_ID" ]]
+          terraform fmt -check -recursive
+          terraform init -input=false \
+            -backend-config="bucket=rubber-duck-terraform-state-$AWS_ACCOUNT_ID" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config=use_lockfile=true \
+            -backend-config=encrypt=true
+          terraform validate
 
-      - name: Send notification to Discord
+      - name: Plan and apply production
+        working-directory: aws/terraform/environment
+        shell: bash
         run: |
-          DISCORD_WEBHOOK_URL="${{ secrets.DISCORD_WEBHOOK_URL }}"
-          COMMIT_SHA="${{ needs.Extract_SHA.outputs.short_sha }}"
+          set -Eeuo pipefail
+          terraform plan -input=false -var-file=environments/production.tfvars -out=production.tfplan
+          terraform apply -input=false -auto-approve production.tfplan
 
-          MESSAGE="✅ Production Config Updated. Commit: \`$COMMIT_SHA\`"
-          ESCAPED_MESSAGE=$(echo "$MESSAGE" | sed 's/"/\\"/g')
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$ESCAPED_MESSAGE\"}" "$DISCORD_WEBHOOK_URL"
+      - name: Export environment outputs
+        id: outputs
+        working-directory: aws/terraform/environment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "instance_id=$(terraform output -raw instance_id)" >>"$GITHUB_OUTPUT"
+          echo "ami_id=$(terraform output -raw ami_id)" >>"$GITHUB_OUTPUT"
+          echo "volume_id=$(terraform output -raw volume_id)" >>"$GITHUB_OUTPUT"
+
+  maintain:
+    runs-on: ubuntu-latest
+    needs: [prepare, provision]
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Wait for bootstrap and update host
+        env:
+          INSTANCE_ID: ${{ needs.provision.outputs.instance_id }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          wait_for_ssm() {
+            for _ in $(seq 1 120); do
+              status=$(aws ssm describe-instance-information \
+                --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                --query 'InstanceInformationList[0].PingStatus' \
+                --output text 2>/dev/null || true)
+              [[ "$status" == Online ]] && return 0
+              sleep 5
+            done
+            echo "timed out waiting for SSM" >&2
+            return 1
+          }
+
+          run_ssm() {
+            local command=$1 polls=${2:-180} command_id status output
+            command_id=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name AWS-RunShellScript \
+              --parameters "$(jq -cn --arg command "$command" '{commands:[$command]}')" \
+              --query 'Command.CommandId' \
+              --output text)
+            for _ in $(seq 1 "$polls"); do
+              status=$(aws ssm get-command-invocation \
+                --command-id "$command_id" \
+                --instance-id "$INSTANCE_ID" \
+                --query Status \
+                --output text 2>/dev/null || true)
+              case "$status" in
+                Success)
+                  aws ssm get-command-invocation \
+                    --command-id "$command_id" \
+                    --instance-id "$INSTANCE_ID" \
+                    --query StandardOutputContent \
+                    --output text
+                  return 0
+                  ;;
+                Failed|Cancelled|TimedOut|Undeliverable|Terminated)
+                  aws ssm get-command-invocation \
+                    --command-id "$command_id" \
+                    --instance-id "$INSTANCE_ID" \
+                    --output json >&2
+                  return 1
+                  ;;
+              esac
+              sleep 5
+            done
+            echo "SSM command timed out: $command_id" >&2
+            return 1
+          }
+
+          wait_for_ssm
+          run_ssm 'cloud-init status --wait >/dev/null && test -f /var/lib/rubber-duck-bootstrap/complete'
+          update_output=$(run_ssm 'sudo /usr/local/sbin/update-host.sh')
+          printf '%s\n' "$update_output"
+          [[ "$update_output" == reboot-required=true || "$update_output" == reboot-required=false ]]
+
+          if [[ "$update_output" == reboot-required=true ]]; then
+            previous_boot_id=$(run_ssm 'cat /proc/sys/kernel/random/boot_id')
+            run_ssm "sudo systemd-run --on-active=5s --unit=rubber-duck-reboot systemctl reboot"
+            sleep 15
+            reboot_complete=false
+            for _ in $(seq 1 120); do
+              status=$(aws ssm describe-instance-information \
+                --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+                --query 'InstanceInformationList[0].PingStatus' \
+                --output text 2>/dev/null || true)
+              if [[ "$status" == Online ]]; then
+                current_boot_id=$(run_ssm 'cat /proc/sys/kernel/random/boot_id' 12 2>/dev/null || true)
+                if [[ -n "$current_boot_id" && "$current_boot_id" != "$previous_boot_id" ]]; then
+                  reboot_complete=true
+                  break
+                fi
+              fi
+              sleep 5
+            done
+            [[ "$reboot_complete" == true ]] || {
+              echo "timed out waiting for SSM after reboot" >&2
+              exit 1
+            }
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [prepare, build, provision, maintain]
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy digest through SSM
+        env:
+          INSTANCE_ID: ${{ needs.provision.outputs.instance_id }}
+          AMI_ID: ${{ needs.provision.outputs.ami_id }}
+          COMMIT_SHA: ${{ needs.prepare.outputs.commit_sha }}
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+          IMAGE_DIGEST: ${{ needs.build.outputs.image_digest }}
+          IMAGE_DIGEST_URI: ${{ needs.build.outputs.image_digest_uri }}
+          ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+          BRANCH: ${{ needs.prepare.outputs.branch }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          printf -v command 'sudo /usr/local/sbin/deploy-container.sh %q %q %q' \
+            "$IMAGE_DIGEST_URI" "$COMMIT_SHA" "$IMAGE_TAG"
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters "$(jq -cn --arg command "$command" '{commands:[$command]}')" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          for _ in $(seq 1 180); do
+            status=$(aws ssm get-command-invocation \
+              --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" \
+              --query Status \
+              --output text 2>/dev/null || true)
+            case "$status" in
+              Success)
+                aws ssm get-command-invocation \
+                  --command-id "$command_id" \
+                  --instance-id "$INSTANCE_ID" \
+                  --query StandardOutputContent \
+                  --output text
+                printf 'deployment-result=success environment=%s branch=%s commit=%s tag=%s digest=%s ami=%s instance=%s\n' \
+                  "$ENVIRONMENT" "$BRANCH" "$COMMIT_SHA" "$IMAGE_TAG" "$IMAGE_DIGEST" "$AMI_ID" "$INSTANCE_ID"
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|Undeliverable|Terminated)
+                aws ssm get-command-invocation \
+                  --command-id "$command_id" \
+                  --instance-id "$INSTANCE_ID" \
+                  --output json >&2
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+          echo "deployment SSM command timed out: $command_id" >&2
+          exit 1

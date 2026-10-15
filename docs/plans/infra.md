@@ -114,6 +114,6 @@ Before any AWS mutation:
 - run `terraform fmt -check` on both roots
 - run offline `terraform init -backend=false` and `terraform validate` for both roots
 - parse/check the GitHub workflow and Docker build configuration with available local tools
-- inspect `git diff --check` and confirm the old instance ID is not referenced by automation
+- inspect `git diff --check` and confirm the old instance ID is referenced only by an explicit IAM deny safeguard, never as an automation target
 
 AWS creation and deployment happen only after repository changes and Terraform plans are reviewed. Acceptance will verify the new instance, SSM, no-ingress networking, digest-pinned container, instance-role credentials, empty persistent data volume, and replacement behavior without changing or stopping the old instance.

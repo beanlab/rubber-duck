@@ -27,5 +27,10 @@ nic2.yaml
 
 *.db
 *.env
+*.tfplan
+*.tfstate
+*.tfstate.*
+.terraform/
+runtime-secrets*.json
 .codex
 .agents/scratch/
