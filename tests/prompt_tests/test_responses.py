@@ -68,9 +68,8 @@ async def test_prompt_response(
     """Generate one response and apply every configured evaluation test."""
     load_dotenv()
     if not os.getenv("OPENAI_API_KEY") or not os.getenv("JEV_API_KEY"):
-        pytest.fail(
-            "OPENAI_API_KEY and JEV_API_KEY are required for prompt evaluations.",
-            pytrace=False,
+        pytest.skip(
+            "OPENAI_API_KEY and JEV_API_KEY are required for live prompt evaluations."
         )
 
     config = case_configuration(SUITE.config, case)

@@ -7,7 +7,8 @@ Discord end-to-end tests.
 
 Prompt tests use the normal pytest infrastructure. Offline framework tests are
 under `tests/prompt_tests/deterministic/`; live model-backed tests are marked
-`prompt_eval` and skipped unless explicitly enabled.
+`prompt_eval`. They run when both required API keys are available and otherwise
+skip with a clear reason.
 
 Run the offline prompt-test coverage with:
 
@@ -19,7 +20,6 @@ Run the live, paid prompt evaluations with:
 
 ```bash
 poetry run pytest \
-  --run-prompt-evals \
   -m prompt_eval \
   -s \
   tests/prompt_tests/test_responses.py
