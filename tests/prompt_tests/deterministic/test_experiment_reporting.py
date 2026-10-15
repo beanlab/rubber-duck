@@ -7,7 +7,11 @@ import pytest
 
 from experiments.evaluation.console import print_prompt_summary
 from experiments.evaluation.types import EvaluationCase, EvaluationRun
-from experiments.utils.report import render_report, write_report
+from experiments.utils.report import (
+    concise_console_summary,
+    render_report,
+    write_report,
+)
 from experiments.utils.results import (
     Candidate,
     ExperimentResults,
@@ -94,6 +98,21 @@ def test_render_report_includes_results_and_evidence() -> None:
     assert "<summary>Repetition 1 — PASS</summary>" in report
     assert "## Candidate prompt" not in report
     assert "JEV probabilities" not in report
+
+
+def test_concise_console_summary_omits_trial_details() -> None:
+    summary = concise_console_summary(_results())
+
+    assert summary == [
+        "Experiment complete",
+        "  Trials completed:             1/1",
+        "  Trials passing all criteria:  1/1",
+        "  OpenAI ratings passed:        1/1 (100%)",
+        "  JEV ratings passed:           1/1 (100%)",
+        "  Evaluator agreement:          1/1 (100%)",
+        "  By scenario:",
+        "    example-case: 1/1 trials passed",
+    ]
 
 
 def test_write_report_creates_markdown_artifact(tmp_path: Path) -> None:

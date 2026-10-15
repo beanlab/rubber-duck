@@ -24,7 +24,7 @@ from experiments.utils.results import (
     source_commit,
     write_results,
 )
-from experiments.utils.report import write_report
+from experiments.utils.report import concise_console_summary, write_report
 from src.armory.armory import Armory
 from src.armory.talk_tool import TalkTool
 from src.gen_ai.build import build_agent
@@ -35,10 +35,8 @@ from experiments.evaluation.config import (
     load_evaluation_suite,
 )
 from experiments.evaluation.engine import evaluate_next_response
-from experiments.evaluation.console import print_case_evaluation
 from experiments.evaluation.selection import CriterionDecisionEvaluator
-from experiments.evaluation.types import EvaluationCase
-from experiments.evaluation.types import EvaluationConfig
+from experiments.evaluation.types import EvaluationCase, EvaluationConfig, EvaluationRun
 from src.gen_ai.gen_ai import Agent
 
 
@@ -101,10 +99,20 @@ async def run_experiment(
         )
     )
     trials: list[TrialResult] = []
+    total_trials = len(cases) * specification.repetitions
+
+    print(f"Experiment: {specification.name}", flush=True)
+    print(f"Running {total_trials} trials\n", flush=True)
 
     async with AsyncOpenAI(api_key=openai_key) as client:
         for case in cases:
             for repetition in range(1, specification.repetitions + 1):
+                trial_number = len(trials) + 1
+                print(
+                    f"[{trial_number}/{total_trials}] START {case['id']} — "
+                    f"repetition {repetition}",
+                    flush=True,
+                )
                 started = time.perf_counter()
                 evaluation = None
                 error = None
@@ -118,22 +126,28 @@ async def run_experiment(
                         jev_evaluator=selector,
                         rubber_duck_tests=suite.rubber_duck_tests,
                     )
-                    print_case_evaluation(case, evaluation)
                 except Exception as exception:
                     error = TrialError(
                         type=exception.__class__.__name__,
                         message=str(exception),
                     )
-                    print(f"\n{case['id']} repetition {repetition}: ERROR {error.message}")
+                duration_seconds = time.perf_counter() - started
                 trials.append(
                     TrialResult(
                         case_id=case["id"],
                         case_name=case["name"],
                         repetition=repetition,
-                        duration_seconds=time.perf_counter() - started,
+                        duration_seconds=duration_seconds,
                         evaluation=evaluation,
                         error=error,
                     )
+                )
+                print(
+                    f"[{trial_number}/{total_trials}] DONE {case['id']} — "
+                    f"repetition {repetition} — "
+                    f"{_trial_console_result(evaluation, error)} — "
+                    f"{duration_seconds:.1f}s",
+                    flush=True,
                 )
 
     results = ExperimentResults(
@@ -152,9 +166,26 @@ async def run_experiment(
     )
     result_path = write_results(_output_directory(specification), results)
     report_path = write_report(result_path.parent, results)
-    print(f"\nJSON results: {result_path}")
-    print(f"Markdown report: {report_path}")
+    print()
+    for line in concise_console_summary(results):
+        print(line)
+    print(f"  Readable report: {report_path}")
+    print(f"  Complete results: {result_path}")
     return results, result_path
+
+
+def _trial_console_result(
+    evaluation: EvaluationRun | None,
+    error: TrialError | None,
+) -> str:
+    if error is not None:
+        return f"ERROR ({error.type})"
+    if evaluation is None:
+        return "INCOMPLETE"
+    if evaluation["summary"]["passed"]:
+        return "PASS"
+    failed = ", ".join(evaluation["summary"]["blocking_tests"])
+    return f"FAIL ({failed})"
 
 
 def _select_cases(

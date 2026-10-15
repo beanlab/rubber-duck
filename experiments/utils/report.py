@@ -24,6 +24,44 @@ def write_report(directory: Path, results: ExperimentResults) -> Path:
     return path
 
 
+def concise_console_summary(results: ExperimentResults) -> list[str]:
+    """Return the compact summary shown after an interactive experiment run."""
+    summary = build_summary(results)
+    lines = [
+        "Experiment complete",
+        _console_measure("Trials completed", f"{summary.completed}/{summary.trials}"),
+        _console_measure(
+            "Trials passing all criteria",
+            f"{summary.fully_passed}/{summary.trials}",
+        ),
+        _console_measure(
+            "OpenAI ratings passed",
+            _fraction(summary.openai_passed, summary.openai_total),
+        ),
+        _console_measure(
+            "JEV ratings passed",
+            _fraction(summary.jev_passed, summary.jev_total),
+        ),
+        _console_measure(
+            "Evaluator agreement",
+            _fraction(summary.agreement, summary.agreement_total),
+        ),
+    ]
+    if summary.errors:
+        lines.append(_console_measure("Trial errors", str(summary.errors)))
+    lines.append("  By scenario:")
+    lines.extend(
+        f"    {scenario.case_id}: {scenario.fully_passed}/{scenario.trials} "
+        "trials passed"
+        for scenario in summary.scenarios
+    )
+    return lines
+
+
+def _console_measure(label: str, value: str) -> str:
+    return f"  {label + ':':<30}{value}"
+
+
 def render_report(
     results: ExperimentResults,
     summary: ExperimentSummary | None = None,

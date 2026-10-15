@@ -16,7 +16,9 @@ rejected.
 | `output_directory` | no | Output path, relative to the repository root or absolute | Timestamped directory under `experiments/results/` |
 
 Case IDs are defined in `tests/prompt_tests/configs/cases.yaml`. Unknown IDs are
-rejected before an experiment starts.
+rejected before an experiment starts. Evaluation criteria are also loaded from
+`tests/prompt_tests/configs/`; experiment specifications select cases and models
+but do not redefine their `pass_condition` values.
 
 ## Complete example
 

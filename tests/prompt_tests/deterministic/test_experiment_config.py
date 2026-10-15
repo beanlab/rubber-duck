@@ -4,8 +4,13 @@ from pathlib import Path
 
 from experiments.config import ExperimentModels, ExperimentSpecification
 from experiments.config import load_experiment_specification
-from experiments.evaluation.config import load_evaluation_suite
-from experiments.runner import ROOT, _configure_models, _specification_path
+from experiments.evaluation.config import case_configuration, load_evaluation_suite
+from experiments.runner import (
+    ROOT,
+    _configure_models,
+    _select_cases,
+    _specification_path,
+)
 from src.gen_ai.build import build_agent
 from src.gen_ai.gen_ai import Agent
 from src.utils.config_loader import load_configuration
@@ -74,3 +79,29 @@ def test_experiment_models_override_pytest_defaults() -> None:
     assert configured_evaluation["evaluator_model"] == "evaluator-override"
     assert configured_evaluation["jev_model"] == "jev-override"
     assert jev_model == "jev-override"
+
+
+def test_every_experiment_resolves_pass_condition_criteria() -> None:
+    suite = load_evaluation_suite(ROOT / "tests/prompt_tests/configs")
+
+    for path in sorted((ROOT / "experiments/configs").glob("*.yaml")):
+        specification = load_experiment_specification(path)
+        cases = _select_cases(
+            suite.cases,
+            None if specification.cases == "all" else specification.cases,
+        )
+        for case in cases:
+            resolved = case_configuration(suite.config, case)
+            assert all(
+                set(test) == {"pass_condition"}
+                for test in resolved["standard_tests"].values()
+            )
+            assert all(
+                set(test) == {"pass_condition"}
+                for test in resolved.get("case_tests", {}).values()
+            )
+
+    assert all(
+        set(test) == {"selection", "pass_condition"}
+        for test in suite.rubber_duck_tests.values()
+    )
