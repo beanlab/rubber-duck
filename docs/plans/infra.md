@@ -17,6 +17,43 @@ The replacement will use:
 
 No implementation or validation step will mutate the current instance `i-0e82640083109edf2`. The new data volume starts empty; database migration and old-host shutdown are deferred to manual cutover.
 
+## Current status
+
+Repository implementation is complete on the `infra` branch and committed through `a13cf67` (`Automate production EC2 deployment`). No AWS resources have been created or changed by this implementation work, and the legacy production instance remains untouched.
+
+Completed:
+
+- documented the production deployment contract
+- changed SES setup to use boto3's ambient credential chain and added focused tests
+- added the committed Docker build and ignore files
+- added bootstrap and production-environment Terraform roots with provider lock files
+- added bootstrap, host-update, container-deployment, and health-check scripts
+- rewrote the GitHub Actions workflow for the explicit `master -> production` path
+- updated deployment, rollback, diagnostics, security-boundary, and manual-cutover documentation
+- added explicit IAM denies protecting the legacy instance, security group, and root volume
+
+Validated locally:
+
+- both Terraform roots pass formatting and `terraform validate`
+- all shell scripts pass `bash -n`
+- the GitHub workflow parses and has the intended five-job structure
+- the Docker image builds successfully and can import the application
+- the 19 applicable Python tests pass, including the ambient-credential tests
+- `git diff --check` passes
+
+The complete Python suite is not currently green because of pre-existing test-harness issues: `tests/test_rubricize.py` imports unavailable `myteam.workflow`, and `tests/tester_bot_tests` expects an undeclared `--config` option when run from the root suite. These failures are unrelated to this deployment implementation.
+
+Remaining work:
+
+1. Refresh the expired `byu-cs-poweruser` AWS SSO session.
+2. Perform final read-only AWS checks and review bootstrap/environment Terraform plans.
+3. Prepare a mode-`400` or mode-`600` production runtime-secret JSON file and confirm the production configuration.
+4. Run `aws/first-time-bootstrap.sh` to create/import shared resources, provision the replacement environment, populate Secrets Manager, and upload configuration.
+5. Push and merge `infra` to `master`, then verify the GitHub OIDC deployment pipeline.
+6. Smoke-test SSM, no-ingress networking, instance-profile credentials, S3, SES, Docker-socket tools, release metadata, and the empty persistent data volume without running two bots with the same Discord token.
+7. During a coordinated manual cutover, stop the old container, copy SQLite to the new EBS volume, redeploy, verify production behavior, and manually take the old instance offline.
+8. Deliberately replace the new EC2 instance and prove that a sentinel SQLite record survives on the persistent volume.
+
 ## 1. Framework refactor
 
 One feature-neutral application change is required before static AWS credentials can be removed:
@@ -51,7 +88,7 @@ The bootstrap command will:
 
 Secret values will never pass through Terraform, user data, S3, or command-line arguments. The bootstrap root will reference, not manage, the existing ECR and configuration buckets.
 
-The GitHub trust policy will allow only `repo:byubean/rubber-duck:ref:refs/heads/master`. The role will use the required enterprise permissions boundary and enumerated Terraform/ECR/SSM permissions rather than wildcard actions.
+The GitHub trust policy will allow only `repo:byubean/rubber-duck:ref:refs/heads/master`. The role will use the required enterprise permissions boundary and bounded Terraform/ECR/SSM permissions rather than an unrestricted `Action = "*"` policy.
 
 ### Terraform environment root
 
@@ -95,11 +132,11 @@ Rewrite `.github/workflows/ci-cd.yml` as one serialized production pipeline:
 4. `maintain`: wait for cloud-init and SSM, execute host updates, and handle a required reboot with bounded waits.
 5. `deploy`: invoke the digest-pinned deployment through SSM, poll terminal states, and report deployment metadata.
 
-The workflow will contain no static AWS credentials, generated secret files, config uploads, short SHAs, arbitrary branch names, or critical-path Discord notifications. Manual dispatch will deploy only the selected commit on `master`.
+The workflow will contain no static AWS credentials, generated secret files, config uploads, short SHAs, arbitrary branch names, or critical-path Discord notifications. Manual dispatch is accepted only from `master` and deploys that ref's resolved commit; rollback uses a revert on `master`, not an arbitrary-commit input.
 
 ### Documentation and legacy path
 
-- Rewrite `docs/deployment.md` with bootstrap, normal deployment, diagnostics, rollback-by-dispatch, and manual database cutover instructions.
+- Rewrite `docs/deployment.md` with bootstrap, normal deployment, diagnostics, rollback-by-revert, and manual database cutover instructions.
 - Expand the README deployment summary.
 - Keep `aws/restart_duck.sh` unchanged as a record of the old host procedure until cutover succeeds.
 - Remove workflow reliance on obsolete S3 upload and inline Docker build helpers, but avoid deleting legacy helpers until the new path is proven.
