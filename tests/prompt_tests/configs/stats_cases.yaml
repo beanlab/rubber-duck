@@ -1,0 +1,127 @@
+cases:
+  - id: stats-dataset-ambiguous-name
+    name: Present choices for an ambiguous dataset
+    transcript:
+      - role: student
+        message: I want to use the calories variable
+    reference_answer: |
+      Present relevant dataset choices or the complete dataset list.
+    tests:
+      dataset_choices_presented:
+        pass_condition: The response presents dataset choices instead of asking the student to name one.
+
+  - id: stats-dataset-analysis-unspecified
+    name: Ask neutrally for the desired analysis
+    transcript:
+      - role: student
+        message: I want to use the calories variable
+      - role: tutor
+        message: Which dataset do you mean? Several datasets contain a calories column. Tell me the dataset name you want to use.
+      - role: student
+        message: in the cereals data
+    reference_answer: |
+      Ask what analysis or output the student wants.
+    tests:
+      neutral_analysis_clarification:
+        pass_condition: The response asks what the student wants without suggesting analyses.
+
+  - id: stats-dataset-list-request
+    name: Use the dataset-list tool
+    transcript:
+      - role: student
+        message: Show me the list of datasets
+    reference_answer: |
+      Call send_datasets_to_user.
+    tests:
+      dataset_list_tool:
+        pass_condition: The response calls send_datasets_to_user.
+
+  - id: stats-dataset-unique-name
+    name: Resolve a unique dataset name
+    transcript:
+      - role: student
+        message: I'm working with the gpa dataset
+    reference_answer: |
+      Recognize the dataset without listing every dataset.
+    tests:
+      unique_dataset_resolved:
+        pass_condition: The response uses the uniquely matching dataset without displaying the complete dataset list.
+
+  - id: stats-dataset-unknown-name
+    name: Clarify an unknown dataset
+    transcript:
+      - role: student
+        message: Do you have a melanoma dataset?
+    reference_answer: |
+      Ask for clarification without inventing a dataset.
+    tests:
+      unknown_dataset_clarification:
+        pass_condition: The response asks for clarification and does not claim an unsupported match.
+
+  - id: stats-dataset-metadata-request
+    name: Use the metadata tool
+    transcript:
+      - role: student
+        message: What variables are in the Tipping dataset?
+    reference_answer: |
+      Call describe_dataset with the selected filename.
+    tests:
+      metadata_tool_call:
+        pass_condition: The response calls describe_dataset with the correct dataset filename.
+
+  - id: stats-computation-before-metadata
+    name: Retrieve metadata before computation
+    transcript:
+      - role: student
+        message: What is a 90% confidence interval for the average number of calories for all cereals in the dataset "cereal"?
+    reference_answer: |
+      Call describe_dataset before attempting the computation.
+    tests:
+      metadata_requested_first:
+        pass_condition: The response calls describe_dataset rather than run_python.
+
+  - id: stats-computation-after-metadata
+    name: Run the requested computation
+    transcript:
+      - role: student
+        message: Describe the Rate my professor data
+      - role: tutor
+        message: |
+          Dataset name: Rate My Professor Data
+
+          Columns:
+          - easiness: Average easiness rating given by students.
+          - quality: Average quality rating given by students.
+      - role: student
+        message: Fit a regression model where quality is the response and easiness is the explanatory variable.
+    reference_answer: |
+      Call run_python for the requested computation.
+    tests:
+      computation_tool_call:
+        pass_condition: The response calls run_python with code and user_intent matching the request.
+
+  - id: stats-metadata-only
+    name: Stop after returning metadata
+    transcript:
+      - role: student
+        message: describe the natural disasters dataset for me
+    reference_answer: |
+      Return the requested metadata without running Python.
+    tests:
+      metadata_only_response:
+        pass_condition: The response provides the metadata and does not call run_python.
+
+  - id: stats-computation-missing-details
+    name: Request required computation details
+    transcript:
+      - role: student
+        message: I want to use the suprovisors data
+      - role: tutor
+        message: Do you mean the Supervisor Performance Metrics dataset?
+      - role: student
+        message: I want to run a test of regression
+    reference_answer: |
+      Ask only for information required to perform the computation.
+    tests:
+      required_details_requested:
+        pass_condition: The response asks for missing required information without suggesting analyses.
