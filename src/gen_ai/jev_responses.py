@@ -1,7 +1,7 @@
 from operator import call
 from typing import TypedDict
 from quest import step
-from typesafe_sdk import AsyncTypeSafeClient, Choice, Score, Noul, Box, SystemOneResponse, Question
+from typesafe_sdk import AsyncTypeSafeClient, SystemOneResponse, Question
 
 
 class Usage(TypedDict):
@@ -23,15 +23,11 @@ class JevAPI:
             client: AsyncTypeSafeClient | None
     ):
         self.client = client or AsyncTypeSafeClient()
-        self.choice = Choice
-        self.score = Score
-        self.noul = Noul
-        self.box = Box
 
     @step
     async def assess(self, state: dict,
-                         questions: dict[str, Question],
-                         model: str | None = None) -> JevResponse:
+                     questions: dict[str, Question],
+                     model: str | None = None) -> JevResponse:
         response: SystemOneResponse = await self.client.system_one(
             state=state,
             questions=questions,
