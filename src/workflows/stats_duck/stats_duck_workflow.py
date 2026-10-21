@@ -1,29 +1,89 @@
-from dataclasses import replace
 import json
 from pathlib import Path
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, TypedDict, Literal
 
-from requests import Session
 from openai.types.responses import EasyInputMessage
 from quest import step
+from requests import Session
 
-
-from src.duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
-from src.gen_ai.ai_responses import ResponsesAPI, Agent
-from src.gen_ai.jev_responses import JevAPI
-from src.utils.config_types import HistoryType
-from src.utils.message_utils import wait_for_message
-from src.utils.python_exec_container import FileResult, PythonExecContainer
-from src.armory.tools import ToolBox
-
+from .armory.tools import ToolBox
+from .gen_ai.ai_responses import ResponsesAPI, Agent
+from .gen_ai.jev_responses import JevAPI
+from .utils.config_types import HistoryType
+from .utils.message_utils import wait_for_message
+from .utils.python_exec_container import FileResult, PythonExecContainer
+from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
+from ...gen_ai.ai_responses import AIResponse
 
 INTRODUCTION = ("I can perform many statistical operations on a list of provided datasets."
                 "If you want more specifics, please ask. How can I help you with stats?")
 
 
+class Decision(TypedDict):
+    analysis_requested: bool
+    analysis_description: str | None
+    missing_information: str | None
+
+
+class PlotOrder(TypedDict):
+    """
+    {
+        "plot": "seaborn.boxplot",
+        "data": {
+            "base": "penguins",
+            "description": "Keep only rows where sex is male."
+        },
+        "args": {
+            "x": "species",
+            "y": "flipper_length"
+        }
+    }
+    """
+    plot: str
+    data: str | dict
+    args: dict
+
+
+class AnalysisOrder(TypedDict):
+    """
+    {
+        "data": "penguins.flipper_length",
+        "analysis": "quantile",
+        "args": {"q": [0, 0.25, 0.5, 0.75, 1]}
+    }
+    """
+    data: str
+    analysis: str
+    args: dict
+
+
+StatsOrder = PlotOrder | AnalysisOrder
+
+
+class SendableText(TypedDict):
+    type: Literal['text']
+    content: str
+
+
+class SendableImage(TypedDict):
+    type: Literal['image']
+    binary_content: bytes
+    filename: str
+    format: str  # png, svg, etc.
+
+
+class SendableTable(TypedDict):
+    type: Literal['table']
+    header: list[str]
+    rows: list[list[str]]
+
+
+SendableArtifact = SendableText | SendableImage | SendableTable
+
+
 def build_stats_tools(
-    container: PythonExecContainer,
-    result_holder: list[dict[str, Any]],
+        container: PythonExecContainer,
+        result_holder: list[dict[str, Any]],
 ) -> ToolBox:
     toolbox = ToolBox()
 
@@ -52,42 +112,44 @@ def build_stats_tools(
     return toolbox
 
 
-class CacheEntry(TypedDict):
-    request: str
-    stdout: str
-    files: dict[str, FileResult]
+def as_stable_key(order: dict) -> tuple:
+    """Converts the JSON into a stable, deterministic tuple"""
+    # dict -> list[sorted items]
+    # list -> tuple
+
+
+def format_results_as_history(results: list[SendableArtifact]) -> list[HistoryType]:
+    """Format the artifacts as system prompt notices that those artifacts were created and sent to the user."""
+    return []
 
 
 class StatsDuckWorkflow:
     commands = []
 
     def __init__(
-        self,
-        name: str,
-        agent: Agent,
-        responses_api: ResponsesAPI,
-        typing: Callable,
-        record_message: Callable,
-        record_usage: Callable,
-        send_message: Callable,
-        sandbox: PythonExecContainer,
-        wait_message: Callable = wait_for_message,
-        jev_api: JevAPI | None = None,
+            self,
+            name: str,
+            agent: Agent,
+            responses_api: ResponsesAPI,
+            jev_api: JevAPI,
+            sandbox: PythonExecContainer,
+            message_handler: MessageHandler,
+            record_usage: Callable,
+            record_message: Callable,
     ):
         self.name = name
-        self._sandbox = sandbox
-        self._jev = jev_api or JevAPI(None)
-        self.tool_caches = []
-        self._agent = agent
+        self._jev = jev_api
         self._responses_api = responses_api
-        self._wait_message = step(wait_message)
-        self._typing = typing
+        self._agent = agent
+        self._sandbox = sandbox
+        self._message_handler = message_handler
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
-        self._send_message = step(send_message)
 
-    async def _record_response(self, context: DuckContext, response: dict[str, Any]):
-        for output in response["outputs"]:
+        self._cache: dict[tuple, list[SendableArtifact]] = {}
+
+    async def _record_response(self, context: DuckContext, outputs: list):
+        for output in outputs:
             output_type = output.get("type")
             if output_type == "message":
                 await self._record_message(
@@ -132,58 +194,10 @@ class StatsDuckWorkflow:
 
         return notify
 
-    async def _find_cached_entry(
-        self,
-        user_message: str,
-        cache: list[CacheEntry],
-    ) -> CacheEntry | None:
-        state = {
-            "user_request": user_message,
-            "cache_entries": [
-                {
-                    "id": str(index),
-                    "request": entry["request"],
-                    "stdout": entry["stdout"],
-                    "files": list(entry["files"]),
-                }
-                for index, entry in enumerate(cache)
-            ],
-        }
-        criteria = {
-            str(index): (
-                f"Use the cached result for this earlier request: {entry['request']}"
-            )
-            for index, entry in enumerate(cache)
-        }
-        criteria["no_match"] = "No cached result can fulfill the current request."
-        assessment = await self._jev.assess(
-            state=state,
-            questions={
-                "cache_match": self._jev.choice(
-                    instructions=(
-                        "Determine whether the latest user request can be fulfilled "
-                        "by one of the cached results. Select the best matching cache "
-                        "entry, or no_match."
-                    ),
-                    criteria=criteria,
-                )
-            },
-        )
-        answer = assessment["answers"].get("cache_match")
-        selected = getattr(answer, "choice", answer)
-        if isinstance(selected, dict):
-            selected = selected.get("choice")
-        if selected == "no_match":
-            return None
-        try:
-            return cache[int(selected)]
-        except (TypeError, ValueError, IndexError):
-            return None
-
     async def _deliver_result(
-        self,
-        channel_id: int,
-        result: dict[str, Any],
+            self,
+            channel_id: int,
+            result: dict[str, Any],
     ):
         for filename, file_data in result.get("files", {}).items():
             await self._send_message(
@@ -197,21 +211,50 @@ class StatsDuckWorkflow:
         if stdout:
             await self._send_message(channel_id, stdout)
 
-    async def _deliver_cached_entry(
-        self,
-        channel_id: int,
-        entry: CacheEntry,
-    ):
-        await self._deliver_result(
-            channel_id,
-            {"stdout": entry["stdout"], "files": entry["files"]},
-        )
+    @step
+    async def _decide(self, history: list[HistoryType]) -> Decision:
+        pass  # Is an analysis requested and ready to fulfill?
+        # TODO - prompt: what options are available, what is the output formats
+
+    @step
+    async def _order_from_menu(self, analysis_description: str) -> StatsOrder:
+        pass  # Formalize the analysis request into one of the provided schemas
+        # TODO - prompt: avoid custom data, avoid custom analyses
+
+    @step
+    async def _fulfill_order(self, analysis_order: StatsOrder) -> list[SendableArtifact]:
+        agent = self._coder_agent
+        response = await self._responses_api.run_agent_turn(agent, ...)
+        code = response['output']
+        result = self._execution.run_code(code)
+        
+        pass  # Call agent with code exec tool to build the request artifacts
+        # Look at code execution result (files and stdout) and build SendableArtifacts
+        # looks kind of like _deliver_result
+
+    @step
+    async def _send_results(self, context: DuckContext, results: list[SendableArtifact]):
+        # TODO - accuracy
+        for artifact in results:
+            if artifact['type'] == 'text':
+                await self._message_handler.send_text(context.thread_id, artifact['content'])
+
+            elif artifact['type'] == 'image':
+                await self._message_handler.send_image(context.thread_id, artifact['filename'], artifact['data_bytes'])
+
+            elif artifact['type'] == 'table':
+                await self._message_handler.send_table(context.thread_id, artifact['header'], artifact['rows'])
+
+    @step
+    async def _help_user_towards_a_decision(
+            self, context: DuckContext, history: list[HistoryType], missing_information: str
+    ) -> AIResponse:
+        pass  # look at history, missing information and prompt the user in the right direction
 
     async def __call__(self, context: DuckContext):
         history: list[HistoryType] = []
-        semantic_cache: list[CacheEntry] = []
         await self._send_message(context.thread_id, INTRODUCTION)
-        notify_retry = self._retry_notifier(context)
+        # notify_retry = self._retry_notifier(context)
 
         while True:
             message = await self._wait_message(context.timeout)
@@ -234,42 +277,32 @@ class StatsDuckWorkflow:
                 ).model_dump()
             )
 
-            cached_entry = await self._find_cached_entry(
-                user_message,
-                semantic_cache,
-            )
-            if cached_entry is not None:
-                await self._deliver_cached_entry(context.thread_id, cached_entry)
-                continue
-
-            execution_results: list[dict[str, Any]] = []
-            agent = replace(
-                self._agent,
-                tools=build_stats_tools(self._sandbox, execution_results),
-            )
             async with self._typing(context.thread_id):
-                response = await self._responses_api.run_agent_turn(
-                    agent,
-                    history,
-                    notify_retry,
-                )
+                decision = await self._decide(context, history)
+                # record decision as system message
 
-            await self._record_response(context, response)
-            history.extend(response["outputs"])
-            await self._record_response_usage(context, response)
+                if decision['analysis_requested']:
+                    order = await self._order_from_menu(decision['analysis_description'])
+                    # record order as system message
+                    key = as_stable_key(order)
+                    if key not in self._cache:
+                        self._cache[key] = await self._fulfill_order(context, order)
+                    results = self._cache[key]
+                    history.extend(format_results_as_history(results))
+                    # record results as system messages
 
-            result = response["result"]
-            if result:
-                await self._send_message(context.thread_id, str(result))
+                    await self._send_results(context, results)
 
-            for executed in execution_results:
-                await self._deliver_result(context.thread_id, executed)
-                if executed["exit_code"] == 0:
-                    semantic_cache.append({
-                        "request": user_message,
-                        "stdout": executed.get("stdout", ""),
-                        "files": executed.get("files", {}),
-                    })
+                else:
+                    response = await self._help_user_towards_a_decision(context, history,
+                                                                        decision['missing_information'])
+                    await self._record_response(context, response)
+                    history.extend(response["outputs"])
+                    await self._record_response_usage(context, response)
+
+                    result = response["result"]
+                    if result:
+                        await self._send_message(context.thread_id, str(result))
 
 
 def build_stats_agent(settings: dict[str, Any]) -> Agent:
