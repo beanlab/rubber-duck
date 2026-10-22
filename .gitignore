@@ -33,3 +33,5 @@ nic2.yaml
 /data/
 /experiments/runs/
 /experiments/results/
+/.agents/
+.terraform/
