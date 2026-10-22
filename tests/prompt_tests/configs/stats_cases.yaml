@@ -1,29 +1,32 @@
 cases:
   - id: stats-dataset-ambiguous-name
-    name: Present choices for an ambiguous dataset
+    name: Present matches for an ambiguous dataset
     transcript:
       - role: student
-        message: I want to use the calories variable
+        message: I want to use the calories dataset
     reference_answer: |
-      Present relevant dataset choices or the complete dataset list.
+      Present the matching datasets and ask the student to choose one.
     tests:
-      dataset_choices_presented:
-        pass_condition: The response presents dataset choices instead of asking the student to name one.
+      ambiguous_dataset_choices:
+        pass_condition: The response presents the Cereal Nutrition Data and Restaurant Nutrition Data choices and asks the student to choose without calling a tool.
 
   - id: stats-dataset-analysis-unspecified
-    name: Ask neutrally for the desired analysis
+    name: Describe the selected dataset
     transcript:
       - role: student
-        message: I want to use the calories variable
+        message: I want to use the calories dataset
       - role: tutor
-        message: Which dataset do you mean? Several datasets contain a calories column. Tell me the dataset name you want to use.
+        message: |
+          Available datasets:
+          - Cereal Nutrition Data
+          - Restaurant Nutrition Data
       - role: student
         message: in the cereals data
     reference_answer: |
-      Ask what analysis or output the student wants.
+      Call describe_dataset for the selected Cereal Nutrition Data dataset.
     tests:
-      neutral_analysis_clarification:
-        pass_condition: The response asks what the student wants without suggesting analyses.
+      selected_dataset_metadata:
+        pass_condition: The response calls describe_dataset with the Cereal Nutrition Data filename from the tool inventory.
 
   - id: stats-dataset-list-request
     name: Use the dataset-list tool
@@ -37,15 +40,15 @@ cases:
         pass_condition: The response calls send_datasets_to_user.
 
   - id: stats-dataset-unique-name
-    name: Resolve a unique dataset name
+    name: Describe a uniquely matched dataset
     transcript:
       - role: student
         message: I'm working with the gpa dataset
     reference_answer: |
-      Recognize the dataset without listing every dataset.
+      Call describe_dataset for the uniquely matched GPA dataset.
     tests:
-      unique_dataset_resolved:
-        pass_condition: The response uses the uniquely matching dataset without displaying the complete dataset list.
+      unique_dataset_metadata:
+        pass_condition: The response calls describe_dataset with the GPA dataset filename from the tool inventory.
 
   - id: stats-dataset-unknown-name
     name: Clarify an unknown dataset
@@ -53,10 +56,10 @@ cases:
       - role: student
         message: Do you have a melanoma dataset?
     reference_answer: |
-      Ask for clarification without inventing a dataset.
+      Directly ask for clarification without inventing a dataset.
     tests:
       unknown_dataset_clarification:
-        pass_condition: The response asks for clarification and does not claim an unsupported match.
+        pass_condition: The response asks for clarification without calling a tool or claiming an unsupported match.
 
   - id: stats-dataset-metadata-request
     name: Use the metadata tool
@@ -100,16 +103,16 @@ cases:
       computation_tool_call:
         pass_condition: The response calls run_python with code and user_intent matching the request.
 
-  - id: stats-metadata-only
-    name: Stop after returning metadata
+  - id: stats-computation-missing-dataset
+    name: Request a missing dataset and variable
     transcript:
       - role: student
-        message: describe the natural disasters dataset for me
+        message: what is the standard deviation
     reference_answer: |
-      Return the requested metadata without running Python.
+      Directly ask which dataset and variable to use.
     tests:
-      metadata_only_response:
-        pass_condition: The response provides the metadata and does not call run_python.
+      missing_dataset_clarification:
+        pass_condition: The response asks for the missing dataset and variable without calling a tool.
 
   - id: stats-computation-missing-details
     name: Request required computation details
@@ -121,7 +124,7 @@ cases:
       - role: student
         message: I want to run a test of regression
     reference_answer: |
-      Ask only for information required to perform the computation.
+      Directly ask only for information required to perform the computation.
     tests:
       required_details_requested:
-        pass_condition: The response asks for missing required information without suggesting analyses.
+        pass_condition: The response asks for the missing regression variables without calling a tool or suggesting analyses.
