@@ -20,9 +20,9 @@ class JevResponse(TypedDict):
 class JevAPI:
     def __init__(
             self,
-            client: AsyncTypeSafeClient | None
+            client: AsyncTypeSafeClient
     ):
-        self.client = client or AsyncTypeSafeClient()
+        self.client = client
 
     @step
     async def assess(self, state: dict,

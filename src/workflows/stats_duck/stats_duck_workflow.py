@@ -1,22 +1,29 @@
+import csv
+import io
 import json
+from dataclasses import replace
 from pathlib import Path
-from typing import Any, Callable, TypedDict, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict
 
 from openai.types.responses import EasyInputMessage
 from quest import step
-from requests import Session
 
-from .armory.tools import ToolBox
-from .gen_ai.ai_responses import ResponsesAPI, Agent
-from .gen_ai.jev_responses import JevAPI
-from .utils.config_types import HistoryType
-from .utils.message_utils import wait_for_message
-from .utils.python_exec_container import FileResult, PythonExecContainer
 from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
-from ...gen_ai.ai_responses import AIResponse
+from ...gen_ai.ai_responses import AIResponse, Agent, ResponsesAPI
+from ...utils.config_types import HistoryType
+from ...utils.message_utils import wait_for_message
+from ...utils.python_exec_container import PythonExecContainer
 
-INTRODUCTION = ("I can perform many statistical operations on a list of provided datasets."
-                "If you want more specifics, please ask. How can I help you with stats?")
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+
+PROMPT_DIRECTORY = Path(__file__).parents[2] / "prompts" / "stats-duck"
+INTRODUCTION = (
+    "I can perform many statistical operations on a list of provided datasets. "
+    "If you want more specifics, please ask. How can I help you with stats?"
+)
+IMAGE_FORMATS = {"gif", "jpeg", "jpg", "png", "svg", "webp"}
 
 
 class Decision(TypedDict):
@@ -25,55 +32,40 @@ class Decision(TypedDict):
     missing_information: str | None
 
 
+class DatasetOrder(TypedDict):
+    action: Literal["list_datasets", "describe_dataset"]
+    data: str | None
+
+
 class PlotOrder(TypedDict):
-    """
-    {
-        "plot": "seaborn.boxplot",
-        "data": {
-            "base": "penguins",
-            "description": "Keep only rows where sex is male."
-        },
-        "args": {
-            "x": "species",
-            "y": "flipper_length"
-        }
-    }
-    """
     plot: str
     data: str | dict
     args: dict
 
 
 class AnalysisOrder(TypedDict):
-    """
-    {
-        "data": "penguins.flipper_length",
-        "analysis": "quantile",
-        "args": {"q": [0, 0.25, 0.5, 0.75, 1]}
-    }
-    """
     data: str
     analysis: str
     args: dict
 
 
-StatsOrder = PlotOrder | AnalysisOrder
+StatsOrder = DatasetOrder | PlotOrder | AnalysisOrder
 
 
 class SendableText(TypedDict):
-    type: Literal['text']
+    type: Literal["text"]
     content: str
 
 
 class SendableImage(TypedDict):
-    type: Literal['image']
+    type: Literal["image"]
     binary_content: bytes
     filename: str
-    format: str  # png, svg, etc.
+    format: str
 
 
 class SendableTable(TypedDict):
-    type: Literal['table']
+    type: Literal["table"]
     header: list[str]
     rows: list[list[str]]
 
@@ -81,74 +73,96 @@ class SendableTable(TypedDict):
 SendableArtifact = SendableText | SendableImage | SendableTable
 
 
-def build_stats_tools(
-        container: PythonExecContainer,
-        result_holder: list[dict[str, Any]],
-) -> ToolBox:
-    toolbox = ToolBox()
+def _load_stage_prompt(filename: str) -> str:
+    return (PROMPT_DIRECTORY / filename).read_text(encoding="utf-8")
 
-    async def execute_python(code: str) -> dict[str, Any]:
-        """Write and execute Python code in the statistics sandbox."""
-        result = await container.run_code(code)
-        result_holder.append(result)
-        return {
-            "exit_code": result["exit_code"],
-            "stdout": result["stdout"],
-            "stderr": result["stderr"],
-            "files": {
-                filename: file["description"]
-                for filename, file in result["files"].items()
-            },
-        }
 
-    toolbox.add_tool(
-        execute_python,
-        name="execute_python",
-        description=(
-            "Executes Python code in the statistics sandbox. "
-            "The code may read available datasets and create output files."
-        ),
-    )
-    return toolbox
+def _stage_agent(agent: Agent, stage: str) -> Agent:
+    prompt = "\n\n".join(
+        filter(None, [agent.prompt, _load_stage_prompt(stage)]))
+    return replace(agent, name=f"{agent.name}_{Path(stage).stem}", prompt=prompt, tools=None)
 
 
 def as_stable_key(order: dict) -> tuple:
-    """Converts the JSON into a stable, deterministic tuple"""
-    # dict -> list[sorted items]
-    # list -> tuple
+    def freeze(value):
+        if isinstance(value, dict):
+            return tuple(
+                (key, freeze(item))
+                for key, item in sorted(value.items())
+            )
+        if isinstance(value, list):
+            return tuple(freeze(item) for item in value)
+        return value
+
+    return freeze(order)
 
 
 def format_results_as_history(results: list[SendableArtifact]) -> list[HistoryType]:
-    """Format the artifacts as system prompt notices that those artifacts were created and sent to the user."""
-    return []
+    history = []
+    for artifact in results:
+        if artifact["type"] == "text":
+            content = artifact["content"]
+        elif artifact["type"] == "image":
+            content = (
+                f"Sent image {artifact['filename']} "
+                f"({artifact['format']} format) to the user."
+            )
+        else:
+            content = json.dumps({
+                "delivered_table": {
+                    "header": artifact["header"],
+                    "rows": artifact["rows"],
+                }
+            })
+        history.append(EasyInputMessage(
+            role="assistant",
+            content=content,
+            type="message",
+        ).model_dump())
+    return history
 
 
 class StatsDuckWorkflow:
     commands = []
+    tool_caches = []
 
     def __init__(
             self,
             name: str,
+            introduction: str,
             agent: Agent,
             responses_api: ResponsesAPI,
-            jev_api: JevAPI,
             sandbox: PythonExecContainer,
             message_handler: MessageHandler,
             record_usage: Callable,
             record_message: Callable,
+            wait_message: Callable = wait_for_message,
     ):
         self.name = name
-        self._jev = jev_api
+        self._introduction = introduction
         self._responses_api = responses_api
-        self._agent = agent
+        self._decision_agent = _stage_agent(agent, "decision.md")
+        self._order_agent = _stage_agent(agent, "order.md")
+        self._coder_agent = _stage_agent(agent, "coder.md")
+        self._clarification_agent = _stage_agent(agent, "clarification.md")
         self._sandbox = sandbox
         self._message_handler = message_handler
+        self._wait_message = step(wait_message)
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
-
         self._cache: dict[tuple, list[SendableArtifact]] = {}
 
-    async def _record_response(self, context: DuckContext, outputs: list):
+    def _dataset_context(self) -> str:
+        datasets = []
+        for dataset in self._sandbox.get_dataset_inventory():
+            filename = dataset["filename"]
+            datasets.append({
+                **dataset,
+                "description": self._sandbox.describe_dataset(filename),
+            })
+        return json.dumps(datasets, indent=2)
+
+    async def _record_response(self, context: DuckContext, outputs: list[HistoryType]):
         for output in outputs:
             output_type = output.get("type")
             if output_type == "message":
@@ -168,7 +182,7 @@ class StatsDuckWorkflow:
                     str(output),
                 )
 
-    async def _record_response_usage(self, context: DuckContext, response: dict[str, Any]):
+    async def _record_response_usage(self, context: DuckContext, response: AIResponse):
         usage = response["usage"]
         if not usage:
             return
@@ -186,75 +200,239 @@ class StatsDuckWorkflow:
 
     def _retry_notifier(self, context: DuckContext):
         async def notify(delay_seconds: int):
-            await self._send_message(
+            await self._message_handler.send_text(
                 context.thread_id,
                 "I hit a temporary connection issue with an upstream server. "
                 f"Retrying in {delay_seconds} seconds...",
             )
-
         return notify
 
-    async def _deliver_result(
+    @step
+    async def _decide(self, context: DuckContext, history: list[HistoryType]) -> Decision:
+        agent = replace(
+            self._decision_agent,
+            prompt=(
+                f"{self._decision_agent.prompt}\n\n"
+                f"Available datasets and metadata:\n{self._dataset_context()}"
+            ),
+        )
+        response = await self._responses_api.run_agent_turn(
+            agent,
+            history,
+            self._retry_notifier(context),
+        )
+        await self._record_response(context, response["outputs"])
+        await self._record_response_usage(context, response)
+        return json.loads(response["result"].strip())
+
+    @step
+    async def _order_from_menu(
             self,
-            channel_id: int,
-            result: dict[str, Any],
-    ):
-        for filename, file_data in result.get("files", {}).items():
-            await self._send_message(
-                channel_id,
-                file={
-                    "filename": filename,
-                    "bytes": file_data["bytes"],
-                },
+            context: DuckContext,
+            analysis_description: str,
+    ) -> StatsOrder:
+        prompt = (
+            f"Available datasets and metadata:\n{self._dataset_context()}\n\n"
+            f"Analysis request:\n{analysis_description}"
+        )
+        response = await self._responses_api.run_agent_turn(
+            self._order_agent,
+            [EasyInputMessage(role="user", content=prompt,
+                              type="message").model_dump()],
+            self._retry_notifier(context),
+        )
+        await self._record_response(context, response["outputs"])
+        await self._record_response_usage(context, response)
+        return json.loads(response["result"].strip())
+
+    async def _generate_code(
+            self,
+            context: DuckContext,
+            analysis_order: StatsOrder,
+            previous_code: str | None = None,
+            error: str | None = None,
+    ) -> str:
+        prompt = (
+            f"Available datasets and metadata:\n{self._dataset_context()}\n\n"
+            f"Order:\n{json.dumps(analysis_order, indent=2)}"
+        )
+        if previous_code is not None:
+            prompt += f"\n\nPrevious code:\n```python\n{previous_code}\n```"
+        if error is not None:
+            prompt += f"\n\nExecution error to correct:\n{error}"
+        response = await self._responses_api.run_agent_turn(
+            self._coder_agent,
+            [EasyInputMessage(role="user", content=prompt,
+                              type="message").model_dump()],
+            self._retry_notifier(context),
+        )
+        await self._record_response(context, response["outputs"])
+        await self._record_response_usage(context, response)
+        code = response["result"].strip()
+        if not code:
+            raise ValueError("The coder agent returned no Python code")
+        return code
+
+    def _dataset_order_results(self, order: DatasetOrder) -> list[SendableArtifact]:
+        if order["action"] == "list_datasets":
+            names = sorted(
+                dataset["dataset_name"]
+                for dataset in self._sandbox.get_dataset_inventory()
             )
-        stdout = result.get("stdout", "")
+            content = (
+                "Available datasets:\n" +
+                "\n".join(f"- {name}" for name in names)
+                if names
+                else "No datasets are currently available."
+            )
+            return [{"type": "text", "content": content}]
+
+        description = self._sandbox.describe_dataset(order["data"] or "")
+        return [{
+            "type": "text",
+            "content": description or f"Dataset '{order['data']}' was not found.",
+        }]
+
+    @staticmethod
+    def _artifacts_from_execution(result: dict[str, Any]) -> list[SendableArtifact]:
+        artifacts: list[SendableArtifact] = []
+        filenames = set(result.get("files", {}))
+        stdout_lines = [
+            line
+            for line in result.get("stdout", "").splitlines()
+            if line.strip() not in filenames
+        ]
+        stdout = "\n".join(stdout_lines).strip()
         if stdout:
-            await self._send_message(channel_id, stdout)
+            artifacts.append({"type": "text", "content": stdout})
+
+        for filename, file_result in result.get("files", {}).items():
+            extension = Path(filename).suffix.lower().lstrip(".")
+            binary_content = file_result["bytes"]
+            if extension == "csv":
+                rows = list(csv.reader(io.StringIO(
+                    binary_content.decode("utf-8-sig"))))
+                if rows:
+                    artifacts.append({
+                        "type": "table",
+                        "header": rows[0],
+                        "rows": rows[1:],
+                    })
+            elif extension in IMAGE_FORMATS:
+                artifacts.append({
+                    "type": "image",
+                    "binary_content": binary_content,
+                    "filename": filename,
+                    "format": extension,
+                })
+            else:
+                artifacts.append({
+                    "type": "text",
+                    "content": f"Generated unsupported file '{filename}'.",
+                })
+
+        if not artifacts:
+            artifacts.append({
+                "type": "text",
+                "content": "The analysis completed without producing output.",
+            })
+        return artifacts
 
     @step
-    async def _decide(self, history: list[HistoryType]) -> Decision:
-        pass  # Is an analysis requested and ready to fulfill?
-        # TODO - prompt: what options are available, what is the output formats
+    async def _fulfill_order(
+            self,
+            context: DuckContext,
+            analysis_order: StatsOrder,
+    ) -> list[SendableArtifact]:
+        if "action" in analysis_order:
+            return self._dataset_order_results(analysis_order)
+
+        code = await self._generate_code(context, analysis_order)
+        result = await self._sandbox.run_code(code)
+        if result["exit_code"] != 0:
+            code = await self._generate_code(
+                context,
+                analysis_order,
+                previous_code=code,
+                error=result["stderr"],
+            )
+            result = await self._sandbox.run_code(code)
+
+        if result["exit_code"] != 0:
+            error = result["stderr"].strip() or "Unknown execution error"
+            return [{
+                "type": "text",
+                "content": f"I couldn't complete the analysis: {error}",
+            }]
+        return self._artifacts_from_execution(result)
 
     @step
-    async def _order_from_menu(self, analysis_description: str) -> StatsOrder:
-        pass  # Formalize the analysis request into one of the provided schemas
-        # TODO - prompt: avoid custom data, avoid custom analyses
-
-    @step
-    async def _fulfill_order(self, analysis_order: StatsOrder) -> list[SendableArtifact]:
-        agent = self._coder_agent
-        response = await self._responses_api.run_agent_turn(agent, ...)
-        code = response['output']
-        result = self._execution.run_code(code)
-        
-        pass  # Call agent with code exec tool to build the request artifacts
-        # Look at code execution result (files and stdout) and build SendableArtifacts
-        # looks kind of like _deliver_result
-
-    @step
-    async def _send_results(self, context: DuckContext, results: list[SendableArtifact]):
-        # TODO - accuracy
+    async def _send_results(
+            self,
+            context: DuckContext,
+            results: list[SendableArtifact],
+    ):
         for artifact in results:
-            if artifact['type'] == 'text':
-                await self._message_handler.send_text(context.thread_id, artifact['content'])
+            if artifact["type"] == "text":
+                await self._message_handler.send_text(
+                    context.thread_id,
+                    artifact["content"],
+                )
+                recorded_artifact = artifact
+            elif artifact["type"] == "image":
+                await self._message_handler.send_image(
+                    context.thread_id,
+                    artifact["filename"],
+                    artifact["binary_content"],
+                )
+                recorded_artifact = {
+                    "type": "image",
+                    "filename": artifact["filename"],
+                    "format": artifact["format"],
+                }
+            else:
+                await self._message_handler.send_table(
+                    context.thread_id,
+                    artifact["header"],
+                    artifact["rows"],
+                )
+                recorded_artifact = artifact
 
-            elif artifact['type'] == 'image':
-                await self._message_handler.send_image(context.thread_id, artifact['filename'], artifact['data_bytes'])
-
-            elif artifact['type'] == 'table':
-                await self._message_handler.send_table(context.thread_id, artifact['header'], artifact['rows'])
+            await self._record_message(
+                context.guild_id,
+                context.thread_id,
+                context.author_id,
+                "assistant",
+                json.dumps(recorded_artifact),
+            )
 
     @step
     async def _help_user_towards_a_decision(
-            self, context: DuckContext, history: list[HistoryType], missing_information: str
+            self,
+            context: DuckContext,
+            history: list[HistoryType],
+            missing_information: str,
     ) -> AIResponse:
-        pass  # look at history, missing information and prompt the user in the right direction
+        prompt = EasyInputMessage(
+            role="user",
+            content=(
+                "Respond concisely according to this decision guidance: "
+                f"{missing_information}"
+            ),
+            type="message",
+        ).model_dump()
+        response = await self._responses_api.run_agent_turn(
+            self._clarification_agent,
+            history + [prompt],
+            self._retry_notifier(context),
+        )
+        await self._record_response(context, response["outputs"])
+        await self._record_response_usage(context, response)
+        return response
 
     async def __call__(self, context: DuckContext):
         history: list[HistoryType] = []
-        await self._send_message(context.thread_id, INTRODUCTION)
-        # notify_retry = self._retry_notifier(context)
+        await self._message_handler.send_text(context.thread_id, self._introduction)
 
         while True:
             message = await self._wait_message(context.timeout)
@@ -269,40 +447,37 @@ class StatsDuckWorkflow:
                 "message",
                 json.dumps(user_message),
             )
-            history.append(
-                EasyInputMessage(
-                    role="user",
-                    content=user_message,
-                    type="message",
-                ).model_dump()
-            )
+            history.append(EasyInputMessage(
+                role="user",
+                content=user_message,
+                type="message",
+            ).model_dump())
 
-            async with self._typing(context.thread_id):
+            async with self._message_handler.typing(context.thread_id):
                 decision = await self._decide(context, history)
-                # record decision as system message
-
-                if decision['analysis_requested']:
-                    order = await self._order_from_menu(decision['analysis_description'])
-                    # record order as system message
+                if decision["analysis_requested"]:
+                    order = await self._order_from_menu(
+                        context,
+                        decision["analysis_description"] or "",
+                    )
                     key = as_stable_key(order)
                     if key not in self._cache:
                         self._cache[key] = await self._fulfill_order(context, order)
                     results = self._cache[key]
-                    history.extend(format_results_as_history(results))
-                    # record results as system messages
-
                     await self._send_results(context, results)
-
+                    history.extend(format_results_as_history(results))
                 else:
-                    response = await self._help_user_towards_a_decision(context, history,
-                                                                        decision['missing_information'])
-                    await self._record_response(context, response)
+                    response = await self._help_user_towards_a_decision(
+                        context,
+                        history,
+                        decision["missing_information"] or "the requested analysis",
+                    )
                     history.extend(response["outputs"])
-                    await self._record_response_usage(context, response)
-
-                    result = response["result"]
-                    if result:
-                        await self._send_message(context.thread_id, str(result))
+                    if response["result"]:
+                        await self._message_handler.send_text(
+                            context.thread_id,
+                            str(response["result"]),
+                        )
 
 
 def build_stats_agent(settings: dict[str, Any]) -> Agent:
@@ -337,13 +512,14 @@ def build(
                 "The new stats duck requires a 'stats-python-sandbox' container"
             ) from error
         sandbox = next(iter(containers.values()))
+
     return StatsDuckWorkflow(
         name=name,
+        introduction=settings.get("introduction", INTRODUCTION),
         agent=build_stats_agent(settings["agent"]),
         responses_api=responses_api,
-        typing=message_handler.typing,
+        sandbox=sandbox,
+        message_handler=message_handler,
         record_message=metrics_handler.record_message,
         record_usage=metrics_handler.record_usage,
-        send_message=message_handler.send_message,
-        sandbox=sandbox,
     )
