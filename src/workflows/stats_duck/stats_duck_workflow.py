@@ -3,7 +3,7 @@ import io
 import json
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, Mapping
 
 from openai.types.responses import EasyInputMessage
 from quest import step
@@ -17,13 +17,13 @@ from ...utils.python_exec_container import PythonExecContainer
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-
 PROMPT_DIRECTORY = Path(__file__).parents[2] / "prompts" / "stats-duck"
 INTRODUCTION = (
     "I can perform many statistical operations on a list of provided datasets. "
     "If you want more specifics, please ask. How can I help you with stats?"
 )
 IMAGE_FORMATS = {"gif", "jpeg", "jpg", "png", "svg", "webp"}
+TABLE_FORMATS = {"csv"}
 
 
 class Decision(TypedDict):
@@ -35,6 +35,10 @@ class Decision(TypedDict):
 class DatasetOrder(TypedDict):
     action: Literal["list_datasets", "describe_dataset"]
     data: str | None
+
+
+def _is_dataset_order(order):
+    return 'action' in order
 
 
 class PlotOrder(TypedDict):
@@ -83,7 +87,7 @@ def _stage_agent(agent: Agent, stage: str) -> Agent:
     return replace(agent, name=f"{agent.name}_{Path(stage).stem}", prompt=prompt, tools=None)
 
 
-def as_stable_key(order: dict) -> tuple:
+def as_stable_key(order) -> tuple:
     def freeze(value):
         if isinstance(value, dict):
             return tuple(
@@ -141,6 +145,7 @@ class StatsDuckWorkflow:
         self.name = name
         self._introduction = introduction
         self._responses_api = responses_api
+        # Move the building out to the builder
         self._decision_agent = _stage_agent(agent, "decision.md")
         self._order_agent = _stage_agent(agent, "order.md")
         self._coder_agent = _stage_agent(agent, "coder.md")
@@ -205,6 +210,7 @@ class StatsDuckWorkflow:
                 "I hit a temporary connection issue with an upstream server. "
                 f"Retrying in {delay_seconds} seconds...",
             )
+
         return notify
 
     @step
@@ -213,6 +219,7 @@ class StatsDuckWorkflow:
             self._decision_agent,
             prompt=(
                 f"{self._decision_agent.prompt}\n\n"
+                # TODO - are datasets available at build-time?
                 f"Available datasets and metadata:\n{self._dataset_context()}"
             ),
         )
@@ -273,7 +280,7 @@ class StatsDuckWorkflow:
             raise ValueError("The coder agent returned no Python code")
         return code
 
-    def _dataset_order_results(self, order: DatasetOrder) -> list[SendableArtifact]:
+    def _handle_dataset_order(self, order: DatasetOrder) -> list[SendableArtifact]:
         if order["action"] == "list_datasets":
             names = sorted(
                 dataset["dataset_name"]
@@ -287,66 +294,17 @@ class StatsDuckWorkflow:
             )
             return [{"type": "text", "content": content}]
 
-        description = self._sandbox.describe_dataset(order["data"] or "")
-        return [{
-            "type": "text",
-            "content": description or f"Dataset '{order['data']}' was not found.",
-        }]
-
-    @staticmethod
-    def _artifacts_from_execution(result: dict[str, Any]) -> list[SendableArtifact]:
-        artifacts: list[SendableArtifact] = []
-        filenames = set(result.get("files", {}))
-        stdout_lines = [
-            line
-            for line in result.get("stdout", "").splitlines()
-            if line.strip() not in filenames
-        ]
-        stdout = "\n".join(stdout_lines).strip()
-        if stdout:
-            artifacts.append({"type": "text", "content": stdout})
-
-        for filename, file_result in result.get("files", {}).items():
-            extension = Path(filename).suffix.lower().lstrip(".")
-            binary_content = file_result["bytes"]
-            if extension == "csv":
-                rows = list(csv.reader(io.StringIO(
-                    binary_content.decode("utf-8-sig"))))
-                if rows:
-                    artifacts.append({
-                        "type": "table",
-                        "header": rows[0],
-                        "rows": rows[1:],
-                    })
-            elif extension in IMAGE_FORMATS:
-                artifacts.append({
-                    "type": "image",
-                    "binary_content": binary_content,
-                    "filename": filename,
-                    "format": extension,
-                })
-            else:
-                artifacts.append({
-                    "type": "text",
-                    "content": f"Generated unsupported file '{filename}'.",
-                })
-
-        if not artifacts:
-            artifacts.append({
+        elif order["action"] == "describe_dataset":
+            description = self._sandbox.describe_dataset(order["data"])
+            return [{
                 "type": "text",
-                "content": "The analysis completed without producing output.",
-            })
-        return artifacts
+                "content": description or f"Dataset '{order['data']}' was not found.",
+            }]
 
-    @step
-    async def _fulfill_order(
-            self,
-            context: DuckContext,
-            analysis_order: StatsOrder,
-    ) -> list[SendableArtifact]:
-        if "action" in analysis_order:
-            return self._dataset_order_results(analysis_order)
+        else:
+            raise NotImplementedError(order['action'])
 
+    async def _handle_code_execution_order(self, context: DuckContext, analysis_order: PlotOrder | AnalysisOrder):
         code = await self._generate_code(context, analysis_order)
         result = await self._sandbox.run_code(code)
         if result["exit_code"] != 0:
@@ -364,7 +322,63 @@ class StatsDuckWorkflow:
                 "type": "text",
                 "content": f"I couldn't complete the analysis: {error}",
             }]
+
         return self._artifacts_from_execution(result)
+
+    @staticmethod
+    def _artifacts_from_execution(result: Mapping[str, Any]) -> list[SendableArtifact]:
+        artifacts: list[SendableArtifact] = []
+
+        filenames = set(result.get("files", {}))
+        stdout_lines = [
+            line
+            for line in result.get("stdout", "").splitlines()
+            if line.strip() not in filenames
+        ]
+        stdout = "\n".join(stdout_lines).strip()
+        if stdout:
+            artifacts.append(SendableText(type="text", content=stdout))
+
+        for filename, file_result in result.get("files", {}).items():
+            extension = Path(filename).suffix.lower().lstrip(".")
+            binary_content = file_result["bytes"]
+
+            if extension in TABLE_FORMATS:
+                rows = list(csv.reader(io.StringIO(
+                    binary_content.decode("utf-8-sig"))))
+                if rows:
+                    artifacts.append(SendableTable(
+                        type="table",
+                        header=rows[0],
+                        rows=rows[1:]
+                    ))
+
+            elif extension in IMAGE_FORMATS:
+                artifacts.append(SendableImage(
+                    type="image",
+                    binary_content=binary_content,
+                    filename=filename,
+                    format=extension,
+                ))
+
+            else:
+                pass  # TODO - log this?
+
+        if not artifacts:
+            pass  # TODO - raise an exception and let the AI retry
+
+        return artifacts
+
+    @step
+    async def _fulfill_order(
+            self,
+            context: DuckContext,
+            analysis_order: StatsOrder,
+    ) -> list[SendableArtifact]:
+        if _is_dataset_order(analysis_order):
+            return self._handle_dataset_order(analysis_order)
+
+        return await self._handle_code_execution_order(context, analysis_order)
 
     @step
     async def _send_results(
@@ -372,39 +386,45 @@ class StatsDuckWorkflow:
             context: DuckContext,
             results: list[SendableArtifact],
     ):
+        async def record_artifact(artifact):
+            await self._record_message(
+                context.guild_id,
+                context.thread_id,
+                context.author_id,
+                "assistant",
+                json.dumps(artifact),
+            )
+
         for artifact in results:
             if artifact["type"] == "text":
                 await self._message_handler.send_text(
                     context.thread_id,
                     artifact["content"],
                 )
-                recorded_artifact = artifact
+                await record_artifact(artifact)
+
             elif artifact["type"] == "image":
                 await self._message_handler.send_image(
                     context.thread_id,
                     artifact["filename"],
                     artifact["binary_content"],
                 )
-                recorded_artifact = {
+                await record_artifact({
                     "type": "image",
                     "filename": artifact["filename"],
                     "format": artifact["format"],
-                }
-            else:
+                })
+
+            elif artifact["type"] == "table":
                 await self._message_handler.send_table(
                     context.thread_id,
                     artifact["header"],
                     artifact["rows"],
                 )
-                recorded_artifact = artifact
+                await record_artifact(artifact)
 
-            await self._record_message(
-                context.guild_id,
-                context.thread_id,
-                context.author_id,
-                "assistant",
-                json.dumps(recorded_artifact),
-            )
+            else:
+                raise NotImplementedError(artifact["type"])
 
     @step
     async def _help_user_towards_a_decision(
@@ -414,7 +434,7 @@ class StatsDuckWorkflow:
             missing_information: str,
     ) -> AIResponse:
         prompt = EasyInputMessage(
-            role="user",
+            role="system",
             content=(
                 "Respond concisely according to this decision guidance: "
                 f"{missing_information}"
@@ -455,10 +475,11 @@ class StatsDuckWorkflow:
 
             async with self._message_handler.typing(context.thread_id):
                 decision = await self._decide(context, history)
+
                 if decision["analysis_requested"]:
                     order = await self._order_from_menu(
                         context,
-                        decision["analysis_description"] or "",
+                        decision.get("analysis_description", ""),
                     )
                     key = as_stable_key(order)
                     if key not in self._cache:
@@ -466,6 +487,7 @@ class StatsDuckWorkflow:
                     results = self._cache[key]
                     await self._send_results(context, results)
                     history.extend(format_results_as_history(results))
+
                 else:
                     response = await self._help_user_towards_a_decision(
                         context,
@@ -478,6 +500,7 @@ class StatsDuckWorkflow:
                             context.thread_id,
                             str(response["result"]),
                         )
+                    # TODO - put send in help user func; wrap in loop with error correction if no output text produced
 
 
 def build_stats_agent(settings: dict[str, Any]) -> Agent:
