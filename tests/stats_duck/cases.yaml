@@ -1,0 +1,110 @@
+model: gpt-5.6-luna
+reasoning: low
+base_prompt: src/prompts/production-prompts/stats-ai-responses.md
+
+contexts:
+  nutrition:
+    - filename: cereal.csv
+      dataset_name: Cereal Nutrition Data
+      path: /home/sandbox/datasets/cereal.csv
+      description: |
+        Dataset name: Cereal Nutrition Data
+        Columns:
+        - cereal, string, cereal name
+        - calories, integer, calories per serving
+    - filename: restaurant_nutrition.csv
+      dataset_name: Restaurant Nutrition Data
+      path: /home/sandbox/datasets/restaurant_nutrition.csv
+      description: |
+        Dataset name: Restaurant Nutrition Data
+        Columns:
+        - item, string, menu item
+        - calories, integer, calories per item
+
+decisions:
+  - id: decide-ready-histogram
+    context: nutrition
+    history:
+      - role: user
+        content: Make a histogram of calories from the cereal dataset.
+    expect:
+      analysis_requested: true
+      analysis_description:
+        contains_all: [histogram, calories, cereal]
+
+  - id: decide-missing-dataset
+    context: nutrition
+    history:
+      - role: user
+        content: Make a histogram.
+    expect:
+      analysis_requested: false
+      missing_information:
+        contains_all: [dataset]
+
+orders:
+  - id: order-cereal-histogram
+    context: nutrition
+    analysis_description: Create a histogram of calories from the cereal dataset.
+    expect:
+      plot: histogram
+      data: cereal.csv
+      args:
+        x: calories
+
+clarifications:
+  - id: clarify-missing-dataset
+    context: nutrition
+    history:
+      - role: user
+        content: Make a histogram.
+    missing_information: The user needs to identify the dataset and variable.
+    expect:
+      contains_all: [dataset]
+      excludes: [cereal.csv, restaurant_nutrition.csv]
+      question: true
+
+fulfillments:
+  - id: fulfill-list-datasets
+    context: nutrition
+    order:
+      action: list_datasets
+      data: null
+    expect:
+      - type: text
+        content: |-
+          Available datasets:
+          - Cereal Nutrition Data
+          - Restaurant Nutrition Data
+
+chains:
+  - id: chain-ready-histogram
+    context: nutrition
+    history:
+      - role: user
+        content: Make a histogram of calories from the cereal dataset.
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [histogram, calories, cereal]
+      order:
+        plot: histogram
+        data: cereal.csv
+        args:
+          x: calories
+
+  - id: chain-missing-dataset
+    context: nutrition
+    history:
+      - role: user
+        content: Make a histogram.
+    expect:
+      decision:
+        analysis_requested: false
+        missing_information:
+          contains_all: [dataset]
+      clarification:
+        contains_all: [dataset]
+        excludes: [cereal.csv, restaurant_nutrition.csv]
+        question: true
