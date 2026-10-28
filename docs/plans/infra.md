@@ -13,7 +13,7 @@ The replacement will use:
 - Canonical Ubuntu 26.04 AMD64 AMI `ami-026ec9e84a2221297`
 - existing ECR repository `beanlab/rubber-duck`
 - existing S3 configuration bucket `rubber-duck-config`
-- GitHub repository `byubean/rubber-duck`
+- GitHub repository `beanlab/rubber-duck`
 
 No implementation or validation step will mutate the current instance `i-0e82640083109edf2`. The new data volume starts empty; database migration and old-host shutdown are deferred to manual cutover.
 
@@ -88,7 +88,7 @@ The bootstrap command will:
 
 Secret values will never pass through Terraform, user data, S3, or command-line arguments. The bootstrap root will reference, not manage, the existing ECR and configuration buckets.
 
-The GitHub trust policy will allow only `repo:byubean/rubber-duck:ref:refs/heads/master`. The role will use the required enterprise permissions boundary and bounded Terraform/ECR/SSM permissions rather than an unrestricted `Action = "*"` policy.
+The GitHub trust policy will allow only `repo:beanlab/rubber-duck:ref:refs/heads/master`. The role will use the required enterprise permissions boundary and bounded Terraform/ECR/SSM permissions rather than an unrestricted `Action = "*"` policy.
 
 ### Terraform environment root
 

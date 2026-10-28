@@ -17,7 +17,7 @@ variable "state_bucket" {
 variable "github_repository" {
   description = "GitHub owner/repository allowed to assume the deployment role."
   type        = string
-  default     = "byubean/rubber-duck"
+  default     = "beanlab/rubber-duck"
 }
 
 variable "ecr_repository_name" {
