@@ -133,7 +133,7 @@ async def main(config: Config, log_path: Path | None):
     responses_api = ResponsesAPI(config["ai_completion_retry_protocol"])
 
     async with DiscordBot(bot_friend_ids=set(config.get("bot-friends", []))) as bot:
-        filter_logs(bot.send_message, config["admin_settings"])
+        filter_logs(bot.send_text, config["admin_settings"])
         metrics = SQLMetricsHandler(sql_session)
         feedback_manager = FeedbackManager({})
 
@@ -159,8 +159,8 @@ async def main(config: Config, log_path: Path | None):
             ]
 
             orchestrator = DuckOrchestrator(
-                SetupPrivateThread(bot.create_thread, bot.send_message),
-                bot.send_message,
+                SetupPrivateThread(bot.create_thread, bot.send_text),
+                bot.send_text,
                 bot.add_reaction,
                 channel_ducks,
                 feedback_manager.remember_conversation,
@@ -172,7 +172,7 @@ async def main(config: Config, log_path: Path | None):
                 True,
             )
             commands = create_commands(
-                bot.send_message,
+                bot.send_text,
                 metrics,
                 reporter,
                 log_path,
@@ -180,7 +180,7 @@ async def main(config: Config, log_path: Path | None):
             )
             workflows = {
                 "duck-orchestrator": orchestrator,
-                "command": BotCommands(commands + duck_commands, bot.send_message),
+                "command": BotCommands(commands + duck_commands, bot.send_text),
             }
             channel_configs = {
                 channel["channel_id"]: channel

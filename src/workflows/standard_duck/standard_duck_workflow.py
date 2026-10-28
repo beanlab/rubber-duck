@@ -47,7 +47,7 @@ def build(
         typing=message_handler.typing,
         record_message=metrics_handler.record_message,
         record_usage=metrics_handler.record_usage,
-        send_message=message_handler.send_message,
+        send_message=message_handler.send_text,
     )
 
 
