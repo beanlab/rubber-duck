@@ -244,6 +244,12 @@ resource "aws_iam_role_policy" "github_deploy" {
         Resource = "arn:aws:s3:::rubber-duck-config"
       },
       {
+        Sid      = "UploadVersionedProductionConfiguration"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "arn:aws:s3:::rubber-duck-config/environments/production/production-config-*.yaml"
+      },
+      {
         Sid      = "SsmRunShellDocument"
         Effect   = "Allow"
         Action   = ["ssm:SendCommand"]

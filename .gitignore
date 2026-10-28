@@ -32,5 +32,6 @@ nic2.yaml
 *.tfstate.*
 .terraform/
 runtime-secrets*.json
+/production-runtime.json
 .codex
 .agents/scratch/

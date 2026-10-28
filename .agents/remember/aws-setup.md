@@ -1,5 +1,9 @@
 # AWS EC2 environment provisioning and deployment plan
 
+## Configuration rollback update
+
+The user's current requirement supersedes the original fixed-config/no-config-snapshots decisions below: CI uploads committed `production-config.yaml` as `environments/production/production-config-<full-commit-sha>.yaml`, paired with image tag `production-<full-commit-sha>`. Manual deployment selects both using the same SHA. See `docs/deployment.md` for the current rollback procedure. Apply bootstrap IAM changes before enabling CI uploads; deployment-script changes replace the instance through cloud-init.
+
 ## Purpose
 
 This is the implementation handoff for replacing Rubber Duck's partially manual AWS deployment with Terraform-provisioned EC2 environments and SSM-based Docker deployment.

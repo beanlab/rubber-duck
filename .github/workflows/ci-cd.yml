@@ -56,7 +56,7 @@ jobs:
             echo "image_tag=$image_tag"
             echo "image_uri=$image_uri"
             echo "state_key=rubber-duck/environments/$environment/terraform.tfstate"
-            echo "configuration_uri=s3://rubber-duck-config/environments/$environment/config.yaml"
+            echo "configuration_uri=s3://rubber-duck-config/environments/$environment/production-config-$GITHUB_SHA.yaml"
           } >>"$GITHUB_OUTPUT"
 
   build:
@@ -106,6 +106,15 @@ jobs:
             --tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
             --push \
             .
+
+      - name: Upload matching configuration
+        env:
+          CONFIGURATION_URI: ${{ needs.prepare.outputs.configuration_uri }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          aws s3 cp production-config.yaml "$CONFIGURATION_URI" \
+            --sse AES256 --only-show-errors
 
       - name: Resolve pushed digest
         id: digest
@@ -296,6 +305,7 @@ jobs:
           IMAGE_DIGEST_URI: ${{ needs.build.outputs.image_digest_uri }}
           ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
           BRANCH: ${{ needs.prepare.outputs.branch }}
+          CONFIGURATION_URI: ${{ needs.prepare.outputs.configuration_uri }}
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -321,8 +331,8 @@ jobs:
                   --instance-id "$INSTANCE_ID" \
                   --query StandardOutputContent \
                   --output text
-                printf 'deployment-result=success environment=%s branch=%s commit=%s tag=%s digest=%s ami=%s instance=%s\n' \
-                  "$ENVIRONMENT" "$BRANCH" "$COMMIT_SHA" "$IMAGE_TAG" "$IMAGE_DIGEST" "$AMI_ID" "$INSTANCE_ID"
+                printf 'deployment-result=success environment=%s branch=%s commit=%s tag=%s digest=%s config=%s ami=%s instance=%s\n' \
+                  "$ENVIRONMENT" "$BRANCH" "$COMMIT_SHA" "$IMAGE_TAG" "$IMAGE_DIGEST" "$CONFIGURATION_URI" "$AMI_ID" "$INSTANCE_ID"
                 exit 0
                 ;;
               Failed|Cancelled|TimedOut|Undeliverable|Terminated)

@@ -46,17 +46,19 @@ read_setting() {
 }
 
 ENVIRONMENT=$(read_setting /etc/rubber-duck/environment)
-CONFIG_URI=$(read_setting /etc/rubber-duck/config-uri)
+CONFIG_BASE_URI=$(read_setting /etc/rubber-duck/config-uri)
 SECRET_ID=$(read_setting /etc/rubber-duck/secret-id)
 AWS_REGION=$(read_setting /etc/rubber-duck/aws-region)
 [[ $ENVIRONMENT == production ]] || {
   echo "unsupported environment: $ENVIRONMENT" >&2
   exit 1
 }
-[[ $CONFIG_URI == s3://rubber-duck-config/environments/$ENVIRONMENT/config.yaml ]] || {
-  echo "unexpected configuration URI" >&2
+[[ $CONFIG_BASE_URI == s3://rubber-duck-config/environments/$ENVIRONMENT/config.yaml ]] || {
+  echo "unexpected configuration base URI" >&2
   exit 1
 }
+# Keep the fixed host setting as the base; select the config paired with this image.
+CONFIG_URI="${CONFIG_BASE_URI%/*}/production-config-$COMMIT_SHA.yaml"
 
 CONTAINER_NAME="rubber-duck-$ENVIRONMENT"
 DATA_DIR=/var/lib/rubber-duck
@@ -86,6 +88,15 @@ chmod 0600 "$secret_json" "$env_file" "$release_tmp"
 
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
 docker pull "$IMAGE_URI"
+[[ $(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_URI") == "$COMMIT_SHA" ]] || {
+  echo "image revision does not match the requested commit/configuration" >&2
+  exit 1
+}
+# Fail before stopping the current container if the matching config is unavailable.
+aws s3api head-object \
+  --region "$AWS_REGION" \
+  --bucket rubber-duck-config \
+  --key "environments/$ENVIRONMENT/production-config-$COMMIT_SHA.yaml" >/dev/null
 
 [[ -f $DATABASE_PATH ]] || install -m 0640 -o root -g root /dev/null "$DATABASE_PATH"
 

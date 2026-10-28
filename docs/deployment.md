@@ -15,7 +15,7 @@ Rubber Duck production runs on one Terraform-managed EC2 instance and is deploye
 | Instance type | `t3.small` |
 | Ubuntu AMI | `ami-026ec9e84a2221297` |
 | ECR repository | `beanlab/rubber-duck` |
-| Configuration | `s3://rubber-duck-config/environments/production/config.yaml` |
+| Configuration | `s3://rubber-duck-config/environments/production/production-config-<full-commit-sha>.yaml` |
 | Runtime secret | `/rubber-duck/production/runtime` |
 
 The AMI is deliberately pinned. Updating its ID in `aws/terraform/environment/environments/production.tfvars` replaces the instance while retaining the persistent data volume.
@@ -59,11 +59,15 @@ The command:
 3. creates the bounded GitHub deployment role
 4. provisions the new production environment
 5. writes runtime values directly to Secrets Manager
-6. uploads the production configuration object
+6. uploads a baseline `environments/production/config.yaml` object (normal deployments use SHA-versioned configurations instead)
 
 Secret values never enter Terraform state or S3. Keep the local JSON file outside the repository. Bootstrap is rerunnable: if it stops after infrastructure creation, correct the reported error and run the same command again. A successful run verifies that the runtime secret has an `AWSCURRENT` value and that the configuration object exists before reporting completion.
 
 Before applying, plans can be reviewed manually from each Terraform root using the backend and variables shown in `aws/first-time-bootstrap.sh`.
+
+When upgrading an existing bootstrap, apply its Terraform plan before merging workflow changes: the GitHub role needs `s3:PutObject` on `environments/production/production-config-*.yaml`. The routine workflow applies only the environment root, not bootstrap IAM.
+
+Instance scripts are delivered through cloud-init. Changes to them cause Terraform to replace the instance; review that plan and coordinate downtime/data cutover before merging.
 
 ## Normal deployment
 
@@ -72,7 +76,7 @@ A push to `master`, or a manual dispatch from `master`, runs one serialized work
 1. validate the explicit `master -> production` mapping
 2. build with the current Python 3.12 base image
 3. label and tag the image with the full commit SHA
-4. push it to ECR and resolve its digest
+4. push it to ECR, upload the checked-out `production-config.yaml` under its full-SHA S3 filename, and resolve the image digest
 5. apply production Terraform
 6. wait for cloud-init and SSM
 7. update host packages and reboot when required
@@ -80,7 +84,9 @@ A push to `master`, or a manual dispatch from `master`, runs one serialized work
 9. require the container to remain running for 30 seconds
 10. report environment, commit, tag, digest, AMI, and instance ID
 
-The production container is named `rubber-duck-production`. Release metadata is written to `/var/lib/rubber-duck/release.json`.
+The production container is named `rubber-duck-production`. Release metadata, including the exact image digest and versioned config URI, is written to `/var/lib/rubber-duck/release.json`.
+
+Each deployment pairs image tag `production-<full-sha>` with `production-config-<full-sha>.yaml`. CI retains older S3 config objects and ECR images. Local Docker cleanup does not delete ECR images. The deployment script verifies the image's revision label and the matching configuration's existence before stopping the current container.
 
 ## Diagnostics
 
@@ -113,13 +119,30 @@ GitHub prints complete SSM invocation details when maintenance or deployment fai
 
 ## Rollback
 
-There is no automatic rollback or arbitrary-commit workflow input. To redeploy previous source behavior:
+There is no automatic rollback or arbitrary-commit workflow input. To manually deploy a retained image/config pair, choose its full commit SHA. On an administrator workstation, resolve the image digest:
 
-1. revert the unwanted change on `master`
-2. push the revert so the normal production workflow rebuilds and deploys it
-3. verify the reported ECR digest and release metadata
+```bash
+SHA=<40-character-commit-sha>
+DIGEST=$(aws --profile byu-cs-poweruser --region us-west-2 ecr describe-images \
+  --repository-name beanlab/rubber-duck \
+  --image-ids "imageTag=production-$SHA" \
+  --query 'imageDetails[0].imageDigest' --output text)
+printf '%s\n' "$DIGEST"
+```
 
-Each run rebuilds dependencies and the base image, so the digest—not only the source tag—identifies the exact artifact.
+Then, in an SSM session on the new instance, substitute that SHA and digest:
+
+```bash
+SHA=<same-40-character-commit-sha>
+DIGEST=sha256:<resolved-digest>
+sudo /usr/local/sbin/deploy-container.sh \
+  "844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck@$DIGEST" \
+  "$SHA" "production-$SHA"
+```
+
+The script selects `environments/production/production-config-$SHA.yaml` automatically. No config upload or Terraform change is needed. Verify `/var/lib/rubber-duck/release.json` afterward. Avoid overlapping manual deployment with CI.
+
+Alternatively, revert on `master` and push to rebuild/deploy the reverted source and config. A rerun can rebuild an existing source tag with newer dependencies; use the digest from the earlier release metadata when you need that exact build. This manual pairing applies to releases produced by the new full-SHA workflow, not legacy five-character tags.
 
 ## Manual database cutover
 
