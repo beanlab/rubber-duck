@@ -14,24 +14,39 @@ VOLUME_ID=$1
 MOUNT_POINT=/var/lib/rubber-duck
 BOOTSTRAP_STATE=/var/lib/rubber-duck-bootstrap
 
-wait_for_apt() {
-  local lock
-  for _ in $(seq 1 120); do
-    for lock in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock; do
-      if fuser "$lock" >/dev/null 2>&1; then
-        sleep 5
-        continue 2
+apt_get() {
+  local deadline=$((SECONDS + ${APT_LOCK_TIMEOUT:-600})) remaining output status line locked other
+  local lock_error='^E: (Could not get lock /(var/lib/dpkg/lock(-frontend)?|var/lib/apt/lists/lock|var/cache/apt/archives/lock)([ .]|$)|Unable to acquire the dpkg frontend lock([ (]|$)|Unable to lock directory /(var/lib/apt/lists|var/cache/apt/archives)/?([ ,.]|$))'
+  while (( SECONDS < deadline )); do
+    remaining=$((deadline - SECONDS))
+    if output=$(LC_ALL=C apt-get -o "DPkg::Lock::Timeout=$remaining" "$@" 2>&1); then
+      printf '%s\n' "$output"
+      return 0
+    else
+      status=$?
+    fi
+    printf '%s\n' "$output" >&2
+    locked=false
+    other=false
+    while IFS= read -r line; do
+      if [[ $line =~ $lock_error ]]; then
+        locked=true
+      elif [[ $line == E:* ]]; then
+        other=true
       fi
-    done
-    return 0
+    done <<<"$output"
+    [[ $locked == true && $other == false ]] || return "$status"
+    remaining=$((deadline - SECONDS))
+    (( remaining > 0 )) || break
+    echo "APT lock busy; retrying $*" >&2
+    sleep "$((remaining < 5 ? remaining : 5))"
   done
-  echo "timed out waiting for package-manager locks" >&2
+  echo "timed out waiting for APT locks: $*" >&2
   return 1
 }
 
-wait_for_apt
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y awscli ca-certificates docker.io jq util-linux
+apt_get update
+DEBIAN_FRONTEND=noninteractive apt_get install -y awscli ca-certificates docker.io jq util-linux
 
 systemctl enable --now docker
 if systemctl list-unit-files --type=service --no-legend | awk '$1 == "amazon-ssm-agent.service" { found = 1 } END { exit !found }'; then

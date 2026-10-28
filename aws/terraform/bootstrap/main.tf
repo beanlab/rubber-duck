@@ -119,6 +119,7 @@ resource "aws_iam_role_policy" "github_deploy" {
         Effect = "Allow"
         Action = [
           "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
           "ecr:CompleteLayerUpload",
           "ecr:DescribeImages",
           "ecr:InitiateLayerUpload",
@@ -234,7 +235,7 @@ resource "aws_iam_role_policy" "github_deploy" {
       {
         Sid      = "ReadExistingEcrRepository"
         Effect   = "Allow"
-        Action   = ["ecr:DescribeRepositories"]
+        Action   = ["ecr:DescribeRepositories", "ecr:ListTagsForResource"]
         Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/${var.ecr_repository_name}"
       },
       {
