@@ -11,6 +11,7 @@ from quest import step
 from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
 from ...gen_ai.ai_responses import AIResponse, Agent, ResponsesAPI
 from ...utils.config_types import HistoryType
+from ...utils.logger import duck_logger
 from ...utils.message_utils import wait_for_message
 from ...utils.python_exec_container import PythonExecContainer
 
@@ -48,7 +49,7 @@ class PlotOrder(TypedDict):
 
 
 class AnalysisOrder(TypedDict):
-    data: str
+    data: str | dict
     analysis: str
     args: dict
 
@@ -77,14 +78,33 @@ class SendableTable(TypedDict):
 SendableArtifact = SendableText | SendableImage | SendableTable
 
 
-def _load_stage_prompt(filename: str) -> str:
-    return (PROMPT_DIRECTORY / filename).read_text(encoding="utf-8")
+class ArtifactError(RuntimeError):
+    pass
 
 
-def _stage_agent(agent: Agent, stage: str) -> Agent:
-    prompt = "\n\n".join(
-        filter(None, [agent.prompt, _load_stage_prompt(stage)]))
-    return replace(agent, name=f"{agent.name}_{Path(stage).stem}", prompt=prompt, tools=None)
+def _stage_agent(agent: Agent, stage: str, additional_prompt: str | None = None) -> Agent:
+    prompt = "\n\n".join(filter(None, [
+        agent.prompt,
+        (PROMPT_DIRECTORY / stage).read_text(encoding="utf-8"),
+        additional_prompt,
+    ]))
+    return replace(
+        agent,
+        name=f"{agent.name}_{Path(stage).stem}",
+        prompt=prompt,
+        tools=None,
+    )
+
+
+def _dataset_context(sandbox: PythonExecContainer) -> str:
+    datasets = []
+    for dataset in sandbox.get_dataset_inventory():
+        filename = dataset["filename"]
+        datasets.append({
+            **dataset,
+            "description": sandbox.describe_dataset(filename),
+        })
+    return json.dumps(datasets, indent=2)
 
 
 def as_stable_key(order) -> tuple:
@@ -134,7 +154,10 @@ class StatsDuckWorkflow:
             self,
             name: str,
             introduction: str,
-            agent: Agent,
+            decision_agent: Agent,
+            order_agent: Agent,
+            coder_agent: Agent,
+            clarification_agent: Agent,
             responses_api: ResponsesAPI,
             sandbox: PythonExecContainer,
             message_handler: MessageHandler,
@@ -145,27 +168,16 @@ class StatsDuckWorkflow:
         self.name = name
         self._introduction = introduction
         self._responses_api = responses_api
-        # Move the building out to the builder
-        self._decision_agent = _stage_agent(agent, "decision.md")
-        self._order_agent = _stage_agent(agent, "order.md")
-        self._coder_agent = _stage_agent(agent, "coder.md")
-        self._clarification_agent = _stage_agent(agent, "clarification.md")
+        self._decision_agent = decision_agent
+        self._order_agent = order_agent
+        self._coder_agent = coder_agent
+        self._clarification_agent = clarification_agent
         self._sandbox = sandbox
         self._message_handler = message_handler
         self._wait_message = step(wait_message)
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
         self._cache: dict[tuple, list[SendableArtifact]] = {}
-
-    def _dataset_context(self) -> str:
-        datasets = []
-        for dataset in self._sandbox.get_dataset_inventory():
-            filename = dataset["filename"]
-            datasets.append({
-                **dataset,
-                "description": self._sandbox.describe_dataset(filename),
-            })
-        return json.dumps(datasets, indent=2)
 
     async def _record_response(self, context: DuckContext, outputs: list[HistoryType]):
         for output in outputs:
@@ -215,16 +227,8 @@ class StatsDuckWorkflow:
 
     @step
     async def _decide(self, context: DuckContext, history: list[HistoryType]) -> Decision:
-        agent = replace(
-            self._decision_agent,
-            prompt=(
-                f"{self._decision_agent.prompt}\n\n"
-                # TODO - are datasets available at build-time?
-                f"Available datasets and metadata:\n{self._dataset_context()}"
-            ),
-        )
         response = await self._responses_api.run_agent_turn(
-            agent,
+            self._decision_agent,
             history,
             self._retry_notifier(context),
         )
@@ -238,10 +242,7 @@ class StatsDuckWorkflow:
             context: DuckContext,
             analysis_description: str,
     ) -> StatsOrder:
-        prompt = (
-            f"Available datasets and metadata:\n{self._dataset_context()}\n\n"
-            f"Analysis request:\n{analysis_description}"
-        )
+        prompt = f"Analysis request:\n{analysis_description}"
         response = await self._responses_api.run_agent_turn(
             self._order_agent,
             [EasyInputMessage(role="user", content=prompt,
@@ -259,10 +260,7 @@ class StatsDuckWorkflow:
             previous_code: str | None = None,
             error: str | None = None,
     ) -> str:
-        prompt = (
-            f"Available datasets and metadata:\n{self._dataset_context()}\n\n"
-            f"Order:\n{json.dumps(analysis_order, indent=2)}"
-        )
+        prompt = f"Order:\n{json.dumps(analysis_order, indent=2)}"
         if previous_code is not None:
             prompt += f"\n\nPrevious code:\n```python\n{previous_code}\n```"
         if error is not None:
@@ -307,7 +305,14 @@ class StatsDuckWorkflow:
     async def _handle_code_execution_order(self, context: DuckContext, analysis_order: PlotOrder | AnalysisOrder):
         code = await self._generate_code(context, analysis_order)
         result = await self._sandbox.run_code(code)
-        if result["exit_code"] != 0:
+        artifacts = None
+        if result["exit_code"] == 0:
+            try:
+                artifacts = self._artifacts_from_execution(result)
+            except ArtifactError as error:
+                result["stderr"] = str(error)
+
+        if result["exit_code"] != 0 or artifacts is None:
             code = await self._generate_code(
                 context,
                 analysis_order,
@@ -315,15 +320,21 @@ class StatsDuckWorkflow:
                 error=result["stderr"],
             )
             result = await self._sandbox.run_code(code)
+            artifacts = None
+            if result["exit_code"] == 0:
+                try:
+                    artifacts = self._artifacts_from_execution(result)
+                except ArtifactError as error:
+                    result["stderr"] = str(error)
 
-        if result["exit_code"] != 0:
+        if result["exit_code"] != 0 or artifacts is None:
             error = result["stderr"].strip() or "Unknown execution error"
             return [{
                 "type": "text",
                 "content": f"I couldn't complete the analysis: {error}",
             }]
 
-        return self._artifacts_from_execution(result)
+        return artifacts
 
     @staticmethod
     def _artifacts_from_execution(result: Mapping[str, Any]) -> list[SendableArtifact]:
@@ -362,10 +373,14 @@ class StatsDuckWorkflow:
                 ))
 
             else:
-                pass  # TODO - log this?
+                duck_logger.warning(
+                    f"Ignoring unsupported analysis artifact '{filename}'"
+                )
 
         if not artifacts:
-            pass  # TODO - raise an exception and let the AI retry
+            raise ArtifactError(
+                "Execution completed without producing supported text, table, or image output"
+            )
 
         return artifacts
 
@@ -441,14 +456,30 @@ class StatsDuckWorkflow:
             ),
             type="message",
         ).model_dump()
-        response = await self._responses_api.run_agent_turn(
-            self._clarification_agent,
-            history + [prompt],
-            self._retry_notifier(context),
-        )
-        await self._record_response(context, response["outputs"])
-        await self._record_response_usage(context, response)
-        return response
+        clarification_history = history + [prompt]
+        while True:
+            response = await self._responses_api.run_agent_turn(
+                self._clarification_agent,
+                clarification_history,
+                self._retry_notifier(context),
+            )
+            await self._record_response(context, response["outputs"])
+            await self._record_response_usage(context, response)
+
+            result = str(response["result"] or "").strip()
+            if result:
+                await self._message_handler.send_text(context.thread_id, result)
+                return response
+
+            clarification_history.extend(response["outputs"])
+            clarification_history.append(EasyInputMessage(
+                role="system",
+                content=(
+                    "Your previous response contained no user-facing text. "
+                    "Return one concise response that follows the decision guidance."
+                ),
+                type="message",
+            ).model_dump())
 
     async def __call__(self, context: DuckContext):
         history: list[HistoryType] = []
@@ -495,12 +526,6 @@ class StatsDuckWorkflow:
                         decision["missing_information"] or "the requested analysis",
                     )
                     history.extend(response["outputs"])
-                    if response["result"]:
-                        await self._message_handler.send_text(
-                            context.thread_id,
-                            str(response["result"]),
-                        )
-                    # TODO - put send in help user func; wrap in loop with error correction if no output text produced
 
 
 def build_stats_agent(settings: dict[str, Any]) -> Agent:
@@ -536,10 +561,18 @@ def build(
             ) from error
         sandbox = next(iter(containers.values()))
 
+    agent = build_stats_agent(settings["agent"])
+    dataset_prompt = (
+        f"Available datasets and metadata:\n{_dataset_context(sandbox)}"
+    )
+
     return StatsDuckWorkflow(
         name=name,
         introduction=settings.get("introduction", INTRODUCTION),
-        agent=build_stats_agent(settings["agent"]),
+        decision_agent=_stage_agent(agent, "decision.md", dataset_prompt),
+        order_agent=_stage_agent(agent, "order.md", dataset_prompt),
+        coder_agent=_stage_agent(agent, "coder.md", dataset_prompt),
+        clarification_agent=_stage_agent(agent, "clarification.md"),
         responses_api=responses_api,
         sandbox=sandbox,
         message_handler=message_handler,
