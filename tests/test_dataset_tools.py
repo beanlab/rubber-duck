@@ -21,39 +21,26 @@ sys.modules.setdefault("botocore", botocore_stub)
 sys.modules.setdefault("botocore.exceptions", botocore_exceptions_stub)
 
 from src.armory.python_tools import DatasetTools
-from src.utils.config_types import DuckContext
-from src.utils.protocols import ConcludesResponse
+from src.utils.python_exec_container import PythonExecContainer
 
 
-class _FakeContainer:
-    def __init__(self, inventory):
+class _FakeContainer(PythonExecContainer):
+    def __init__(self, inventory: list[dict[str, str]]) -> None:
         self._inventory = inventory
 
-    def get_dataset_inventory(self):
+    def get_dataset_inventory(self) -> list[dict[str, str]]:
         return self._inventory
 
 
-def _ctx(thread_id=999) -> DuckContext:
-    return DuckContext(
-        guild_id=1,
-        parent_channel_id=2,
-        author_id=3,
-        author_mention="@user",
-        content="list datasets",
-        message_id=4,
-        thread_id=thread_id,
-        timeout=60,
-    )
+class _TextOutput:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def capture_text(self, message: str) -> None:
+        self.messages.append(message)
 
 
-def test_send_datasets_to_user_sorts_dedupes_and_falls_back_to_filename():
-    sent_messages = []
-
-    async def _send_message(_channel_id, message=None, file=None, view=None):
-        if message is not None:
-            sent_messages.append(message)
-        return 1
-
+def test_send_datasets_to_user_sorts_dedupes_and_falls_back_to_filename() -> None:
     containers = [
         _FakeContainer(
             [
@@ -69,14 +56,13 @@ def test_send_datasets_to_user_sorts_dedupes_and_falls_back_to_filename():
             ]
         ),
     ]
-    tools = DatasetTools(containers, _send_message)
+    tools = DatasetTools(containers)
+    output = _TextOutput()
 
-    result = asyncio.run(tools.send_datasets_to_user(_ctx()))
+    result = asyncio.run(tools.send_datasets_to_user(output))
 
-    assert isinstance(result, ConcludesResponse)
-    assert result.result == "Sent 4 dataset names."
-    assert len(sent_messages) == 1
-    assert sent_messages[0] == "\n".join(
+    assert result == "Prepared 4 dataset names for delivery."
+    assert output.messages == ["\n".join(
         [
             "Available datasets:",
             "- Alpha",
@@ -84,44 +70,35 @@ def test_send_datasets_to_user_sorts_dedupes_and_falls_back_to_filename():
             "- fallback.csv",
             "- zeta",
         ]
-    )
+    )]
 
 
-def test_send_datasets_to_user_sends_full_large_list():
-    sent_messages = []
-
-    async def _send_message(_channel_id, message=None, file=None, view=None):
-        if message is not None:
-            sent_messages.append(message)
-        return 1
-
+def test_send_datasets_to_user_sends_full_large_list() -> None:
     inventory = [
-        {"dataset_name": f"Dataset {i:03d}", "filename": f"dataset_{i:03d}.csv", "path": "/d/x.csv"}
+        {
+            "dataset_name": f"Dataset {i:03d}",
+            "filename": f"dataset_{i:03d}.csv",
+            "path": "/d/x.csv",
+        }
         for i in range(220)
     ]
-    tools = DatasetTools([_FakeContainer(inventory)], _send_message)
+    tools = DatasetTools([_FakeContainer(inventory)])
+    output = _TextOutput()
 
-    result = asyncio.run(tools.send_datasets_to_user(_ctx()))
+    result = asyncio.run(tools.send_datasets_to_user(output))
 
-    assert isinstance(result, ConcludesResponse)
-    assert len(sent_messages) == 1
-    rendered = sent_messages[0]
+    assert result == "Prepared 220 dataset names for delivery."
+    assert len(output.messages) == 1
+    rendered = output.messages[0]
     assert "- Dataset 000" in rendered
     assert "- Dataset 219" in rendered
 
 
-def test_send_datasets_to_user_reports_empty_inventory():
-    sent_messages = []
+def test_send_datasets_to_user_reports_empty_inventory() -> None:
+    tools = DatasetTools([_FakeContainer([])])
+    output = _TextOutput()
 
-    async def _send_message(_channel_id, message=None, file=None, view=None):
-        if message is not None:
-            sent_messages.append(message)
-        return 1
+    result = asyncio.run(tools.send_datasets_to_user(output))
 
-    tools = DatasetTools([_FakeContainer([])], _send_message)
-
-    result = asyncio.run(tools.send_datasets_to_user(_ctx()))
-
-    assert isinstance(result, ConcludesResponse)
-    assert result.result == "No datasets are currently available."
-    assert sent_messages == ["No datasets are currently available."]
+    assert result == "Prepared 0 dataset names for delivery."
+    assert output.messages == ["No datasets are currently available."]

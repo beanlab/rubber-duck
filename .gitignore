@@ -28,5 +28,10 @@ nic2.yaml
 *.db
 *.env
 .codex
+/.vscode/
+/research/papers/
+/data/
+/experiments/runs/
+/experiments/results/
 /.agents/
 .terraform/

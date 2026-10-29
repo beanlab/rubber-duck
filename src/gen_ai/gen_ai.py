@@ -13,7 +13,8 @@ from quest import step
 
 from ..armory.armory import Armory
 from ..armory.talk_tool import ConversationComplete
-from ..utils.config_types import DuckContext, HistoryType, RetryProtocol
+from ..duck_protocols import DuckContext
+from ..utils.config_types import HistoryType, RetryProtocol
 from ..utils.logger import duck_logger
 from ..utils.retry import retry_async, retry_delay_seconds, is_retryable_discord_server_error
 

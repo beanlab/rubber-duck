@@ -5,6 +5,7 @@ import os
 from importlib import import_module
 from pathlib import Path
 
+from dotenv import load_dotenv
 from quest import these
 from quest.utils import quest_logger
 
@@ -201,6 +202,8 @@ async def main(config: Config, log_path: Path | None):
 
 
 if __name__ == "__main__":
+    load_dotenv()
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",

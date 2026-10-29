@@ -7,7 +7,8 @@ from discord import Guild, utils
 from quest import step
 
 from ..armory.tools import register_tool
-from ..utils.config_types import RegistrationSettings, DuckContext, RetryProtocol
+from ..duck_protocols import DuckContext
+from ..utils.config_types import RegistrationSettings, RetryProtocol
 from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message
 from ..utils.protocols import ConversationComplete

@@ -8,8 +8,9 @@ from quest import step, task
 
 from .parsing_utils import is_filled_in_report, unflatten_dictionary, dict_to_md, \
     find_project_name_in_report_headers
+from ..duck_protocols import DuckContext
 from ..gen_ai.gen_ai import Agent, AIClient
-from ..utils.config_types import DuckContext, AssignmentFeedbackSettings, Gradable, RubricItemResponse
+from ..utils.config_types import AssignmentFeedbackSettings, Gradable, RubricItemResponse
 from ..utils.logger import duck_logger
 from ..utils.message_utils import wait_for_message
 from ..utils.protocols import ConversationComplete

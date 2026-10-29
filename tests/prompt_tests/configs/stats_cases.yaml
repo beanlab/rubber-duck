@@ -1,0 +1,130 @@
+cases:
+  - id: stats-dataset-ambiguous-name
+    name: Present matches for an ambiguous dataset
+    transcript:
+      - role: student
+        message: I want to use the calories dataset
+    reference_answer: |
+      Present the matching datasets and ask the student to choose one.
+    tests:
+      ambiguous_dataset_choices:
+        pass_condition: The response presents the Cereal Nutrition Data and Restaurant Nutrition Data choices and asks the student to choose without calling a tool.
+
+  - id: stats-dataset-analysis-unspecified
+    name: Describe the selected dataset
+    transcript:
+      - role: student
+        message: I want to use the calories dataset
+      - role: tutor
+        message: |
+          Available datasets:
+          - Cereal Nutrition Data
+          - Restaurant Nutrition Data
+      - role: student
+        message: in the cereals data
+    reference_answer: |
+      Call describe_dataset for the selected Cereal Nutrition Data dataset.
+    tests:
+      selected_dataset_metadata:
+        pass_condition: The response calls describe_dataset with the Cereal Nutrition Data filename from the tool inventory.
+
+  - id: stats-dataset-list-request
+    name: Use the dataset-list tool
+    transcript:
+      - role: student
+        message: Show me the list of datasets
+    reference_answer: |
+      Call send_datasets_to_user.
+    tests:
+      dataset_list_tool:
+        pass_condition: The response calls send_datasets_to_user.
+
+  - id: stats-dataset-unique-name
+    name: Describe a uniquely matched dataset
+    transcript:
+      - role: student
+        message: I'm working with the gpa dataset
+    reference_answer: |
+      Call describe_dataset for the uniquely matched GPA dataset.
+    tests:
+      unique_dataset_metadata:
+        pass_condition: The response calls describe_dataset with the GPA dataset filename from the tool inventory.
+
+  - id: stats-dataset-unknown-name
+    name: Clarify an unknown dataset
+    transcript:
+      - role: student
+        message: Do you have a melanoma dataset?
+    reference_answer: |
+      Directly ask for clarification without inventing a dataset.
+    tests:
+      unknown_dataset_clarification:
+        pass_condition: The response asks for clarification without calling a tool or claiming an unsupported match.
+
+  - id: stats-dataset-metadata-request
+    name: Use the metadata tool
+    transcript:
+      - role: student
+        message: What variables are in the Tipping dataset?
+    reference_answer: |
+      Call describe_dataset with the selected filename.
+    tests:
+      metadata_tool_call:
+        pass_condition: The response calls describe_dataset with the correct dataset filename.
+
+  - id: stats-computation-before-metadata
+    name: Retrieve metadata before computation
+    transcript:
+      - role: student
+        message: What is a 90% confidence interval for the average number of calories for all cereals in the dataset "cereal"?
+    reference_answer: |
+      Call describe_dataset before attempting the computation.
+    tests:
+      metadata_requested_first:
+        pass_condition: The response calls describe_dataset rather than run_python.
+
+  - id: stats-computation-after-metadata
+    name: Run the requested computation
+    transcript:
+      - role: student
+        message: Describe the Rate my professor data
+      - role: tutor
+        message: |
+          Dataset name: Rate My Professor Data
+
+          Columns:
+          - easiness: Average easiness rating given by students.
+          - quality: Average quality rating given by students.
+      - role: student
+        message: Fit a regression model where quality is the response and easiness is the explanatory variable.
+    reference_answer: |
+      Call run_python for the requested computation.
+    tests:
+      computation_tool_call:
+        pass_condition: The response calls run_python with code and user_intent matching the request.
+
+  - id: stats-computation-missing-dataset
+    name: Request a missing dataset and variable
+    transcript:
+      - role: student
+        message: what is the standard deviation
+    reference_answer: |
+      Directly ask which dataset and variable to use.
+    tests:
+      missing_dataset_clarification:
+        pass_condition: The response asks for the missing dataset and variable without calling a tool.
+
+  - id: stats-computation-missing-details
+    name: Request required computation details
+    transcript:
+      - role: student
+        message: I want to use the suprovisors data
+      - role: tutor
+        message: Do you mean the Supervisor Performance Metrics dataset?
+      - role: student
+        message: I want to run a test of regression
+    reference_answer: |
+      Directly ask only for information required to perform the computation.
+    tests:
+      required_details_requested:
+        pass_condition: The response asks for the missing regression variables without calling a tool or suggesting analyses.

@@ -6,7 +6,7 @@ from typing import Callable
 from openai.types.responses import FunctionToolParam
 
 from .tools import generate_function_schema
-from ..utils.config_types import DuckContext
+from ..duck_protocols import DuckContext
 from ..utils.protocols import ConcludesResponse
 
 

@@ -1,0 +1,189 @@
+"""Data contracts for pytest-based prompt evaluation."""
+
+from typing import Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import NotRequired, Protocol, TypedDict
+
+from experiments.evaluation.completion import (
+    CompletionClient,
+    ResponsesCompletionAPI,
+)
+
+
+TestOutcome = Literal["pass", "fail"]
+ApplicabilityOutcome = Literal[
+    "applicable",
+    "not_applicable",
+    "insufficient_evidence",
+]
+TestSelectionMode = Literal["always", "conditional"]
+TestSuite = Literal["standard", "case", "rubber_duck"]
+TestEvaluator = Literal["openai"]
+ResponseAction = Literal[
+    "talk_to_user",
+    "conclude_conversation",
+    "direct_message",
+]
+
+
+class NamedEvaluationResult(BaseModel):
+    """One reasoned result in a combined evaluator response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(description="The exact supplied test name.")
+    evidence: list[str] = Field(
+        description="Short, exact excerpts considered before reaching a verdict."
+    )
+    rationale: str = Field(
+        description="Reasoning that applies the pass condition to the evidence."
+    )
+    rating: TestOutcome = Field(
+        description="The final pass/fail verdict, selected after the analysis."
+    )
+
+
+class CombinedEvaluationResult(BaseModel):
+    """Structured results for every selected semantic test."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    results: list[NamedEvaluationResult]
+
+
+ResponseModel = TypeVar("ResponseModel", bound=BaseModel, covariant=True)
+
+
+class ParsedEvaluationResponse(Protocol, Generic[ResponseModel]):
+    @property
+    def model(self) -> str: ...
+
+    @property
+    def output_parsed(self) -> ResponseModel | None: ...
+
+
+class ResponsesAPI(ResponsesCompletionAPI, Protocol):
+    async def parse(
+        self,
+        *,
+        model: str,
+        instructions: str,
+        input: str,
+        text_format: type[ResponseModel],
+        store: bool,
+    ) -> ParsedEvaluationResponse[ResponseModel]: ...
+
+
+class EvaluationClient(CompletionClient, Protocol):
+    @property
+    def responses(self) -> ResponsesAPI: ...
+
+
+class TranscriptTurn(TypedDict):
+    role: Literal["student", "tutor"]
+    message: str
+
+
+class EvaluationTestConfig(TypedDict):
+    pass_condition: str
+
+
+class RubberDuckTestConfig(EvaluationTestConfig):
+    selection: TestSelectionMode
+
+
+class EvaluationConfig(TypedDict):
+    evaluator_model: str
+    jev_model: NotRequired[str]
+    standard_tests: dict[str, EvaluationTestConfig]
+    case_tests: NotRequired[dict[str, EvaluationTestConfig]]
+    evaluator_prompt: NotRequired[str]
+    reference_answer: NotRequired[str]
+    use_reference_answer: NotRequired[bool]
+
+
+class RubberDuckTestsConfig(TypedDict):
+    rubber_duck_tests: dict[str, RubberDuckTestConfig]
+
+
+class EvaluationCase(TypedDict):
+    id: str
+    name: str
+    transcript: list[TranscriptTurn]
+    reference_answer: str
+    tests: NotRequired[dict[str, EvaluationTestConfig]]
+
+
+class EvaluationCasesFile(TypedDict):
+    cases: list[EvaluationCase]
+
+
+class EvaluatorContext(TypedDict):
+    conversation_prefix: list[TranscriptTurn]
+    candidate_response: TranscriptTurn
+    candidate_action: ResponseAction
+    tutor_prompt: str
+    reference_answer: NotRequired[str]
+
+
+class EvaluatorTestPrompt(TypedDict):
+    name: str
+    pass_condition: str
+
+
+class EvaluatorRequest(EvaluatorContext):
+    tests: list[EvaluatorTestPrompt]
+
+
+class TestResult(TypedDict):
+    rating: TestOutcome
+    evidence: list[str]
+    rationale: str
+    suite: TestSuite
+    evaluator: TestEvaluator
+
+
+class EvaluationSummary(TypedDict):
+    passed: bool
+    score: float
+    blocking_tests: list[str]
+
+
+class JevTestResult(TypedDict):
+    rating: TestOutcome
+    confidence: float
+    probabilities: dict[str, float]
+    suite: TestSuite
+
+
+class JevApplicabilityResult(TypedDict):
+    outcome: ApplicabilityOutcome
+    confidence: float
+    probabilities: dict[str, float]
+
+
+class TestSelection(TypedDict):
+    selected: list[str]
+    skipped: list[str]
+    uncertain: list[str]
+    applicability: dict[str, JevApplicabilityResult]
+
+
+class JevEvaluation(TypedDict):
+    model: str
+    tests: dict[str, JevTestResult]
+    selection: TestSelection
+    summary: EvaluationSummary
+
+
+class EvaluationRun(TypedDict):
+    transcript: list[TranscriptTurn]
+    candidate_action: ResponseAction
+    candidate_model: str
+    openai_evaluator_model: str
+    tests: dict[str, TestResult]
+    summary: EvaluationSummary
+    reference_answer_used: bool
+    selection: NotRequired[TestSelection]
+    jev: NotRequired[JevEvaluation]

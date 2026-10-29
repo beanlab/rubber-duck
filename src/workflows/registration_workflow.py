@@ -1,7 +1,7 @@
 from typing import Callable
 
 from .registration import Registration, RegistrationInfo
-from ..utils.config_types import DuckContext
+from ..duck_protocols import DuckContext
 
 
 def describe_registration_progress(info: RegistrationInfo) -> str:

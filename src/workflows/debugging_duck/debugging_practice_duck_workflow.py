@@ -9,8 +9,9 @@ from pydantic import BaseModel, ConfigDict
 from quest import step, task
 import yaml
 
+from ...duck_protocols import DuckContext
 from ...gen_ai.gen_ai import AIClient, Agent
-from ...utils.config_types import DebuggingPracticeDuckSettings, DuckContext
+from ...utils.config_types import DebuggingPracticeDuckSettings
 from ...utils.protocols import ConversationComplete
 from .conversation import DebuggingConversation
 from .messaging import MessageRouting

@@ -1,0 +1,14 @@
+# Complete field reference: experiments/configs/README.md
+
+name: image-flip-two-repetitions
+
+models:
+  response: gpt-5.6-luna
+  evaluator: gpt-5.6-luna
+  jev: jev-latest
+
+cases:
+  - image-flip-clarification
+
+repetitions: 2
+output_directory: null

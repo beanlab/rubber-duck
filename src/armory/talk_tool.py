@@ -3,7 +3,7 @@ import asyncio
 from quest import queue, step
 
 from .tools import register_tool
-from ..utils.config_types import DuckContext
+from ..duck_protocols import DuckContext
 from ..utils.protocols import Message
 from ..utils.protocols import ConversationComplete
 

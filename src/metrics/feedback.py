@@ -4,7 +4,7 @@ from typing import Protocol, TypedDict
 from quest import step, alias, queue, wrap_steps
 
 from .feedback_manager import FeedbackManager
-from ..utils.config_types import DuckContext
+from ..duck_protocols import DuckContext
 from ..utils.logger import duck_logger
 from ..utils.protocols import AddReaction, SendMessage, Message
 

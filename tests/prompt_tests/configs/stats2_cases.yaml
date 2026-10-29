@@ -1,0 +1,166 @@
+# Proposed Stats Duck case format. The prompt-test loader does not yet support
+# tool_context, tool_call, or tool_output turns.
+
+tool_context:
+  available_datasets:
+    - name: Cereal Nutrition Data
+      filename: cereal.csv
+    - name: Restaurant Nutrition Data
+      filename: restaurant_nutrition.csv
+    - name: GPA Data
+      filename: GPA.csv
+    - name: Tipping Data
+      filename: Tipping.csv
+    - name: Rate My Professor Data
+      filename: RMP.csv
+    - name: Supervisor Performance Metrics
+      filename: Supervisor.csv
+
+cases:
+  - id: stats-dataset-ambiguous-name
+    name: Present matches for an ambiguous dataset
+    transcript:
+      - role: student
+        message: I want to use the calories dataset
+    reference_answer: |
+      Present the matching datasets and ask the student to choose.
+    tests:
+      ambiguous_dataset_choices:
+        pass_condition: The response presents Cereal Nutrition Data and Restaurant Nutrition Data and asks the student to choose without calling a tool.
+
+  - id: stats-dataset-selected
+    name: Describe the selected dataset
+    transcript:
+      - role: student
+        message: I want to use the calories dataset
+      - role: tutor
+        message: |
+          I found two relevant datasets:
+          - Cereal Nutrition Data
+          - Restaurant Nutrition Data
+
+          Which one would you like to use?
+      - role: student
+        message: The cereals data
+    reference_answer: |
+      Call describe_dataset for Cereal Nutrition Data.
+    tests:
+      selected_dataset_metadata:
+        pass_condition: The response calls describe_dataset with dataset_filename set to cereal.csv.
+
+  - id: stats-dataset-list-request
+    name: Request the complete dataset list
+    transcript:
+      - role: student
+        message: Show me the list of datasets
+    reference_answer: |
+      Call send_datasets_to_user.
+    tests:
+      dataset_list_tool:
+        pass_condition: The response calls send_datasets_to_user with no arguments.
+
+  - id: stats-dataset-ready
+    name: Ask neutrally after describing a dataset
+    transcript:
+      - role: student
+        message: I want to use the cereals data
+      - role: tool_call
+        name: describe_dataset
+        call_id: describe_cereal
+        arguments:
+          dataset_filename: cereal.csv
+      - role: tool_output
+        call_id: describe_cereal
+        output: |
+          Dataset name: Cereal Nutrition Data
+          Columns:
+          - cereal, (string): Cereal name.
+          - calories, (int): Calories per serving.
+          - rating, (float): Consumer rating.
+    reference_answer: |
+      Ask what analysis or output the student wants.
+    tests:
+      neutral_analysis_question:
+        pass_condition: The response asks what the student wants without calling another tool or suggesting analyses.
+
+  - id: stats-dataset-unknown-name
+    name: Clarify an unknown dataset
+    transcript:
+      - role: student
+        message: Do you have a melanoma dataset?
+    reference_answer: |
+      Ask for clarification without inventing a dataset.
+    tests:
+      unknown_dataset_clarification:
+        pass_condition: The response asks for clarification without calling a tool or claiming a match.
+
+  - id: stats-dataset-metadata-request
+    name: Retrieve requested metadata
+    transcript:
+      - role: student
+        message: What variables are in the Tipping dataset?
+    reference_answer: |
+      Call describe_dataset for Tipping Data.
+    tests:
+      metadata_tool_call:
+        pass_condition: The response calls describe_dataset with dataset_filename set to Tipping.csv.
+
+  - id: stats-computation-before-metadata
+    name: Retrieve metadata before computation
+    transcript:
+      - role: student
+        message: What is a 90% confidence interval for the average calories in the cereal dataset?
+    reference_answer: |
+      Call describe_dataset before computing the interval.
+    tests:
+      metadata_requested_first:
+        pass_condition: The response calls describe_dataset with dataset_filename set to cereal.csv instead of calling run_python.
+
+  - id: stats-computation-after-metadata
+    name: Run a computation after receiving metadata
+    transcript:
+      - role: student
+        message: Fit a regression where quality is the response and easiness is the explanatory variable in the Rate My Professor data.
+      - role: tool_call
+        name: describe_dataset
+        call_id: describe_rmp
+        arguments:
+          dataset_filename: RMP.csv
+      - role: tool_output
+        call_id: describe_rmp
+        output: |
+          Dataset name: Rate My Professor Data
+          Columns:
+          - easiness, (float): Average easiness rating.
+          - quality, (float): Average quality rating.
+    reference_answer: |
+      Call run_python for the requested regression.
+    tests:
+      computation_tool_call:
+        pass_condition: The response calls run_python with code for the requested regression and a matching user_intent.
+
+  - id: stats-computation-missing-dataset
+    name: Request a missing dataset and variable
+    transcript:
+      - role: student
+        message: What is the standard deviation?
+    reference_answer: |
+      Ask which dataset and variable to use.
+    tests:
+      missing_dataset_clarification:
+        pass_condition: The response asks for the dataset and variable without calling a tool.
+
+  - id: stats-computation-missing-details
+    name: Request missing regression variables
+    transcript:
+      - role: student
+        message: I want to use the supervisors data
+      - role: tutor
+        message: Do you mean the Supervisor Performance Metrics dataset?
+      - role: student
+        message: Yes. I want to run a regression.
+    reference_answer: |
+      Ask for the response and explanatory variables.
+    tests:
+      required_details_requested:
+        pass_condition: The response asks for the missing regression variables without calling a tool or suggesting analyses.

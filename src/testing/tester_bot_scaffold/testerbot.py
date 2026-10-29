@@ -7,8 +7,9 @@ import discord
 from openai.types.responses import EasyInputMessage
 
 from ...armory.armory import Armory
+from ...duck_protocols import DuckContext
 from ...gen_ai.gen_ai import Agent, AIClient
-from ...utils.config_types import DuckContext, HistoryType
+from ...utils.config_types import HistoryType
 from .assessments import ProgressAssessment, format_history_for_assessor
 from .discord_io import DiscordIORouter
 
