@@ -14,6 +14,8 @@ from src.workflows.stats_duck.stats_duck_workflow import (
     DatasetOrder,
     Decision,
     StatsDuckWorkflow,
+    _dataset_context,
+    _stage_agent,
 )
 from tests.stats_duck.cases import (
     ChainCase,
@@ -125,18 +127,25 @@ def workflow(
         context_name: str,
 ) -> StatsDuckWorkflow:
     prompt = (ROOT / SUITE.base_prompt).read_text(encoding="utf-8")
+    sandbox = FakeSandbox(SUITE.contexts[context_name])
     agent = Agent(
         name="stats_test",
         model=SUITE.model,
         prompt=prompt,
         reasoning=SUITE.reasoning,
     )
+    dataset_prompt = (
+        f"Available datasets and metadata:\n{_dataset_context(sandbox)}"
+    )
     return StatsDuckWorkflow(
         name="stats_test",
         introduction="",
-        agent=agent,
+        decision_agent=_stage_agent(agent, "decision.md", dataset_prompt),
+        order_agent=_stage_agent(agent, "order.md", dataset_prompt),
+        coder_agent=_stage_agent(agent, "coder.md", dataset_prompt),
+        clarification_agent=_stage_agent(agent, "clarification.md"),
         responses_api=responses_api,
-        sandbox=FakeSandbox(SUITE.contexts[context_name]),
+        sandbox=sandbox,
         message_handler=FakeMessages(),
         record_usage=record_nothing,
         record_message=record_nothing,
