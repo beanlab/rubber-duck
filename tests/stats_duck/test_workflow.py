@@ -94,8 +94,10 @@ class FakeMessages(MessageHandler):
         del channel_id, header, rows
         raise AssertionError("Unexpected table")
 
-    async def add_reaction(self, message_id: int, emoji: str) -> None:
-        del message_id, emoji
+    async def add_reaction(
+            self, channel_id: int, message_id: int, emoji: str,
+    ) -> None:
+        del channel_id, message_id, emoji
         raise AssertionError("Unexpected reaction")
 
     def typing(self, channel_id: int) -> None:

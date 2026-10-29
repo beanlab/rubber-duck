@@ -384,7 +384,6 @@ class StatsDuckWorkflow:
 
         return artifacts
 
-    @step
     async def _fulfill_order(
             self,
             context: DuckContext,
@@ -395,7 +394,6 @@ class StatsDuckWorkflow:
 
         return await self._handle_code_execution_order(context, analysis_order)
 
-    @step
     async def _send_results(
             self,
             context: DuckContext,

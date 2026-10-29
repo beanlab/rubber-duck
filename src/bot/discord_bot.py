@@ -1,3 +1,4 @@
+import csv
 import io
 
 import discord
@@ -100,7 +101,7 @@ class DiscordBot(discord.Client):
         duck_logger.info('Starting workflow manager')
 
         try:
-            await self.send_message(self._admin_channel, 'Duck online')
+            await self.send_text(self._admin_channel, 'Duck online')
         except Exception:
             duck_logger.exception(f'Unable to message channel {self._admin_channel}')
 
@@ -153,7 +154,7 @@ class DiscordBot(discord.Client):
 
         raise NotImplementedError(f"Unsupported file type: {file}")
 
-    async def send_message(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
+    async def send_text(self, channel_id, message: str = None, file: FileData = None, view=None) -> int:
         channel = self.get_channel(channel_id)
         # try catch it and fetch the channel if it is not found
         if channel is None:
@@ -184,6 +185,17 @@ class DiscordBot(discord.Client):
             return (await channel.send(view=view)).id
 
         raise Exception('Must send message, file, or view')
+
+    async def send_image(self, channel_id: int, filename: str, image_data: bytes):
+        return await self.send_text(channel_id, file=(filename, image_data))
+
+    async def send_attachment(self, channel_id: int, filename: str, file_data: bytes):
+        return await self.send_text(channel_id, file=(filename, file_data))
+
+    async def send_table(self, channel_id: int, header: list[str], rows: list[list[str]]):
+        output = io.StringIO()
+        csv.writer(output).writerows([header, *rows])
+        await self.send_text(channel_id, f"```csv\n{output.getvalue()}```")
 
     async def edit_message(self, channel_id: int, message_id: int, new_content: str):
         channel = self.get_channel(channel_id)
