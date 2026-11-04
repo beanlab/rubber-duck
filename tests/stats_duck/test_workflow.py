@@ -4,7 +4,7 @@ import pytest
 
 from src.gen_ai.ai_responses import ResponsesAPI
 from tests.stats_duck.cases import StatsCase, load_suite
-from tests.stats_duck.harness import run_case
+from tests.stats_duck.runner import run_case
 
 
 SUITE = load_suite(Path(__file__).with_name("cases.yaml"))

@@ -22,5 +22,5 @@ async def live_responses_api() -> AsyncIterator[ResponsesAPI]:
     load_dotenv()
     if not os.getenv("OPENAI_API_KEY"):
         pytest.skip("OPENAI_API_KEY is required for live Stats Duck tests")
-    async with AsyncOpenAI() as client:
+    async with AsyncOpenAI(timeout=60.0, max_retries=0) as client:
         yield ResponsesAPI(RETRY, client)

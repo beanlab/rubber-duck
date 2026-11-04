@@ -17,7 +17,6 @@ from src.workflows.stats_duck.stats_duck_workflow import (
     INTRODUCTION,
     AnalysisOrder,
     DatasetOrder,
-    Decision,
     PlotOrder,
     StatsOrder,
     StatsDuckWorkflow,
@@ -26,12 +25,9 @@ from src.workflows.stats_duck.stats_duck_workflow import (
 )
 from tests.stats_duck.cases import (
     DatasetFixture,
-    DecisionExpectation,
     ExecutionKind,
     HistoryTurn,
-    StatsCase,
     TestSuite,
-    TextExpectation,
 )
 
 
@@ -230,76 +226,3 @@ def stats_order(value: dict[str, JsonValue]) -> StatsOrder:
     if "plot" in value:
         return PlotOrder(plot=str(value["plot"]), data=data, args=args)
     return AnalysisOrder(data=data, analysis=str(value["analysis"]), args=args)
-
-
-def assert_text(value: str, expected: TextExpectation) -> None:
-    value = value.casefold()
-    assert all(term.casefold() in value for term in expected.contains_all)
-    assert all(term.casefold() not in value for term in expected.excludes)
-    assert not expected.question or "?" in value
-
-
-def assert_decision(result: Decision, expected: DecisionExpectation) -> None:
-    assert result["analysis_requested"] is expected.analysis_requested
-    if expected.analysis_description:
-        assert_text(result["analysis_description"] or "", expected.analysis_description)
-    if expected.missing_information:
-        assert_text(result["missing_information"] or "", expected.missing_information)
-
-
-def assert_workflow(case: StatsCase, harness: Harness) -> None:
-    assert harness.sandbox.execution is None
-    assert harness.messages.texts[0] == INTRODUCTION
-    texts = harness.messages.texts[1:]
-    assert len(texts) == len(case.expect.texts)
-    for value, expected in zip(texts, case.expect.texts, strict=True):
-        assert_text(value, expected)
-    assert len(harness.messages.images) == case.expect.images
-    assert len(harness.messages.tables) == case.expect.tables
-    if case.expect.code:
-        assert len(harness.sandbox.generated_code) == 1
-        assert_text(harness.sandbox.generated_code[0], case.expect.code)
-    else:
-        assert not harness.sandbox.generated_code
-
-
-async def run_case(
-        suite: TestSuite,
-        case: StatsCase,
-        responses_api: ResponsesAPI,
-) -> None:
-    harness = build_harness(
-        suite,
-        case.context,
-        responses_api,
-        turns=case.turns,
-        execution=case.execution,
-    )
-    if case.run == "full":
-        await harness.workflow(context())
-        assert_workflow(case, harness)
-        return
-
-    stages = [case.run] if isinstance(case.run, str) else case.run
-    decision: Decision | None = None
-    order: StatsOrder | None = None
-    for stage in stages:
-        if stage == "decision":
-            decision = await harness.workflow._decide(context(), history(case.history))
-            assert case.expect.decision is not None
-            assert_decision(decision, case.expect.decision)
-        elif stage == "order":
-            description = case.analysis_description
-            if decision is not None:
-                description = decision["analysis_description"]
-            assert description is not None
-            order = await harness.workflow._order_from_menu(context(), description)
-            assert order == case.expect.order
-        else:
-            if order is None:
-                assert case.order is not None
-                order = stats_order(case.order)
-            code = await harness.workflow._generate_code(context(), order)
-            ast.parse(code)
-            assert case.expect.code is not None
-            assert_text(code, case.expect.code)

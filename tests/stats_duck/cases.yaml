@@ -46,6 +46,22 @@ cases:
         missing_information:
           contains_all: [dataset, variable]
 
+  - id: decide-follow-up-uses-history
+    context: nutrition
+    run: decision
+    history:
+      - role: user
+        content: Calculate the mean from the cereal dataset.
+      - role: assistant
+        content: Which variable should I use?
+      - role: user
+        content: Calories.
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [mean, calories, cereal]
+
   - id: order-cereal-histogram
     context: nutrition
     run: order
@@ -56,6 +72,15 @@ cases:
         data: cereal.csv
         args:
           x: calories
+
+  - id: order-list-datasets
+    context: nutrition
+    run: order
+    analysis_description: List the available datasets.
+    expect:
+      order:
+        action: list_datasets
+        data: null
 
   - id: code-cereal-histogram
     context: nutrition
@@ -73,9 +98,11 @@ cases:
   - id: decision-to-order
     context: nutrition
     run: [decision, order]
+    handoff: both
     history:
       - role: user
         content: Make a histogram of calories from the cereal dataset.
+    analysis_description: Create a histogram of calories from the cereal dataset.
     expect:
       decision:
         analysis_requested: true
@@ -86,6 +113,33 @@ cases:
         data: cereal.csv
         args:
           x: calories
+
+  - id: decision-to-order-to-coder-mean
+    context: nutrition
+    run: [decision, order, coder]
+    handoff: both
+    history:
+      - role: user
+        content: Calculate the mean calories in the cereal dataset.
+    analysis_description: Calculate the mean of calories in the cereal dataset.
+    order:
+      data: cereal.csv
+      analysis: mean
+      args:
+        column: calories
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [mean, calories, cereal]
+      order:
+        data: cereal.csv
+        analysis: mean
+        args:
+          column: calories
+      code:
+        contains_all: [cereal.csv, calories, mean, print]
+        excludes: ["```"]
 
   - id: full-ready-histogram
     context: nutrition
@@ -122,6 +176,28 @@ cases:
             - Cereal Nutrition Data
             - Restaurant Nutrition Data
           excludes: [cereal.csv, restaurant_nutrition.csv]
+
+  - id: full-describe-cereal
+    context: nutrition
+    run: full
+    turns:
+      - Describe the cereal dataset.
+    expect:
+      texts:
+        - contains_all: [Cereal Nutrition Data, cereal, calories]
+
+  - id: full-mean-calories
+    context: nutrition
+    run: full
+    turns:
+      - Calculate the mean calories in the cereal dataset.
+    execution: text
+    expect:
+      texts:
+        - contains_all: [Analysis result]
+      code:
+        contains_all: [cereal.csv, calories, mean, print]
+        excludes: ["```"]
 
   - id: full-clarify-then-histogram
     context: nutrition

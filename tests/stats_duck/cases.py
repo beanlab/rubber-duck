@@ -44,18 +44,49 @@ class CaseExpectation(CaseModel):
 
 AgentStage = Literal["decision", "order", "coder"]
 ExecutionKind = Literal["text", "image", "table"]
+Handoff = Literal["fixed", "model", "both"]
 
 
 class StatsCase(CaseModel):
     id: str
     context: str
     run: AgentStage | Literal["full"] | list[AgentStage]
+    handoff: Handoff = "model"
     history: list[HistoryTurn] = Field(default_factory=list)
     analysis_description: str | None = None
     order: dict[str, JsonValue] | None = None
     turns: list[str] = Field(default_factory=list)
     execution: ExecutionKind | None = None
     expect: CaseExpectation
+
+    @model_validator(mode="after")
+    def validate_run(self) -> Self:
+        match self.run:
+            case "full":
+                return self
+            case "decision" | "order" | "coder":
+                stages: list[AgentStage] = [self.run]
+            case _:
+                stages = self.run
+
+        if not stages:
+            raise ValueError("Agent sequences cannot be empty")
+        expected_order: list[AgentStage] = ["decision", "order", "coder"]
+        start = expected_order.index(stages[0])
+        if stages != expected_order[start:start + len(stages)]:
+            raise ValueError("Agent sequences must follow decision, order, coder")
+
+        if stages[0] == "order" and self.analysis_description is None:
+            raise ValueError("Order runs require analysis_description")
+        if stages[0] == "coder" and self.order is None:
+            raise ValueError("Coder runs require order")
+
+        if len(stages) > 1 and self.handoff in ("fixed", "both"):
+            if "decision" in stages[:-1] and self.analysis_description is None:
+                raise ValueError("Fixed decision handoffs require analysis_description")
+            if "order" in stages[:-1] and self.order is None:
+                raise ValueError("Fixed order handoffs require order")
+        return self
 
 
 class TestSuite(CaseModel):
