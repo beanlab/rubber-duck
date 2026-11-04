@@ -21,65 +21,58 @@ contexts:
         - item, string, menu item
         - calories, integer, calories per item
 
-decisions:
+cases:
   - id: decide-ready-histogram
     context: nutrition
+    run: decision
     history:
       - role: user
         content: Make a histogram of calories from the cereal dataset.
     expect:
-      analysis_requested: true
-      analysis_description:
-        contains_all: [histogram, calories, cereal]
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [histogram, calories, cereal]
 
   - id: decide-missing-dataset
     context: nutrition
+    run: decision
     history:
       - role: user
         content: Make a histogram.
     expect:
-      analysis_requested: false
-      missing_information:
-        contains_all: [dataset]
+      decision:
+        analysis_requested: false
+        missing_information:
+          contains_all: [dataset, variable]
 
-orders:
   - id: order-cereal-histogram
     context: nutrition
+    run: order
     analysis_description: Create a histogram of calories from the cereal dataset.
     expect:
+      order:
+        plot: seaborn.histplot
+        data: cereal.csv
+        args:
+          x: calories
+
+  - id: code-cereal-histogram
+    context: nutrition
+    run: coder
+    order:
       plot: seaborn.histplot
       data: cereal.csv
       args:
         x: calories
-
-clarifications:
-  - id: clarify-missing-dataset
-    context: nutrition
-    history:
-      - role: user
-        content: Make a histogram.
-    missing_information: The user needs to identify the dataset and variable.
     expect:
-      contains_all: [dataset]
-      excludes: [cereal.csv, restaurant_nutrition.csv]
-      question: true
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]
 
-fulfillments:
-  - id: fulfill-list-datasets
+  - id: decision-to-order
     context: nutrition
-    order:
-      action: list_datasets
-      data: null
-    expect:
-      - type: text
-        content: |-
-          Available datasets:
-          - Cereal Nutrition Data
-          - Restaurant Nutrition Data
-
-chains:
-  - id: chain-ready-histogram
-    context: nutrition
+    run: [decision, order]
     history:
       - role: user
         content: Make a histogram of calories from the cereal dataset.
@@ -94,17 +87,54 @@ chains:
         args:
           x: calories
 
-  - id: chain-missing-dataset
+  - id: full-ready-histogram
     context: nutrition
-    history:
-      - role: user
-        content: Make a histogram.
+    run: full
+    turns:
+      - Make a histogram of calories from the cereal dataset.
+    execution: image
     expect:
-      decision:
-        analysis_requested: false
-        missing_information:
-          contains_all: [dataset]
-      clarification:
-        contains_all: [dataset]
-        excludes: [cereal.csv, restaurant_nutrition.csv]
-        question: true
+      images: 1
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]
+
+  - id: full-missing-dataset
+    context: nutrition
+    run: full
+    turns:
+      - Make a histogram.
+    expect:
+      texts:
+        - contains_all: [dataset, variable]
+          excludes: [cereal.csv, restaurant_nutrition.csv]
+          question: true
+
+  - id: full-list-datasets
+    context: nutrition
+    run: full
+    turns:
+      - What datasets are available?
+    expect:
+      texts:
+        - contains_all:
+            - Available datasets
+            - Cereal Nutrition Data
+            - Restaurant Nutrition Data
+          excludes: [cereal.csv, restaurant_nutrition.csv]
+
+  - id: full-clarify-then-histogram
+    context: nutrition
+    run: full
+    turns:
+      - Make a histogram.
+      - Use the cereal dataset and the calories variable.
+    execution: image
+    expect:
+      texts:
+        - contains_all: [dataset, variable]
+          question: true
+      images: 1
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]

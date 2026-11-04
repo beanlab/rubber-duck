@@ -1,3 +1,4 @@
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -20,7 +21,10 @@ class MessageHandler(Protocol):
     
     async def add_reaction(self, channel_id: int, message_id: int, emoji: str): ...
 
-    def typing(self, channel_id): ...
+    def typing(
+            self,
+            channel_id: int,
+    ) -> AbstractAsyncContextManager[None]: ...
 
 
 class MetricsHandler(Protocol):

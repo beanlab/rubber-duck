@@ -33,81 +33,49 @@ class DecisionExpectation(CaseModel):
     missing_information: TextExpectation | None = None
 
 
-class StageCase(CaseModel):
+class CaseExpectation(CaseModel):
+    decision: DecisionExpectation | None = None
+    order: dict[str, JsonValue] | None = None
+    code: TextExpectation | None = None
+    texts: list[TextExpectation] = Field(default_factory=list)
+    images: int = 0
+    tables: int = 0
+
+
+AgentStage = Literal["decision", "order", "coder"]
+ExecutionKind = Literal["text", "image", "table"]
+
+
+class StatsCase(CaseModel):
     id: str
     context: str
-
-
-class DecisionCase(StageCase):
-    history: list[HistoryTurn]
-    expect: DecisionExpectation
-
-
-class OrderCase(StageCase):
-    analysis_description: str
-    expect: dict[str, JsonValue]
-
-
-class ClarificationCase(StageCase):
-    history: list[HistoryTurn]
-    missing_information: str
-    expect: TextExpectation
-
-
-class FulfillmentCase(StageCase):
-    order: dict[str, JsonValue]
-    expect: list[dict[str, JsonValue]]
-
-
-class ChainExpectation(CaseModel):
-    decision: DecisionExpectation
+    run: AgentStage | Literal["full"] | list[AgentStage]
+    history: list[HistoryTurn] = Field(default_factory=list)
+    analysis_description: str | None = None
     order: dict[str, JsonValue] | None = None
-    clarification: TextExpectation | None = None
-
-    @model_validator(mode="after")
-    def validate_branch(self) -> Self:
-        if self.decision.analysis_requested:
-            if self.order is None or self.clarification is not None:
-                raise ValueError("Actionable chains require only an order")
-        elif self.clarification is None or self.order is not None:
-            raise ValueError("Incomplete chains require only a clarification")
-        return self
+    turns: list[str] = Field(default_factory=list)
+    execution: ExecutionKind | None = None
+    expect: CaseExpectation
 
 
-class ChainCase(StageCase):
-    history: list[HistoryTurn]
-    expect: ChainExpectation
-
-
-class WorkflowSuite(CaseModel):
+class TestSuite(CaseModel):
     model: str
     reasoning: str | None = None
     base_prompt: Path
     contexts: dict[str, list[DatasetFixture]]
-    decisions: list[DecisionCase]
-    orders: list[OrderCase]
-    clarifications: list[ClarificationCase]
-    fulfillments: list[FulfillmentCase]
-    chains: list[ChainCase]
+    cases: list[StatsCase]
 
     @model_validator(mode="after")
     def validate_cases(self) -> Self:
-        cases: list[StageCase] = [
-            *self.decisions,
-            *self.orders,
-            *self.clarifications,
-            *self.fulfillments,
-            *self.chains,
-        ]
-        ids = [case.id for case in cases]
+        ids = [case.id for case in self.cases]
         if len(ids) != len(set(ids)):
             raise ValueError("Case IDs must be unique")
-        unknown = sorted({case.context for case in cases} - set(self.contexts))
+        unknown = sorted({case.context for case in self.cases} - set(self.contexts))
         if unknown:
             raise ValueError(f"Unknown dataset contexts: {unknown}")
         return self
 
 
-def load_suite(path: Path) -> WorkflowSuite:
+def load_suite(path: Path) -> TestSuite:
     data: object = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return WorkflowSuite.model_validate(data)
+    return TestSuite.model_validate(data)
