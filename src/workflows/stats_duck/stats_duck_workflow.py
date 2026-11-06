@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, Mapping
@@ -441,7 +442,7 @@ class StatsDuckWorkflow:
 
         return artifacts
 
-    async def _fulfill_order(
+    async def _execute_order(
             self,
             context: DuckContext,
             analysis_order: StatsOrder,
@@ -450,6 +451,32 @@ class StatsDuckWorkflow:
             return self._handle_dataset_order(analysis_order)
 
         return await self._handle_code_execution_order(context, analysis_order)
+
+    async def _fulfill_order(
+            self,
+            context: DuckContext,
+            analysis_order: StatsOrder,
+            key: tuple,
+    ) -> list[SendableArtifact]:
+        if key not in self._cache:
+            self._cache[key] = await self._execute_order(context, analysis_order)
+        return self._cache[key]
+
+    async def _fulfill_order_with_cache_logging(
+            self,
+            context: DuckContext,
+            analysis_order: StatsOrder,
+            key: tuple,
+    ) -> list[SendableArtifact]:
+        started_at = time.perf_counter()
+        was_cached = key in self._cache
+        results = await self._fulfill_order(context, analysis_order, key)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        event = "HIT" if was_cached else "MISS"
+        duck_logger.info(
+            f"Stats cache {event} key={key} total_ms={elapsed_ms:.1f}"
+        )
+        return results
 
     async def _send_results(
             self,
@@ -568,9 +595,11 @@ class StatsDuckWorkflow:
                         decision.get("analysis_description", ""),
                     )
                     key = as_stable_key(order)
-                    if key not in self._cache:
-                        self._cache[key] = await self._fulfill_order(context, order)
-                    results = self._cache[key]
+                    results = await self._fulfill_order_with_cache_logging(
+                        context,
+                        order,
+                        key,
+                    )
                     await self._send_results(context, results)
                     history.extend(format_results_as_history(results))
 
