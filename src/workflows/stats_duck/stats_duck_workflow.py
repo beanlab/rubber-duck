@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, Mapping
 
 from openai.types.responses import EasyInputMessage
+from pydantic import BaseModel, ConfigDict, JsonValue, RootModel
 from quest import step
 
 from ...duck_protocols import DuckContext, DuckConversation, MessageHandler, MetricsHandler
@@ -33,7 +34,22 @@ class Decision(TypedDict):
     missing_information: str | None
 
 
+class DecisionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    analysis_requested: bool
+    analysis_description: str | None
+    missing_information: str | None
+
+
 class DatasetOrder(TypedDict):
+    action: Literal["list_datasets", "describe_dataset"]
+    data: str | None
+
+
+class DatasetOrderModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     action: Literal["list_datasets", "describe_dataset"]
     data: str | None
 
@@ -42,16 +58,45 @@ def _is_dataset_order(order):
     return 'action' in order
 
 
+class DataSelectionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    base: str
+    description: str
+
+
 class PlotOrder(TypedDict):
     plot: str
     data: str | dict
     args: dict
 
 
+class PlotOrderModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    plot: str
+    data: str | DataSelectionModel
+    args: dict[str, JsonValue]
+
+
 class AnalysisOrder(TypedDict):
     data: str | dict
     analysis: str
     args: dict
+
+
+class AnalysisOrderModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    data: str | DataSelectionModel
+    analysis: str
+    args: dict[str, JsonValue]
+
+
+class OrderResponseModel(RootModel[
+    DatasetOrderModel | PlotOrderModel | AnalysisOrderModel
+]):
+    pass
 
 
 StatsOrder = DatasetOrder | PlotOrder | AnalysisOrder
@@ -82,7 +127,13 @@ class ArtifactError(RuntimeError):
     pass
 
 
-def _stage_agent(agent: Agent, stage: str, additional_prompt: str | None = None) -> Agent:
+def _stage_agent(
+        agent: Agent,
+        stage: str,
+        additional_prompt: str | None = None,
+        *,
+        output_format: type[BaseModel] | None = None,
+) -> Agent:
     prompt = "\n\n".join(filter(None, [
         agent.prompt,
         (PROMPT_DIRECTORY / stage).read_text(encoding="utf-8"),
@@ -93,6 +144,7 @@ def _stage_agent(agent: Agent, stage: str, additional_prompt: str | None = None)
         name=f"{agent.name}_{Path(stage).stem}",
         prompt=prompt,
         tools=None,
+        output_format=output_format,
     )
 
 
@@ -234,7 +286,8 @@ class StatsDuckWorkflow:
         )
         await self._record_response(context, response["outputs"])
         await self._record_response_usage(context, response)
-        return json.loads(response["result"].strip())
+        decision = DecisionModel.model_validate(response["result"])
+        return decision.model_dump(mode="json")
 
     @step
     async def _order_from_menu(
@@ -251,7 +304,11 @@ class StatsDuckWorkflow:
         )
         await self._record_response(context, response["outputs"])
         await self._record_response_usage(context, response)
-        return json.loads(response["result"].strip())
+        result = response["result"]
+        if not isinstance(result, str):
+            raise TypeError("Expected order agent to return JSON text")
+        order = OrderResponseModel.model_validate_json(result)
+        return order.root.model_dump(mode="json")
 
     async def _generate_code(
             self,
@@ -567,7 +624,12 @@ def build(
     return StatsDuckWorkflow(
         name=name,
         introduction=settings.get("introduction", INTRODUCTION),
-        decision_agent=_stage_agent(agent, "decision.md", dataset_prompt),
+        decision_agent=_stage_agent(
+            agent,
+            "decision.md",
+            dataset_prompt,
+            output_format=DecisionModel,
+        ),
         order_agent=_stage_agent(agent, "order.md", dataset_prompt),
         coder_agent=_stage_agent(agent, "coder.md", dataset_prompt),
         clarification_agent=_stage_agent(agent, "clarification.md"),

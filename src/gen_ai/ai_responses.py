@@ -9,7 +9,7 @@ from openai.lib._parsing._responses import type_to_text_format_param
 from openai.types.responses import ToolChoiceTypesParam, ToolChoiceFunctionParam, FunctionToolParam, Response, \
     ResponseInputItemParam
 from openai.types.responses.response_input_item import FunctionCallOutput
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, JsonValue, ValidationError
 from quest import step
 
 from ..armory.tools import ToolBox
@@ -52,7 +52,7 @@ class Agent:
 class AIResponse(TypedDict):
     outputs: list[HistoryType]
     usage: Usage | None
-    result: str | BaseModel | None
+    result: str | JsonValue | None
 
 
 def format_function_call_history_items(result: str, call_id) -> FunctionCallOutput:
@@ -174,10 +174,17 @@ class ResponsesAPI:
 
                 message = self._message_text(outputs)
                 if message is not None:
+                    result = self._validate_output(
+                        agent.name,
+                        message,
+                        agent.output_format,
+                    )
+                    if isinstance(result, BaseModel):
+                        result = result.model_dump(mode="json")
                     return AIResponse(
                         outputs=turn_outputs,
                         usage=total_usage,
-                        result=self._validate_output(agent.name, message, agent.output_format),
+                        result=result,
                     )
 
         except (
@@ -215,7 +222,9 @@ class ResponsesAPI:
             params["instructions"] = prompt
 
         if output_format:
-            params["text"] = type_to_text_format_param(output_format)
+            params["text"] = {
+                "format": type_to_text_format_param(output_format),
+            }
 
         if reasoning:
             # noinspection PyTypeChecker
