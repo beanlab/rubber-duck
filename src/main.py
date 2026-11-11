@@ -125,7 +125,7 @@ def build_ducks(
     return channel_ducks
 
 
-def setup_inline_channel_behavior(
+def build_channel_custom_ducks(
         config: Config,
         *,
         message_handler: MessageHandler,
@@ -199,7 +199,7 @@ async def main(config: Config, log_path: Path | None):
                 containers=containers,
                 sql_session=sql_session,
             )
-            inline_channel_ducks = setup_inline_channel_behavior(
+            inline_channel_ducks = build_channel_custom_ducks(
                 config,
                 message_handler=bot,
                 metrics_handler=metrics,
