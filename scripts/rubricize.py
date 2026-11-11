@@ -2,7 +2,6 @@ from pathlib import Path
 import re
 import sys
 
-from myteam.workflow import run_agent
 from yaml import safe_dump, safe_load
 
 AGENT_PROMPT = """# Error Fix
@@ -66,6 +65,8 @@ def fetch_content(infile: str) -> str:
 
 
 def id_issues(md_prompt: str, code: str, yaml_filename: str):
+    from myteam.workflow import run_agent
+
     curr_step = run_agent(
         agent='codex',
         input={
@@ -92,6 +93,13 @@ def id_issues(md_prompt: str, code: str, yaml_filename: str):
 
     populate_correct_code_field(Path(yaml_filename), next_code)
     return
+
+
+def _apply_single_replacement(code: str, target: str, replacement: str) -> str:
+    """Apply one unambiguous code edit requested by the rubric workflow."""
+    if code.count(target) != 1:
+        raise ValueError("Replacement target must occur exactly once")
+    return code.replace(target, replacement, 1)
 
 
 def populate_error_code_fields(rubric_path: Path, source_code: str | None = None) -> None:
@@ -131,10 +139,18 @@ def _populate_error_code_fields(value, source_code: str | None = None):
         return populated
 
     if isinstance(value, list):
-        return [
-            _populate_error_code_fields(item, source_code)
-            for item in value
-        ]
+        populated_items = []
+        for item in value:
+            if isinstance(item, dict) and len(item) == 1:
+                key = next(iter(item))
+                tail = item[key]
+                if isinstance(key, str) and isinstance(tail, str):
+                    populated_items.append(f"{key}: {tail}")
+                    continue
+            populated_items.append(
+                _populate_error_code_fields(item, source_code)
+            )
+        return populated_items
 
     return value
 

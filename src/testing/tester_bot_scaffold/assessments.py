@@ -5,12 +5,13 @@ from pathlib import Path
 
 from openai.lib._parsing._responses import type_to_text_format_param
 
+from ...duck_protocols import DuckContext
 from ...gen_ai.gen_ai import Agent, AIClient
 from ...storage.assessment_models import (
     PostConversationAssessment,
     ProgressAssessment,
 )
-from ...utils.config_types import DuckContext, HistoryType
+from ...utils.config_types import HistoryType
 
 
 _ASSESSOR_MARKER_RE = re.compile(r"\{\{\s*(/?)assessor\s*\}\}")

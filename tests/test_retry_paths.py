@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.duck_protocols import DuckContext
 from src.gen_ai.gen_ai import AIClient
-from src.utils.config_types import DuckContext
 from src.utils.protocols import ConversationComplete
 from src.workflows.registration import Registration
 
@@ -23,6 +23,8 @@ class _FakeOutput:
 
 class _FakeResponse:
     def __init__(self):
+        self.id = "response-test"
+        self.model = "gpt-test"
         self.output = [_FakeOutput()]
         self.usage = None
 

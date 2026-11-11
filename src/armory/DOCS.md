@@ -5,7 +5,9 @@
 ## Operational Flow
 
 - `Armory.scrub_tools(...)` discovers `@register_tool` methods and registers them.
-- `add_tool(...)` wraps tools to accept `DuckContext`, tracks `complete_response` behavior, and stores strict function schemas.
+- `Armory.add_tool(...)` wraps legacy tools to accept `DuckContext`, tracks `complete_response` behavior, and stores strict function schemas.
+- `ToolBox.add_tool(...)` registers context-free tools for the Responses API and converts synchronous callables to async callables without adding control values to results.
+- `ToolBox.get_tool_schemas()` generates schemas for all registered tools.
 - `generate_function_schema(...)` derives strict JSON schema from Python type hints.
 - `PythonTools.run_code(...)` executes containerized Python, normalizes scientific notation in stdout/stderr, sends generated files/tables/stdout to Discord, and caches outputs.
 - `send_table(...)` now renders numeric cells as plain decimal strings (rounded/trimmed) and disables markdown numeric parsing to preserve formatting.

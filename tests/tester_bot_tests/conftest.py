@@ -35,14 +35,6 @@ TESTERBOT_TOKEN_ENV = "ACTOR_TOKEN"
 TESTERBOT_MODEL = "gpt-5.6-luna"
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--config",
-        action="store",
-        help="Path to the rubber duck application config for the e2e test.",
-    )
-
-
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"

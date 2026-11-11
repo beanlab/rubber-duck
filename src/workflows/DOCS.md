@@ -8,7 +8,7 @@
   - `registration` -> `RegistrationWorkflow`
   - `assignment_feedback` -> `AssignmentFeedbackWorkflow`
   - `debugging_practice_duck` -> `DebuggingPracticeDuckWorkflow`
-- `RegistrationWorkflow` runs `Registration.run(...)`, summarizes progress, and hands off continuation guidance to the configured registration bot tool.
+- `RegistrationWorkflow` runs `Registration.run(...)` in a fixed sequence and sends the completion message directly; it does not use an agent.
 - `AssignmentFeedbackWorkflow` collects a markdown report, resolves assignment/project, loads rubric/rules, grades each rubric item, and returns markdown-formatted feedback.
 
 ## Dependencies

@@ -3,8 +3,8 @@ import asyncio
 import pytest
 from pydantic import BaseModel
 
+from src.duck_protocols import DuckContext
 from src.gen_ai.gen_ai import AIClient, Agent, GenAIException
-from src.utils.config_types import DuckContext
 from src.utils.protocols import ConversationComplete
 
 

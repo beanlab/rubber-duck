@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import NotRequired, Literal, Union
+from typing import NotRequired, Literal
 
 from openai.types.responses import ResponseInputItemParam
 from typing_extensions import TypedDict
@@ -45,13 +44,8 @@ class RolesSettings(TypedDict):
 
 
 class RegistrationSettings(TypedDict):
-    cache_timeout: int
     authenticated_user_role_name: str
-    email_domain: str
-    # This is the domain used for email verification. For example, 'byu.edu'.
-    roles: RolesSettings
-    max_retries: NotRequired[int]
-    registration_bot: str
+    roles: NotRequired[RolesSettings | None]
     ta_channel_id: int
 
 
@@ -111,21 +105,9 @@ class AgentConversationSettings(TypedDict):
     file_type_ext: list[str]
 
 
-@dataclass
-class DuckContext:
-    guild_id: int
-    parent_channel_id: int
-    author_id: int
-    author_mention: str
-    content: str
-    message_id: int
-    thread_id: int
-    timeout: int
-
-
 class DuckConfig(TypedDict):
-    duck_type: str  # validated in build_ducks
-    settings: dict  # could specify further
+    builder: str  # path to build_duck function, e.g. ducks/standard_duck.py:build_standard_duck
+    settings: dict  # specific settings for the duck
 
 
 class ChannelConfig(TypedDict):
@@ -210,17 +192,18 @@ class ContainerTool(TypedDict):
 
 ToolConfig = ContainerTool
 
+
 class Config(TypedDict):
+    ducks: dict[DUCK_NAME, DuckConfig]
+    servers: dict[str, ServerConfig]
     sql: SQLConfig
     containers: dict[str, ContainerConfig]
-    tools: dict[str, ToolConfig]
+    tools: NotRequired[dict[str, ToolConfig]]
     cache_cleanup_settings: NotRequired[CacheCleanupSettings]
-    ducks: dict[DUCK_NAME, DuckConfig]
-    agents_as_tools: dict[str, AgentAsToolSettings]
-    servers: dict[str, ServerConfig]
+    agents_as_tools: NotRequired[dict[str, AgentAsToolSettings]]
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
     reporter_settings: ReporterConfig
-    sender_email: str
+    sender_email: NotRequired[str]
     bot_friends: NotRequired[list[int]]

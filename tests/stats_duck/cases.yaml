@@ -1,0 +1,216 @@
+model: gpt-5.6-luna
+reasoning: low
+base_prompt: src/prompts/production-prompts/stats-ai-responses.md
+
+contexts:
+  nutrition:
+    - filename: cereal.csv
+      dataset_name: Cereal Nutrition Data
+      path: /home/sandbox/datasets/cereal.csv
+      description: |
+        Dataset name: Cereal Nutrition Data
+        Columns:
+        - cereal, string, cereal name
+        - calories, integer, calories per serving
+    - filename: restaurant_nutrition.csv
+      dataset_name: Restaurant Nutrition Data
+      path: /home/sandbox/datasets/restaurant_nutrition.csv
+      description: |
+        Dataset name: Restaurant Nutrition Data
+        Columns:
+        - item, string, menu item
+        - calories, integer, calories per item
+
+cases:
+  - id: decide-ready-histogram
+    context: nutrition
+    run: decision
+    history:
+      - role: user
+        content: Make a histogram of calories from the cereal dataset.
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [histogram, calories, cereal]
+
+  - id: decide-missing-dataset
+    context: nutrition
+    run: decision
+    history:
+      - role: user
+        content: Make a histogram.
+    expect:
+      decision:
+        analysis_requested: false
+        missing_information:
+          contains_all: [dataset, variable]
+
+  - id: decide-follow-up-uses-history
+    context: nutrition
+    run: decision
+    history:
+      - role: user
+        content: Calculate the mean from the cereal dataset.
+      - role: assistant
+        content: Which variable should I use?
+      - role: user
+        content: Calories.
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [mean, calories, cereal]
+
+  - id: order-cereal-histogram
+    context: nutrition
+    run: order
+    analysis_description: Create a histogram of calories from the cereal dataset.
+    expect:
+      order:
+        plot: seaborn.histplot
+        data: cereal.csv
+        args:
+          x: calories
+
+  - id: order-list-datasets
+    context: nutrition
+    run: order
+    analysis_description: List the available datasets.
+    expect:
+      order:
+        action: list_datasets
+        data: null
+
+  - id: code-cereal-histogram
+    context: nutrition
+    run: coder
+    order:
+      plot: seaborn.histplot
+      data: cereal.csv
+      args:
+        x: calories
+    expect:
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]
+
+  - id: decision-to-order
+    context: nutrition
+    run: [decision, order]
+    handoff: both
+    history:
+      - role: user
+        content: Make a histogram of calories from the cereal dataset.
+    analysis_description: Create a histogram of calories from the cereal dataset.
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [histogram, calories, cereal]
+      order:
+        plot: seaborn.histplot
+        data: cereal.csv
+        args:
+          x: calories
+
+  - id: decision-to-order-to-coder-mean
+    context: nutrition
+    run: [decision, order, coder]
+    handoff: both
+    history:
+      - role: user
+        content: Calculate the mean calories in the cereal dataset.
+    analysis_description: Calculate the mean of calories in the cereal dataset.
+    order:
+      data: cereal.csv
+      analysis: mean
+      args:
+        column: calories
+    expect:
+      decision:
+        analysis_requested: true
+        analysis_description:
+          contains_all: [mean, calories, cereal]
+      order:
+        data: cereal.csv
+        analysis: mean
+        args:
+          column: calories
+      code:
+        contains_all: [cereal.csv, calories, mean, print]
+        excludes: ["```"]
+
+  - id: full-ready-histogram
+    context: nutrition
+    run: full
+    turns:
+      - Make a histogram of calories from the cereal dataset.
+    execution: image
+    expect:
+      images: 1
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]
+
+  - id: full-missing-dataset
+    context: nutrition
+    run: full
+    turns:
+      - Make a histogram.
+    expect:
+      texts:
+        - contains_all: [dataset, variable]
+          excludes: [cereal.csv, restaurant_nutrition.csv]
+          question: true
+
+  - id: full-list-datasets
+    context: nutrition
+    run: full
+    turns:
+      - What datasets are available?
+    expect:
+      texts:
+        - contains_all:
+            - Available datasets
+            - Cereal Nutrition Data
+            - Restaurant Nutrition Data
+          excludes: [cereal.csv, restaurant_nutrition.csv]
+
+  - id: full-describe-cereal
+    context: nutrition
+    run: full
+    turns:
+      - Describe the cereal dataset.
+    expect:
+      texts:
+        - contains_all: [Cereal Nutrition Data, cereal, calories]
+
+  - id: full-mean-calories
+    context: nutrition
+    run: full
+    turns:
+      - Calculate the mean calories in the cereal dataset.
+    execution: text
+    expect:
+      texts:
+        - contains_all: [Analysis result]
+      code:
+        contains_all: [cereal.csv, calories, mean, print]
+        excludes: ["```"]
+
+  - id: full-clarify-then-histogram
+    context: nutrition
+    run: full
+    turns:
+      - Make a histogram.
+      - Use the cereal dataset and the calories variable.
+    execution: image
+    expect:
+      texts:
+        - contains_all: [dataset, variable]
+          question: true
+      images: 1
+      code:
+        contains_all: [histplot, calories, cereal.csv, savefig]
+        excludes: ["```"]

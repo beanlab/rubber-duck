@@ -34,4 +34,11 @@ nic2.yaml
 runtime-secrets*.json
 /production-runtime.json
 .codex
+/.vscode/
+/research/papers/
+/data/
+/experiments/runs/
+/experiments/results/
+/.agents/
+.terraform/
 .agents/scratch/

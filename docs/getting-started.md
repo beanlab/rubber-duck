@@ -52,11 +52,12 @@ Before you begin, you'll need:
     - **OpenAI API Key**:
         - From the [OpenAI Platform](https://platform.openai.com/), go to `Settings` > `API keys`
         - Create a new secret key
-    - Set both in your shell or IDE run configuration:
+    - Add both to a `.env` file in the repository root:
     ```bash
-    export DISCORD_TOKEN=your_discord_bot_token
-    export OPENAI_API_KEY=your_openai_key
+    DISCORD_TOKEN=your_discord_bot_token
+    OPENAI_API_KEY=your_openai_key
     ```
+    - The app loads `.env` automatically at startup. Shell or IDE environment values, when present, take precedence.
 
 ## Discord Bot Setup
 

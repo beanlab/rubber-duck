@@ -1,18 +1,42 @@
 import re
 import uuid
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
 
 import discord
 from discord import Guild, utils
 from quest import step
 
-from ..armory.tools import register_tool
-from ..utils.config_types import RegistrationSettings, DuckContext, RetryProtocol
-from ..utils.logger import duck_logger
-from ..utils.message_utils import wait_for_message
-from ..utils.protocols import ConversationComplete
-from ..utils.retry import retry_async, is_retryable_discord_server_error
-from ..utils.send_email import EmailSender
+from ...armory.tools import register_tool
+from ...duck_protocols import (
+    DuckContext,
+    DuckConversation,
+    MessageHandler,
+    MetricsHandler,
+)
+from ...utils.config_types import RegistrationSettings, RetryProtocol
+from ...utils.logger import duck_logger
+from ...utils.message_utils import wait_for_message
+from ...utils.protocols import ConversationComplete
+from ...utils.retry import retry_async, is_retryable_discord_server_error
+from ...utils.send_email import EmailSender
+from ...gen_ai.ai_responses import ResponsesAPI
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from ...commands.command import Command
+    from ...utils.python_exec_container import PythonExecContainer
+
+
+DEFAULT_EMAIL_DOMAIN = "byu.edu"
+REGISTRATION_SENDER_EMAIL = "byu-cs-course-ops@cs.byu.edu"
+REGISTRATION_RETRY_PROTOCOL: RetryProtocol = {
+    "max_retries": 3,
+    "delay": 1,
+    "backoff": 2,
+}
+MAX_NICKNAME_RETRIES = 3
 
 
 async def wait_for_registration_msg(*args, **kwargs) -> str:
@@ -48,6 +72,13 @@ class Registration:
         self._settings = settings
         self._retry_protocol = retry_protocol
 
+    @property
+    def settings(self) -> RegistrationSettings:
+        return self._settings
+
+    async def send_message(self, thread_id: int, message: str):
+        await self._send_message(thread_id, message)
+
     async def _handle_discord_retry_exhausted(self, ctx: DuckContext, operation_name: str, error: Exception):
         duck_logger.warning(
             "Discord connection issue persisted after retries during registration "
@@ -77,50 +108,6 @@ class Registration:
             is_retryable_discord_server_error,
             on_exhausted=lambda error, _attempt: self._handle_discord_retry_exhausted(ctx, operation_name, error)
         )
-
-    async def run(self, ctx: DuckContext) -> RegistrationInfo | None:
-        # Start the registration process
-        registration_info = RegistrationInfo(None, False, False, None, None, None)
-        try:
-            net_id = await self.get_net_id(ctx)
-            if not net_id:
-                return registration_info
-            registration_info.net_id = net_id
-
-            if not await self.check_net_id(net_id):
-                return registration_info
-            registration_info.net_id_checked = True
-
-            # Get and verify the email
-            if not await self.confirm_registration_via_email(ctx, net_id):
-                return registration_info
-            registration_info.email_verified = True
-
-            # Get and assign nickname
-            name, reason = await self.nickname_flow(ctx)
-            if reason:
-                registration_info.nickname_reason = reason
-                return registration_info
-            registration_info.nickname = name
-
-            # Assign Discord roles
-            roles = await self.assign_roles(ctx)
-            if roles:
-                registration_info.roles = roles
-            else:
-                return registration_info
-
-        except ConversationComplete as e:
-            if ctx.thread_id and str(e):
-                await self._send_message(ctx.thread_id, str(e))
-        except Exception as e:
-            duck_logger.exception(f"Setup failed: {e}")
-            await self._send_message(ctx.thread_id, "Registration setup failed. Please contact an administrator.")
-            if self._settings.get('ta_channel_id'):
-                await self._send_message(
-                    self._settings['ta_channel_id'],
-                    f"Registration workflow failed. Thread: <#{ctx.thread_id}>"
-                )
 
     @register_tool
     async def check_net_id(self, netid: str):
@@ -160,7 +147,7 @@ class Registration:
     async def confirm_registration_via_email(self, ctx: DuckContext, net_id: str) -> bool:
         thread_id = ctx.thread_id
         timeout = ctx.timeout or 300
-        email_domain = self._settings['email_domain']
+        email_domain = DEFAULT_EMAIL_DOMAIN
         email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
@@ -384,10 +371,15 @@ class Registration:
                     f"You already have these selected roles: {already_added_role_names}"
                 )
 
-        # Send confirmation message
-        role_names = ", ".join(role.name for role in selected_roles)
+        # Send confirmation message. Existing selected roles count as success.
+        assigned_roles = [role for role in selected_roles]
+        assigned_roles.extend(
+            role for role_id in already_roles
+            if (role := guild.get_role(role_id)) is not None
+        )
+        role_names = ", ".join(role.name for role in assigned_roles)
         if not selected_roles:
-            await self._send_message(thread_id, f"No new roles added")
+            await self._send_message(thread_id, "No new roles added")
         else:
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
         return role_names
@@ -448,7 +440,7 @@ class Registration:
             ctx: DuckContext,
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        max_retries = self._settings.get('max_retries', 3)
+        max_retries = MAX_NICKNAME_RETRIES
         thread_id = ctx.thread_id
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, ctx.timeout)
@@ -461,3 +453,89 @@ class Registration:
                 await self._send_message(thread_id, f"Please try again.")
             else:
                 return name, reason
+
+
+class RegistrationMessageHandler(MessageHandler, Protocol):
+    async def fetch_guild(self, guild_id: int) -> discord.Guild | None: ...
+
+
+class RegistrationWorkflow:
+    commands: list["Command"] = []
+
+    def __init__(self, name: str, registration: Registration):
+        self.name = name
+        self._registration = registration
+
+    async def __call__(self, context: DuckContext):
+        info = RegistrationInfo(None, False, False, None, None, None)
+        try:
+            net_id = await self._registration.get_net_id(context)
+            if not net_id:
+                return
+            info.net_id = net_id
+
+            if not await self._registration.check_net_id(net_id):
+                return
+            info.net_id_checked = True
+
+            if not await self._registration.confirm_registration_via_email(context, net_id):
+                return
+            info.email_verified = True
+
+            name, reason = await self._registration.nickname_flow(context)
+            if reason:
+                info.nickname_reason = reason
+                return
+            info.nickname = name
+
+            roles = await self._registration.assign_roles(context)
+            if not roles:
+                return
+            info.roles_assigned = roles
+
+        except ConversationComplete as error:
+            if context.thread_id and str(error):
+                await self._registration.send_message(context.thread_id, str(error))
+            return
+        except Exception as error:
+            duck_logger.exception(f"Setup failed: {error}")
+            await self._registration.send_message(
+                context.thread_id,
+                "Registration setup failed. Please contact an administrator.",
+            )
+            ta_channel_id = self._registration.settings.get("ta_channel_id")
+            if ta_channel_id:
+                await self._registration.send_message(
+                    ta_channel_id,
+                    f"Registration workflow failed. Thread: <#{context.thread_id}>",
+                )
+            return
+
+        if info.roles_assigned:
+            await self._registration.send_message(
+                context.thread_id,
+                "Registration complete. You’re all set.",
+            )
+
+
+def build(
+    name: str,
+    settings: RegistrationSettings,
+    *,
+    message_handler: RegistrationMessageHandler,
+    metrics_handler: MetricsHandler,
+    responses_api: ResponsesAPI,
+    containers: dict[str, "PythonExecContainer"],
+    sql_session: "Session",
+    tool_configs: dict[str, object],
+) -> DuckConversation:
+    del metrics_handler, responses_api, containers, sql_session, tool_configs
+    registration = Registration(
+        send_message=message_handler.send_text,
+        get_channel=None,
+        fetch_guild=message_handler.fetch_guild,
+        email_sender=EmailSender(REGISTRATION_SENDER_EMAIL),
+        settings=settings,
+        retry_protocol=REGISTRATION_RETRY_PROTOCOL,
+    )
+    return RegistrationWorkflow(name, registration)

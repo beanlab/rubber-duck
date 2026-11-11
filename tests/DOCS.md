@@ -1,15 +1,38 @@
 ## Purpose
 
-`tests/` provides lightweight regression checks for SQL metrics persistence, Python tool output formatting behavior, and rubric generation helpers.
+`tests/` contains application regression tests, pytest-based prompt tests, and
+Discord end-to-end tests.
 
-## Operational Flow
+## Prompt tests
 
-- `test_sql_metric_handlers.py` validates insert/read paths for `messages`, `usage`, and `feedback` via in-memory SQLite.
-- `test_python_tools_formatting.py` validates numeric table formatting, blank handling, and scientific-notation suppression in rendered tool output.
-- `test_rubricize.py` validates debugging-practice rubric helper behavior for line-numbered code fields, error-line extraction, and correct-code output.
-- `conftest.py` injects a minimal `quest` module shim so tests can import project modules without full runtime dependencies.
+Prompt tests use the normal pytest infrastructure. Offline framework tests are
+under `tests/prompt_tests/deterministic/`; live model-backed tests are marked
+`prompt_eval`. They run when both required API keys are available and otherwise
+skip with a clear reason.
 
-## Failure Modes and Guardrails
+Run the offline prompt-test coverage with:
 
-- Test coverage is intentionally narrow; most runtime subsystems are currently untested in this directory.
-- Formatting tests assert string-level output contracts, so prompt/runtime formatting changes may require coordinated test updates.
+```bash
+poetry run pytest tests/prompt_tests/deterministic
+```
+
+Run the live, paid prompt evaluations with:
+
+```bash
+poetry run pytest \
+  -m prompt_eval \
+  -s \
+  tests/prompt_tests/test_responses.py
+```
+
+`OPENAI_API_KEY` and `JEV_API_KEY` are required for live evaluations. Use
+standard pytest options such as `-k contradictory` to select individual cases.
+
+The YAML evaluation definitions and their complete field reference are under
+`tests/prompt_tests/configs/`.
+
+## Discord end-to-end tests
+
+Discord tests remain under `tests/tester_bot_tests/`. They require the relevant
+bot credentials and application configuration; see that directory's fixtures
+for supported command-line options.

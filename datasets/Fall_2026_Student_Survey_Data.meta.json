@@ -1,0 +1,210 @@
+{
+  "dataset_name": "Fall 2026 Student Survey Data",
+  "description": "Survey responses from students collected for Fall 2026, covering academics, demographics, habits, preferences, personal estimates, and campus-related knowledge.",
+  "columns": [
+    {
+      "col_name": "College",
+      "display_name": "Academic College",
+      "description": "The respondent's academic college, recorded using a name or abbreviation.",
+      "dtype": "string: Business, Education, CMS, Life, Humanities, CFAC, Nursing, Engineering, FHSS"
+    },
+    {
+      "col_name": "SemestersTillGrad",
+      "display_name": "Semesters Until Graduation",
+      "description": "Number of semesters the respondent expects to complete before graduating.",
+      "dtype": "int"
+    },
+    {
+      "col_name": "AttendDevos",
+      "display_name": "Attends Devotionals",
+      "description": "Indicates whether the respondent attends university devotionals.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "InRelationship",
+      "display_name": "In a Relationship",
+      "description": "Indicates whether the respondent is currently in a relationship.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "UsedDatingApp",
+      "display_name": "Has Used a Dating App",
+      "description": "Indicates whether the respondent has used a dating app.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "AppleOrAndroid",
+      "display_name": "Mobile Platform",
+      "description": "The respondent's preferred or used mobile platform.",
+      "dtype": "string: Apple, Android"
+    },
+    {
+      "col_name": "MacOrPC",
+      "display_name": "Computer Platform",
+      "description": "The respondent's preferred or used computer platform.",
+      "dtype": "string: Mac, PC, Other"
+    },
+    {
+      "col_name": "Diet",
+      "display_name": "Diet",
+      "description": "The respondent's selected dietary pattern.",
+      "dtype": "string: Omnivore, Keto, Vegetarian, Vegan, Paleo"
+    },
+    {
+      "col_name": "FoodPerWeek",
+      "display_name": "Weekly Food Spending",
+      "description": "The respondent's reported weekly spending on food, in dollars.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "Height",
+      "display_name": "Height",
+      "description": "The respondent's self-reported height, in inches.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "MotherHeight",
+      "display_name": "Mother's Height",
+      "description": "The respondent's reported height of their mother, in inches.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "FatherHeight",
+      "display_name": "Father's Height",
+      "description": "The respondent's reported height of their father, in inches.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "Sex",
+      "display_name": "Sex",
+      "description": "The respondent's reported sex.",
+      "dtype": "string: Male, Female"
+    },
+    {
+      "col_name": "ShoeSize",
+      "display_name": "Shoe Size",
+      "description": "The respondent's reported shoe size.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "SportsInHS",
+      "display_name": "Played Sports in High School",
+      "description": "Indicates whether the respondent played sports in high school.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "AI",
+      "display_name": "Has Used AI",
+      "description": "Indicates whether the respondent reported using artificial intelligence tools.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "HoursSleep",
+      "display_name": "Hours of Sleep",
+      "description": "The respondent's reported typical number of hours of sleep per night.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "MusicGenre",
+      "display_name": "Preferred Music Genre",
+      "description": "The respondent's selected preferred music genre.",
+      "dtype": "string: Rock and Metal, Pop, Hip-hop and Rap, Country, Other, Dance and Electronic Music, Classical"
+    },
+    {
+      "col_name": "TuitionPerSemester",
+      "display_name": "Tuition per Semester",
+      "description": "The amount the respondent reports paying in tuition per semester, in dollars.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "Credits",
+      "display_name": "Current Credits",
+      "description": "Number of academic credits the respondent is taking during the current semester.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "HighSchoolGPA",
+      "display_name": "High School GPA",
+      "description": "The respondent's self-reported high school grade point average.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "Job",
+      "display_name": "Has a Job",
+      "description": "Indicates whether the respondent currently has a job.",
+      "dtype": "string: Yes, No"
+    },
+    {
+      "col_name": "NumberOfSiblings",
+      "display_name": "Number of Siblings",
+      "description": "The respondent's reported number of siblings.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "FutureHome",
+      "display_name": "Preferred Future Home Region",
+      "description": "The region where the respondent would prefer to live in the future.",
+      "dtype": "string: West, International, South, Northeast, Midwest"
+    },
+    {
+      "col_name": "HoursHomework",
+      "display_name": "Weekly Homework Hours",
+      "description": "The respondent's reported number of hours spent on homework per week.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "SocialMediaApp",
+      "display_name": "Preferred Social Media App",
+      "description": "The respondent's selected preferred social media application.",
+      "dtype": "string: Instagram, YouTube, Facebook, Tik Tok, Snapchat, Twitter"
+    },
+    {
+      "col_name": "MovieGenre",
+      "display_name": "Preferred Movie Genre",
+      "description": "The respondent's selected preferred movie genre.",
+      "dtype": "string: Action, Comedy, Horror, Fantasy, Romance, Drama, Foreign, Mystery"
+    },
+    {
+      "col_name": "Subscriptions",
+      "display_name": "Streaming Subscription",
+      "description": "The respondent's selected streaming service subscription; missing values indicate no recorded selection.",
+      "dtype": "string: Netflix, Apple TV, HBO Max, Hulu"
+    },
+    {
+      "col_name": "AgeSantaClaus",
+      "display_name": "Age Learned About Santa Claus",
+      "description": "The age at which the respondent reports learning that Santa Claus was not real.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "YearInternet",
+      "display_name": "Estimated Year the Internet Began",
+      "description": "The respondent's estimate of the year the Internet began.",
+      "dtype": "int"
+    },
+    {
+      "col_name": "BYUFounded",
+      "display_name": "Estimated Year BYU Was Founded",
+      "description": "The respondent's estimate of the year Brigham Young University was founded.",
+      "dtype": "int"
+    },
+    {
+      "col_name": "YHowTall",
+      "display_name": "Estimated Height of the Y",
+      "description": "The respondent's estimate of the height of the block Y on Y Mountain, in feet.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "Salary",
+      "display_name": "Expected Salary",
+      "description": "The respondent's reported expected annual salary, in dollars.",
+      "dtype": "float"
+    },
+    {
+      "col_name": "PayForA",
+      "display_name": "Amount Willing to Pay for an A",
+      "description": "The amount the respondent reports being willing to pay to receive an A in a class, in dollars.",
+      "dtype": "float"
+    }
+  ]
+}

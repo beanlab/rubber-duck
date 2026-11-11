@@ -6,15 +6,13 @@
 
 - `build_agent(...)` builds `Agent` objects from inline prompts or `prompt_files`.
 - `AIClient._get_completion(...)` calls `AsyncOpenAI.responses.create(...)` with instructions, history, tool schemas, tool settings, and optional reasoning/output format.
-- `AIClient._run_agent(...)` handles response items:
-  - `function_call`: execute tool through armory, append `function_call_output`, continue loop.
-  - `message`: return assistant text.
-  - `reasoning`: ignored for user output.
+- `AIClient._run_agent(...)` handles legacy response items through Armory.
+- `ResponsesAPI.run_agent_turn(...)` sends schemas and executes context-free tools through the agent's optional `ToolBox`, appending `function_call_output` items until a message is returned.
 - `run_conversation(...)` loops user input -> model/tool execution until the conversation concludes.
 
 ## Dependencies
 
-- Depends on `Armory` for tool schemas/tool execution.
+- Legacy `AIClient` depends on `Armory`; `ResponsesAPI` agents use `ToolBox`.
 - Depends on record hooks for metrics (`record_message`, `record_usage`).
 
 ## Failure Modes and Guardrails
