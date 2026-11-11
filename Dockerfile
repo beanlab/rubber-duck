@@ -8,8 +8,9 @@ ENV PYTHONPATH=/app/src \
 
 WORKDIR /app
 
+ARG POETRY_VERSION=2.5.1
 COPY pyproject.toml poetry.lock ./
-RUN pip install --no-cache-dir poetry && \
+RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}" && \
     poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --no-root --only main && \
     pip uninstall --yes poetry
