@@ -34,7 +34,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 
 ### Prerequisites
 
-- Python 3.11
+- Python 3.11 or newer (the production container uses Python 3.12)
 - Poetry
 - Docker (required if you enable container tools such as code execution)
 - Discord bot token
@@ -73,7 +73,9 @@ Primary examples:
 
 ## Deployment Summary
 
-CI/CD is defined in `.github/workflows/ci-cd.yml`.
+Production deploys from `master` through `.github/workflows/ci-cd.yml`. GitHub Actions uses AWS OIDC to build a full-SHA-tagged image, provision a private EC2 environment with Terraform, update the host, and deploy the exact ECR digest through SSM. Runtime secrets come from Secrets Manager, configuration comes from a fixed S3 object, and SQLite data resides on a persistent EBS volume.
+
+See [AWS production deployment](docs/deployment.md) for bootstrap, operation, rollback, and database-cutover instructions.
 
 ## Documentation
 

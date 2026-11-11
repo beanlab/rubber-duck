@@ -1,130 +1,170 @@
-# Deployment Guide
+# AWS production deployment
 
-This guide covers the deployment process for the Rubber Duck bot to AWS infrastructure.
+Rubber Duck production runs on one Terraform-managed EC2 instance and is deployed from GitHub Actions through AWS Systems Manager (SSM). The instance has no public IP, inbound security-group rules, SSH key, or static AWS credentials.
 
-## Prerequisites
+## Production environment
 
-1. **AWS Account Access**
+| Setting | Value |
+|---|---|
+| Git branch | `master` |
+| Environment | `production` |
+| AWS account | `844825014198` |
+| Region | `us-west-2` |
+| VPC | `vpc-0d5da450de7b3e1ee` |
+| Private subnet | `subnet-0a49a0288c57235e1` |
+| Instance type | `t3.small` |
+| Ubuntu AMI | `ami-026ec9e84a2221297` |
+| ECR repository | `beanlab/rubber-duck` |
+| Configuration | `s3://rubber-duck-config/environments/production/production-config-<full-commit-sha>.yaml` |
+| Runtime secret | `/rubber-duck/production/runtime` |
 
-   - Ensure you have access to the BYU AWS account
-   - Have the necessary IAM permissions
+The AMI is deliberately pinned. Updating its ID in `aws/terraform/environment/environments/production.tfvars` replaces the instance while retaining the persistent data volume.
 
-2. **AWS CLI**
+## Architecture
 
-   - Install AWS CLI from [aws.amazon.com/cli](https://aws.amazon.com/cli/)
-   - Configure with your credentials
+- `aws/terraform/bootstrap`: shared state bucket, GitHub OIDC provider, and GitHub deployment role.
+- `aws/terraform/environment`: EC2, IAM instance profile, security group, persistent EBS volume, and secret container.
+- `aws/scripts`: scripts installed on the instance by cloud-init.
+- `.github/workflows/ci-cd.yml`: build, provision, host maintenance, and deployment pipeline.
 
-3. **Docker**
-   - Install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
-   - Verify installation with `docker --version`
+SQLite is stored at `/var/lib/rubber-duck/rubber-duck.db` on the persistent EBS volume and mounted into the container as `/rubber-duck.db`.
 
-## GitHub Secrets Configuration
+## One-time bootstrap
 
-The following secrets must be configured in your GitHub repository:
+Bootstrap requires Terraform 1.10 or newer, AWS CLI, `jq`, and an administrator-capable AWS profile. It creates new resources but does not interact with the old production instance.
 
-| Secret Name           | Description                 | Example                                             |
-| --------------------- | --------------------------- | --------------------------------------------------- |
-| AWS_ACCESS_KEY_ID     | AWS Access Key ID           | AKIAIOSFODNN7EXAMPLE                                |
-| AWS_SECRET_ACCESS_KEY | AWS Secret Access Key       | wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY            |
-| AWS_REGION            | AWS region                  | us-west-2                                           |
-| VPC_ID                | VPC ID                      | vpc-057175f829f9e74b2                               |
-| SUBNET_IDS            | Comma-separated subnet IDs  | subnet-0a9cdc5582a7a6e20,subnet-1b8b9a9c87b1a6343   |
-| SECURITY_GROUP_ID     | Security Group ID           | sg-05cce821e162bca07                                |
-| EXECUTION_ROLE        | ECS Task Execution Role ARN | arn:aws:iam::844825014198:role/ecsTaskExecutionRole |
+Create a local JSON file containing Docker environment values:
 
-## Deployment Process
+```json
+{
+  "DISCORD_TOKEN": "...",
+  "OPENAI_API_KEY": "..."
+}
+```
 
-1. **Build Docker Image**
+Additional single-line string values may be included when required. Protect the file and run bootstrap:
 
-   ```bash
-   docker build -t rubber-duck:latest .
-   ```
+```bash
+chmod 600 /private/path/production-runtime.json
+./aws/first-time-bootstrap.sh \
+  --profile byu-cs-poweruser \
+  --secrets /private/path/production-runtime.json \
+  --config production-config.yaml
+```
 
-2. **Push to ECR**
+The command:
 
-   ```bash
-   aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck
-   docker tag rubber-duck:latest 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-   docker push 844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck:latest
-   ```
+1. validates account `844825014198` and region `us-west-2`
+2. creates/imports the Terraform state bucket and existing GitHub OIDC provider
+3. creates the bounded GitHub deployment role
+4. provisions the new production environment
+5. writes runtime values directly to Secrets Manager
+6. uploads a baseline `environments/production/config.yaml` object (normal deployments use SHA-versioned configurations instead)
 
-3. **Deploy to ECS**
-   - The deployment is automated through GitHub Actions
-   - Push to the master branch to trigger deployment
-   - Monitor the deployment in GitHub Actions
+Secret values never enter Terraform state or S3. Keep the local JSON file outside the repository. Bootstrap is rerunnable: if it stops after infrastructure creation, correct the reported error and run the same command again. A successful run verifies that the runtime secret has an `AWSCURRENT` value and that the configuration object exists before reporting completion.
 
-## Configuration Files
+Before applying, plans can be reviewed manually from each Terraform root using the backend and variables shown in `aws/first-time-bootstrap.sh`.
 
-1. **Environment Configuration**
+When upgrading an existing bootstrap, apply its Terraform plan before merging workflow changes: the GitHub role needs `s3:PutObject` on `environments/production/production-config-*.yaml`. The routine workflow applies only the environment root, not bootstrap IAM.
 
-   - Store environment variables in S3
-   - Example format: `s3://rubber-duck-config/pre-production/secrets-{sha}.env`
-   - Current workflow naming uses `production-secrets-{short_sha}.env`
+Instance scripts are delivered through cloud-init. Changes to them cause Terraform to replace the instance; review that plan and coordinate downtime/data cutover before merging.
 
-2. **Bot Configuration**
-   - Bot configuration in S3 (YAML in current workflow)
-   - Example format: `s3://rubber-duck-config/pre-production/config-{sha}.json`
-   - Current workflow naming uses `production-config-{short_sha}.yaml`
-   - See `.github/workflows/ci-cd.yml` for source-of-truth naming
+## Normal deployment
 
-## Monitoring
+A push to `master`, or a manual dispatch from `master`, runs one serialized workflow:
 
-1. **CloudWatch Logs**
+1. validate the explicit `master -> production` mapping
+2. build with the current Python 3.12 base image
+3. label and tag the image with the full commit SHA
+4. push it to ECR, upload the checked-out `production-config.yaml` under its full-SHA S3 filename, and resolve the image digest
+5. apply production Terraform
+6. wait for cloud-init and SSM
+7. update host packages and reboot when required
+8. deploy the exact ECR digest through SSM
+9. require the container to remain running for 30 seconds
+10. report environment, commit, tag, digest, AMI, and instance ID
 
-   - View logs in AWS CloudWatch
-   - Log group: `/ecs/rubber-duck-pre-production`
+The production container is named `rubber-duck-production`. Release metadata, including the exact image digest and versioned config URI, is written to `/var/lib/rubber-duck/release.json`.
 
-2. **ECS Service**
-   - Monitor service health in ECS console
-   - Check task status and logs
+Each deployment pairs image tag `production-<full-sha>` with `production-config-<full-sha>.yaml`. CI retains older S3 config objects and ECR images. Local Docker cleanup does not delete ECR images. The deployment script verifies the image's revision label and the matching configuration's existence before stopping the current container.
 
-## Troubleshooting
+## Diagnostics
 
-1. **Deployment Failures**
+Find the Terraform-managed instance:
 
-   - Check GitHub Actions logs
-   - Verify all secrets are configured
-   - Ensure IAM roles have correct permissions
+```bash
+aws --profile byu-cs-poweruser --region us-west-2 ec2 describe-instances \
+  --filters Name=tag:Application,Values=rubber-duck Name=tag:Environment,Values=production \
+  --query 'Reservations[].Instances[].{Id:InstanceId,State:State.Name,Name:Tags[?Key==`Name`]|[0].Value}'
+```
 
-2. **Container Issues**
+Use Session Manager rather than SSH:
 
-   - Check CloudWatch logs
-   - Verify environment variables
-   - Ensure config files are accessible
+```bash
+aws --profile byu-cs-poweruser --region us-west-2 ssm start-session \
+  --target INSTANCE_ID
+```
 
-3. **Network Issues**
-   - Verify VPC and subnet configuration
-   - Check security group rules
-   - Ensure proper IAM roles
+Useful instance-side commands:
 
-## Rollback Procedure
+```bash
+sudo docker ps -a
+sudo docker logs --tail 200 rubber-duck-production
+sudo cat /var/lib/rubber-duck/release.json
+findmnt /var/lib/rubber-duck
+cloud-init status --long
+```
 
-1. **Manual Rollback**
+GitHub prints complete SSM invocation details when maintenance or deployment fails.
 
-   ```bash
-   # Revert to previous image
-   aws ecs update-service --cluster DuckCluster-rubber-duck-pre-production --service rubber-duck-pre-production-Service --force-new-deployment
-   ```
+## Rollback
 
-2. **GitHub Rollback**
-   - Revert the commit that caused issues
-   - Push to trigger new deployment
+There is no automatic rollback or arbitrary-commit workflow input. To manually deploy a retained image/config pair, choose its full commit SHA. On an administrator workstation, resolve the image digest:
 
-## Best Practices
+```bash
+SHA=<40-character-commit-sha>
+DIGEST=$(aws --profile byu-cs-poweruser --region us-west-2 ecr describe-images \
+  --repository-name beanlab/rubber-duck \
+  --image-ids "imageTag=production-$SHA" \
+  --query 'imageDetails[0].imageDigest' --output text)
+printf '%s\n' "$DIGEST"
+```
 
-1. **Security**
+Then, in an SSM session on the new instance, substitute that SHA and digest:
 
-   - Never commit sensitive information
-   - Use GitHub Secrets for all credentials
-   - Follow least privilege principle
+```bash
+SHA=<same-40-character-commit-sha>
+DIGEST=sha256:<resolved-digest>
+sudo /usr/local/sbin/deploy-container.sh \
+  "844825014198.dkr.ecr.us-west-2.amazonaws.com/beanlab/rubber-duck@$DIGEST" \
+  "$SHA" "production-$SHA"
+```
 
-2. **Deployment**
+The script selects `environments/production/production-config-$SHA.yaml` automatically. No config upload or Terraform change is needed. Verify `/var/lib/rubber-duck/release.json` afterward. Avoid overlapping manual deployment with CI.
 
-   - Test in pre-production first
-   - Monitor deployment progress
-   - Have rollback plan ready
+Alternatively, revert on `master` and push to rebuild/deploy the reverted source and config. A rerun can rebuild an existing source tag with newer dependencies; use the digest from the earlier release metadata when you need that exact build. This manual pairing applies to releases produced by the new full-SHA workflow, not legacy five-character tags.
 
-3. **Monitoring**
-   - Set up CloudWatch alarms
-   - Monitor error rates
-   - Track resource utilization
+## Manual database cutover
+
+The replacement volume intentionally starts empty. Do not run the old and new production bots simultaneously with the same Discord token.
+
+At the coordinated cutover:
+
+1. manually stop the old `duck` container
+2. make a consistent copy of `/home/ubuntu/rubber-duck.db` from the old host
+3. stop `rubber-duck-production` if it has created an empty database
+4. place the copied database at `/var/lib/rubber-duck/rubber-duck.db` on the new host
+5. set ownership and permissions appropriate for the root-run container
+6. rerun the GitHub deployment and verify bot behavior and stored records
+7. take the old instance offline manually only after verification
+
+Terraform and the deployment workflow never target, stop, or replace the old instance `i-0e82640083109edf2`.
+
+## Security notes
+
+- GitHub uses OIDC role assumption; no AWS access-key secrets are required.
+- The application uses its EC2 instance profile from inside Docker.
+- The host Docker socket is mounted intentionally because configured Python tools launch short-lived sibling sandbox containers. This grants the application root-equivalent control of the new host and is a known trust boundary; no unrelated workloads should run there.
+- Runtime values are fetched from Secrets Manager into a temporary root-only file and removed on every exit.
+- The security group has no ingress. Outbound traffic uses the private subnet's NAT gateway.
+- The persistent volume has Terraform deletion protection.
