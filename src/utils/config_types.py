@@ -44,13 +44,8 @@ class RolesSettings(TypedDict):
 
 
 class RegistrationSettings(TypedDict):
-    cache_timeout: int
     authenticated_user_role_name: str
-    email_domain: str
-    # This is the domain used for email verification. For example, 'byu.edu'.
-    roles: RolesSettings
-    max_retries: NotRequired[int]
-    registration_bot: str
+    roles: NotRequired[RolesSettings | None]
     ta_channel_id: int
 
 
@@ -203,12 +198,12 @@ class Config(TypedDict):
     servers: dict[str, ServerConfig]
     sql: SQLConfig
     containers: dict[str, ContainerConfig]
-    tools: dict[str, ToolConfig]
+    tools: NotRequired[dict[str, ToolConfig]]
     cache_cleanup_settings: NotRequired[CacheCleanupSettings]
-    agents_as_tools: dict[str, AgentAsToolSettings]
+    agents_as_tools: NotRequired[dict[str, AgentAsToolSettings]]
     admin_settings: AdminSettings
     ai_completion_retry_protocol: RetryProtocol
     feedback_notifier_settings: NotRequired[FeedbackNotifierSettings]
     reporter_settings: ReporterConfig
-    sender_email: str
+    sender_email: NotRequired[str]
     bot_friends: NotRequired[list[int]]

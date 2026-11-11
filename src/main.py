@@ -25,7 +25,7 @@ from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_quest import create_sql_manager
 from .utils.cache_cleaner import CacheCleaner
 from .utils.config_loader import load_configuration
-from .utils.config_types import CHANNEL_ID, Config
+from .utils.config_types import CHANNEL_ID, Config, DuckConfig
 from .utils.logger import add_console_handler, add_file_handler, duck_logger, filter_logs
 from .utils.protocols import ToolCache
 from .utils.python_exec_container import build_containers
@@ -34,6 +34,51 @@ from .utils.python_exec_container import build_containers
 def iter_channels(config: Config):
     for server in config["servers"].values():
         yield from server["channels"].values()
+
+
+def _build_duck(
+        name: str,
+        duck_config: DuckConfig,
+        config: Config,
+        *,
+        message_handler: MessageHandler,
+        metrics_handler: MetricsHandler,
+        responses_api: ResponsesAPI,
+        containers: dict,
+        sql_session,
+) -> DuckConversation:
+    builder_path = duck_config["builder"]
+    try:
+        module_name, builder_name = builder_path.rsplit(":", 1)
+    except ValueError as error:
+        raise ValueError(
+            f"Invalid duck builder '{builder_path}'; expected 'module:function'"
+        ) from error
+
+    try:
+        module = import_module(module_name)
+        builder: DuckBuilder = getattr(module, builder_name)
+    except (ImportError, AttributeError) as error:
+        raise ImportError(f"Could not load duck builder '{builder_path}'") from error
+
+    if not callable(builder):
+        raise TypeError(f"Duck builder is not callable: {builder_path}")
+
+    duck = builder(
+        name,
+        duck_config["settings"],
+        message_handler=message_handler,
+        metrics_handler=metrics_handler,
+        responses_api=responses_api,
+        containers=containers,
+        sql_session=sql_session,
+        tool_configs=config.get("tools", {}),
+    )
+    if duck.name != name:
+        raise ValueError(
+            f"Duck builder for '{name}' returned a duck named '{duck.name}'"
+        )
+    return duck
 
 
 def build_ducks(
@@ -45,41 +90,19 @@ def build_ducks(
         containers: dict,
         sql_session,
 ) -> dict[CHANNEL_ID, DuckConversation]:
-    ducks: dict[str, DuckConversation] = {}
-
-    for name, duck_config in config["ducks"].items():
-        builder_path = duck_config["builder"]
-        try:
-            module_name, builder_name = builder_path.rsplit(":", 1)
-        except ValueError as error:
-            raise ValueError(
-                f"Invalid duck builder '{builder_path}'; expected 'module:function'"
-            ) from error
-
-        try:
-            module = import_module(module_name)
-            builder: DuckBuilder = getattr(module, builder_name)
-        except (ImportError, AttributeError) as error:
-            raise ImportError(f"Could not load duck builder '{builder_path}'") from error
-
-        if not callable(builder):
-            raise TypeError(f"Duck builder is not callable: {builder_path}")
-
-        duck = builder(
+    ducks = {
+        name: _build_duck(
             name,
-            duck_config["settings"],
+            duck_config,
+            config,
             message_handler=message_handler,
             metrics_handler=metrics_handler,
             responses_api=responses_api,
             containers=containers,
             sql_session=sql_session,
-            tool_configs=config.get("tools", {}),
         )
-        if duck.name != name:
-            raise ValueError(
-                f"Duck builder for '{name}' returned a duck named '{duck.name}'"
-            )
-        ducks[name] = duck
+        for name, duck_config in config["ducks"].items()
+    }
 
     if not ducks:
         raise ValueError("No ducks configured")
@@ -90,9 +113,7 @@ def build_ducks(
         if duck_name is None:
             continue
         if not isinstance(duck_name, str):
-            raise TypeError(
-                f"Channel {channel['channel_id']} must reference a named duck"
-            )
+            continue
         try:
             channel_ducks[channel["channel_id"]] = ducks[duck_name]
         except KeyError as error:
@@ -100,6 +121,37 @@ def build_ducks(
                 f"Duck '{duck_name}' referenced by channel "
                 f"{channel['channel_id']} was not built"
             ) from error
+
+    return channel_ducks
+
+
+def setup_inline_channel_behavior(
+        config: Config,
+        *,
+        message_handler: MessageHandler,
+        metrics_handler: MetricsHandler,
+        responses_api: ResponsesAPI,
+        containers: dict,
+        sql_session,
+) -> dict[CHANNEL_ID, DuckConversation]:
+    channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
+    for channel in iter_channels(config):
+        duck_config = channel.get("duck")
+        if not isinstance(duck_config, dict):
+            continue
+
+        channel_id = channel["channel_id"]
+        name = f"channel-{channel_id}"
+        channel_ducks[channel_id] = _build_duck(
+            name,
+            duck_config,
+            config,
+            message_handler=message_handler,
+            metrics_handler=metrics_handler,
+            responses_api=responses_api,
+            containers=containers,
+            sql_session=sql_session,
+        )
 
     return channel_ducks
 
@@ -139,7 +191,7 @@ async def main(config: Config, log_path: Path | None):
         feedback_manager = FeedbackManager({})
 
         with these(build_containers(config)) as containers:
-            channel_ducks = build_ducks(
+            named_channel_ducks = build_ducks(
                 config,
                 message_handler=bot,
                 metrics_handler=metrics,
@@ -147,6 +199,23 @@ async def main(config: Config, log_path: Path | None):
                 containers=containers,
                 sql_session=sql_session,
             )
+            inline_channel_ducks = setup_inline_channel_behavior(
+                config,
+                message_handler=bot,
+                metrics_handler=metrics,
+                responses_api=responses_api,
+                containers=containers,
+                sql_session=sql_session,
+            )
+            duplicate_channels = (
+                named_channel_ducks.keys() & inline_channel_ducks.keys()
+            )
+            if duplicate_channels:
+                raise ValueError(
+                    "Multiple ducks configured for channels: "
+                    f"{sorted(duplicate_channels)}"
+                )
+            channel_ducks = {**named_channel_ducks, **inline_channel_ducks}
             ducks = {id(duck): duck for duck in channel_ducks.values()}.values()
             tool_caches = [
                 cache

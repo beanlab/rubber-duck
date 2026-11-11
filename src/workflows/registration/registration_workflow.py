@@ -1,19 +1,42 @@
 import re
 import uuid
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
 
 import discord
 from discord import Guild, utils
 from quest import step
 
-from ..armory.tools import register_tool
-from ..duck_protocols import DuckContext
-from ..utils.config_types import RegistrationSettings, RetryProtocol
-from ..utils.logger import duck_logger
-from ..utils.message_utils import wait_for_message
-from ..utils.protocols import ConversationComplete
-from ..utils.retry import retry_async, is_retryable_discord_server_error
-from ..utils.send_email import EmailSender
+from ...armory.tools import register_tool
+from ...duck_protocols import (
+    DuckContext,
+    DuckConversation,
+    MessageHandler,
+    MetricsHandler,
+)
+from ...utils.config_types import RegistrationSettings, RetryProtocol
+from ...utils.logger import duck_logger
+from ...utils.message_utils import wait_for_message
+from ...utils.protocols import ConversationComplete
+from ...utils.retry import retry_async, is_retryable_discord_server_error
+from ...utils.send_email import EmailSender
+from ...gen_ai.ai_responses import ResponsesAPI
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from ...commands.command import Command
+    from ...utils.python_exec_container import PythonExecContainer
+
+
+DEFAULT_EMAIL_DOMAIN = "byu.edu"
+REGISTRATION_SENDER_EMAIL = "byu-cs-course-ops@cs.byu.edu"
+REGISTRATION_RETRY_PROTOCOL: RetryProtocol = {
+    "max_retries": 3,
+    "delay": 1,
+    "backoff": 2,
+}
+MAX_NICKNAME_RETRIES = 3
 
 
 async def wait_for_registration_msg(*args, **kwargs) -> str:
@@ -48,6 +71,9 @@ class Registration:
         self._email_sender = email_sender
         self._settings = settings
         self._retry_protocol = retry_protocol
+
+    async def send_message(self, thread_id: int, message: str):
+        await self._send_message(thread_id, message)
 
     async def _handle_discord_retry_exhausted(self, ctx: DuckContext, operation_name: str, error: Exception):
         duck_logger.warning(
@@ -107,9 +133,11 @@ class Registration:
             # Assign Discord roles
             roles = await self.assign_roles(ctx)
             if roles:
-                registration_info.roles = roles
+                registration_info.roles_assigned = roles
             else:
                 return registration_info
+
+            return registration_info
 
         except ConversationComplete as e:
             if ctx.thread_id and str(e):
@@ -161,7 +189,7 @@ class Registration:
     async def confirm_registration_via_email(self, ctx: DuckContext, net_id: str) -> bool:
         thread_id = ctx.thread_id
         timeout = ctx.timeout or 300
-        email_domain = self._settings['email_domain']
+        email_domain = DEFAULT_EMAIL_DOMAIN
         email = f"{net_id}@{email_domain}"
         token = self._generate_token()
         if not self._email_sender.send_email(email, token):
@@ -385,10 +413,15 @@ class Registration:
                     f"You already have these selected roles: {already_added_role_names}"
                 )
 
-        # Send confirmation message
-        role_names = ", ".join(role.name for role in selected_roles)
+        # Send confirmation message. Existing selected roles count as success.
+        assigned_roles = [role for role in selected_roles]
+        assigned_roles.extend(
+            role for role_id in already_roles
+            if (role := guild.get_role(role_id)) is not None
+        )
+        role_names = ", ".join(role.name for role in assigned_roles)
         if not selected_roles:
-            await self._send_message(thread_id, f"No new roles added")
+            await self._send_message(thread_id, "No new roles added")
         else:
             await self._send_message(thread_id, f"Successfully gave you the following roles: {role_names}")
         return role_names
@@ -449,7 +482,7 @@ class Registration:
             ctx: DuckContext,
     ):
         """Handle full nickname assignment flow with retries and TA escalation."""
-        max_retries = self._settings.get('max_retries', 3)
+        max_retries = MAX_NICKNAME_RETRIES
         thread_id = ctx.thread_id
         for attempt in range(max_retries + 1):
             name = await self._get_names(thread_id, ctx.timeout)
@@ -462,3 +495,46 @@ class Registration:
                 await self._send_message(thread_id, f"Please try again.")
             else:
                 return name, reason
+
+
+class RegistrationMessageHandler(MessageHandler, Protocol):
+    async def fetch_guild(self, guild_id: int) -> discord.Guild | None: ...
+
+
+class RegistrationWorkflow:
+    commands: list["Command"] = []
+
+    def __init__(self, name: str, registration: Registration):
+        self.name = name
+        self._registration = registration
+
+    async def __call__(self, context: DuckContext):
+        info = await self._registration.run(context)
+        if info and info.roles_assigned:
+            await self._registration.send_message(
+                context.thread_id,
+                "Registration complete. You’re all set.",
+            )
+
+
+def build(
+    name: str,
+    settings: RegistrationSettings,
+    *,
+    message_handler: RegistrationMessageHandler,
+    metrics_handler: MetricsHandler,
+    responses_api: ResponsesAPI,
+    containers: dict[str, "PythonExecContainer"],
+    sql_session: "Session",
+    tool_configs: dict[str, object],
+) -> DuckConversation:
+    del metrics_handler, responses_api, containers, sql_session, tool_configs
+    registration = Registration(
+        send_message=message_handler.send_text,
+        get_channel=None,
+        fetch_guild=message_handler.fetch_guild,
+        email_sender=EmailSender(REGISTRATION_SENDER_EMAIL),
+        settings=settings,
+        retry_protocol=REGISTRATION_RETRY_PROTOCOL,
+    )
+    return RegistrationWorkflow(name, registration)

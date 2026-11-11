@@ -595,7 +595,7 @@ class StatsDuckWorkflow:
                         decision.get("analysis_description", ""),
                     )
                     key = as_stable_key(order)
-                    results = await self._fulfill_order_with_cache_logging(
+                    results = await self._fulfill_order(
                         context,
                         order,
                         key,
