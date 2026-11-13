@@ -101,7 +101,7 @@ conventions.
 
 ## Conversation Lifecycle
 
-The conversation closes when it reaches its configured inactivity timeout. Do not attempt to end the conversation with a tool.
+The conversation closes when the decision stage identifies a clear intent to finish, or after the configured inactivity timeout. Do not attempt to end the conversation with a tool.
 
 ---
 

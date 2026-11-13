@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel
@@ -6,10 +7,34 @@ from pydantic import BaseModel
 from src.duck_protocols import DuckContext
 from src.gen_ai.gen_ai import AIClient, Agent, GenAIException
 from src.utils.protocols import ConversationComplete
+from src.workflows.stats_duck.stats_duck_workflow import DecisionModel, StatsDuckWorkflow
 
 
 class Result(BaseModel):
     answer: str
+
+
+@pytest.mark.parametrize("complete", [True, False])
+def test_stats_conversation_ends_only_when_decision_says_complete(complete):
+    workflow = StatsDuckWorkflow.__new__(StatsDuckWorkflow)
+    workflow._introduction = "Hello"
+    workflow._message_handler = MagicMock()
+    workflow._message_handler.send_text = AsyncMock()
+    workflow._wait_message = AsyncMock(side_effect=[{"content": "I have everything I need"}, None])
+    workflow._record_message = AsyncMock()
+    workflow._decide = AsyncMock(return_value=DecisionModel(
+        conversation_complete=complete,
+        analysis_requested=False,
+        analysis_description=None,
+        missing_information=None,
+    ).model_dump())
+    workflow._help_user_towards_a_decision = AsyncMock(return_value={"outputs": []})
+
+    history = asyncio.run(workflow(ctx()))
+
+    assert len(history) == 1
+    assert workflow._wait_message.await_count == (1 if complete else 2)
+    assert workflow._help_user_towards_a_decision.await_count == (0 if complete else 1)
 
 
 class FakeArmory:
