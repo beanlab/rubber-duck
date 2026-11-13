@@ -240,7 +240,7 @@ class StatsDuckWorkflow:
             if output_type == "message":
                 await self._record_message(
                     context.guild_id,
-                    context.thread_id,
+                    context.conversation_id,
                     context.author_id,
                     "assistant",
                     json.dumps(output.get("content")),
@@ -248,7 +248,7 @@ class StatsDuckWorkflow:
             elif output_type == "function_call_output":
                 await self._record_message(
                     context.guild_id,
-                    context.thread_id,
+                    context.conversation_id,
                     context.author_id,
                     "function_call_output",
                     str(output),
@@ -261,7 +261,7 @@ class StatsDuckWorkflow:
         await self._record_usage(
             context.guild_id,
             context.parent_channel_id,
-            context.thread_id,
+            context.conversation_id,
             context.author_id,
             usage["model"],
             usage["input_tokens"],
@@ -488,7 +488,7 @@ class StatsDuckWorkflow:
         async def record_artifact(artifact):
             await self._record_message(
                 context.guild_id,
-                context.thread_id,
+                context.conversation_id,
                 context.author_id,
                 "assistant",
                 json.dumps(artifact),
@@ -577,7 +577,7 @@ class StatsDuckWorkflow:
             user_message = message["content"]
             await self._record_message(
                 context.guild_id,
-                context.thread_id,
+                context.conversation_id,
                 context.author_id,
                 "message",
                 json.dumps(user_message),

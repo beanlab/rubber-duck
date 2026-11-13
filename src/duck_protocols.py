@@ -31,7 +31,7 @@ class MetricsHandler(Protocol):
     async def record_message(
             self,
             guild_id: int,
-            thread_id: int,
+            conversation_id: int,
             user_id: int,
             type_: str,
             output: dict,
@@ -41,7 +41,7 @@ class MetricsHandler(Protocol):
             self,
             guild_id,
             parent_channel_id,
-            thread_id,
+            conversation_id,
             user_id,
             engine,
             input_tokens,
@@ -55,7 +55,7 @@ class MetricsHandler(Protocol):
             workflow_type: str,
             guild_id: int,
             parent_channel_id: int,
-            thread_id: int,
+            conversation_id: int,
             user_id: int,
             reviewer_id: int,
             feedback_score: int,
@@ -70,7 +70,7 @@ class DuckContext:
     author_id: int
     author_mention: str
     content: str
-    message_id: int
+    conversation_id: int
     thread_id: int
     timeout: int
 

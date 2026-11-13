@@ -81,22 +81,22 @@ class Reporter:
     # tuple[1]: description of the graph
     pre_baked = {
         # 'all': (None, 'All the following charts.'),
-        'ftrend percent': (None, "What percent of threads are scored over time?"),
+        'ftrend percent': (None, "What percent of conversations are scored over time?"),
         'ftrend average': (None, "How has the feedback score changed over time?"),
         'f1': ('!report -df feedback -iv feedback_score -p year -ev guild_id -per',
-               "What percent of threads are scored by class over the past year?"),
+               "What percent of conversations are scored by class over the past year?"),
         'f2': ('!report -df feedback -iv feedback_score -p year -ev guild_id -avg',
                "What is the average feedback score by class over the past year?"),
-        'u1': ('!report -df usage -iv thread_id -ev hour_of_day -p year -c',
-               "What time are threads being opened over the past year?"),
+        'u1': ('!report -df usage -iv conversation_id -ev hour_of_day -p year -c',
+               "What time are conversations being opened over the past year?"),
         'u2': ('!report -df usage -iv cost -ev hour_of_day -p year -avg',
-               "How expensive is the average thread based on the time of day over the past year?"),
-        'u3': ('!report -df usage -iv cost -p year -ev thread_id -avg',
-               "What does the distribution of thread cost look like over the past year?"),
+               "How expensive is the average conversation based on the time of day over the past year?"),
+        'u3': ('!report -df usage -iv cost -p year -ev conversation_id -avg',
+               "What does the distribution of conversation cost look like over the past year?"),
         'u4': ('!report -df usage -iv cost -p year -ev guild_id -avg',
-               "How expensive is the average thread based on the class over the past year?"),
-        'u5': ('!report -df usage -iv thread_id -ev hour_of_day -ev2 guild_id -p year -c',
-               "How many threads being opened per class during what time over the past year?")
+               "How expensive is the average conversation based on the class over the past year?"),
+        'u5': ('!report -df usage -iv conversation_id -ev hour_of_day -ev2 guild_id -p year -c',
+               "How many conversations being opened per class during what time over the past year?")
     }
 
     def __init__(self, SQLMetricsHandler, server_configs: dict[str, ServerConfig], reporting_config: ReporterConfig, show_fig=False):
@@ -401,7 +401,7 @@ class Reporter:
                 f"{e}\n\n"
                 f"{self.help_menu()}\n\n"
                 "Custom report format example:\n"
-                "`!report -df usage -iv thread_id -c -ev hour_of_day -ev2 guild_id -p year`"
+                "`!report -df usage -iv conversation_id -c -ev hour_of_day -ev2 guild_id -p year`"
             )
         except Exception as e:
             # Ensure any matplotlib figures are closed

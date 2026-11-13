@@ -27,11 +27,11 @@ class GenAIException(Exception):
 
 
 class RecordMessage(Protocol):
-    async def __call__(self, guild_id: int, thread_id: int, user_id: int, role: str, message: str): ...
+    async def __call__(self, guild_id: int, conversation_id: int, user_id: int, role: str, message: str): ...
 
 
 class RecordUsage(Protocol):
-    async def __call__(self, guild_id: int, parent_channel_id: int, thread_id: int, user_id: int, engine: str,
+    async def __call__(self, guild_id: int, parent_channel_id: int, conversation_id: int, user_id: int, engine: str,
                        input_tokens: int,
                        output_tokens: int, cached_tokens: int, reasoning_tokens: int): ...
 
@@ -157,7 +157,7 @@ class AIClient:
 
         if response.usage:
             usage = response.usage
-            await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.thread_id, ctx.author_id, model,
+            await self._record_usage(ctx.guild_id, ctx.parent_channel_id, ctx.conversation_id, ctx.author_id, model,
                                      usage.input_tokens, usage.output_tokens,
                                      usage.input_tokens_details.cached_tokens,
                                      usage.output_tokens_details.reasoning_tokens)
@@ -212,7 +212,7 @@ class AIClient:
         initial_history = []
 
         if query is not None:
-            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+            await self._record_message(ctx.guild_id, ctx.conversation_id, ctx.author_id, "message",
                                        json.dumps(query))
             initial_history.append(EasyInputMessage(role='user', content=query, type='message').model_dump())
 
@@ -234,7 +234,7 @@ class AIClient:
             except ConversationComplete:
                 break
 
-            await self._record_message(ctx.guild_id, ctx.thread_id, ctx.author_id, "message",
+            await self._record_message(ctx.guild_id, ctx.conversation_id, ctx.author_id, "message",
                                        json.dumps(user_message))
 
             history.append(EasyInputMessage(role='user', content=user_message, type='message').model_dump())
@@ -271,7 +271,7 @@ class AIClient:
                     if 'role' not in output:
                         continue
                     await self._record_message(
-                        ctx.guild_id, ctx.thread_id, ctx.author_id,
+                        ctx.guild_id, ctx.conversation_id, ctx.author_id,
                         output['role'], str(output['content'])  # <-- what should output store for each type of output
                     )
 
@@ -295,7 +295,7 @@ class AIClient:
 
                         function_item = format_function_call_history_items(result, output)
                         await self._record_message(
-                            ctx.guild_id, ctx.thread_id, ctx.author_id,
+                            ctx.guild_id, ctx.conversation_id, ctx.author_id,
                             "function_call_output", str(function_item)
                         )
                         history.append(function_item)

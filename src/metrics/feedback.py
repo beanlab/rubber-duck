@@ -12,7 +12,7 @@ from ..utils.protocols import AddReaction, SendMessage, Message
 class RecordFeedback(Protocol):
     async def __call__(self,
                        workflow_type: str, guild_id: int, parent_channel_id: int,
-                       thread_id: int, user_id: int, reviewer_id: int,
+                       conversation_id: int, user_id: int, reviewer_id: int,
                        feedback_score: int, written_feedback: str): ...
 
 
@@ -95,7 +95,7 @@ class HaveTAGradingConversation:
                         data['duck_type'],
                         data['guild_id'],
                         data['parent_channel_id'],
-                        data['conversation_thread_id'],
+                        data['conversation_id'],
                         data['user_id'],
                         reviewer_id,
                         feedback_score,

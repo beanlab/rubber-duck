@@ -29,7 +29,7 @@ class MessagesModel(MetricsBase):
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(String(255))
     guild_id = Column(BigInteger)
-    thread_id = Column(BigInteger)
+    conversation_id = Column(BigInteger)
     user_id = Column(BigInteger)
     type = Column(String(255))
     output = Column(JSON, nullable=False)
@@ -43,7 +43,7 @@ class UsageModel(MetricsBase):
     timestamp = Column(String(255))
     guild_id = Column(BigInteger)
     parent_channel_id = Column(BigInteger)
-    thread_id = Column(BigInteger)
+    conversation_id = Column(BigInteger)
     user_id = Column(BigInteger)
     engine = Column(String(255))
     input_tokens = Column(String(255))
@@ -61,7 +61,7 @@ class FeedbackModel(MetricsBase):
     workflow_type = Column(String(255))
     guild_id = Column(BigInteger)
     parent_channel_id = Column(BigInteger)
-    thread_id = Column(BigInteger)
+    conversation_id = Column(BigInteger)
     user_id = Column(BigInteger)
     reviewer_role_id = Column(BigInteger)
     feedback_score = Column(BigInteger)
@@ -73,12 +73,12 @@ class SQLMetricsHandler:
         MetricsBase.metadata.create_all(session.connection())
         self.session = session
 
-    async def record_message(self, guild_id: int, thread_id: int, user_id: int, type_: str, output: dict):
+    async def record_message(self, guild_id: int, conversation_id: int, user_id: int, type_: str, output: dict):
         try:
             new_message_row = MessagesModel(
                 timestamp=get_timestamp(),
                 guild_id=guild_id,
-                thread_id=thread_id,
+                conversation_id=conversation_id,
                 user_id=user_id,
                 type=type_,
                 output=output
@@ -89,12 +89,12 @@ class SQLMetricsHandler:
             self.session.rollback()
             duck_logger.exception("Failed to record message metrics")
 
-    async def record_usage(self, guild_id, parent_channel_id, thread_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
+    async def record_usage(self, guild_id, parent_channel_id, conversation_id, user_id, engine, input_tokens, output_tokens, cached_tokens=None, reasoning_tokens=None):
         try:
             new_usage_row = UsageModel(timestamp=get_timestamp(),
                                        guild_id=guild_id,
                                        parent_channel_id=parent_channel_id,
-                                       thread_id=thread_id,
+                                       conversation_id=conversation_id,
                                        user_id=user_id,
                                        engine=engine,
                                        input_tokens=input_tokens,
@@ -107,15 +107,15 @@ class SQLMetricsHandler:
             self.session.rollback()
             duck_logger.exception("Failed to record usage metrics")
 
-    async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int, thread_id: int,
-                              user_id: int, reviewer_id: int,
+    async def record_feedback(self, workflow_type: str, guild_id: int, parent_channel_id: int,
+                              conversation_id: int, user_id: int, reviewer_id: int,
                               feedback_score: int, written_feedback: str):
         try:
             new_feedback_row = FeedbackModel(timestamp=get_timestamp(),
                                              workflow_type=workflow_type,
                                              guild_id=guild_id,
                                              parent_channel_id=parent_channel_id,
-                                             thread_id=thread_id,
+                                             conversation_id=conversation_id,
                                              user_id=user_id,
                                              reviewer_role_id=reviewer_id,
                                              feedback_score=feedback_score,

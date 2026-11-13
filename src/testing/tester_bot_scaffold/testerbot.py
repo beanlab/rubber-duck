@@ -129,7 +129,7 @@ class TesterBot(discord.Client):
 
             await self.ai_client._record_message(
                 ctx.guild_id,
-                ctx.thread_id,
+                ctx.conversation_id,
                 ctx.author_id,
                 "message",
                 json.dumps(user_input),
@@ -205,7 +205,7 @@ class TesterBot(discord.Client):
             author_id=int(author.id),
             author_mention=getattr(author, "mention", ""),
             content=startup_message.content,
-            message_id=int(startup_message.id),
+            conversation_id=int(startup_message.id),
             thread_id=int(channel.id),
             timeout=int(timeout),
         )

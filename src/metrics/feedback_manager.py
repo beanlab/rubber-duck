@@ -11,6 +11,7 @@ class FeedbackData(TypedDict):
     parent_channel_id: int
     user_id: int
     conversation_thread_id: int
+    conversation_id: int
 
 
 class FeedbackManager:
