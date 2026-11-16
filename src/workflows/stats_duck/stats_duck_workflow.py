@@ -30,7 +30,6 @@ TABLE_FORMATS = {"csv"}
 
 
 class Decision(TypedDict):
-    conversation_complete: bool
     analysis_requested: bool
     analysis_description: str | None
     missing_information: str | None
@@ -39,7 +38,6 @@ class Decision(TypedDict):
 class DecisionModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    conversation_complete: bool
     analysis_requested: bool
     analysis_description: str | None
     missing_information: str | None
@@ -590,8 +588,6 @@ class StatsDuckWorkflow:
 
             async with self._message_handler.typing(context.thread_id):
                 decision = await self._decide(context, history)
-                if decision["conversation_complete"]:
-                    return history
 
                 if decision["analysis_requested"]:
                     order = await self._order_from_menu(
