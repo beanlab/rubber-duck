@@ -6,10 +6,12 @@ from .utils.protocols import Message
 
 
 class RubberDuckApp:
-    def __init__(self, admin_channel_id: int, channel_configs: dict[int, ChannelConfig], workflow_manager):
+    def __init__(self, admin_channel_id: int, channel_configs: dict[int, ChannelConfig],
+                 workflow_manager, conversations):
         self._admin_channel = admin_channel_id
         self._workflow_manager: WorkflowManager = workflow_manager
         self._channel_configs = channel_configs
+        self._conversations = conversations
 
     async def route_message(self, message: Message):
         if message['channel_id'] == self._admin_channel:
@@ -33,6 +35,10 @@ class RubberDuckApp:
             return
 
         # Belongs to an existing conversation
+        conversation = self._conversations.get_by_thread(message['channel_id'])
+        if conversation is None or conversation.user_id != message['author_id']:
+            return
+
         str_id = str(message["channel_id"])
         if self._workflow_manager.has_workflow(str_id):
             duck_logger.debug(f"Existing conversation message: {message}")

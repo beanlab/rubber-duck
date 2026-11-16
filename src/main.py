@@ -12,7 +12,7 @@ from quest.utils import quest_logger
 from .bot.discord_bot import DiscordBot
 from .commands.bot_commands import BotCommands
 from .commands.command import create_commands
-from .conversation.threads import SetupPrivateThread
+from .conversation.threads import SetupConversationThread
 from .duck_orchestrator import DuckOrchestrator
 from .duck_protocols import DuckBuilder, DuckConversation, MessageHandler, MetricsHandler
 from .gen_ai.ai_responses import ResponsesAPI
@@ -22,6 +22,7 @@ from .rubber_duck_app import RubberDuckApp
 from .storage.serializer import workflow_serializer
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
+from .storage.sql_conversations import SQLConversationStore
 from .storage.sql_quest import create_sql_manager
 from .utils.cache_cleaner import CacheCleaner
 from .utils.config_loader import load_configuration
@@ -188,6 +189,7 @@ async def main(config: Config, log_path: Path | None):
     async with DiscordBot(bot_friend_ids=set(config.get("bot-friends", []))) as bot:
         filter_logs(bot.send_text, config["admin_settings"])
         metrics = SQLMetricsHandler(sql_session)
+        conversations = SQLConversationStore(sql_session)
         feedback_manager = FeedbackManager({})
 
         with these(build_containers(config)) as containers:
@@ -229,7 +231,7 @@ async def main(config: Config, log_path: Path | None):
             ]
 
             orchestrator = DuckOrchestrator(
-                SetupPrivateThread(bot.create_thread, bot.send_text),
+                SetupConversationThread(bot.create_thread, bot.send_text, conversations),
                 bot.send_text,
                 bot.add_reaction,
                 channel_ducks,
@@ -260,7 +262,7 @@ async def main(config: Config, log_path: Path | None):
 
             async with create_workflow_manager(sql_session, workflows) as workflow_manager:
                 admin_channel = config["admin_settings"]["admin_channel_id"]
-                app = RubberDuckApp(admin_channel, channel_configs, workflow_manager)
+                app = RubberDuckApp(admin_channel, channel_configs, workflow_manager, conversations)
                 bot.set_duck_app(app, admin_channel)
 
                 tasks = [bot.start(os.environ["DISCORD_TOKEN"])]
