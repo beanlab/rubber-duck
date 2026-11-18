@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String, BigInteger, JSON
+from sqlalchemy import Column, Integer, String, BigInteger, JSON, Text
 from sqlalchemy.orm import declarative_base, Session
 
 from ..utils.logger import duck_logger
@@ -66,6 +66,17 @@ class FeedbackModel(MetricsBase):
     reviewer_role_id = Column(BigInteger)
     feedback_score = Column(BigInteger)
     written_feedback = Column(String(4096))
+
+
+@add_iter
+class StatsCacheEventModel(MetricsBase):
+    __tablename__ = "stats_cache_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(Text, nullable=False)
+    thread_id = Column(Text, nullable=False)
+    cache_key = Column(Text, nullable=False)
+    hit = Column(Text, nullable=False)
 
 
 class SQLMetricsHandler:
@@ -154,3 +165,34 @@ class SQLMetricsHandler:
 
     def get_feedback(self):
         return self.sql_model_to_data_list(FeedbackModel)
+
+    async def record_stats_cache_event(
+        self,
+        thread_id: int,
+        cache_key: str,
+        hit: bool,
+    ) -> None:
+        try:
+            self.session.add(StatsCacheEventModel(
+                timestamp=get_timestamp(),
+                thread_id=str(thread_id),
+                cache_key=cache_key,
+                hit="t" if hit else "f",
+            ))
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            duck_logger.exception("Failed to record stats cache event")
+
+    def get_stats_cache_events(self) -> list[dict[str, str]]:
+        return [
+            {
+                "timestamp": event.timestamp,
+                "thread_id": event.thread_id,
+                "cache_key": event.cache_key,
+                "hit": event.hit,
+            }
+            for event in self.session.query(StatsCacheEventModel)
+            .order_by(StatsCacheEventModel.id)
+            .all()
+        ]

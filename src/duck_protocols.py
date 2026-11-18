@@ -50,6 +50,13 @@ class MetricsHandler(Protocol):
             reasoning_tokens=None,
     ): ...
 
+    async def record_stats_cache_event(
+            self,
+            thread_id: int,
+            cache_key: str,
+            hit: bool,
+    ) -> None: ...
+
     async def record_feedback(
             self,
             workflow_type: str,

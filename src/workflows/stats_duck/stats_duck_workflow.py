@@ -1,10 +1,9 @@
 import csv
 import io
 import json
-import time
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, Mapping
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, TypedDict, Mapping
 
 from openai.types.responses import EasyInputMessage
 from pydantic import BaseModel, ConfigDict, JsonValue, RootModel
@@ -216,6 +215,7 @@ class StatsDuckWorkflow:
             message_handler: MessageHandler,
             record_usage: Callable,
             record_message: Callable,
+            record_stats_cache_event: Callable[[int, str, bool], Awaitable[None]],
             wait_message: Callable = wait_for_message,
     ):
         self.name = name
@@ -230,6 +230,7 @@ class StatsDuckWorkflow:
         self._wait_message = step(wait_message)
         self._record_message = step(record_message)
         self._record_usage = step(record_usage)
+        self._record_stats_cache_event = step(record_stats_cache_event)
         self._cache: dict[tuple, list[SendableArtifact]] = {}
 
     async def _record_response(self, context: DuckContext, outputs: list[HistoryType]):
@@ -468,15 +469,13 @@ class StatsDuckWorkflow:
             analysis_order: StatsOrder,
             key: tuple,
     ) -> list[SendableArtifact]:
-        started_at = time.perf_counter()
         was_cached = key in self._cache
-        results = await self._fulfill_order(context, analysis_order, key)
-        elapsed_ms = (time.perf_counter() - started_at) * 1000
-        event = "HIT" if was_cached else "MISS"
-        duck_logger.info(
-            f"Stats cache {event} key={key} total_ms={elapsed_ms:.1f}"
+        await self._record_stats_cache_event(
+            context.thread_id,
+            json.dumps(key, separators=(",", ":")),
+            was_cached,
         )
-        return results
+        return await self._fulfill_order(context, analysis_order, key)
 
     async def _send_results(
             self,
@@ -595,7 +594,7 @@ class StatsDuckWorkflow:
                         decision.get("analysis_description", ""),
                     )
                     key = as_stable_key(order)
-                    results = await self._fulfill_order(
+                    results = await self._fulfill_order_with_cache_logging(
                         context,
                         order,
                         key,
@@ -667,4 +666,5 @@ def build(
         message_handler=message_handler,
         record_message=metrics_handler.record_message,
         record_usage=metrics_handler.record_usage,
+        record_stats_cache_event=metrics_handler.record_stats_cache_event,
     )
