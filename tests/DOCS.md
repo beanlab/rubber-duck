@@ -3,6 +3,25 @@
 `tests/` contains application regression tests, pytest-based prompt tests, and
 Discord end-to-end tests.
 
+## Offline conversation tests
+
+Run the deterministic suite without live prompt or Discord calls:
+
+```bash
+poetry run pytest -q -m 'not prompt_eval' --ignore=tests/tester_bot_tests
+```
+
+- `test_conversations.py` covers thread ownership, routing, concurrent starts,
+  restart ordering, cancellation, and error reporting. Its integration test
+  checks that replies reach the latest conversation in a reused thread.
+- `stats_duck/test_workflow.py` contains Stats Duck's deterministic behavior tests,
+  a real-Quest test of fresh history and separate metrics, and existing YAML prompt tests.
+  Only its YAML cases carry the `prompt_eval` marker.
+
+The two integration tests use `@with_real_quest` to run their async test functions
+in fresh interpreters, avoiding the root `conftest.py` Quest stub. They use real
+Quest and SQL with scripted Discord and model operations.
+
 ## Prompt tests
 
 Prompt tests use the normal pytest infrastructure. Offline framework tests are

@@ -44,7 +44,7 @@ def _ctx(thread_id=999) -> DuckContext:
         author_id=3,
         author_mention="@user",
         content="hello",
-        message_id=4,
+        conversation_id=4,
         thread_id=thread_id,
         timeout=60,
     )

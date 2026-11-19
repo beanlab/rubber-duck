@@ -54,8 +54,11 @@ except ModuleNotFoundError:
 
 quest_mod = types.ModuleType("quest")
 quest_utils_mod = types.ModuleType("quest.utils")
+quest_persistence_mod = types.ModuleType("quest.persistence")
+quest_persistence_mod.BlobStorage = object
 quest_utils_mod.quest_logger = logging.getLogger("quest")
 quest_mod.step = lambda fn: fn
+quest_mod.WorkflowManager = object
 
 
 class _QueueStub:
@@ -70,6 +73,8 @@ class _QueueStub:
 
 
 quest_mod.queue = lambda *_args, **_kwargs: _QueueStub()
+quest_mod.alias = lambda *_args: _QueueStub()
 quest_mod.utils = quest_utils_mod
 sys.modules.setdefault("quest", quest_mod)
 sys.modules.setdefault("quest.utils", quest_utils_mod)
+sys.modules.setdefault("quest.persistence", quest_persistence_mod)

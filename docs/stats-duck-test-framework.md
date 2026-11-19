@@ -1,6 +1,6 @@
 # Stats Duck test framework
 
-All tests are defined in `tests/stats_duck/cases.yaml` under one `cases:` list.
+The YAML suite is defined in `tests/stats_duck/cases.yaml` under one `cases:` list.
 Adding a case does not require Python changes.
 
 ## Run modes

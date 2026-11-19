@@ -95,7 +95,7 @@ class UsageCollector:
         self,
         guild_id,
         parent_channel_id,
-        thread_id,
+        conversation_id,
         user_id,
         model,
         input_tokens,
@@ -106,7 +106,7 @@ class UsageCollector:
         self.rows.append({
             "guild_id": guild_id,
             "parent_channel_id": parent_channel_id,
-            "thread_id": thread_id,
+            "conversation_id": conversation_id,
             "user_id": user_id,
             "model": model,
             "input_tokens": int(input_tokens or 0),
@@ -139,10 +139,10 @@ def conversation_cost_report(testerbot, rubber_duck_config):
     if testerbot.last_context is None:
         raise RuntimeError("TesterBot did not create a DuckContext.")
 
-    thread_id = testerbot.last_context.thread_id
+    conversation_id = testerbot.last_context.conversation_id
     tester_rows = [
         row for row in testerbot.usage_collector.rows
-        if row["thread_id"] == thread_id
+        if row["conversation_id"] == conversation_id
     ]
 
     sql_config = dict(rubber_duck_config["sql"])
@@ -155,7 +155,7 @@ def conversation_cost_report(testerbot, rubber_duck_config):
     try:
         duck_rows = [
             {
-                "thread_id": row.thread_id,
+                "conversation_id": row.conversation_id,
                 "model": row.engine,
                 "input_tokens": int(row.input_tokens or 0),
                 "output_tokens": int(row.output_tokens or 0),
@@ -163,7 +163,7 @@ def conversation_cost_report(testerbot, rubber_duck_config):
                 "reasoning_tokens": int(row.reasoning_tokens or 0),
             }
             for row in session.scalars(
-                select(UsageModel).where(UsageModel.thread_id == thread_id)
+                select(UsageModel).where(UsageModel.conversation_id == conversation_id)
             )
         ]
     finally:
@@ -177,7 +177,7 @@ def conversation_cost_report(testerbot, rubber_duck_config):
         "rubber_duck": duck_summary,
         "total": total,
     }
-    print(f"\nConversation usage (thread {thread_id})")
+    print(f"\nConversation usage (conversation {conversation_id})")
     print(
         f"  tester bot: tokens={tester_summary['input_tokens'] + tester_summary['output_tokens']} "
         f"(input={tester_summary['input_tokens']}, "

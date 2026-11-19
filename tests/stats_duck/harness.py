@@ -17,6 +17,7 @@ from src.workflows.stats_duck.stats_duck_workflow import (
     INTRODUCTION,
     AnalysisOrder,
     DatasetOrder,
+    DecisionModel,
     PlotOrder,
     StatsOrder,
     StatsDuckWorkflow,
@@ -188,7 +189,7 @@ def build_harness(
     workflow = StatsDuckWorkflow(
         name="stats_test",
         introduction=INTRODUCTION,
-        decision_agent=_stage_agent(agent, "decision.md", datasets),
+        decision_agent=_stage_agent(agent, "decision.md", datasets, output_format=DecisionModel),
         order_agent=_stage_agent(agent, "order.md", datasets),
         coder_agent=_stage_agent(agent, "coder.md", datasets),
         clarification_agent=_stage_agent(agent, "clarification.md"),
