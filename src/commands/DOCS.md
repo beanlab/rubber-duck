@@ -17,5 +17,6 @@
 ## Failure Modes and Guardrails
 
 - Dispatch exceptions are caught in `BotCommands` and return a generic error to the channel.
-- Current built-ins include: `!messages`, `!usage`, `!feedback`, `!metrics`, `!status`, `!report`, `!log`, `!active`, and `!cache`.
+- Current built-ins include: `!messages`, `!usage`, `!feedback`, `!metrics`, `!status`, `!report`, `!log`, `!stats-cache`, `!active`, and `!cache`.
+- `!stats-cache` exports stats cache lookup events as a CSV file.
 - `!cache clear` requires explicit `confirm` suffix to avoid accidental destructive cleanup.

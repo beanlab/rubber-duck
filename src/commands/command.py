@@ -1,3 +1,4 @@
+import csv
 import io
 import json
 import subprocess
@@ -218,6 +219,46 @@ class LogCommand(Command):
 
         finally:
             zip_buffer.close()
+
+
+class StatsCacheCommand(Command):
+    name = "!stats-cache"
+    help_msg = "export stats cache hit and miss events as CSV"
+
+    def __init__(self, send_message, metrics_handler):
+        self.send_message = send_message
+        self.metrics_handler = metrics_handler
+
+    @step
+    async def execute(self, message: Message):
+        channel_id = message["channel_id"]
+        events = self.metrics_handler.get_stats_cache_events()
+
+        if not events:
+            await self.send_message(channel_id, "No stats cache events found.")
+            return
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["timestamp", "thread_id", "cache_key", "hit"])
+
+        for event in events:
+            writer.writerow([
+                event["timestamp"],
+                event["thread_id"],
+                event["cache_key"],
+                event["hit"],
+            ])
+
+        await self.send_message(
+            channel_id,
+            file={
+                "filename": (
+                    f"stats_cache_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.csv"
+                ),
+                "bytes": buffer.getvalue().encode("utf-8"),
+            },
+        )
 
 
 class ActiveWorkflowsCommand(Command):
@@ -527,6 +568,7 @@ def create_commands(
         StatusCommand(send_message),
         ReportCommand(send_message, reporter),
         LogCommand(send_message, log_dir),
+        StatsCacheCommand(send_message, metrics_handler),
         ActiveWorkflowsCommand(send_message, get_workflow_metrics),
         CacheCommand(send_message, tool_caches),
     ]
