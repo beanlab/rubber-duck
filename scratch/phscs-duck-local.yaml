@@ -9,6 +9,7 @@ ducks:
       agent:
         name: PHSCSDuck
         prompt_files:
+          - src/prompts/phscs-duck/phscs-gen-prompt.md
           - src/prompts/phscs-duck/longest-par-3.md
         engine: gpt-5.6-luna
         reasoning: low
