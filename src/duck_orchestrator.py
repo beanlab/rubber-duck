@@ -54,11 +54,21 @@ class DuckOrchestrator:
             raise ValueError(f'No duck configured for channel {channel_id}')
         return duck
 
-    async def _run_duck(self, duck: DuckConversation, context: DuckContext, initial_message: Message):
+    async def _run_duck(
+        self,
+        duck: DuckConversation,
+        context: DuckContext,
+        initial_message: Message,
+    ) -> bool:
+        conversation_id_is_thread_message = False
         try:
             if 'duck' in initial_message['content']:
                 await self._add_reaction(initial_message['channel_id'], initial_message['message_id'], "🦆")
-            await self._send_message(context.thread_id, '*A new conversation has started.*')
+            context.conversation_id = await self._send_message(
+                context.thread_id,
+                '*A new conversation has started.*',
+            )
+            conversation_id_is_thread_message = True
             await duck(context)
         except asyncio.CancelledError as ex:
             if ex.args != (_CONVERSATION_RESTARTED,):
@@ -67,6 +77,7 @@ class DuckOrchestrator:
             error_code = uuid.uuid4().hex[:8].upper()
             duck_logger.exception('Error: ' + error_code)
             await self._send_message(context.thread_id, f'😵 **Error code {error_code}** 😵\n')
+        return conversation_id_is_thread_message
 
     async def __call__(self, channel_config: ChannelConfig, initial_message: Message):
         duck = self._get_duck(channel_config['channel_id'])
@@ -94,7 +105,11 @@ class DuckOrchestrator:
             )
 
             try:
-                await self._run_duck(duck, context, initial_message)
+                conversation_id_is_thread_message = await self._run_duck(
+                    duck,
+                    context,
+                    initial_message,
+                )
 
                 self._closing.add(thread_id)
                 await thread_alias.aclose()
@@ -106,7 +121,8 @@ class DuckOrchestrator:
                     parent_channel_id=channel_config['channel_id'],
                     user_id=initial_message['author_id'],
                     conversation_thread_id=thread_id,
-                    conversation_id=initial_message['message_id'],
+                    conversation_id=context.conversation_id,
+                    conversation_id_is_thread_message=conversation_id_is_thread_message,
                 ))
             finally:
                 self._running.pop(thread_id, None)

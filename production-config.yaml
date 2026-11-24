@@ -49,6 +49,15 @@ servers:
   CS 110:
     server_id: 927616651409649675
     channels:
+      review-cs-110:
+        channel_id: 1296158078017736725
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1457781730202095616
+              - 1507071078198018279
       general/duck-pond:
         channel_id: 1457781730202095616
         timeout: 600
@@ -81,6 +90,14 @@ servers:
   CS 235:
     server_id: 747510855536738336
     channels:
+      review-cs-235:
+        channel_id: 1327385245036838912
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1195490291134779502
       student-text-channels/duck-pond:
         channel_id: 1195490291134779502
         timeout: 600
@@ -113,6 +130,14 @@ servers:
   CS 111:
     server_id: 1235303213796691998
     channels:
+      review-cs-111:
+        channel_id: 1329934513333338244
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1497345204225577131
       student-text-channels/duck-pond:
         channel_id: 1497345204225577131
         timeout: 600
@@ -134,6 +159,15 @@ servers:
                 Lecture-Sections:
                   pattern: lecture-
                   description: Who teaches your lecture?
+      duck-review:
+        channel_id: 1442908515147710558
+        timeout: 600
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1442908120488743113
+              - 1442908158757437502
       duck-pond:
         channel_id: 1442908120488743113
         timeout: 600
@@ -142,6 +176,15 @@ servers:
   Stats:
     server_id: 1371951485629370458
     channels:
+      ta-review:
+        channel_id: 1371951756149260298
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1371951696061661215
+              - 1374066971523678279
       join-the-server:
         channel_id: 1404899692210553033
         timeout: 600
@@ -162,6 +205,22 @@ servers:
   Physics:
     server_id: 1354902266246598928
     channels:
+      review-phys-230:
+        channel_id: 1363949553102880869
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1363949528201564170
+      review-phys-430:
+        channel_id: 1359587713749094700
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1359587525605458030
       physics-230-phys230:
         channel_id: 1363949528201564170
         timeout: 600
@@ -174,6 +233,14 @@ servers:
   Rubber Duck Demo Server:
     server_id: 1338616224858374287
     channels:
+      standard-duck-review:
+        channel_id: 1338619665789751337
+        timeout: 300
+        duck:
+          builder: src.workflows.conversation_review.conversation_review_workflow:build
+          settings:
+            target_channel_ids:
+              - 1338616283671040000
       standard-duck:
         channel_id: 1338616283671040000
         timeout: 600

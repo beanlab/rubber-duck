@@ -13,6 +13,7 @@ from ...utils.message_utils import wait_for_message
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
+    from ...metrics.feedback_manager import FeedbackManager
     from ...utils.python_exec_container import PythonExecContainer
 
 
@@ -39,6 +40,7 @@ def build(
         containers: dict[str, "PythonExecContainer"],
         sql_session: "Session",
         tool_configs: dict,
+        feedback_manager: "FeedbackManager | None" = None,
 ) -> DuckConversation:
     return StandardDuckWorkflow(
         name=name,

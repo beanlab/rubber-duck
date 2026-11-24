@@ -19,6 +19,8 @@ from ...utils.python_exec_container import PythonExecContainer
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
+    from ...metrics.feedback_manager import FeedbackManager
+
 PROMPT_DIRECTORY = Path(__file__).parents[2] / "prompts" / "stats-duck"
 INTRODUCTION = (
     "I can perform many statistical operations on a list of provided datasets. "
@@ -634,6 +636,7 @@ def build(
         containers: dict[str, PythonExecContainer],
         sql_session: "Session",
         tool_configs: dict,
+        feedback_manager: "FeedbackManager | None" = None,
 ) -> DuckConversation:
     try:
         sandbox = containers["stats-python-sandbox"]

@@ -6,13 +6,13 @@
 
 - `AIClient` writes message and usage metrics through `SQLMetricsHandler` hooks.
 - `DuckOrchestrator` calls `FeedbackManager.remember_conversation(...)` after a conversation closes.
-- `HaveTAGradingConversation` serves queued conversations in TA review threads, captures emoji/written feedback, and writes feedback records.
+- The builder in `src/workflows/conversation_review/` serves queued conversations in reviewer threads; `main.py` constructs persistent FIFO queues from configured review targets, and `SQLMetricsHandler` records ratings/comments.
 - `Reporter` reads metrics tables and generates predefined or argument-driven plots for `!report`.
 
 ## Dependencies
 
 - Depends on `src/storage/sql_metrics.py` for persistent metrics storage.
-- Depends on queue state from `utils.persistent_queue` via `FeedbackManager`.
+- `FeedbackManager` provides access to the per-target queues constructed by `main.py` using `utils.persistent_queue`.
 
 ## Failure Modes and Guardrails
 

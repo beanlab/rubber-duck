@@ -23,13 +23,19 @@ from .storage.serializer import workflow_serializer
 from .storage.sql_connection import create_sql_session
 from .storage.sql_metrics import SQLMetricsHandler
 from .storage.sql_conversations import SQLConversationStore
-from .storage.sql_quest import create_sql_manager
+from .storage.sql_quest import QuestRecordBase, SqlBlobStorage, create_sql_manager
 from .utils.cache_cleaner import CacheCleaner
 from .utils.config_loader import load_configuration
 from .utils.config_types import CHANNEL_ID, Config, DuckConfig
 from .utils.logger import add_console_handler, add_file_handler, duck_logger, filter_logs
 from .utils.protocols import ToolCache
 from .utils.python_exec_container import build_containers
+from .utils.persistent_queue import PersistentQueue
+
+
+CONVERSATION_REVIEW_BUILDER = (
+    "src.workflows.conversation_review.conversation_review_workflow:build"
+)
 
 
 def iter_channels(config: Config):
@@ -47,6 +53,7 @@ def _build_duck(
         responses_api: ResponsesAPI,
         containers: dict,
         sql_session,
+        feedback_manager: FeedbackManager | None = None,
 ) -> DuckConversation:
     builder_path = duck_config["builder"]
     try:
@@ -65,16 +72,18 @@ def _build_duck(
     if not callable(builder):
         raise TypeError(f"Duck builder is not callable: {builder_path}")
 
-    duck = builder(
-        name,
-        duck_config["settings"],
-        message_handler=message_handler,
-        metrics_handler=metrics_handler,
-        responses_api=responses_api,
-        containers=containers,
-        sql_session=sql_session,
-        tool_configs=config.get("tools", {}),
-    )
+    builder_kwargs = {
+        "message_handler": message_handler,
+        "metrics_handler": metrics_handler,
+        "responses_api": responses_api,
+        "containers": containers,
+        "sql_session": sql_session,
+        "tool_configs": config.get("tools", {}),
+    }
+    if feedback_manager is not None:
+        builder_kwargs["feedback_manager"] = feedback_manager
+
+    duck = builder(name, duck_config["settings"], **builder_kwargs)
     if duck.name != name:
         raise ValueError(
             f"Duck builder for '{name}' returned a duck named '{duck.name}'"
@@ -90,6 +99,7 @@ def build_ducks(
         responses_api: ResponsesAPI,
         containers: dict,
         sql_session,
+        feedback_manager: FeedbackManager | None = None,
 ) -> dict[CHANNEL_ID, DuckConversation]:
     ducks = {
         name: _build_duck(
@@ -101,6 +111,7 @@ def build_ducks(
             responses_api=responses_api,
             containers=containers,
             sql_session=sql_session,
+            feedback_manager=feedback_manager,
         )
         for name, duck_config in config["ducks"].items()
     }
@@ -134,6 +145,7 @@ def build_channel_custom_ducks(
         responses_api: ResponsesAPI,
         containers: dict,
         sql_session,
+        feedback_manager: FeedbackManager | None = None,
 ) -> dict[CHANNEL_ID, DuckConversation]:
     channel_ducks: dict[CHANNEL_ID, DuckConversation] = {}
     for channel in iter_channels(config):
@@ -152,9 +164,37 @@ def build_channel_custom_ducks(
             responses_api=responses_api,
             containers=containers,
             sql_session=sql_session,
+            feedback_manager=feedback_manager,
         )
 
     return channel_ducks
+
+
+def _iter_duck_configs(config: Config):
+    yield from config["ducks"].values()
+    for channel in iter_channels(config):
+        duck_config = channel.get("duck")
+        if isinstance(duck_config, dict):
+            yield duck_config
+
+
+def _build_feedback_queues(config: Config, sql_session):
+    target_channel_ids = {
+        target_channel_id
+        for duck_config in _iter_duck_configs(config)
+        if duck_config.get("builder") == CONVERSATION_REVIEW_BUILDER
+        for target_channel_id in duck_config.get("settings", {}).get(
+            "target_channel_ids", []
+        )
+    }
+
+    # Reuse the existing SQL blob namespace and channel keys.
+    QuestRecordBase.metadata.create_all(sql_session.connection())
+    queue_storage = SqlBlobStorage("conversation-queues", sql_session)
+    return these({
+        channel_id: PersistentQueue(str(channel_id), queue_storage)
+        for channel_id in target_channel_ids
+    })
 
 
 def create_workflow_manager(sql_session, workflows):
@@ -190,9 +230,11 @@ async def main(config: Config, log_path: Path | None):
         filter_logs(bot.send_text, config["admin_settings"])
         metrics = SQLMetricsHandler(sql_session)
         conversations = SQLConversationStore(sql_session)
-        feedback_manager = FeedbackManager({})
-
-        with these(build_containers(config)) as containers:
+        with (
+            _build_feedback_queues(config, sql_session) as persistent_queues,
+            these(build_containers(config)) as containers,
+        ):
+            feedback_manager = FeedbackManager(persistent_queues)
             named_channel_ducks = build_ducks(
                 config,
                 message_handler=bot,
@@ -200,6 +242,7 @@ async def main(config: Config, log_path: Path | None):
                 responses_api=responses_api,
                 containers=containers,
                 sql_session=sql_session,
+                feedback_manager=feedback_manager,
             )
             inline_channel_ducks = build_channel_custom_ducks(
                 config,
@@ -208,6 +251,7 @@ async def main(config: Config, log_path: Path | None):
                 responses_api=responses_api,
                 containers=containers,
                 sql_session=sql_session,
+                feedback_manager=feedback_manager,
             )
             duplicate_channels = (
                 named_channel_ducks.keys() & inline_channel_ducks.keys()

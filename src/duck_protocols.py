@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from .commands.command import Command
     from .gen_ai.ai_responses import ResponsesAPI
+    from .metrics.feedback_manager import FeedbackManager
     from .utils.python_exec_container import PythonExecContainer
 
 
@@ -106,4 +107,5 @@ class DuckBuilder(Protocol):
             containers: dict[str, "PythonExecContainer"],
             sql_session: "Session",
             tool_configs: dict,
+            feedback_manager: "FeedbackManager | None" = None,
     ) -> DuckConversation: ...

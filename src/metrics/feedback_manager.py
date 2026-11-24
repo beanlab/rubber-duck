@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from ..utils.config_types import CHANNEL_ID
 from ..utils.logger import duck_logger
@@ -12,6 +12,7 @@ class FeedbackData(TypedDict):
     user_id: int
     conversation_thread_id: int
     conversation_id: int
+    conversation_id_is_thread_message: NotRequired[bool]
 
 
 class FeedbackManager:

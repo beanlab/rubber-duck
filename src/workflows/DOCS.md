@@ -8,8 +8,11 @@
   - `registration` -> `RegistrationWorkflow`
   - `assignment_feedback` -> `AssignmentFeedbackWorkflow`
   - `debugging_practice_duck` -> `DebuggingPracticeDuckWorkflow`
+  - `conversation_review` -> `CoversationReviewWorkflow`
 - `RegistrationWorkflow` runs `Registration.run(...)` in a fixed sequence and sends the completion message directly; it does not use an agent.
 - `AssignmentFeedbackWorkflow` collects a markdown report, resolves assignment/project, loads rubric/rules, grades each rubric item, and returns markdown-formatted feedback.
+- The conversation-review builder consumes the target-channel queues that `main.py` constructs from its settings; reviewers receive a jump link to the opening message and a link to its thread.
+- Configure it as a named duck with `builder: src.workflows.conversation_review.conversation_review_workflow:build` and `settings.target_channel_ids`, then reference that duck from the reviewer channel.
 
 ## Dependencies
 

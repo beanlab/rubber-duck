@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from ...commands.command import Command
+    from ...metrics.feedback_manager import FeedbackManager
     from ...utils.python_exec_container import PythonExecContainer
 
 
@@ -528,6 +529,7 @@ def build(
     containers: dict[str, "PythonExecContainer"],
     sql_session: "Session",
     tool_configs: dict[str, object],
+    feedback_manager: "FeedbackManager | None" = None,
 ) -> DuckConversation:
     del metrics_handler, responses_api, containers, sql_session, tool_configs
     registration = Registration(
