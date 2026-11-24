@@ -17,6 +17,7 @@ htmlcov
 *.tfstate.*
 crash.log
 tests
+evaluation
 docs
 archive
 backlog

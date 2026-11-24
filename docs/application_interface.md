@@ -1,5 +1,11 @@
 # Application Interface
 
+Historical interface notes. This document predates builder-based startup and
+reusable conversation threads; its `duck_type` configuration, thread-creation
+rules, and conversation-close strings are no longer current contracts. Use
+[application flow](application-flow.md) for the source-checked runtime path.
+The older descriptions below are retained for reference.
+
 ## Purpose
 
 Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.

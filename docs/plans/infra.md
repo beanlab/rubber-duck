@@ -41,7 +41,7 @@ Validated locally:
 - the 19 applicable Python tests pass, including the ambient-credential tests
 - `git diff --check` passes
 
-The complete Python suite is not currently green because of pre-existing test-harness issues: `tests/test_rubricize.py` imports unavailable `myteam.workflow`, and `tests/tester_bot_tests` expects an undeclared `--config` option when run from the root suite. These failures are unrelated to this deployment implementation.
+The complete Python suite is not currently green because of pre-existing test-harness issues: `tests/test_rubricize.py` imports unavailable `myteam.workflow`, and `tests/discord` expects an undeclared `--config` option when run from the root suite. These failures are unrelated to this deployment implementation.
 
 Remaining work:
 

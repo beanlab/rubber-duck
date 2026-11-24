@@ -1,7 +1,8 @@
 # Rubber Duck
 
 Rubber Duck is a configurable Discord bot platform for AI-assisted learning workflows.
-It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, registration, assignment feedback, debugging practice, and conversation review), all selected through config.
+The current runtime provides Standard tutoring and Stats analysis ducks. The repository
+also contains registration and other learning workflows.
 
 ## What This Project Does
 
@@ -19,7 +20,7 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `src/rubber_duck_app.py`: channel/admin message routing
 - `src/duck_orchestrator.py`: thread creation + duck dispatch
 - `src/conversation/`: conversation implementations
-- `src/workflows/`: registration, assignment feedback, and debugging-practice workflows
+- `src/workflows/`: Standard, Stats, registration, and other learning workflows
 - `src/gen_ai/`: OpenAI client orchestration + agent execution
 - `src/armory/`: tool registration, Python tool execution, and caching
 - `src/storage/` + `src/metrics/`: SQL persistence and reporting
@@ -28,7 +29,9 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - `rubrics/`: grading rubrics for assignment feedback workflows
 - `rubrics/examples/`: non-runtime rubric examples and demos
 - `datasets/`: local datasets staged into container tools
-- `docs/`: getting started and deployment docs
+- `docs/`: getting started, application flow, and deployment docs
+- `tests/`: pytest cases and shared application drivers
+- `evaluation/`: experiment orchestration, graders, measurements, and reports
 - `scripts/`: developer utility scripts (including metadata generation)
 - `archive/`: non-runtime historical and scratch artifacts kept for reference
 
@@ -40,16 +43,16 @@ It supports multiple "duck" behaviors (Socratic tutoring, stats/code execution, 
 - Discord bot token
 - OpenAI API key
 
-## Duck Types (Implemented)
+## Duck Configuration
 
-Configured ducks are built by `duck_type`.
+Configured ducks use `builder: module:function`, with duck-specific `settings`.
+The production configuration selects Standard and Stats builders, plus
+registration and conversation review through inline channel definitions. Other workflow
+implementations in the repository are not automatically selectable by a
+`duck_type` string.
 
-- `agent_led_conversation`: one-shot or agent-led interaction
-- `user_led_conversation`: chat flow where user messages drive turns
-- `conversation_review`: TA/reviewer scoring workflow
-- `registration`: NetID/email verification + role assignment workflow
-- `assignment_feedback`: rubric-based grading workflow for markdown reports
-- `debugging_practice_duck`: debugging practice workflow where a review agent assesses traceback-based rubric scenarios as JSON, optional subprocess agents handle incomplete or incorrect answers, and the workflow sends student-facing replies
+See [application flow](docs/application-flow.md) for startup, routing, conversation
+lifecycle, and the current builder-based runtime.
 
 ## Admin Commands
 
@@ -58,6 +61,7 @@ Commands are processed in the configured admin channel.
 - `!help`: list commands
 - `!status`: health check
 - `!metrics`: export messages/usage/feedback tables as zip files
+- `!stats-cache`: export Stats cache hit/miss events as CSV
 - `!report`: generate preconfigured report outputs
 - `!log`: export log files
 - `!active [full]`: show active workflow summary/details
@@ -81,6 +85,11 @@ See [AWS production deployment](docs/deployment.md) for bootstrap, operation, ro
 
 - [Getting Started](docs/getting-started.md)
 - [Deployment Guide](docs/deployment.md)
+- [Application Flow](docs/application-flow.md)
+- [Tests](tests/DOCS.md)
+- [Stats Test Guide](tests/ducks/stats_duck/README.md)
+- [Evaluation Tooling and Experiments](evaluation/README.md)
+- [Evaluation Documentation](evaluation/docs/README.md)
 - Archived legacy docs: `docs/old/`
 
 ## Developer Utilities

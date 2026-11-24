@@ -1,0 +1,62 @@
+sql:
+  db_type: sqlite
+  database: tests/discord/conversations.db
+
+containers:
+  evaluation-stats-sandbox:
+    image: byucscourseops/python-tools-sandbox:latest
+    settings:
+      timeout: 10
+      working_dir: /home/sandbox/out
+      network_mode: none
+      memory: 1g
+      memory_swap: 1g
+      cpus: 1
+      pids_limit: 128
+      read_only_root: false
+    resources:
+      - source: datasets/
+        target: /home/sandbox/datasets/
+
+ducks:
+  standard-rubber-duck:
+    $include: "../../production-config.yaml@$.ducks.standard-rubber-duck"
+  stats-duck:
+    $include: "../../production-config.yaml@$.ducks.stats-duck"
+  cs-stats-duck:
+    $include: "../../production-config.yaml@$.ducks.stats-duck"
+    settings:
+      introduction: >
+        I can answer questions about CS grades and enrollment trends.
+        What can I do for you today?
+
+servers:
+  BeanLab:
+    server_id: 1058490579799003187
+    channels:
+      Rubber Duck E2E Tests/standard-duck:
+        channel_id: 1539679841203523646
+        timeout: 300
+        duck: standard-rubber-duck
+      Rubber Duck E2E Tests/gen-stats-duck:
+        channel_id: 1539679945553608704
+        timeout: 300
+        duck: stats-duck
+      Rubber Duck E2E Tests/cs-stats-duck:
+        channel_id: 1539679975525851136
+        timeout: 100
+        duck: cs-stats-duck
+
+admin_settings:
+  $include: "../../production-config.yaml@$.admin_settings"
+  admin_channel_id: 1539679775868715039
+  admin_role_id: 1496960115193155754
+
+bot-friends:
+  - 1537230570688487454
+
+ai_completion_retry_protocol:
+  $include: "../../production-config.yaml@$.ai_completion_retry_protocol"
+
+reporter_settings:
+  $include: "../../production-config.yaml@$.reporter_settings"

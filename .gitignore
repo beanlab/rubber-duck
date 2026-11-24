@@ -35,10 +35,10 @@ runtime-secrets*.json
 /production-runtime.json
 .codex
 /.vscode/
-/research/papers/
+/evaluation/docs/papers/*.pdf
+/evaluation/runs/
+/evaluation/results/
 /data/
-/experiments/runs/
-/experiments/results/
 /.agents/
 .terraform/
 .agents/scratch/

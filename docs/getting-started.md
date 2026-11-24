@@ -113,6 +113,8 @@ Before you begin, you'll need:
 
 ## Next Steps
 
+- Read the [test guide](../tests/DOCS.md) to run tests and add cases
+- Read the [evaluation guide](../evaluation/README.md) for experiment commands and implementation status
 - Review the [Deployment Guide](deployment.md) for production deployment instructions
 - Inspect `production-config.yaml` to understand full production configuration
 - Inspect `local-config-example.yaml` for include patterns and local overrides
