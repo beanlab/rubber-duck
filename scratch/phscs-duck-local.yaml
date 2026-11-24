@@ -1,0 +1,37 @@
+sql:
+  db_type: sqlite
+  database: scratch/phscs-duck.sqlite
+
+ducks:
+  phscs-duck:
+    builder: src.workflows.standard_duck.standard_duck_workflow:build
+    settings:
+      agent:
+        name: PHSCSDuck
+        prompt_files:
+          - src/prompts/phscs-duck/longest-par-3.md
+        engine: gpt-5.6-luna
+        reasoning: low
+        tools: []
+
+servers:
+  local-testing:
+    server_id: 0 # replace with your Discord server ID
+    channels:
+      phscs-duck-test:
+        channel_id: 0 # replace with your test channel ID
+        timeout: 600
+        duck: phscs-duck
+
+admin_settings:
+  admin_channel_id: 0 # replace with your admin channel ID
+  admin_role_id: 0 # replace with your admin role ID
+  log_level: WARNING
+
+ai_completion_retry_protocol:
+  max_retries: 2
+  delay: 2
+  backoff: 2
+
+reporter_settings:
+  gpt_pricing: {}
