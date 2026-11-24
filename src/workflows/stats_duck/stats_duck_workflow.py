@@ -471,7 +471,7 @@ class StatsDuckWorkflow:
     ) -> list[SendableArtifact]:
         was_cached = key in self._cache
         await self._record_stats_cache_event(
-            context.thread_id,
+            context.conversation_id,
             json.dumps(key, separators=(",", ":")),
             was_cached,
         )

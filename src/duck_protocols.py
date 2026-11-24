@@ -52,7 +52,7 @@ class MetricsHandler(Protocol):
 
     async def record_stats_cache_event(
             self,
-            thread_id: int,
+            conversation_id: int,
             cache_key: str,
             hit: bool,
     ) -> None: ...

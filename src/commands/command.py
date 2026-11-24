@@ -240,12 +240,12 @@ class StatsCacheCommand(Command):
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(["timestamp", "thread_id", "cache_key", "hit"])
+        writer.writerow(["timestamp", "conversation_id", "cache_key", "hit"])
 
         for event in events:
             writer.writerow([
                 event["timestamp"],
-                event["thread_id"],
+                event["conversation_id"],
                 event["cache_key"],
                 event["hit"],
             ])

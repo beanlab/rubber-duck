@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Column, Integer, String, BigInteger, JSON, Text
+from sqlalchemy import Column, Integer, String, BigInteger, JSON, Text, inspect
 from sqlalchemy.orm import declarative_base, Session
 
 from ..utils.logger import duck_logger
@@ -74,7 +74,7 @@ class StatsCacheEventModel(MetricsBase):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(Text, nullable=False)
-    thread_id = Column(Text, nullable=False)
+    conversation_id = Column(Text, nullable=False)
     cache_key = Column(Text, nullable=False)
     hit = Column(Text, nullable=False)
 
@@ -168,14 +168,14 @@ class SQLMetricsHandler:
 
     async def record_stats_cache_event(
         self,
-        thread_id: int,
+        conversation_id: int,
         cache_key: str,
         hit: bool,
     ) -> None:
         try:
             self.session.add(StatsCacheEventModel(
                 timestamp=get_timestamp(),
-                thread_id=str(thread_id),
+                conversation_id=str(conversation_id),
                 cache_key=cache_key,
                 hit="t" if hit else "f",
             ))
@@ -188,7 +188,7 @@ class SQLMetricsHandler:
         return [
             {
                 "timestamp": event.timestamp,
-                "thread_id": event.thread_id,
+                "conversation_id": event.conversation_id,
                 "cache_key": event.cache_key,
                 "hit": event.hit,
             }
